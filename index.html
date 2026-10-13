@@ -2,14 +2,117 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#0b0b0d" />
-    <meta name="description" content="Create an AI version of yourself and explore immersive Gaussian-splat worlds in third person." />
-    <title>Portal — Immersive 3D Worlds</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230b0b0d'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%23e8b25a' stroke-width='2.5'/%3E%3C/svg%3E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="description" content="A person living through today, in real time. Every action." />
+    <meta name="theme-color" content="#10131a" />
+    <!-- Don't cache this page. GitHub Pages can't send headers, so ask here. -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <!-- Site version. Bump it with bump-version.bat (or npm run bump) before publishing. -->
+    <meta name="version" content="1.0.0" />
+    <title>A day</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310131a'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23f6f1e8' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,420&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/site.css?v=1.0.0" />
+    <script>
+      /* Show the HUD (clock, timeline, action log, details) only when testing locally. */
+      (function () {
+        var h = location.hostname;
+        var local = location.protocol === "file:" || h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1" ||
+          /^(10|192\.168)\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /\.local$/.test(h);
+        if (!local) document.documentElement.classList.add("public");
+      })();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <canvas id="view" aria-label="A 3D view of the person's day"></canvas>
+
+    <header class="hud top">
+      <section class="panel now" aria-live="polite">
+        <p class="mark">
+          <span id="mark-title">I can be</span>
+          <span class="sep">·</span>
+          <span class="chapter" id="chapter">–</span>
+          <span class="sep">·</span>
+          <span id="where">–</span>
+        </p>
+        <h1 class="time"><span id="time">–</span><small id="ampm"></small></h1>
+        <p class="what" id="what">The day is starting.</p>
+        <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+        <p class="next" id="next"></p>
+      </section>
+      <div class="tools">
+        <button type="button" id="sound" aria-pressed="false">Sound off</button>
+        <button type="button" id="details" aria-pressed="true">Details</button>
+      </div>
+    </header>
+
+    <aside class="panel side" id="side">
+      <section>
+        <h2>Every action</h2>
+        <ol class="log" id="log"></ol>
+      </section>
+      <section>
+        <h2>Body</h2>
+        <div class="meters" id="meters"></div>
+      </section>
+      <section>
+        <h2>Things</h2>
+        <div class="chips" id="things"></div>
+      </section>
+      <p class="foot">Edit <code>day.config.js</code> to change the day.</p>
+    </aside>
+
+    <footer class="hud bottom panel">
+      <div class="controls">
+        <button type="button" id="live" class="live" aria-pressed="true">● Live</button>
+        <button type="button" id="play">Pause</button>
+        <div class="speeds" id="speeds" role="group" aria-label="Playback speed"></div>
+        <span class="spacer"></span>
+        <span class="date" id="date"></span>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="daybar">
+        <div class="segs" id="segs"></div>
+        <div class="marker" aria-hidden="true"></div>
+        <label class="sr" for="scrub">Time of day</label>
+        <input id="scrub" type="range" min="450" max="1889.99" step="0.05" value="450" />
+        <div class="ticks" id="ticks" aria-hidden="true"></div>
+      </div>
+    </footer>
+
+    <div class="errors" id="errors" hidden></div>
+
+    <!-- Local only: preview the page the way the public sees it (no HUD). Shortcut: H -->
+    <button type="button" class="public-toggle" id="public-toggle" aria-pressed="false" title="Preview the public view (H)">Public view</button>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var btn = document.getElementById("public-toggle");
+        if (root.classList.contains("public")) return;
+        function set(on) {
+          root.classList.toggle("preview-public", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+          btn.textContent = on ? "Show HUD" : "Public view";
+          try { localStorage.setItem("previewPublic", on ? "1" : "0"); } catch (e) {}
+        }
+        var saved = false;
+        try { saved = localStorage.getItem("previewPublic") === "1"; } catch (e) {}
+        set(saved);
+        btn.addEventListener("click", function () { set(!root.classList.contains("preview-public")); });
+        window.addEventListener("keydown", function (e) {
+          if ((e.key === "h" || e.key === "H") && !(e.target && e.target.tagName === "INPUT")) set(!root.classList.contains("preview-public"));
+        });
+      })();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/babylonjs@7.54.3/babylon.js"></script>
+    <script src="day.config.js?v=1.0.0"></script>
+    <script src="js/schedule.js?v=1.0.0"></script>
+    <script src="js/world.js?v=1.0.0"></script>
+    <script src="js/main.js?v=1.0.0"></script>
   </body>
 </html>

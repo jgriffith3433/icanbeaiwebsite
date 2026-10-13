@@ -1,0 +1,19 @@
+import { defineConfig } from 'vite';
+
+// Plain static site: index.html loads day.config.js and js/*.js as classic scripts.
+export default defineConfig({
+  base: './',
+  appType: 'mpa',
+  server: {
+    host: '0.0.0.0',
+    port: 8090,
+    strictPort: true,
+    open: false,
+    headers: { 'Cache-Control': 'no-store' }, // always serve fresh files while testing
+  },
+  preview: {
+    port: 8091,
+    strictPort: true,
+    headers: { 'Cache-Control': 'no-store' },
+  },
+});
