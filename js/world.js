@@ -846,8 +846,8 @@
       const body = mat(color, { spec: 0.35 });
       const glass = mat("#26303a", { spec: 0.8 });
       box("lower", 1.78, 0.55, 4.1, 0, 0.55, 0, body, root);
-      box("cabin", 1.6, 0.55, 2.1, 0, 1.08, -0.25, glass, root);
-      box("roof", 1.5, 0.08, 1.9, 0, 1.38, -0.3, body, root);
+      const cabinMesh = box("cabin", 1.6, 0.55, 2.1, 0, 1.08, -0.25, glass, root);
+      const roofMesh = box("roof", 1.5, 0.08, 1.9, 0, 1.38, -0.3, body, root);
       box("pillarF", 1.6, 0.5, 0.08, 0, 1.08, 0.78, body, root);
       const wheels = [];
       [[-0.85, 1.3], [0.85, 1.3], [-0.85, -1.35], [0.85, -1.35]].forEach((p, i) => {
@@ -865,7 +865,7 @@
       glowing(box("hlR", 0.38, 0.14, 0.04, 0.6, 0.7, 2.06, hl, root, false));
       glowing(box("tlL", 0.38, 0.12, 0.04, -0.6, 0.72, -2.06, tl, root, false));
       glowing(box("tlR", 0.38, 0.12, 0.04, 0.6, 0.72, -2.06, tl, root, false));
-      return { root, wheels, hl, tl };
+      return { root, wheels, hl, tl, roof: roofMesh, cabin: cabinMesh };
     }
     if (pw) {
       ["#9a3b3b", "#d8d8d2", "#2f3c52", "#6c7a5e", "#c9a04f"].forEach((c, i) => {
@@ -1307,6 +1307,10 @@
       /* car */
       const car = fr.car;
       myCar.root.position.set(car.x, 0, car.z);
+      /* cutaway: the drive camera looks down, so the roof would hide the person inside */
+      myCar.roof.setEnabled(!pp.inCar);
+      /* the cabin is a solid dark box the person sits inside: hide it too so they show */
+      myCar.cabin.setEnabled(!pp.inCar);
       if (state.carYaw == null || snap) state.carYaw = car.yaw;
       state.carYaw = dampAngle(state.carYaw, car.yaw, dt, car.moving ? 6 : 3);
       myCar.root.rotation.y = state.carYaw;
@@ -1408,11 +1412,18 @@
         }
         cam.inited = true;
       } else {
-        const follow = pp.inCar ? 6 : 2.6;
-        cam.x = damp(cam.x, tx, dt, follow);
-        cam.y = damp(cam.y, ty, dt, follow);
-        cam.z = damp(cam.z, tz, dt, follow);
+        if (pp.inCar && cam.wasInCar) {
+          /* locked to the car: a damped follow trails a moving car by speed/6 units and loses it */
+          cam.x = tx;
+          cam.y = ty;
+          cam.z = tz;
+        } else {
+          cam.x = damp(cam.x, tx, dt, 2.6);
+          cam.y = damp(cam.y, ty, dt, 2.6);
+          cam.z = damp(cam.z, tz, dt, 2.6);
+        }
       }
+      cam.wasInCar = !!pp.inCar;
       cam.user = Math.max(0, cam.user - dt);
       camera.target.set(cam.x, cam.y, cam.z);
       /* keep an automatic camera inside the cutaway, never behind a side wall */
@@ -1455,6 +1466,7 @@
         cam.user = 0;
       },
       person: me.root, // read by the playtest
+      car: myCar.root,
     };
   }
 
