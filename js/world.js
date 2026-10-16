@@ -846,7 +846,7 @@
       const body = mat(color, { spec: 0.35 });
       const glass = mat("#26303a", { spec: 0.8 });
       box("lower", 1.78, 0.55, 4.1, 0, 0.55, 0, body, root);
-      box("cabin", 1.6, 0.55, 2.1, 0, 1.08, -0.25, glass, root);
+      const cabinMesh = box("cabin", 1.6, 0.55, 2.1, 0, 1.08, -0.25, glass, root);
       const roofMesh = box("roof", 1.5, 0.08, 1.9, 0, 1.38, -0.3, body, root);
       box("pillarF", 1.6, 0.5, 0.08, 0, 1.08, 0.78, body, root);
       const wheels = [];
@@ -865,7 +865,7 @@
       glowing(box("hlR", 0.38, 0.14, 0.04, 0.6, 0.7, 2.06, hl, root, false));
       glowing(box("tlL", 0.38, 0.12, 0.04, -0.6, 0.72, -2.06, tl, root, false));
       glowing(box("tlR", 0.38, 0.12, 0.04, 0.6, 0.72, -2.06, tl, root, false));
-      return { root, wheels, hl, tl, roof: roofMesh };
+      return { root, wheels, hl, tl, roof: roofMesh, cabin: cabinMesh };
     }
     if (pw) {
       ["#9a3b3b", "#d8d8d2", "#2f3c52", "#6c7a5e", "#c9a04f"].forEach((c, i) => {
@@ -1309,6 +1309,8 @@
       myCar.root.position.set(car.x, 0, car.z);
       /* cutaway: the drive camera looks down, so the roof would hide the person inside */
       myCar.roof.setEnabled(!pp.inCar);
+      /* the cabin is a solid dark box the person sits inside: hide it too so they show */
+      myCar.cabin.setEnabled(!pp.inCar);
       if (state.carYaw == null || snap) state.carYaw = car.yaw;
       state.carYaw = dampAngle(state.carYaw, car.yaw, dt, car.moving ? 6 : 3);
       myCar.root.rotation.y = state.carYaw;
