@@ -312,7 +312,7 @@ window.DAY_CONFIG = {
     road: {
       label: "On the road",
       building: "street",
-      camera: { alpha: 1.15, beta: 1.0, radius: 14 },
+      camera: { alpha: 1.15, beta: 0.8, radius: 11 },
       spots: {
         parkHome: [-1.5, 7.6, 180],
         drivewayEnd: [-1.5, 10.6, 180],

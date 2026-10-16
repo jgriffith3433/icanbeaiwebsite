@@ -1386,6 +1386,12 @@
       const shot = Object.assign({ alpha: 1.3, beta: 1.05, radius: 8 }, roomCam || {});
       const aspect = engine.getRenderWidth() / Math.max(1, engine.getRenderHeight());
       if (aspect < 1.2) shot.radius *= Math.min(1.9, Math.pow(1.2 / aspect, 0.75));
+      if (pp.inCar) {
+        /* keep the drive camera inside the street corridor (curb to house fronts); tilt it up
+           rather than letting it back into the houses, shops and trees beside the road */
+        const side = shot.radius * Math.abs(Math.sin(shot.alpha));
+        if (side * Math.sin(shot.beta) > 6.5) shot.beta = Math.asin(Math.max(0.35, Math.min(1, 6.5 / side)));
+      }
       const tx = pp.inCar ? car.x : pp.x;
       const tz = pp.inCar ? car.z : pp.z;
       const ty = pp.inCar ? 1.0 : (POSE[pp.pose] || POSE.stand).y * 0.6 + 0.45;
