@@ -1448,6 +1448,7 @@
       resetCamera() {
         cam.user = 0;
       },
+      person: me.root, // read by the playtest
     };
   }
 

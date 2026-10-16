@@ -347,6 +347,8 @@
 
   let lastFrameMs = performance.now();
   let lastMinutes = null;
+  let lastFr = null;
+  const watchers = []; // playtest hooks (js/playtest.js); empty unless a playtest is running
   let lastThings = null;
   let rowIdx = -1;
 
@@ -429,12 +431,19 @@
     }
 
     const snap = jumped || lastMinutes == null || Math.abs(loc.minutes - lastMinutes) > 3;
+    const fromMinutes = lastMinutes;
+    const userJumped = jumped;
     jumped = false;
+    lastFr = fr;
     lastMinutes = loc.minutes;
     lastThings = fr.things;
     if (world) {
       world.update(fr, dt, { snap });
       world.scene.render();
+    }
+    if (watchers.length) {
+      const info = { key: loc.key, day, fr, from: fromMinutes, to: loc.minutes, jumped: userJumped, dt };
+      watchers.slice().forEach((fn) => fn(info));
     }
   }
 
@@ -471,5 +480,11 @@
     live: () => el.live.click(),
     today: () => getDay(locate(simMs).key),
     world: () => world,
+    /* for the playtest (js/playtest.js) */
+    now: () => ({ mode, speed, key: locate(simMs).key, minutes: locate(simMs).minutes, frame: lastFr }),
+    watch: (fn) => {
+      watchers.push(fn);
+      return () => watchers.splice(watchers.indexOf(fn), 1);
+    },
   };
 })();

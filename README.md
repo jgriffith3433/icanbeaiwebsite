@@ -6,7 +6,7 @@ A person living through today, in real time, one action at a time. Open `index.h
 
 ## Run it locally
 
-Double-click `auto-start.bat`. The first time, it installs Vite. Then it serves the site at **http://localhost:8090** and opens your browser. `auto-stop.bat` stops whatever is running on port 8090. From a terminal you can also use `npm run dev`, `npm run build`, or `npm run preview` (which serves on port 8091).
+Double-click `auto-start.bat`. The first time, it installs Vite. Then it serves the site at **http://localhost:8092** and opens your browser. `auto-stop.bat` stops whatever is running on port 8092. From a terminal you can also use `npm run dev`, `npm run build`, or `npm run preview` (which serves on port 8093).
 
 ## How it fits together
 
@@ -88,3 +88,40 @@ day.today()         // the compiled timeline
 ## Keys
 
 `Space` play/pause · `←` `→` 5 minutes (`Shift` for 1) · `1`–`5` speeds · `Esc` back to now
+
+## Playtests
+
+The page implements the Hawkes playtest contract v1 (spec: `C:\Projects\hawkesstudio\docs\playtest.md`), so the
+daily runner in Hawkes Gen can play it. `js/hawkes-playtest.js` is a copy of the shared helper (source of truth:
+`hawkesstudio/clients/web/hawkes-playtest.js`); the scenarios are in `js/playtest.js`. Nothing runs until the runner
+calls `window.hawkesPlaytest.start()` or the URL has `?playtest=<id>`.
+
+| Scenario | What it does |
+| --- | --- |
+| `smoke` (~15 s) | Boot, check the person is on screen, watch the live clock tick, play one day-minute at 10×, pause, Esc back to live. |
+| `day` (~75 s) | Drag the day bar to the start of the day, play at 1200× to the end, and check every block in today's timeline started and every action was reached. `?speed=` multiplies the speed. |
+
+Problems it reports: a block (activity) that never starts, actions never reached, the clock stopping, NaN in the
+body stats or the person's position, the person mesh not where the engine puts them, config errors and warnings,
+the person off screen, Babylon or `day.config.js` not loading. Spine blocks with `chance` that today's draw skipped
+are listed as `skipped-today` events, not problems.
+
+Try it: open http://localhost:8092/?playtest=day and, when it's done, run `hawkesPlaytest.report()` in the console.
+
+Hooks it uses in the game: `day.now()` and `day.watch(fn)` in `js/main.js` (a frame callback, empty unless a
+playtest runs) and `world.person` in `js/world.js`. `main.js` caps a frame at 0.1 s, so on a slow renderer
+(software WebGL in a headless browser runs at 1–2 fps) playback is slower than its label; the `day` scenario raises
+the speed every few seconds to finish in about 75 s.
+
+## Generative AI: Hawkes Gen
+
+Images, textures, video, 3D, music, voice, sound and Claude all go through **Hawkes Gen**
+(`C:\Projects\hawkesgen`, dashboard http://127.0.0.1:8790; start it with `hawkesgen\auto-start.bat`). It holds
+the API and AWS keys and runs the shared GPU fleet. This project never holds those keys.
+
+- **Agents:** the `hawkesgen` MCP server is in this folder's `.mcp.json`. Use `hawkesgen_presets` (project
+  `icanbe`) for the art direction, then `hawkesgen_run`.
+- **Command line:** `C:\Projects\hawkesgen\hawkesgen.cmd run - --project icanbe --preset <name> --param prompt="..." --out <folder>`
+- **Art direction:** `hawkesgen/presets/icanbe.json` (style line and named presets). Edit it there.
+- **Code:** copy `hawkesgen/clients/js/hawkesgen.mjs` into `tools/` and use `new HawkesGen({ project: 'icanbe' })`.
+- GPU tools cost money while a server runs. Ask J before starting servers or running big batches.

@@ -6,13 +6,13 @@ export default defineConfig({
   appType: 'mpa',
   server: {
     host: '0.0.0.0',
-    port: 8090,
+    port: 8092,
     strictPort: true,
     open: false,
     headers: { 'Cache-Control': 'no-store' }, // always serve fresh files while testing
   },
   preview: {
-    port: 8091,
+    port: 8093,
     strictPort: true,
     headers: { 'Cache-Control': 'no-store' },
   },
