@@ -517,3 +517,18 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 640px) {
   .public-toggle { top: auto; bottom: 8px; }
 }
+
+/* ---------- the version: a quiet link to What's new (also in the public view) ---------- */
+.version-tag {
+  position: fixed;
+  z-index: 5;
+  right: var(--gutter);
+  bottom: max(8px, env(safe-area-inset-bottom));
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  opacity: 0.45;
+  text-decoration: none;
+}
+.version-tag:hover, .version-tag:focus-visible { opacity: 1; }
+html:not(.public):not(.preview-public) .version-tag { display: none; }

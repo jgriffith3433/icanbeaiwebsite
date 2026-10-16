@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 8093 --strictPort",
-    "bump": "node scripts/bump-version.mjs"
+    "stamp": "node scripts/stamp-build.mjs"
   },
   "devDependencies": {
     "vite": "^5.4.10"

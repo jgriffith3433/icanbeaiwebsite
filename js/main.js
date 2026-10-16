@@ -451,19 +451,20 @@
   else setInterval(tick, 250);
 
   /* ---------------- version ---------------- */
-  const versionMeta = document.querySelector('meta[name="version"]');
-  const VERSION = versionMeta ? versionMeta.content : "dev";
+  // The version is releases.json's (js/hawkes-release.js fills [data-hawkes-version]); the build stamp is the meta.
+  const buildMeta = document.querySelector('meta[name="build"]');
+  const BUILD = buildMeta ? buildMeta.content : "dev";
   const foot = document.querySelector(".foot");
-  if (foot) foot.insertAdjacentHTML("beforeend", ` <span class="ver">v${VERSION}</span>`);
+  if (foot) foot.insertAdjacentHTML("beforeend", ` <span class="ver" data-hawkes-version hidden></span>`);
   // The page is meant to stay open all day. On the live site, check for a newly
-  // published version every 10 minutes and reload into it.
-  if (document.documentElement.classList.contains("public") && versionMeta) {
+  // published build every 10 minutes and reload into it.
+  if (document.documentElement.classList.contains("public") && buildMeta) {
     setInterval(() => {
       fetch("index.html?check=" + Date.now(), { cache: "no-store" })
         .then((r) => (r.ok ? r.text() : ""))
         .then((html) => {
-          const m = /<meta name="version" content="([^"]+)"/.exec(html);
-          if (m && m[1] !== VERSION) location.reload();
+          const m = /<meta name="(?:build|version)" content="([^"]+)"/.exec(html);
+          if (m && m[1] !== BUILD) location.reload();
         })
         .catch(() => {});
     }, 10 * 60 * 1000);

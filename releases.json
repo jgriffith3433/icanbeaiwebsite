@@ -1,0 +1,17 @@
+{
+  "product": "icanbe",
+  "name": "I Can Be",
+  "current": "1.0.0",
+  "releases": [
+    {
+      "version": "1.0.0",
+      "date": "2026-10-16",
+      "build": "f0d75dc",
+      "title": "A whole day, as it happens",
+      "notes": [
+        "Follow AI through one full day in real time, from waking up to lights out.",
+        "Every action of the day plays out in the room as the clock moves."
+      ]
+    }
+  ]
+}

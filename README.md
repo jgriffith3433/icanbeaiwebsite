@@ -18,12 +18,19 @@ Double-click `auto-start.bat`. The first time, it installs Vite. Then it serves 
 | `js/main.js` | Clock, playback, the action log, body meters, the things panel |
 | `simulation-checklist.md` | The original rules the simulation follows |
 
-## Publishing a new version
+## Versions and publishing
 
-1. Double-click `bump-version.bat` (or run `npm run bump`). Press Enter for a patch bump (1.0.0 → 1.0.1), or type `minor`, `major`, or an exact version.
-2. Commit and push.
+Going live is Hawkes Studio's go live (beta, playtested, then J types `DEPLOY icanbe`). Before it, Studio runs
+`node scripts/stamp-build.mjs` on beta: it stamps `?v=<hash of the files>` on every local file link in `index.html` and
+the same hash in `<meta name="build">`, so browsers fetch fresh CSS and JS the moment it's live. The page also asks
+browsers not to cache it (GitHub Pages can't send cache headers, so `<meta>` tags do it, and Pages may still hold
+`index.html` for about 10 minutes). On the live site an open tab checks the build every 10 minutes and reloads when it
+changes. The local dev server sends `no-store`.
 
-The bump updates the version in `package.json` and stamps `?v=<version>` on every local file link in `index.html`, so browsers fetch fresh CSS and JS the moment it's live. The page also asks browsers not to cache it. GitHub Pages can't send cache headers, so this is done with `<meta>` tags, and Pages may still hold `index.html` for up to about 10 minutes. On the live site, an open tab checks for a new version every 10 minutes and reloads itself when one is published. The local dev server sends `no-store`, so nothing is ever cached while you test.
+The version is a release (Hawkes Studio `src/releases.ts`): a semver bumped at each go live (minor when there's
+something new, patch for fixes), tagged `v<version>` in git. Studio adds it to `releases.json` with the notes J approved;
+`whatsnew.html`, the corner label in the public view and the side panel read it through `js/hawkes-release.js` (a copy
+of `hawkesstudio/clients/web/hawkes-release.js`). Don't bump it by hand.
 
 ## Editing the day
 
