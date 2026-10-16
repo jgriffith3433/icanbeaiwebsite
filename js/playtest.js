@@ -314,18 +314,80 @@ async function wholeDay(options, t) {
   t.progress(1);
 }
 
+/* ---------------- drive: the road camera must see the car, not a wall of blurred buildings ---------------- */
+/** Visible meshes between the camera and the car (the car's own parts and the ground don't count). */
+function blockersToCar(fr) {
+  const w = world();
+  const cam = w.scene.activeCamera;
+  const B = window.BABYLON;
+  const to = new B.Vector3(fr.car.x, 1.0, fr.car.z);
+  const from = cam.position.clone();
+  const dir = to.subtract(from);
+  const dist = dir.length();
+  const ray = new B.Ray(from, dir.normalize(), dist - 0.5);
+  const hits = w.scene.multiPickWithRay(ray, (m) => {
+    if (!m.isEnabled() || !m.isVisible || m.visibility === 0) return false;
+    for (let p = m; p; p = p.parent) if (p.name === "car" || p === w.person) return false;
+    return true;
+  });
+  return (hits || []).filter((h) => h.hit && h.pickedMesh);
+}
+
+async function drive(options, t) {
+  t.scene("Live");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const day = window.day.today();
+  // Jump along the day bar to the first drive and let the camera settle.
+  const first = day.actions.find((a) => /Onto the street|Through the neighborhood/.test(a.text)) || day.actions.find((a) => a.chapter === "commute");
+  if (!first) {
+    t.problem("bug", "The day has no drive to look at");
+    return;
+  }
+  scrubTo(first.start + 0.3);
+  await t.until(() => window.day.now().frame && window.day.now().frame.person.inCar, 8000, "the person in the car");
+  t.event("driving", `${first.block}: ${window.day.now().frame.action.text}`);
+  clickSpeed(10);
+  let looks = 0;
+  let blocked = 0;
+  let worst = 0;
+  for (let i = 0; i < 10; i++) {
+    await sleep(700);
+    const fr = window.day.now().frame;
+    if (!fr || !fr.person.inCar) continue;
+    looks++;
+    const hits = blockersToCar(fr);
+    worst = Math.max(worst, hits.length);
+    if (hits.length) {
+      blocked++;
+      t.log(`camera view of the car blocked by ${hits.slice(0, 3).map((h) => h.pickedMesh.name).join(", ")}`);
+    }
+    t.progress((i + 1) / 10);
+  }
+  t.metric("driveLooks", looks);
+  t.metric("driveLooksBlocked", blocked);
+  t.metric("driveWorstBlockers", worst);
+  // At least 9 clear looks in 10.
+  if (!looks) t.problem("bug", "Never got to look at the drive camera");
+  else if (looks - blocked < Math.ceil(looks * 0.9)) t.problem("bug", `The drive camera could not see the car in ${blocked} of ${looks} looks`);
+  else t.event("car-in-view", `${looks - blocked} of ${looks} looks had a clear line to the car`);
+  pressKey("Escape");
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
   product: "icanbe",
   scenarios: [
     { id: "smoke", title: "Boot, see the person, a minute of the day at 10×, pause, back to live", seconds: 20, tags: ["smoke"] },
+    { id: "drive", title: "Jump to a drive; the camera must have a clear view of the car", seconds: 25, tags: ["camera"] },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
     try {
       if (id === "smoke") await smoke(options, t);
+      else if (id === "drive") await drive(options, t);
       else if (id === "day") await wholeDay(options, t);
     } finally {
       stopWatching();
