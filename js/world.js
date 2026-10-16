@@ -1410,11 +1410,18 @@
         }
         cam.inited = true;
       } else {
-        const follow = pp.inCar ? 6 : 2.6;
-        cam.x = damp(cam.x, tx, dt, follow);
-        cam.y = damp(cam.y, ty, dt, follow);
-        cam.z = damp(cam.z, tz, dt, follow);
+        if (pp.inCar && cam.wasInCar) {
+          /* locked to the car: a damped follow trails a moving car by speed/6 units and loses it */
+          cam.x = tx;
+          cam.y = ty;
+          cam.z = tz;
+        } else {
+          cam.x = damp(cam.x, tx, dt, 2.6);
+          cam.y = damp(cam.y, ty, dt, 2.6);
+          cam.z = damp(cam.z, tz, dt, 2.6);
+        }
       }
+      cam.wasInCar = !!pp.inCar;
       cam.user = Math.max(0, cam.user - dt);
       camera.target.set(cam.x, cam.y, cam.z);
       /* keep an automatic camera inside the cutaway, never behind a side wall */
@@ -1457,6 +1464,7 @@
         cam.user = 0;
       },
       person: me.root, // read by the playtest
+      car: myCar.root,
     };
   }
 

@@ -62,6 +62,20 @@ function personOnScreen() {
   return w.person.getChildMeshes().some((m) => m.isEnabled() && m.isVisible && m.isInFrustum(planes));
 }
 
+/** Where the player's car is on screen: {x, y} as 0-1 of the width and height, or null if behind the camera. */
+function carScreenPos() {
+  const w = world();
+  if (!w || !w.car || !w.scene.activeCamera) return null;
+  const B = window.BABYLON;
+  const rw = w.engine.getRenderWidth();
+  const rh = w.engine.getRenderHeight();
+  const c = w.car.getAbsolutePosition().clone();
+  c.y = 0.7;
+  const v = B.Vector3.Project(c, B.Matrix.Identity(), w.scene.getTransformMatrix(), w.scene.activeCamera.viewport.toGlobal(rw, rh));
+  if (v.z < 0 || v.z > 1) return null;
+  return { x: v.x / rw, y: v.y / rh };
+}
+
 function clickSpeed(s) {
   const b = document.querySelector(`#speeds button[data-speed="${s}"]`);
   if (b) {
@@ -196,6 +210,10 @@ async function wholeDay(options, t) {
   let onScreen = 0;
   let checked = 0;
   let lastScreenCheck = 0;
+  let lastCarCheck = 0;
+  let carChecks = 0;
+  let carOk = 0;
+  let carBad = 0;
   let walkFrames = 0;
   let walkStill = 0;
   let lastPos = null;
@@ -230,6 +248,15 @@ async function wholeDay(options, t) {
       lastPos = { x: p.x, z: p.z };
     } else lastPos = null;
     const now = performance.now();
+    if (fr.person.inCar && now - lastCarCheck > 700) {
+      lastCarCheck = now;
+      const pos = carScreenPos();
+      const ok = !!pos && pos.x > 0.15 && pos.x < 0.85 && pos.y > 0.15 && pos.y < 0.85;
+      carChecks++;
+      if (ok) carOk++;
+      else if (carBad++ < 3) t.problem("bug", `The car isn't on screen while driving (${E().fmtClock(fr.action.start)} ${fr.action.text})`);
+      t.log(`car-on-screen ${ok ? "yes" : "NO"} ${pos ? pos.x.toFixed(2) + "," + pos.y.toFixed(2) : "behind camera"} ${$("time").textContent}${$("ampm").textContent}`);
+    }
     if (now - lastScreenCheck > 1000) {
       lastScreenCheck = now;
       checked++;
@@ -285,6 +312,8 @@ async function wholeDay(options, t) {
   t.metric("nanFrames", nanFrames);
   t.metric("walkFrames", walkFrames);
   t.metric("walkFramesStill", walkStill);
+  t.metric("carChecks", carChecks);
+  t.metric("carOnScreenPct", carChecks ? Math.round((carOk / carChecks) * 100) : 0);
   t.metric("personOnScreenPct", checked ? Math.round((onScreen / checked) * 100) : 0);
 
   const missedBlocks = [];
