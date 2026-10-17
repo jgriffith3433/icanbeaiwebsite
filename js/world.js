@@ -1400,7 +1400,9 @@
       const tz = pp.inCar ? car.z : pp.z;
       const ty = pp.inCar ? 1.0 : (POSE[pp.pose] || POSE.stand).y * 0.6 + 0.45;
       const jump = Math.hypot(tx - cam.x, tz - cam.z) > 25;
-      if (!cam.inited || snap || jump) {
+      /* a drive starts with the camera already on the car: never blend in from the walking shot */
+      const startsDrive = !!pp.inCar && !cam.wasInCar;
+      if (!cam.inited || snap || jump || startsDrive) {
         cam.x = tx;
         cam.y = ty;
         cam.z = tz;
