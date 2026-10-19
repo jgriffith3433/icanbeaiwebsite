@@ -527,6 +527,276 @@ async function analytics(options, t) {
   }
 }
 
+/* ---------------- control: take him, move, run, jump, let go, he walks back to his day ---------------- */
+// Real input only: Enter, WASD, Shift, Space and Esc as keys; a mouse drag for the camera; then the phone's touch
+// stick and jump button as touch pointers. Setup shortcuts (named): the day bar to a quiet moment at home, and
+// day.control.touch(true) to show the phone's controls on a desktop-sized window ("phone controls").
+function keyDown(key, extra) {
+  window.dispatchEvent(new KeyboardEvent("keydown", { key, code: key === " " ? "Space" : "", bubbles: true, ...(extra || {}) }));
+}
+function keyUp(key, extra) {
+  window.dispatchEvent(new KeyboardEvent("keyup", { key, code: key === " " ? "Space" : "", bubbles: true, ...(extra || {}) }));
+}
+async function holdKeys(list, ms) {
+  list.forEach((k) => keyDown(k, { shiftKey: list.includes("Shift") }));
+  await sleep(ms);
+  list.slice().reverse().forEach((k) => keyUp(k));
+}
+async function tapKey(key, ms = 120) {
+  keyDown(key);
+  await sleep(ms);
+  keyUp(key);
+}
+function touchOn(el, type, x, y, id = 7) {
+  el.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true }));
+}
+async function tapEl(el) {
+  const r = el.getBoundingClientRect();
+  touchOn(el, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+  await sleep(90);
+  touchOn(el, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+}
+/** Measures how far and how fast he goes while `act` runs: { path, peak } (metres, metres per second). */
+async function measure(act) {
+  const C = window.day.control;
+  let last = C.state();
+  let path = 0;
+  let peak = 0;
+  const iv = setInterval(() => {
+    const st = C.state();
+    path += Math.hypot(st.x - last.x, st.z - last.z);
+    peak = Math.max(peak, st.speed);
+    last = st;
+  }, 50);
+  try {
+    await act();
+  } finally {
+    clearInterval(iv);
+  }
+  return { path: Math.round(path * 100) / 100, peak: Math.round(peak * 100) / 100 };
+}
+
+/** A quiet moment at home: he's on the couch (or anywhere at home, not walking, for a while). */
+function quietMoment(day) {
+  const home = (a) => !a.inCar && !a.path && a.room && window.DAY_CONFIG.rooms[a.room] && window.DAY_CONFIG.rooms[a.room].building === "home";
+  return (
+    day.actions.find((a) => a.pose === "sitCouch" && home(a) && a.end - a.start > 4) ||
+    day.actions.find((a) => home(a) && a.pose !== "lie" && a.pose !== "side" && a.end - a.start > 4) ||
+    day.actions.find((a) => !a.inCar && !a.path)
+  );
+}
+
+/** Let go (Esc or the button), then watch him walk back: no teleport, ends where the day says, the log goes on. */
+async function letGoAndWatch(t, how, label) {
+  const C = window.day.control;
+  const w = world();
+  let maxStep = 0;
+  let frames = 0;
+  let lastPos = null;
+  let off = null;
+  unwatch = window.day.watch(({ fr, steered }) => {
+    const p = w.person.position;
+    if (steered) {
+      frames++;
+      if (lastPos) maxStep = Math.max(maxStep, Math.hypot(p.x - lastPos.x, p.z - lastPos.z));
+      lastPos = { x: p.x, z: p.z };
+    } else if (C.mode() === "schedule" && off == null && !fr.person.inCar) {
+      off = Math.hypot(p.x - fr.person.x, p.z - fr.person.z);
+    }
+  });
+  const fr0 = window.day.now().frame;
+  const st0 = C.state();
+  t.log(`${label}: letting go at ${st0.x.toFixed(2)},${st0.z.toFixed(2)}; his day says ${fr0.person.x.toFixed(2)},${fr0.person.z.toFixed(2)} (${fr0.room}): "${fr0.action.text}"`);
+  await how();
+  await t.until(() => C.mode() !== "control", 3000, "letting go");
+  t.event("let-go", `${label}: his day says ${fr0.room} · "${fr0.action.text}" · ${Math.hypot(st0.x - fr0.person.x, st0.z - fr0.person.z).toFixed(1)} m away`);
+  if (!$("log").textContent.includes(window.DAY_CONFIG.control.lines.letGo)) t.problem("bug", "Letting go isn't in the action log");
+  await t.until(() => C.mode() === "schedule", 70000, "him to walk back to his day");
+  await sleep(300);
+  stopWatching();
+  const back = C.log().filter((e) => e.what === "back").pop();
+  const fr = window.day.now().frame;
+  t.metric(`${label}ReturnFrames`, frames);
+  t.metric(`${label}ReturnMaxStep`, Math.round(maxStep * 1000) / 1000);
+  if (back && back.how === "walk") t.event("back-on-schedule", `${label}: walked back, now "${fr.action.text}" (${fr.room}), ${off == null ? "?" : off.toFixed(3)} m from where his day puts him`);
+  else t.problem("bug", `${label}: he didn't walk back to his day (${back ? back.how : "no back"})`);
+  if (maxStep > 0.5) t.problem("bug", `${label}: he jumped ${maxStep.toFixed(2)} m in one frame on the way back (a teleport, not a walk)`);
+  if (off != null && off > 0.05) t.problem("bug", `${label}: back on his day, but ${off.toFixed(2)} m from where it puts him`);
+  checkFrame(t, fr);
+  if (!$("log").textContent.includes(window.DAY_CONFIG.control.lines.back)) t.problem("bug", "Being back on his day isn't in the action log");
+}
+
+async function control(options, t) {
+  t.scene("Live");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control (js/control.js didn't install)");
+    return;
+  }
+  const btn = $("control");
+  if (!btn) t.problem("bug", "There's no Take control button");
+  const lines = window.DAY_CONFIG.control.lines;
+
+  // Setup: a quiet moment at home on the day bar, the clock running at 1×.
+  const day = window.day.today();
+  const a = quietMoment(day);
+  scrubTo(a.start + Math.min(1, (a.end - a.start) / 3));
+  await sleep(600);
+  clickSpeed(1);
+  t.event("start-at", `${E().fmtClock(a.start)} ${a.block}: "${a.text}" (${a.room})`);
+  await sleep(1500);
+  t.progress(0.05);
+
+  // 1. Take control (Enter).
+  t.scene("Taking control");
+  const m0 = window.day.now().minutes;
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  const st = C.state();
+  t.event("control-taken", `Enter · at ${st.x.toFixed(2)},${st.z.toFixed(2)} · Havok controller ${st.physics ? "on" : "OFF"} · button "${btn && btn.textContent}"`);
+  if (!st.physics) t.problem("bug", "He moves without the Havok character controller (physics off?)");
+  if (btn && btn.textContent !== "Let go") t.problem("bug", `The button says "${btn.textContent}" while he's the player's, not "Let go"`);
+  if (!$("log").textContent.includes(lines.take)) t.problem("bug", "Taking control isn't in the action log");
+  await sleep(1200);
+  t.progress(0.12);
+
+  // 2. Walk (WASD), 3. sprint (Shift), in a few directions: walls stop one, not all.
+  t.scene("Walking");
+  const walk = await measure(async () => {
+    await holdKeys(["d"], 1200);
+    await holdKeys(["w"], 900);
+    await holdKeys(["a"], 900);
+  });
+  t.event("moved", `WASD: ${walk.path} m, up to ${walk.peak} m/s (walking is ${C.move.walk})`);
+  if (walk.path < 1.5) t.problem("bug", `Holding WASD for 3 s moved him only ${walk.path} m`);
+  t.progress(0.22);
+  t.scene("Sprinting");
+  const run = await measure(async () => {
+    for (const k of ["s", "d", "w", "a"]) await holdKeys(["Shift", k], 800);
+  });
+  t.event("sprint", `Shift: ${run.path} m, up to ${run.peak} m/s (sprint is ${C.move.sprint})`);
+  if (run.peak < C.move.walk * 1.6) t.problem("bug", `Sprinting topped out at ${run.peak} m/s (walking is ${C.move.walk})`);
+  if (!(run.peak > walk.peak)) t.problem("bug", "Sprinting isn't faster than walking");
+  t.progress(0.32);
+
+  // The camera orbits him (a mouse drag).
+  t.scene("Camera");
+  const alpha0 = world().camera.alpha;
+  await dragCamera(0.22);
+  await sleep(600);
+  const turned = world().camera.alpha - alpha0;
+  if (Math.abs(turned) > 0.05) t.event("camera-orbit", `drag turned the camera ${turned.toFixed(2)} rad; he's on screen: ${personOnScreen()}`);
+  else t.problem("bug", "Dragging didn't orbit the camera while he's the player's");
+  if (!personOnScreen()) t.problem("bug", "He's off screen while the player has him");
+  t.progress(0.38);
+
+  // 4. Jump, and two more in the air (a fourth press does nothing), then hold to float down.
+  t.scene("Jumping");
+  const flights0 = C.state().flights;
+  let floated = false;
+  let peakY = 0;
+  const y0 = C.state().y;
+  const watchAir = setInterval(() => {
+    const s = C.state();
+    floated = floated || s.floating;
+    peakY = Math.max(peakY, s.y - y0);
+  }, 50);
+  try {
+    await tapKey(" ");
+    await sleep(500);
+    await tapKey(" ");
+    await sleep(500);
+    await tapKey(" ");
+    await sleep(450);
+    await tapKey(" "); // one too many
+    await sleep(250);
+    keyDown(" ");
+    await sleep(1600);
+    keyUp(" ");
+    await t.until(() => C.state().flights > flights0, 6000, "him to land");
+  } finally {
+    clearInterval(watchAir);
+  }
+  const fl = C.state().lastFlight || { jumps: 0, height: 0 };
+  t.event("triple-jump", `${fl.jumps} jumps in one flight (1 + ${C.move.airJumps} in the air), ${peakY.toFixed(2)} m up${floated ? ", floated down holding Space" : ""}`);
+  if (fl.jumps !== 1 + C.move.airJumps) t.problem("bug", `${fl.jumps} jumps in one flight, not ${1 + C.move.airJumps} (a jump and two in the air)`);
+  if (!floated) t.problem("polish", "Holding Space while falling didn't float him down");
+  t.progress(0.5);
+
+  if (!(window.day.now().minutes > m0)) t.problem("bug", "The clock stopped while the player had him");
+  else t.event("clock-running", `${(window.day.now().minutes - m0).toFixed(2)} day-minutes passed while he was the player's`);
+
+  // 5. Let go (Esc): he walks back to where his day says, and the day carries on.
+  t.scene("Letting go");
+  await letGoAndWatch(t, () => pressKey("Escape"), "keys");
+  t.scene("Back on his day");
+  const row0 = $("what").textContent;
+  clickSpeed(60);
+  await sleep(4000);
+  const nowRow = $("log").querySelector("li.now");
+  t.event("log-continues", `"${row0}" → now "${nowRow ? nowRow.textContent.replace(/^\S+/, "").trim() : "?"}" at ${$("time").textContent}${$("ampm").textContent}`);
+  clickSpeed(1);
+  await sleep(800);
+  t.progress(0.7);
+
+  // The phone: the touch stick and the jump button.
+  t.scene("Phone controls");
+  const native = C.state().touch;
+  if (!native) C.touch(true);
+  t.event("touch-layout", native ? `a phone-sized window (${innerWidth}×${innerHeight})` : `phone controls shown on a ${innerWidth}×${innerHeight} window (setup shortcut)`);
+  if (!btn.disabled) await tapEl(btn);
+  btn.click();
+  await t.until(() => C.mode() === "control", 3000, "Take control (tap)");
+  await sleep(300);
+  const stickEl = $("stick");
+  const jumpEl = $("jump-btn");
+  const visible = (el) => !!el && el.offsetParent !== null && el.getBoundingClientRect().width > 30;
+  if (visible(stickEl) && visible(jumpEl)) t.event("touch-controls", `stick ${Math.round(stickEl.getBoundingClientRect().width)} px, jump button ${Math.round(jumpEl.getBoundingClientRect().width)} px`);
+  else {
+    t.problem("bug", "The touch stick and jump button didn't appear on the phone layout");
+    return;
+  }
+  const r = stickEl.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  const touchMove = await measure(async () => {
+    for (const [dx, dy, ms] of [[0, -32, 1100], [34, 0, 900], [0, 60, 900], [-60, 0, 900]]) {
+      touchOn(stickEl, "pointerdown", cx, cy);
+      for (let i = 1; i <= 4; i++) {
+        touchOn(stickEl, "pointermove", cx + (dx * i) / 4, cy + (dy * i) / 4);
+        await sleep(40);
+      }
+      await sleep(ms);
+      touchOn(stickEl, "pointerup", cx + dx, cy + dy);
+      await sleep(150);
+    }
+  });
+  t.event("touch-move", `the stick: ${touchMove.path} m, up to ${touchMove.peak} m/s (pushed to the edge runs)`);
+  if (touchMove.path < 1.5) t.problem("bug", `The touch stick moved him only ${touchMove.path} m`);
+  if (touchMove.peak < C.move.walk * 1.6) t.problem("polish", `Pushing the touch stick to its edge didn't run (${touchMove.peak} m/s)`);
+  const tf0 = C.state().flights;
+  await tapEl(jumpEl);
+  await sleep(450);
+  await tapEl(jumpEl);
+  await sleep(450);
+  await tapEl(jumpEl);
+  await t.until(() => C.state().flights > tf0, 8000, "him to land after the touch jumps");
+  const tfl = C.state().lastFlight || { jumps: 0 };
+  t.event("touch-jump", `the jump button: ${tfl.jumps} jumps, ${tfl.height} m`);
+  if (tfl.jumps < 2) t.problem("bug", `The touch jump button gave ${tfl.jumps} jumps for three taps`);
+  t.progress(0.85);
+
+  t.scene("Letting go (phone)");
+  await letGoAndWatch(t, () => tapEl(btn).then(() => btn.click()), "touch");
+  if (!native) C.touch(false);
+  t.scene("Back on his day");
+  await sleep(1500);
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -535,6 +805,7 @@ installPlaytest({
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live; Babylon 9, physics, his name in the panel and log", seconds: 30, tags: ["smoke"] },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
+    { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -542,6 +813,7 @@ installPlaytest({
       if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);
+      else if (id === "control") await control(options, t);
     } finally {
       stopWatching();
     }

@@ -2,7 +2,7 @@
 
 Small Weather living through today, in real time, one action at a time. Open the site and you see what he's doing right now. Drag the day bar to look around the day, or play it at 10×–1200×.
 
-Where it's going: a third-person game. Small Weather (he/him, the storm caller from Dose Of Destruction) lives his developer's day on autopilot; the player can take control, walk the city and command the weather. Today the page is the day on autopilot, on Babylon.js 9 with Havok physics and colliders for the world. More in [AGENTS.md](AGENTS.md#direction).
+Where it's going: a third-person game. Small Weather (he/him, the storm caller from Dose Of Destruction) lives his developer's day on autopilot; the player can take control, walk the city and command the weather. Today the day plays on autopilot and you can take control of him (walk, run, jump, then let go and he walks back to his day), on Babylon.js 9 with Havok physics and colliders for the world. More in [AGENTS.md](AGENTS.md#direction).
 
 **The whole day is defined in [`day.config.js`](day.config.js).** Change it, save it, and reload the page.
 
@@ -22,6 +22,8 @@ The page needs Vite: opening `index.html` straight from disk no longer works, be
 | `js/world.js` | The 3D stage (Babylon.js 9). Furniture is placed from the spots in the config, and props react to the things. `enablePhysics` gives the ground, buildings and furniture Havok colliders. |
 | `js/main.js` | Clock, playback, the action log, body meters, the things panel |
 | `js/analytics.js` | Hawkes Analytics: what viewers watch and touch (see [AGENTS.md](AGENTS.md#analytics-hawkes-analytics)) |
+| `js/control.js` | Taking control: the player moves him in third person (Havok character controller, keys, gamepad, touch stick, orbit camera), and Let go walks him back to his day |
+| `js/avatar.js` | How his rigged model (a GLB with idle/walk/run/jump/fall/float/cast clips) replaces the stand-in figure |
 | `simulation-checklist.md` | The original rules the simulation follows |
 
 ## Versions and publishing
@@ -100,7 +102,11 @@ day.today()         // the compiled timeline
 
 ## Keys
 
-`Space` play/pause · `←` `→` 5 minutes (`Shift` for 1) · `1`–`5` speeds · `Esc` back to now
+`Space` play/pause · `←` `→` 5 minutes (`Shift` for 1) · `1`–`5` speeds · `Esc` back to now · `Enter` take control
+
+While he's yours: `WASD` or arrows move · `Shift` runs · `Space` jumps (twice more in the air; hold to float down) ·
+drag to look, wheel to zoom · `Esc` lets go. A gamepad works too (Start takes and lets go, A jumps, a bumper runs, B
+lets go), and on a phone there's a touch stick (push it to the edge to run) and a jump button.
 
 ## Playtests
 
@@ -113,6 +119,7 @@ calls `window.hawkesPlaytest.start()` or the URL has `?playtest=<id>`.
 | --- | --- |
 | `smoke` (~25 s) | Boot, check Small Weather is on screen, watch the live clock tick, play one day-minute at 10×, pause, Esc back to live. Then an `engine` event (Babylon version, Havok, the colliders), `collider-under-person`, and his name: `name-in-panel`, then the day bar to the alarm for `name-in-log`, and Esc back to live. |
 | `day` (~75 s) | Drag the day bar to the start of the day, play at 1200× to the end, and check every block in today's timeline started and every action was reached. `?speed=` multiplies the speed. |
+| `control` (~100 s) | From a quiet moment at home (the day bar): Enter takes control; WASD walks, Shift sprints, a drag orbits the camera, Space jumps three times in one flight and holds to float; Esc lets go and it checks he walks back (no teleport) to where his day puts him, the log says so and the day carries on. Then the phone's touch stick and jump button (shown with `day.control.touch(true)` on a desktop window), and letting go again by tapping. |
 | `analytics` (~4 min) | Camera, speed buttons and keys, the day bar, the panels, with every analytics event that goes out on the timeline; then waits for the 3-minute question ("What would you want this to be?") and dismisses it. |
 
 Problems it reports: a block (activity) that never starts, actions never reached, the clock stopping, NaN in the

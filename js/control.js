@@ -374,7 +374,6 @@ function install() {
   /* ---------- input ---------- */
   const keys = new Set();
   let jumps = 0; // presses since the last frame
-  let jumpHeld = false;
   const stick = { x: 0, y: 0, id: null };
   let touchJumpHeld = false;
   const KEY = {
