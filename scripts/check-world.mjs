@@ -141,6 +141,68 @@ do {
   steps++;
 } while (back === 'walking' && steps < 60 * 60);
 ok(back === 'arrived' && Math.hypot(ms.x - bedSpot.x, ms.z - bedSpot.z) < 0.02, `the walk back to the bed ended "${back}" at ${ms.x.toFixed(2)},${ms.z.toFixed(2)}`);
+
+// The district: the park is solid ground, three roofs hold him, a stair gets him up and back down,
+// and a building stops him. createMover's step() is world-direction input (the playtest uses keys).
+const city = cfg.city || { blocks: [], park: null };
+const roofs = (city.blocks || []).filter((b) => b.stair);
+ok(roofs.length >= 3, `the city has ${roofs.length} roofs with stairs, need at least 3`);
+const park = city.park;
+if (park) {
+  const px = (park.x0 + park.x1) / 2;
+  const pz = park.z0 + 8;
+  const under = hit(px, pz, 4);
+  ok(under && under.y < 0.3, `the park isn't open ground (hit ${JSON.stringify(under)})`);
+}
+function walkToward(tx, tz, sec, close = 0.35) {
+  const n = Math.round(sec * 60);
+  let still = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = tx - ms.x;
+    const dz = tz - ms.z;
+    if (Math.hypot(dx, dz) < close) return true;
+    const d = Math.hypot(dx, dz) || 1;
+    mover.step(DT, { x: dx / d, z: dz / d });
+    physicsStep();
+    if (ms.y < -0.4) return false;
+    still = ms.speed < 0.05 ? still + 1 : 0;
+    if (still > 90) return Math.hypot(tx - ms.x, tz - ms.z) < close + 0.45;
+  }
+  return Math.hypot(tx - ms.x, tz - ms.z) < close + 0.45;
+}
+roofs.forEach((b) => {
+  const s = b.stair;
+  const lip = b.z + b.d / 2 - 1.1; // on the roof, just inside the north edge, through the parapet gap
+  const topX = s.x1 - 0.25;
+  const base = mover.start(s.x0 - 0.9, s.z, 0);
+  ok(Math.hypot(base.x - (s.x0 - 0.9), base.z - s.z) < 1.2 && ms.y < 0.4, `${b.id}: the stair doesn't start on open ground (at ${base.x.toFixed(2)},${base.z.toFixed(2)} y ${ms.y.toFixed(2)})`);
+  walkToward(topX, s.z, 22, 0.2);
+  ok(ms.y > b.h - 0.3, `${b.id}: the stair didn't reach the roof (y ${ms.y.toFixed(2)}, roof ${b.h}, at ${ms.x.toFixed(1)},${ms.z.toFixed(1)})`);
+  walkToward(topX, lip, 6);
+  walkToward(b.x, b.z, 8);
+  const onRoof = ms.y > b.h - 0.35 && Math.abs(ms.x - b.x) < b.w / 2 - 0.4 && Math.abs(ms.z - b.z) < b.d / 2 - 0.4;
+  ok(onRoof, `${b.id}: he isn't standing on the roof (y ${ms.y.toFixed(2)} at ${ms.x.toFixed(1)},${ms.z.toFixed(1)})`);
+  const yRoof = ms.y;
+  hold(0.4, { x: 0, z: 0 });
+  ok(Math.abs(ms.y - yRoof) < 0.15 && ms.y > b.h - 0.35, `${b.id}: the roof didn't hold him (y ${ms.y.toFixed(2)})`);
+  walkToward(topX, lip, 6);
+  walkToward(topX, s.z, 5);
+  walkToward(s.x0 - 0.9, s.z, 22);
+  ok(ms.y < 0.5, `${b.id}: he didn't walk back down the stair (y ${ms.y.toFixed(2)} at ${ms.x.toFixed(1)},${ms.z.toFixed(1)})`);
+});
+// Into a wall: the shop's south face. He must stay outside it.
+const shop = (city.blocks || []).find((b) => b.id === "shop");
+if (shop) {
+  const face = shop.z - shop.d / 2;
+  mover.start(shop.x, face - 1.4, 0);
+  hold(1.6, { x: 0, z: 1 });
+  ok(ms.z < face - 0.05 && ms.y < 1, `he walked through the shop (z ${ms.z.toFixed(2)}, wall at ${face}, y ${ms.y.toFixed(2)})`);
+}
+if (park) {
+  mover.start(-8, park.z0 + 1.5, 0);
+  const entered = walkToward(-8, park.z0 + 12, 10);
+  ok(entered && ms.y < 0.4 && ms.z > park.z0 && ms.z < park.z1 && ms.x > park.x0 && ms.x < park.x1, `he didn't walk into the park (at ${ms.x.toFixed(1)},${ms.z.toFixed(1)} y ${ms.y.toFixed(2)})`);
+}
 ok(MOVE_DEFAULTS.airJumps === 2 && (!cfg.control || !cfg.control.move || cfg.control.move.airJumps === 2), 'Small Weather has two air jumps (his DoD fighter has two)');
 // The stand-in plays every clip a rigged model will have, and the world draws him where the player put him.
 const fr1 = E.frame(day, day.dayStart + 60);

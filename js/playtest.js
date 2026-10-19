@@ -212,6 +212,10 @@ async function wholeDay(options, t) {
   t.log(`date ${key}: ${day.blocks.length} blocks, ${day.actions.length} actions`);
   t.metric("blocks", day.blocks.length);
   t.metric("actions", day.actions.length);
+  if (day.spots && day.spots.bed && day.spots.desk) {
+    t.event("city-places", `bed ${day.spots.bed.x.toFixed(0)},${day.spots.bed.z.toFixed(0)} · desk ${day.spots.desk.x.toFixed(0)},${day.spots.desk.z.toFixed(0)}`);
+    if (day.spots.desk.x > 400) t.problem("bug", `the office is still out along the old road (desk x ${day.spots.desk.x.toFixed(0)})`);
+  }
 
   // Spine blocks the config has but today's random draw skipped (chance) are fine, just noted.
   const today = new Set(day.blocks.map((b) => b.title));
@@ -924,6 +928,219 @@ async function model(options, t) {
   t.progress(1);
 }
 
+/* ---------------- city: the day in the district, then walk the streets, the park and three roofs ---------------- */
+// Day-bar setup shows home, the drive and the office. The walk is real keys (WASD, Shift, Enter).
+// Ramps are the north-face stairs in day.config.js city.blocks.
+let heldKeys = [];
+function setHeld(next) {
+  heldKeys.filter((k) => !next.includes(k)).forEach((k) => keyUp(k));
+  next.filter((k) => !heldKeys.includes(k)).forEach((k) => keyDown(k, { shiftKey: next.includes("Shift") }));
+  heldKeys = next.slice();
+}
+function releaseHeld() {
+  heldKeys.forEach((k) => keyUp(k));
+  heldKeys = [];
+}
+function steerKeys(tx, tz, sprint) {
+  const st = window.day.control.state();
+  const dx = tx - st.x;
+  const dz = tz - st.z;
+  const dist = Math.hypot(dx, dz) || 1;
+  const cam = world().camera;
+  const fx = -Math.cos(cam.alpha);
+  const fz = -Math.sin(cam.alpha);
+  const f = (dx * fx + dz * fz) / dist;
+  const r = (dx * fz - dz * fx) / dist;
+  const keys = [];
+  if (f > 0.22) keys.push("w");
+  else if (f < -0.22) keys.push("s");
+  if (r > 0.22) keys.push("d");
+  else if (r < -0.22) keys.push("a");
+  if (!keys.length) keys.push(f >= 0 ? "w" : "s");
+  if (sprint) keys.push("Shift");
+  return keys;
+}
+/** Walk him to a point with the keys. False if he gets stuck or falls through. */
+async function goTo(tx, tz, t, opts) {
+  opts = opts || {};
+  const close = opts.close == null ? 0.7 : opts.close;
+  const limit = opts.ms || 22000;
+  const sprint = !!opts.sprint;
+  const started = performance.now();
+  let stillSince = started;
+  let last = window.day.control.state();
+  let ticks = 0;
+  try {
+    while (performance.now() - started < limit) {
+      const st = window.day.control.state();
+      if (st.y < -0.45) {
+        t.problem("bug", `He fell through the world at ${st.x.toFixed(1)},${st.z.toFixed(1)} (y ${st.y.toFixed(2)})`);
+        return false;
+      }
+      if (Math.hypot(st.x - tx, st.z - tz) < close) return true;
+      if (Math.hypot(st.x - last.x, st.z - last.z) > 0.12) {
+        stillSince = performance.now();
+        last = st;
+      } else if (performance.now() - stillSince > 2800) return false;
+      const far = Math.hypot(st.x - tx, st.z - tz);
+      setHeld(steerKeys(tx, tz, sprint && far > 2.5));
+      if (ticks++ % 6 === 0) t.progress(opts.progress || 0.5);
+      await sleep(160);
+    }
+    return Math.hypot(window.day.control.state().x - tx, window.day.control.state().z - tz) < close + 0.4;
+  } finally {
+    releaseHeld();
+  }
+}
+
+async function city(options, t) {
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { from: -48, to: 210, z: 12.6 };
+  const onAvenue = (x, z) => x > street.from && x < street.to && Math.abs(z - street.z) < 3;
+  if ((day.errors || []).length) return;
+
+  async function moment(sceneName, pred, label) {
+    const a = day.actions.find(pred);
+    if (!a) {
+      t.problem("bug", `The day has no ${label}`);
+      return null;
+    }
+    t.scene(sceneName);
+    scrubTo(a.start + Math.min(1, (a.end - a.start) / 3));
+    clickSpeed(1);
+    await sleep(700);
+    const fr = window.day.now().frame;
+    checkFrame(t, fr);
+    return fr;
+  }
+
+  const home = await moment("Home", (a) => a.room === "bedroom" && !a.inCar, "morning at home");
+  if (home) {
+    const here = home.person.x > street.from && home.person.x < street.to;
+    if (here) t.event("day-home", `${home.room} at ${home.person.x.toFixed(1)},${home.person.z.toFixed(1)}: "${home.action.text}"`);
+    else t.problem("bug", `Morning at home is outside the district (${home.person.x.toFixed(0)},${home.person.z.toFixed(0)})`);
+  }
+  t.progress(0.08);
+
+  const drive = await moment("Commute", (a) => a.block === "The rest of the drive" && a.inCar && a.car && a.car.path, "drive along the avenue");
+  if (drive) {
+    if (onAvenue(drive.car.x, drive.car.z)) t.event("day-commute", `the car at ${drive.car.x.toFixed(1)},${drive.car.z.toFixed(1)} on the avenue: "${drive.action.text}"`);
+    else t.problem("bug", `The commute isn't on the avenue (car ${drive.car.x.toFixed(1)},${drive.car.z.toFixed(1)})`);
+  }
+  t.progress(0.14);
+
+  const office = await moment("Office", (a) => a.room === "workOffice" && a.pose === "sitChair", "at his desk");
+  if (office) {
+    if (office.person.x > 110 && office.person.x < street.to) t.event("day-office", `desk at ${office.person.x.toFixed(1)},${office.person.z.toFixed(1)}: "${office.action.text}"`);
+    else t.problem("bug", `The office isn't in the district (x ${office.person.x.toFixed(0)})`);
+  }
+  t.progress(0.2);
+
+  const back = await moment("Home again", (a) => a.block === "Home" && !a.inCar, "evening at home");
+  if (back) {
+    if (back.person.x > street.from && back.person.x < 40) t.event("day-home-again", `${back.room} at ${back.person.x.toFixed(1)},${back.person.z.toFixed(1)}: "${back.action.text}"`);
+    else t.problem("bug", `Evening home isn't back in the district (${back.person.x.toFixed(0)},${back.person.z.toFixed(0)})`);
+  }
+
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  t.scene("Streets");
+  if (!outside) {
+    t.problem("bug", "No moment beside the car to take control");
+    return;
+  }
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  t.event("start-at", `${E().fmtClock(outside.start)} beside the car (${outside.room})`);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  if (!C.state().physics) t.problem("bug", "He moves without the Havok character controller");
+  t.progress(0.28);
+
+  const park = (cfg.city && cfg.city.park) || { x0: -34, z0: 20, x1: 30, z1: 68 };
+  const roofs = ((cfg.city && cfg.city.blocks) || []).filter((b) => b.stair);
+  if (roofs.length < 3) t.problem("bug", `The district has ${roofs.length} roofs to climb`);
+
+  const sideZ = street.z - 3.2;
+  const walked = await goTo(C.state().x + 14, sideZ, t, { sprint: true, progress: 0.32, ms: 12000 });
+  const st1 = C.state();
+  if (walked && st1.y < 0.4) t.event("street-walked", `along the sidewalk to ${st1.x.toFixed(1)},${st1.z.toFixed(1)}`);
+  else t.problem("bug", `He didn't walk the street (at ${st1.x.toFixed(1)},${st1.z.toFixed(1)} y ${st1.y.toFixed(2)})`);
+  t.progress(0.36);
+
+  async function climb(b, progress) {
+    const s = b.stair;
+    const lip = b.z + b.d / 2 - 1.1;
+    const topX = s.x1 - 0.25;
+    t.scene(`Roof ${b.id}`);
+    if (!(await goTo(s.x0 - 0.9, s.z, t, { sprint: true, progress, ms: 30000 }))) {
+      t.problem("bug", `${b.id}: he didn't reach the ramp (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+      return false;
+    }
+    if (!(await goTo(topX, s.z, t, { close: 0.35, progress, ms: 20000 }))) {
+      t.problem("bug", `${b.id}: he didn't walk up the ramp (y ${C.state().y.toFixed(2)} at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+      return false;
+    }
+    if (C.state().y < b.h - 0.45) {
+      t.problem("bug", `${b.id}: the ramp left him at y ${C.state().y.toFixed(2)}, roof is ${b.h}`);
+      return false;
+    }
+    await goTo(topX, lip, t, { close: 0.5, progress, ms: 8000 });
+    await goTo(b.x, b.z, t, { close: 0.8, progress, ms: 10000 });
+    const st = C.state();
+    const on = st.y > b.h - 0.4 && Math.abs(st.x - b.x) < b.w / 2 && Math.abs(st.z - b.z) < b.d / 2;
+    if (on) t.event(`roof-${b.id}`, `on the roof at y ${st.y.toFixed(2)} (${st.x.toFixed(1)},${st.z.toFixed(1)})`);
+    else t.problem("bug", `${b.id}: he isn't on the roof (y ${st.y.toFixed(2)} at ${st.x.toFixed(1)},${st.z.toFixed(1)})`);
+    await goTo(topX, lip, t, { close: 0.6, progress, ms: 8000 });
+    await goTo(topX, s.z, t, { close: 0.45, progress, ms: 8000 });
+    await goTo(s.x0 - 0.9, s.z, t, { close: 0.7, progress, ms: 20000 });
+    if (C.state().y > 1) t.problem("bug", `${b.id}: he didn't come back down (y ${C.state().y.toFixed(2)})`);
+    return on;
+  }
+
+  let roofsUp = 0;
+  for (let i = 0; i < roofs.length; i++) {
+    if (i === 1) {
+      t.scene("Park");
+      const into = await goTo(-8, park.z0 + 12, t, { sprint: true, progress: 0.5, ms: 18000 });
+      const st = C.state();
+      const inside = into && st.x > park.x0 && st.x < park.x1 && st.z > park.z0 && st.z < park.z1 && st.y < 0.45;
+      if (inside) t.event("park-entered", `in the park at ${st.x.toFixed(1)},${st.z.toFixed(1)} y ${st.y.toFixed(2)}`);
+      else t.problem("bug", `He didn't enter the park (at ${st.x.toFixed(1)},${st.z.toFixed(1)} y ${st.y.toFixed(2)})`);
+    }
+    if (await climb(roofs[i], 0.4 + i * 0.15)) roofsUp++;
+    t.progress(0.45 + i * 0.15);
+  }
+  t.metric("roofsReached", roofsUp);
+  if (roofsUp >= 3) t.event("roofs-reached", `${roofsUp} rooftops`);
+
+  const shop = ((cfg.city && cfg.city.blocks) || []).find((b) => b.id === "shop");
+  if (shop) {
+    t.scene("Against a wall");
+    const face = shop.z - shop.d / 2;
+    await goTo(shop.x, face - 1.6, t, { sprint: true, progress: 0.9, ms: 30000 });
+    const before = C.state().z;
+    setHeld(steerKeys(shop.x, face + 3, false));
+    await sleep(1600);
+    releaseHeld();
+    const after = C.state();
+    if (after.z < face - 0.05 && after.y < 1.2) t.event("blocked-by-building", `the shop wall at z ${face.toFixed(1)} stopped him at ${after.z.toFixed(2)} (from ${before.toFixed(2)})`);
+    else t.problem("bug", `He walked through the shop (z ${after.z.toFixed(2)}, wall ${face.toFixed(1)}, y ${after.y.toFixed(2)})`);
+  }
+  if (C.state().y > -0.2) t.event("stayed-on-the-ground", `feet at y ${C.state().y.toFixed(2)} after the walk`);
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -934,6 +1151,7 @@ installPlaytest({
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
+    { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -943,7 +1161,9 @@ installPlaytest({
       else if (id === "analytics") await analytics(options, t);
       else if (id === "control") await control(options, t);
       else if (id === "model") await model(options, t);
+      else if (id === "city") await city(options, t);
     } finally {
+      releaseHeld();
       stopWatching();
     }
   },
