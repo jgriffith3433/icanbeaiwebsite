@@ -25,8 +25,11 @@ levels get redone over time. The page is the day playing on its own until someon
   now, then the day has him again. Where he can't walk to (the day has him driving, or in the other building) he
   catches up with it in a quick fade. He can't be taken while he's driving. The log gets a line for each of these
   (`day.note()`), and the panel says `control.lines.steering` while he's the player's.
-- **Not yet:** the weather powers (the stand-in has a `cast` pose for them), his look (the person is still the
-  box-built figure in `js/world.js` makePerson), the city. Those are next steps.
+- **His look:** a rigged 3D model made in Hawkes Gen from his Dose Of Destruction art (below, "His 3D model"): black
+  messy hair, glasses, the navy tech jacket with glowing blue seams, cargo pants, glowing boots; lightning coils his
+  arms while he's the player's. It's the same him all day (no pyjamas or towel colours: `person.outfits` only colours
+  the box figure, which shows until the model loads or if it fails).
+- **Not yet:** the weather powers (the model has `cast` and `throw` clips for them), the city. Those are next steps.
 
 ### Taking control: how it's built
 
@@ -38,16 +41,38 @@ levels get redone over time. The page is the day playing on its own until someon
 - `main.js` calls the controller every frame through `day.pilot(fn)` before drawing; while it returns
   `{ x, y, z, yaw, speed, anim, text }`, `world.update(fr, dt, { player })` leaves him and the camera to it and
   draws the rest of the day as usual. `null` = the day has him.
-- He's drawn through an **avatar**: `{ place(x, feetY, z, yaw), play(clip, speed, dt), show(on) }`. Today it's
-  `world.avatar`, the box-built figure with a pose per clip (`idle walk run jump fall float cast`, POSE and gesture
-  in `world.js`). The rigged GLB drops in with `clipAvatar()` in `js/avatar.js` (clip names matched by word,
-  cross-faded, walk/run speed matched to the ground speed) and `day.control.setAvatar()`; it needs
-  `@babylonjs/loaders` added first. Its origin at his feet, facing +z, in metres.
+- He's drawn through an **avatar**: `{ place(x, feetY, z, yaw), play(clip, speed, dt), show(on) }`: `world.avatar`,
+  the box-built figure with a pose per clip (`idle walk run jump fall float cast`, POSE and gesture in `world.js`).
+  His model is worn over that figure (below), so `day.control.setAvatar()` isn't needed for it.
 - The key handler runs in the capture phase and swallows the keys it uses only while he's the player's, so ← →,
   Space and Esc keep their day meanings otherwise. `day.control` (console, playtest): `mode()`, `state()`,
   `take()`, `letGo()`, `touch(on)` (show the phone controls on any screen; `?touch=1` too).
 - Touch controls show while he's the player's on a coarse pointer or a window 700 px wide or less. The button is on
   the public site too (it isn't part of the HUD).
+
+### His 3D model
+
+- **The file:** `models/small-weather.glb` (GLB only, under 10 MB; `npm test` checks), named by `day.config.js`
+  `control.model` (null = the box figure). Its recipe is `hawkes.assets.json` (`small-weather`): an A-pose front
+  sheet from `AllTheCharacters/SmallWeather/anims/_reference.png` (image.edit), a textured mesh (mesh.textured, best
+  of a few, judged on mesh.rig's turntables), then Gen's auto-rig (mesh.rig) with 14 clips. Gen entity
+  `icanbe/small-weather` keeps the takes.
+- **The clips** are made here, not downloaded: `node scripts/small-weather-clips.mjs` writes
+  `art/small-weather/clips/*.glb` from PH Origins' ch33 hero's Mixamo rig (`phoriginswebsite/assets/models/ch33-hero.glb`
+  next to this repo): Idle, Walk, Run, Jump (push-off to the top) and Sitting Idle in place, and posed ones (fall,
+  float, cast with both arms up, a lightning throw, and the day's type, phone, lie, side, recline), by bone directions
+  (`scripts/gltf-skeleton.mjs`). Upload a changed clip to the entity's `clip-src/<name>` slot and rig again.
+- **In the page:** `js/app.js` imports `js/small-weather.js` (its own chunk, with `@babylonjs/loaders`) once the page
+  is up and calls `world.setSkin()`. The model is parented to the figure's `spin` node, so the day's placing, tilting
+  (in bed) and seating still work; the boxes hide (the phone, cup and bag stay). The clip comes from the controller's
+  anim under control, and from the figure's pose and hand on his day (`skinClip` in `world.js`: walk, sit, type, phone,
+  lie, side, recline, cast for a stretch, else idle). Each clip's hips height (its first Hips key) lifts or lowers the
+  model so his hips sit where the figure's pelvis is; the model is scaled so standing hips match the figure's.
+- **Glow and lightning:** the texture's bright blue pixels (the jacket seams, the boot lights) become an emissive map
+  in the page, in the glow layer. While he's the player's, jagged tubes along each arm flicker (`BOLTS` per clip:
+  strongest for cast and throw). `day.engineInfo().model` says `small-weather`, `loading` or `figure`.
+- **Playtest:** the `model` scenario watches which clip the model plays on his day (walk, idle, work) and under
+  control (still, WASD, Shift, Space, Space held).
 
 ## How it's built (Babylon 9, Havok, Vite)
 

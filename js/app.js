@@ -16,8 +16,28 @@ import "./control.js"; // the player can take control of him
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 
-const status = { babylon: window.BABYLON.Engine.Version, physics: "loading" };
+const control = (window.DAY_CONFIG && window.DAY_CONFIG.control) || {};
+const status = { babylon: window.BABYLON.Engine.Version, physics: "loading", model: control.model ? "loading" : "figure" };
 window.day && (window.day.engineInfo = () => ({ ...status }));
+
+/* Small Weather's 3D model (day.config.js control.model): its own chunk, loaded once the page is up, so the
+   day never waits for it. The box figure shows until it's in, and stays if it fails. */
+const skinWorld = control.model && window.day && window.day.world();
+if (skinWorld) {
+  const w = skinWorld;
+  import("./small-weather.js")
+    .then(({ loadSmallWeather }) => loadSmallWeather(w, control.model))
+    .then((skin) => {
+      w.setSkin(skin);
+      Object.assign(status, { model: "small-weather", clips: skin.clips });
+      console.info(`[world] Small Weather's model: ${skin.clips.length} clips (${skin.clips.join(" ")})`);
+    })
+    .catch((err) => {
+      Object.assign(status, { model: "figure", modelError: String((err && err.message) || err) });
+      console.error("[world] Small Weather's model didn't load:", err);
+    })
+    .finally(() => window.dispatchEvent(new CustomEvent("day:model", { detail: { ...status } })));
+}
 
 HavokPhysics({ locateFile: () => havokWasm })
   .then((havok) => {

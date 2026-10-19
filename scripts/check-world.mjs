@@ -152,12 +152,45 @@ for (const clip of world.avatar.clips) {
   ok([q.x, q.y, q.z].every(Number.isFinite) && near(q.x, 1, 1e-6) && near(q.z, 2, 1e-6), `the stand-in isn't where the player put him after "${clip}"`);
 }
 ['idle', 'walk', 'run', 'jump', 'fall', 'float', 'cast'].forEach((c) => ok(world.avatar.clips.includes(c), `the stand-in has no "${c}" clip`));
+// His model (day.config.js control.model, js/small-weather.js): a GLB under 10 MB with every clip, worn over the
+// figure: the boxes hide, the player's clips play as the controller asks, and his day picks the clip from his pose.
+const modelPath = cfg.control && cfg.control.model;
+let modelInfo = 'no model (the box figure)';
+if (modelPath) {
+  const file = new URL(modelPath, root);
+  if (ok(/\.glb$/i.test(modelPath) && fs.existsSync(file), `control.model "${modelPath}" isn't a GLB in the repo`)) {
+    const bytes = fs.readFileSync(file);
+    ok(bytes.length < 10 * 1024 * 1024, `${modelPath} is ${(bytes.length / 1048576).toFixed(1)} MB (10 MB at most)`);
+    const { loadSmallWeather, SKIN_CLIPS } = await import(new URL('js/small-weather.js', root).href);
+    const skin = await loadSmallWeather(world, null, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length));
+    const missing = SKIN_CLIPS.filter((c) => !skin.clips.includes(c));
+    ok(!missing.length, `${modelPath} has no clip for ${missing.join(', ')}`);
+    world.setSkin(skin);
+    ok(world.person.getChildMeshes(false).filter((m) => m.isEnabled() && !skin.meshes.includes(m) && !/phone|cup|bag/.test(m.name)).length === 0, 'the box figure still shows under his model');
+    for (const clip of ['idle', 'walk', 'run', 'jump', 'fall', 'float', 'cast', 'throw']) {
+      world.avatar.play(clip, 3, DT);
+      ok(skin.clip() === clip, `under control, "${clip}" played "${skin.clip()}"`);
+    }
+    // his day: the first block has him in bed; later he walks, sits at his desk and types
+    const seen = new Set();
+    for (let m = day.dayStart; m < day.dayStart + 16 * 60; m += 2) {
+      world.update(E.frame(day, m), DT, {});
+      seen.add(skin.clip());
+    }
+    ['walk', 'type'].forEach((c) => ok(seen.has(c), `in his day he never played "${c}" (${[...seen].join(' ')})`));
+    const box = skin.root.getHierarchyBoundingVectors(true);
+    const tall = box.max.y - box.min.y;
+    world.avatar.play('idle', 0, 1);
+    ok(tall > 1.3 && tall < 2.1, `his model is ${tall.toFixed(2)} m tall`);
+    modelInfo = `model ${(bytes.length / 1048576).toFixed(1)} MB, ${skin.clips.length} clips, ${tall.toFixed(2)} m, his day played ${[...seen].join(' ')}`;
+  }
+}
 const lines = (cfg.control && cfg.control.lines) || {};
 const controlTexts = Object.values(lines).flat();
 ok(['take', 'letGo', 'back', 'steering'].every((k) => lines[k]), 'day.config.js control.lines needs take, steering, letGo and back');
 ok(!controlTexts.some((t) => /\b(they|their|theirs|themselves)\b/i.test(t)), `control lines that say "they" for him: ${controlTexts.join(' | ')}`);
 
-const summary = `Babylon ${core.Engine.Version}, Havok: ${p.colliders} colliders in ${p.bodies} bodies; ${day.actions.length} actions; field ${g && g.y.toFixed(2)}, road ${r && r.y.toFixed(2)}, home floor ${inside && inside.y.toFixed(2)}, bed ${onBed && onBed.y.toFixed(2)}, capsule at ${cap.position.y.toFixed(2)}; control: walk ${walked.toFixed(2)} m/s, three jumps ${(peak - y0).toFixed(2)} m, walked back in ${(steps / 60).toFixed(1)} s`;
+const summary = `Babylon ${core.Engine.Version}, Havok: ${p.colliders} colliders in ${p.bodies} bodies; ${day.actions.length} actions; field ${g && g.y.toFixed(2)}, road ${r && r.y.toFixed(2)}, home floor ${inside && inside.y.toFixed(2)}, bed ${onBed && onBed.y.toFixed(2)}, capsule at ${cap.position.y.toFixed(2)}; control: walk ${walked.toFixed(2)} m/s, three jumps ${(peak - y0).toFixed(2)} m, walked back in ${(steps / 60).toFixed(1)} s; ${modelInfo}`;
 if (problems.length) {
   console.error(`check-world: ${problems.length} problem(s)\n- ${problems.join('\n- ')}\n${summary}`);
   process.exit(1);

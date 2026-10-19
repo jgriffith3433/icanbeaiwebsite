@@ -797,6 +797,133 @@ async function control(options, t) {
   t.progress(1);
 }
 
+/* ---------------- model: Small Weather's rigged 3D model, on his day and under control ---------------- */
+// Waits for the GLB (js/small-weather.js), then watches which clip his model plays: on autopilot while his day walks
+// him, stands him and sits him at the desk (day-bar setup shortcuts), then under control with real keys: still (idle),
+// WASD (walk), Shift (run), Space (jump, then fall), Space held (float). Esc lets go and he walks back.
+function skinNow() {
+  const w = world();
+  return w && w.skin ? w.skin() : null;
+}
+/** The clips his model played while `act` ran (sampled every 50 ms), in order of first appearance. */
+async function clipsDuring(act) {
+  const seen = [];
+  const iv = setInterval(() => {
+    const s = skinNow();
+    const c = s && s.clip();
+    if (c && !seen.includes(c)) seen.push(c);
+  }, 50);
+  try {
+    await act();
+  } finally {
+    clearInterval(iv);
+  }
+  return seen;
+}
+async function watchDay(t, label, a, want, ms) {
+  scrubTo(a.start + Math.min(0.2, (a.end - a.start) / 3));
+  clickSpeed(1);
+  const seen = await clipsDuring(() => sleep(ms));
+  const ok = want.some((c) => seen.includes(c));
+  t.event(`autopilot-${label}`, `${E().fmtClock(a.start)} "${a.text}" (${a.pose || "stand"}${a.hand ? ", " + a.hand : ""}): his model played ${seen.join(" → ") || "nothing"}`);
+  if (!ok) t.problem("bug", `On his day (${label}: "${a.text}") his model played ${seen.join(", ") || "nothing"}, not ${want.join(" or ")}`);
+}
+
+async function model(options, t) {
+  t.scene("Loading his model");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const info = window.day.engineInfo ? window.day.engineInfo() : {};
+  if (info.model !== "small-weather" || !skinNow()) {
+    t.problem("blocker", `Small Weather's model didn't load (${info.model}${info.modelError ? ": " + info.modelError : ""}): the box figure shows`);
+    return;
+  }
+  const skin = skinNow();
+  t.event("model", `Small Weather's 3D model: ${skin.meshes.length} mesh(es), clips ${skin.clips.join(" ")}`);
+  t.progress(0.08);
+
+  // On autopilot: his day walks him, stands him, sits him down to work.
+  const day = window.day.today();
+  const home = (a) => a.room && window.DAY_CONFIG.rooms[a.room] && window.DAY_CONFIG.rooms[a.room].building === "home";
+  const walkA = day.actions.filter((a) => a.path && !a.inCar && home(a)).sort((x, y) => y.end - y.start - (x.end - x.start))[0];
+  const standA = day.actions.find((a) => !a.path && !a.inCar && (!a.pose || a.pose === "stand") && (!a.hand || a.hand === "none") && a.end - a.start > 1);
+  const workA = day.actions.find((a) => a.pose === "sitChair" && a.hand === "type" && a.end - a.start > 5);
+  t.scene("His day: walking");
+  if (walkA) await watchDay(t, "walk", walkA, ["walk"], 3500);
+  t.scene("His day: standing");
+  if (standA) await watchDay(t, "idle", standA, ["idle"], 2500);
+  t.scene("His day: at work");
+  if (workA) await watchDay(t, "work", workA, ["type", "sit"], 3000);
+  t.progress(0.35);
+
+  // Under control: real keys.
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control (js/control.js didn't install)");
+    return;
+  }
+  const a = quietMoment(day);
+  scrubTo(a.start + Math.min(1, (a.end - a.start) / 3));
+  await sleep(600);
+  clickSpeed(1);
+  t.scene("Taking control");
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  const check = (label, seen, want) => {
+    t.event(`control-${label}`, `${label}: his model played ${seen.join(" → ") || "nothing"}`);
+    want.forEach((c) => {
+      if (!seen.includes(c)) t.problem("bug", `Under control (${label}) his model never played "${c}" (${seen.join(", ") || "nothing"})`);
+    });
+  };
+  t.scene("Idle");
+  check("still", await clipsDuring(() => sleep(1500)), ["idle"]);
+  t.progress(0.45);
+  t.scene("Walking");
+  check("WASD", await clipsDuring(() => holdKeys(["d"], 1300).then(() => holdKeys(["w"], 1000))), ["walk"]);
+  t.progress(0.55);
+  t.scene("Running");
+  check("Shift", await clipsDuring(() => holdKeys(["Shift", "a"], 1200).then(() => holdKeys(["Shift", "s"], 1000))), ["run"]);
+  t.progress(0.65);
+  t.scene("Jumping and falling");
+  const flights0 = C.state().flights;
+  check(
+    "Space",
+    await clipsDuring(async () => {
+      await tapKey(" ");
+      await t.until(() => C.state().flights > flights0, 6000, "him to land").catch(() => {});
+      await sleep(400);
+    }),
+    ["jump", "fall"]
+  );
+  t.progress(0.75);
+  t.scene("Floating");
+  const flights1 = C.state().flights;
+  check(
+    "Space held",
+    await clipsDuring(async () => {
+      await tapKey(" ");
+      await sleep(350);
+      await tapKey(" ");
+      await sleep(350);
+      keyDown(" ");
+      await sleep(2200);
+      keyUp(" ");
+      await t.until(() => C.state().flights > flights1, 8000, "him to land").catch(() => {});
+    }),
+    ["float"]
+  );
+  if (!personOnScreen()) t.problem("bug", "He's off screen while the player has him");
+  t.progress(0.85);
+
+  t.scene("Letting go");
+  await letGoAndWatch(t, () => pressKey("Escape"), "keys");
+  t.scene("Back on his day");
+  t.event("model-back", `back on his day, his model plays "${skinNow() ? skinNow().clip() : "?"}"`);
+  await sleep(1500);
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -805,6 +932,7 @@ installPlaytest({
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live; Babylon 9, physics, his name in the panel and log", seconds: 30, tags: ["smoke"] },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
+    { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
@@ -814,6 +942,7 @@ installPlaytest({
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);
       else if (id === "control") await control(options, t);
+      else if (id === "model") await model(options, t);
     } finally {
       stopWatching();
     }
