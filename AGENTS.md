@@ -29,7 +29,8 @@ levels get redone over time. The page is the day playing on its own until someon
   messy hair, glasses, the navy tech jacket with glowing blue seams, cargo pants, glowing boots; lightning coils his
   arms while he's the player's. It's the same him all day (no pyjamas or towel colours: `person.outfits` only colours
   the box figure, which shows until the model loads or if it fails).
-- **Not yet:** the weather powers (the model has `cast` and `throw` clips for them), the city. Those are next steps.
+- **The city:** a few blocks in `day.config.js` `city` (avenues, crosses, the park, solid blocks). Three of the blocks have a stair up the north face onto the roof (`stair`). His rooms and the office stay the cutaway interiors; the office origin is a few blocks east on the main avenue (`street`). Untextured shapes; the art pass is later.
+- **Not yet:** the weather powers (the model has `cast` and `throw` clips for them).
 
 ### Taking control: how it's built
 

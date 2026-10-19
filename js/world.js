@@ -1,5 +1,5 @@
 /* ==========================================================================
-   The stage: a cutaway house, a long road, an office, and one person.
+   The stage: his apartment, a few city blocks, and one person.
    Furniture is placed from the spots in day.config.js, so moving a spot
    moves the furniture that belongs to it. Everything that can change
    (lights, screens, doors, the glass of water) reads the day's "things".
@@ -36,7 +36,7 @@
     scene.clearColor = new B.Color4(0.1, 0.12, 0.17, 1);
     scene.ambientColor = new B.Color3(0.25, 0.25, 0.28);
     scene.fogMode = B.Scene.FOGMODE_EXP2;
-    scene.fogDensity = 0.011;
+    scene.fogDensity = 0.0065;
     scene.skipPointerMovePicking = true;
 
     /* ---------------- materials ---------------- */
@@ -162,20 +162,65 @@
     /* ---------------- ground, street ---------------- */
     const street = cfg.street || { z: 12.6, from: -80, to: 2500, signals: [] };
     const RZ = street.z;
-    const groundLen = street.to - street.from + 200;
-    const ground = B.MeshBuilder.CreateGround("ground", { width: groundLen, height: 160 }, scene);
-    ground.position.set((street.from + street.to) / 2, 0, 10);
+    const groundLen = street.to - street.from + 80;
+    const groundD = 180;
+    const ground = B.MeshBuilder.CreateGround("ground", { width: groundLen, height: groundD }, scene);
+    ground.position.set((street.from + street.to) / 2, 0, 12);
     ground.material = mat("#4a6b4c");
     ground.receiveShadows = true;
     ground.isPickable = false;
-    const road = box("road", street.to - street.from, 0.04, 4.4, (street.from + street.to) / 2, 0.02, RZ, mat("#3b3e44"), null, false);
-    road.receiveShadows = true;
+    /* Streets from day.config.js `city`: the main avenue is one continuous road (his drive, and the
+       raycast the checks use). Side streets stop where they meet it. Sidewalks stop at the corners. */
+    const city = cfg.city || { avenues: [], crosses: [], blocks: [], park: null };
+    const roadM = mat("#3b3e44");
     const curbM = mat("#b9b3a8");
-    box("walkS", street.to - street.from, 0.06, 1.2, (street.from + street.to) / 2, 0.03, RZ - 2.9, curbM, null, false).receiveShadows = true;
-    box("walkN", street.to - street.from, 0.06, 1.2, (street.from + street.to) / 2, 0.03, RZ + 2.9, curbM, null, false).receiveShadows = true;
+    const streetMeshes = [];
+    function gaps(from, to, cuts, gap) {
+      const mids = cuts.filter((c) => c > from + gap && c < to - gap).sort((a, b) => a - b);
+      const pts = [from].concat(mids, [to]);
+      const out = [];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = i === 0 ? pts[i] : pts[i] + gap;
+        const b = i === pts.length - 2 ? pts[i + 1] : pts[i + 1] - gap;
+        if (b - a > 1.5) out.push([a, b]);
+      }
+      return out;
+    }
+    function layRoad(name, len, x, z, alongX) {
+      const mesh = box(name, alongX ? len : 4.4, 0.04, alongX ? 4.4 : len, x, 0.02, z, roadM, null, false);
+      mesh.receiveShadows = true;
+      streetMeshes.push(mesh);
+      return mesh;
+    }
+    function layWalk(name, len, x, z, alongX) {
+      const mesh = box(name, alongX ? len : 1.2, 0.06, alongX ? 1.2 : len, x, 0.03, z, curbM, null, false);
+      mesh.receiveShadows = true;
+      streetMeshes.push(mesh);
+    }
+    const crossXs = (city.crosses || []).map((c) => c.x);
+    const avenueZs = (city.avenues || []).map((a) => a.z);
+    const road = layRoad("road", street.to - street.from, (street.from + street.to) / 2, RZ, true);
+    gaps(street.from, street.to, crossXs, 3.8).forEach(([a, b], k) => {
+      layWalk("walkS" + k, b - a, (a + b) / 2, RZ - 2.9, true);
+      layWalk("walkN" + k, b - a, (a + b) / 2, RZ + 2.9, true);
+    });
     const dash = box("dash", 1.6, 0.012, 0.12, 0, 0.05, RZ, mat("#e8e1cf", { emissive: "#2a281f" }), null, false);
     for (let x = street.from; x < street.to; x += 6) dash.thinInstanceAdd(B.Matrix.Translation(x, 0, 0));
-    const streetMeshes = [road, ...scene.meshes.filter((m) => m.name === "walkS" || m.name === "walkN")];
+    (city.avenues || []).forEach((a, i) => {
+      if (Math.abs(a.z - RZ) < 1) return;
+      gaps(a.from, a.to, crossXs, 2).forEach(([a0, b0], k) => layRoad("ave" + i + "r" + k, b0 - a0, (a0 + b0) / 2, a.z, true));
+      gaps(a.from, a.to, crossXs, 3.8).forEach(([a0, b0], k) => {
+        layWalk("aveS" + i + "_" + k, b0 - a0, (a0 + b0) / 2, a.z - 2.9, true);
+        layWalk("aveN" + i + "_" + k, b0 - a0, (a0 + b0) / 2, a.z + 2.9, true);
+      });
+    });
+    (city.crosses || []).forEach((c, i) => {
+      gaps(c.from, c.to, avenueZs, 2).forEach(([a0, b0], k) => layRoad("cross" + i + "r" + k, b0 - a0, c.x, (a0 + b0) / 2, false));
+      gaps(c.from, c.to, avenueZs, 3.8).forEach(([a0, b0], k) => {
+        layWalk("crossW" + i + "_" + k, b0 - a0, c.x - 2.9, (a0 + b0) / 2, false);
+        layWalk("crossE" + i + "_" + k, b0 - a0, c.x + 2.9, (a0 + b0) / 2, false);
+      });
+    });
 
     const rng = makeRng(20261013);
 
@@ -183,7 +228,7 @@
     const ph = spots.parkHome;
     if (ph) box("driveway", 3.2, 0.03, RZ - 2.2 - 4.7, ph.x, 0.025, (4.7 + RZ - 2.2) / 2, mat("#6f6a62"), null, false).receiveShadows = true;
     const pw = spots.parkWork;
-    const officeO = (cfg.buildings.office && cfg.buildings.office.origin) || [2400, 0];
+    const officeO = (cfg.buildings.office && cfg.buildings.office.origin) || [128, 0];
     if (pw) {
       const lot = box("lot", 20, 0.03, RZ - 2.2 - 4.7, officeO[0] + 9, 0.025, (4.7 + RZ - 2.2) / 2, mat("#4a4d52"), null, false);
       lot.receiveShadows = true;
@@ -191,7 +236,42 @@
       for (let i = -3; i <= 4; i++) box("pline" + i, 0.08, 0.012, 4.2, pw.x + i * 2.6 - 1.3, 0.05, 7.8, lineM, null, false);
     }
 
-    /* Street furniture: lamps, trees, houses, shops */
+    /* Room to plant a lamp or a tree: not in a building, on a stair, in his yard, or on the check's open grass. */
+    const openGrass = { x: street.from + 30, z: street.z + 40 };
+    function cityOpen(x, z, pad) {
+      pad = pad == null ? 1 : pad;
+      if (Math.hypot(x - openGrass.x, z - openGrass.z) < 4) return false;
+      if (x > -10 && x < 14 && z > 3 && z < 11.5) return false;
+      if (pw && Math.abs(x - pw.x) < 16 && z > 4 && z < RZ + 1) return false;
+      const blocks = city.blocks || [];
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (x > b.x - b.w / 2 - pad && x < b.x + b.w / 2 + pad && z > b.z - b.d / 2 - pad && z < b.z + b.d / 2 + pad) return false;
+        if (b.stair && x > b.stair.x0 - pad && x < b.stair.x1 + pad && Math.abs(z - b.stair.z) < b.stair.w / 2 + pad) return false;
+      }
+      const indoors = ["home", "office"];
+      for (let i = 0; i < indoors.length; i++) {
+        const b = cfg.buildings[indoors[i]];
+        if (!b || !b.bounds) continue;
+        const o = b.origin || [0, 0];
+        if (x > b.bounds[0] + o[0] - pad && x < b.bounds[2] + o[0] + pad && z > b.bounds[1] + o[1] - pad && z < b.bounds[3] + o[1] + pad) return false;
+      }
+      return true;
+    }
+    function onAsphalt(x, z) {
+      if (Math.abs(z - RZ) < 2.5 && x > street.from && x < street.to) return true;
+      for (let i = 0; i < (city.avenues || []).length; i++) {
+        const a = city.avenues[i];
+        if (Math.abs(z - a.z) < 2.5 && x > a.from && x < a.to) return true;
+      }
+      for (let i = 0; i < (city.crosses || []).length; i++) {
+        const c = city.crosses[i];
+        if (Math.abs(x - c.x) < 2.5 && z > c.from && z < c.to) return true;
+      }
+      return false;
+    }
+
+    /* Street furniture: lamps and trees. The blocks come from day.config.js `city`. */
     const poleM = mat("#3a3d42");
     const lampHeadM = glowMat("#fff1c9");
     const pole = cyl("pole", 4.2, 0.1, 0.14, poleM, null, 8);
@@ -202,7 +282,7 @@
     glowing(lampHead);
     for (let x = street.from + 10; x < street.to; x += 32) {
       [RZ - 3.4, RZ + 3.4].forEach((z, i) => {
-        if (Math.abs(x - (ph ? ph.x : 0)) < 4 || Math.abs(x - (pw ? pw.x : 0)) < 12) return;
+        if (Math.abs(x - (ph ? ph.x : 0)) < 4 || Math.abs(x - (pw ? pw.x : 0)) < 12 || !cityOpen(x, z) || onAsphalt(x, z)) return;
         const m = B.Matrix.Compose(B.Vector3.One(), B.Quaternion.FromEulerAngles(0, i ? PI : 0, 0), V3(x, 0, z));
         pole.thinInstanceAdd(m);
         lampHead.thinInstanceAdd(m);
@@ -228,85 +308,84 @@
       crowns[k].thinInstanceAdd(B.Matrix.Compose(V3(s * (0.9 + rng() * 0.3), s * (0.8 + rng() * 0.4), s * (0.9 + rng() * 0.3)), B.Quaternion.Identity(), V3(x, 0, z)));
     }
 
-    const houseMs = ["#d9cbb5", "#c8d2d6", "#e2d5c9", "#bfc9b7", "#d6bfa9"].map((c) => mat(c));
-    const roofMs = ["#7a4d42", "#55606b", "#6b5a4a"].map((c) => mat(c));
-    const houseBody = houseMs.map((m, i) => {
-      const b = box("hb" + i, 1, 1, 1, 0, 0.5, 0, m, null, false);
-      b.bakeCurrentTransformIntoVertices();
-      return b;
-    });
-    const roofs = roofMs.map((m, i) => {
-      const r = B.MeshBuilder.CreateCylinder("roof" + i, { height: 1, diameter: 1, tessellation: 3 }, scene);
-      r.material = m;
-      r.isPickable = false;
-      r.rotation.z = PI / 2;
-      r.bakeCurrentTransformIntoVertices();
-      return r;
-    });
-    const winM = glowMat("#2b3340");
-    const houseWin = box("hwin", 1, 1, 0.04, 0, 0, 0, winM, null, false);
-    glowing(houseWin);
-    function house(x, z, w, d, h, facing) {
-      const k = Math.floor(rng() * houseBody.length);
-      houseBody[k].thinInstanceAdd(B.Matrix.Compose(V3(w, h, d), B.Quaternion.Identity(), V3(x, 0, z)));
-      solids.push({ x, y: h / 2, z, w, h, d });
-      const rk = Math.floor(rng() * roofs.length);
-      const ry = d * 0.45;
-      roofs[rk].thinInstanceAdd(B.Matrix.Compose(V3(w * 1.06, ry, d * 1.12), B.Quaternion.Identity(), V3(x, h + 0.25 * ry, z)));
-      const fz = z + (facing > 0 ? d / 2 + 0.03 : -d / 2 - 0.03);
-      for (let i = 0; i < 2; i++) {
-        const wx = x - w / 4 + (i * w) / 2;
-        houseWin.thinInstanceAdd(B.Matrix.Compose(V3(0.9, 0.8, 1), B.Quaternion.Identity(), V3(wx, h * 0.55, fz)));
-      }
-    }
-    const shopMs = ["#9aa3ab", "#b8ab98", "#8e98a3", "#c2b8a6", "#a3968a"].map((c) => mat(c));
-    const shopBodies = shopMs.map((m, i) => {
-      const b = box("sb" + i, 1, 1, 1, 0, 0.5, 0, m, null, false);
-      b.bakeCurrentTransformIntoVertices();
-      return b;
-    });
-    function shop(x, z, w, d, h, facing) {
-      const k = Math.floor(rng() * shopBodies.length);
-      shopBodies[k].thinInstanceAdd(B.Matrix.Compose(V3(w, h, d), B.Quaternion.Identity(), V3(x, 0, z)));
-      solids.push({ x, y: h / 2, z, w, h, d });
-      const fz = z + (facing > 0 ? d / 2 + 0.03 : -d / 2 - 0.03);
-      const floors = Math.max(1, Math.floor(h / 3));
-      for (let f = 0; f < floors; f++) {
-        for (let i = 0; i < Math.max(1, Math.floor(w / 3)); i++) {
-          const wx = x - w / 2 + 1.5 + i * 3;
-          if (rng() < 0.75) houseWin.thinInstanceAdd(B.Matrix.Compose(V3(1.6, 1.1, 1), B.Quaternion.Identity(), V3(wx, 1.6 + f * 3, fz)));
-        }
-      }
-    }
     const homeB = cfg.buildings.home && cfg.buildings.home.bounds;
-    const signalX = (street.signals || []).map((s) => s.x);
-    function nearKeepout(x, z) {
-      if (homeB && x > homeB[0] - 6 && x < homeB[2] + 6 && z < RZ) return true;
-      if (x > officeO[0] - 8 && x < officeO[0] + 26 && z < RZ) return true;
-      if (signalX.some((sx) => Math.abs(sx - x) < 8)) return true;
-      return false;
+
+    /* Blocks: one solid box, a parapet, and (where `stair` is set) a ramp up the north face
+       onto the roof. A ramp, not a stack of steps: the controller treats a sharp riser as a
+       wall once the capsule's curve meets it, and a slope under 30° stays walkable. */
+    const trimM = mat("#3a424c");
+    const stepM = mat("#8a8174");
+    const winM = glowMat("#243044");
+    const blockWin = box("bwin", 1.15, 1.25, 0.06, 0, 0, 0, winM, null, false);
+    glowing(blockWin);
+    blockWin.bakeCurrentTransformIntoVertices();
+    function lip(id, w, d, x, y, z, ph) {
+      box(id, w, ph, d, x, y, z, trimM, null, false).receiveShadows = true;
+      solids.push({ x, y, z, w, h: ph, d });
     }
-    for (let x = street.from + 4; x < street.to; x += 13 + rng() * 10) {
-      const neighborhood = x < (signalX[0] || 500) + 60;
-      [-1, 1].forEach((side) => {
-        const z = side < 0 ? RZ - 11 - rng() * 3 : RZ + 11 + rng() * 3;
-        if (nearKeepout(x, z)) return;
-        if (neighborhood) {
-          if (rng() < 0.82) house(x, z, 7 + rng() * 3, 6 + rng() * 2, 2.6 + rng() * 0.8, side < 0 ? 1 : -1);
-        } else if (rng() < 0.7) {
-          shop(x, z + side * 3, 9 + rng() * 8, 8 + rng() * 6, 3 + rng() * 12, side < 0 ? 1 : -1);
+    (city.blocks || []).forEach((b) => {
+      const shell = box("block-" + b.id, b.w, b.h, b.d, b.x, b.h / 2, b.z, mat(b.color || "#7a8794"));
+      shell.receiveShadows = true;
+      solids.push({ x: b.x, y: b.h / 2, z: b.z, w: b.w, h: b.h, d: b.d });
+      const ph = 0.85;
+      const t = 0.28;
+      const py = b.h + ph / 2;
+      const x0 = b.x - b.w / 2;
+      const x1 = b.x + b.w / 2;
+      const z0 = b.z - b.d / 2;
+      const z1 = b.z + b.d / 2;
+      lip(b.id + "ps", b.w + t, t, b.x, py, z0 + t / 2, ph);
+      lip(b.id + "pw", t, b.d, x0 + t / 2, py, b.z, ph);
+      lip(b.id + "pe", t, b.d, x1 - t / 2, py, b.z, ph);
+      if (b.stair) {
+        const s0 = b.stair.x0 - 0.8;
+        const s1 = b.stair.x1 + 0.8;
+        if (s0 - x0 > 0.4) lip(b.id + "pn1", s0 - x0, t, (x0 + s0) / 2, py, z1 - t / 2, ph);
+        if (x1 - s1 > 0.4) lip(b.id + "pn2", x1 - s1, t, (s1 + x1) / 2, py, z1 - t / 2, ph);
+      } else lip(b.id + "pn", b.w, t, b.x, py, z1 - t / 2, ph);
+      const floors = Math.max(1, Math.floor((b.h - 0.8) / 3));
+      for (let f = 0; f < floors; f++) {
+        const wy = 1.7 + f * 3;
+        if (wy > b.h - 0.9) continue;
+        for (let wx = x0 + 1.7; wx < x1 - 0.8; wx += 3.1) {
+          if (b.stair && wx > b.stair.x0 - 0.3 && wx < b.stair.x1 + 0.3) continue;
+          blockWin.thinInstanceAdd(B.Matrix.Translation(wx, wy, z1 + 0.04));
+          blockWin.thinInstanceAdd(B.Matrix.Translation(wx, wy, z0 - 0.04));
         }
+      }
+      if (!b.stair) return;
+      const s = b.stair;
+      const run = s.x1 - s.x0;
+      const L = Math.hypot(run, b.h);
+      const theta = Math.atan2(b.h, run);
+      const thick = 0.45;
+      const cx = s.x0 + (L / 2) * Math.cos(theta) + (thick / 2) * Math.sin(theta);
+      const cy = (L / 2) * Math.sin(theta) - (thick / 2) * Math.cos(theta);
+      const ramp = box(b.id + "ramp", L, thick, s.w, cx, cy, s.z, stepM, null, false);
+      ramp.rotation.z = theta;
+      solids.push({ x: cx, y: cy, z: s.z, w: L, h: thick, d: s.w, roll: theta });
+      const mark = new B.TransformNode("at-roof-" + b.id, scene);
+      mark.position.set(b.x, b.h, b.z);
+    });
+
+    if (city.park) {
+      const p = city.park;
+      const mark = new B.TransformNode("at-park", scene);
+      mark.position.set((p.x0 + p.x1) / 2, 0, (p.z0 + p.z1) / 2);
+      const pathLen = Math.max(4, p.z1 - p.z0 - 6);
+      const path = box("parkpath", 2.2, 0.02, pathLen, -8, 0.012, p.z0 + 3 + pathLen / 2, mat("#c4b59a"), null, false);
+      path.receiveShadows = true;
+      [[-4.2, 30], [-4.2, 46], [2.6, 38]].forEach((seat, i) => {
+        if (!cityOpen(seat[0], seat[1], 0.4)) return;
+        box("bench" + i, 1.4, 0.12, 0.45, seat[0], 0.48, seat[1], mat("#6b4e38"), null, false);
+        solids.push({ x: seat[0], y: 0.48, z: seat[1], w: 1.4, h: 0.5, d: 0.45 });
       });
     }
-    for (let x = street.from; x < street.to; x += 4 + rng() * 9) {
-      [-1, 1].forEach((side) => {
-        if (rng() < 0.45) return;
-        const z = side < 0 ? RZ - 5 - rng() * 2.5 : RZ + 5 + rng() * 3;
-        if (nearKeepout(x, z)) return;
-        tree(x, z, 0.8 + rng() * 0.7);
-      });
-    }
-    [[-12, 3], [-9, -6], [14, 1], [15, -5], [officeO[0] - 5, 1], [officeO[0] + 23, -2], [officeO[0] + 22, 4]].forEach((p) => tree(p[0], p[1], 1.1 + rng() * 0.4));
+    [[-28, 28, 1.1], [-22, 46, 1.2], [-14, 34, 0.9], [0, 26, 1.1], [2, 52, 1], [12, 34, 1.15], [18, 50, 1], [22, 30, 0.95],
+      [-30, -16, 1], [18, -16, 1.05], [70, -16, 1.1], [100, 8, 0.9], [124, 8, 1], [172, 8, 1.05], [40, 24, 1.1], [96, 30, 1.2],
+    ].forEach((p) => {
+      if (cityOpen(p[0], p[1], 1.2) && !onAsphalt(p[0], p[1])) tree(p[0], p[1], p[2]);
+    });
 
     /* Traffic signals */
     const signalLamps = [];
@@ -1032,9 +1111,9 @@
       rl.light.includedOnlyMeshes = (buildingMeshes[rl.building] || []).concat(movers, casters.filter((c) => c.getAbsolutePosition().x < 100));
     });
     officeLights.forEach((L) => {
-      L.includedOnlyMeshes = (buildingMeshes.office || []).concat(movers, casters.filter((c) => c.getAbsolutePosition().x > 1000));
+      L.includedOnlyMeshes = (buildingMeshes.office || []).concat(movers, casters.filter((c) => c.getAbsolutePosition().x > 100));
     });
-    headSpot.includedOnlyMeshes = [ground, road];
+    headSpot.includedOnlyMeshes = [ground].concat(streetMeshes);
 
     function dotTexture() {
       if (dotTexture.tex) return dotTexture.tex;
@@ -1615,10 +1694,10 @@
       }
       body("ground", (add) => {
         // a thick slab under the ground plane: nothing tunnels through it
-        add(V3(ground.position.x, -0.5, ground.position.z), B.Quaternion.Identity(), V3(groundLen, 1, 160));
+        add(V3(ground.position.x, -0.5, ground.position.z), B.Quaternion.Identity(), V3(groundLen, 1, groundD));
         streetMeshes.forEach((m) => meshBox(add, m));
       });
-      body("town", (add) => solids.forEach((o) => add(V3(o.x, o.y, o.z), B.Quaternion.FromEulerAngles(0, o.yaw || 0, 0), V3(o.w, o.h, o.d))));
+      body("town", (add) => solids.forEach((o) => add(V3(o.x, o.y, o.z), B.Quaternion.FromEulerAngles(o.pitch || 0, o.yaw || 0, o.roll || 0), V3(o.w, o.h, o.d))));
       body("rooms", (add) => solidMeshes.forEach((m) => meshBox(add, m)));
       physics = { plugin, bodies, colliders };
       return physics;

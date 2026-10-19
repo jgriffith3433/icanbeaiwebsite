@@ -250,7 +250,7 @@ window.DAY_CONFIG = {
       ],
     },
     office: {
-      origin: [2400, 0],
+      origin: [128, 0],
       bounds: [0, -3.6, 18, 4.6],
       wall: "#d5dbe3",
       floor: "#b9b4aa",
@@ -356,16 +356,16 @@ window.DAY_CONFIG = {
         parkHome: [-1.5, 7.6, 180],
         drivewayEnd: [-1.5, 10.6, 180],
         roadHomeE: [2.5, 11.9, 90],
-        signalE: [496, 11.9, 90],
-        roadWorkE: [2402, 11.9, 90],
-        lotEntry: [2403.5, 10.8, 180],
-        lotLane: [2405.5, 9.6, 180],
-        parkWork: [2405.5, 7.8, 180],
-        parkWorkFix: [2405.5, 7.45, 180],
-        backOutWork: [2405.5, 9.8, 180],
-        lotExit: [2403.5, 11.4, 270],
-        roadWorkW: [2399, 13.3, 270],
-        signalW: [504, 13.3, 270],
+        signalE: [70, 11.9, 90],
+        roadWorkE: [130, 11.9, 90],
+        lotEntry: [131.5, 10.8, 180],
+        lotLane: [133.5, 9.6, 180],
+        parkWork: [133.5, 7.8, 180],
+        parkWorkFix: [133.5, 7.45, 180],
+        backOutWork: [133.5, 9.8, 180],
+        lotExit: [131.5, 11.4, 270],
+        roadWorkW: [127, 13.3, 270],
+        signalW: [74, 13.3, 270],
         roadHomeW: [2.5, 13.3, 270],
       },
     },
@@ -461,12 +461,45 @@ window.DAY_CONFIG = {
     { at: "meetOther", pose: "sitChair", hand: "none", top: "#a67b5b", when: { meeting: "on" } },
   ],
 
-  /* The road between home and work. */
+  /* The main avenue (his drive) and the blocks around it. Home stays at the
+     origin; the office is a few blocks east on the same avenue. `street` is
+     that avenue: the checks raycast it. `city` is the rest of the district. */
   street: {
     z: 12.6,
-    from: -80,
-    to: 2500,
-    signals: [{ x: 500, thing: "signal" }],
+    from: -48,
+    to: 210,
+    signals: [{ x: 72, thing: "signal" }],
+  },
+
+  /* A few blocks, built by hand (J, q_843c2557747c: a made-up city, not a map).
+     Avenues run east-west, crosses north-south. Blocks are solid buildings;
+     ones with `stair` have a walkable roof (a ramp along +x on the north
+     face, from x0 at the ground to x1 at the roof). */
+  city: {
+    park: { x0: -34, z0: 20, x1: 30, z1: 68 },
+    avenues: [
+      { z: 12.6, from: -48, to: 210 },
+      { z: -34, from: -48, to: 210 },
+      { z: 76, from: -48, to: 210 },
+    ],
+    crosses: [
+      { x: -42, from: -48, to: 90 },
+      { x: 36, from: -48, to: 90 },
+      { x: 100, from: -48, to: 90 },
+      { x: 168, from: -48, to: 90 },
+    ],
+    blocks: [
+      { id: "apt", x: -24, z: 0.5, w: 16, d: 12, h: 6.16, color: "#7a8794", stair: { x0: -31, x1: -17, z: 7.2, w: 1.45 } },
+      { id: "shop", x: 50, z: 0.5, w: 16, d: 12, h: 3.3, color: "#a68462", stair: { x0: 43, x1: 50.5, z: 7.2, w: 1.45 } },
+      { id: "annex", x: 157, z: 0.5, w: 16, d: 12, h: 5.72, color: "#5c6b7a", stair: { x0: 150, x1: 163, z: 7.2, w: 1.45 } },
+      { id: "row-west", x: -24, z: -20, w: 18, d: 10, h: 5, color: "#6d635c" },
+      { id: "row-south", x: 52, z: -20, w: 22, d: 10, h: 8, color: "#7a6a60" },
+      { id: "mid", x: 86, z: 0.5, w: 12, d: 12, h: 11, color: "#59636e" },
+      { id: "corner", x: 112, z: 0.5, w: 10, d: 12, h: 9, color: "#4c5966" },
+      { id: "north-mid", x: 68, z: 46, w: 36, d: 22, h: 15, color: "#45515c" },
+      { id: "north-east", x: 140, z: 48, w: 32, d: 20, h: 20, color: "#3c4650" },
+      { id: "south-office", x: 146, z: -20, w: 24, d: 10, h: 8, color: "#6a6560" },
+    ],
   },
 
   /* ------------------------------------------------------------------------
@@ -581,7 +614,8 @@ window.DAY_CONFIG = {
         { pose: "sitCar", hand: "reach", for: "10-20s", do: ["He puts music on.", "He connects the phone. A podcast."] },
         { drive: "drivewayEnd", reverse: true, for: "25-40s", do: "He backs out of the driveway." },
         { drive: "roadHomeE", for: "15-25s", do: "Onto the street." },
-        { drive: "signalE", fill: true, micro: DRIVE_MICRO, do: ["Through the neighborhood.", "Onto the main road.", "Past the houses."] },
+        { drive: "signalE", for: "10-14s", micro: DRIVE_MICRO, do: ["Through the neighborhood.", "Onto the avenue.", "Past the buildings."] },
+        { pose: "sitCar", hand: "wheel", fill: true, micro: DRIVE_MICRO, do: ["The light at the corner. The line stops.", "He waits in the line."] },
       ],
     },
     {
@@ -597,7 +631,10 @@ window.DAY_CONFIG = {
       time: "8:32",
       title: "The rest of the drive",
       chapter: "commute",
-      steps: [{ drive: "roadWorkE", fill: true, micro: DRIVE_MICRO, do: ["The rest of the drive.", "Main road.", "Traffic moves."] }],
+      steps: [
+        { drive: "roadWorkE", for: "10-14s", micro: DRIVE_MICRO, do: ["The rest of the drive.", "Along the avenue.", "Traffic moves."] },
+        { pose: "sitCar", hand: "wheel", fill: true, micro: DRIVE_MICRO, do: ["The lot is just ahead. He waits to turn."] },
+      ],
     },
     {
       time: "8:46",
@@ -950,7 +987,8 @@ window.DAY_CONFIG = {
         { drive: "backOutWork", reverse: true, for: "15-25s", do: "He backs out of the spot." },
         { drive: "lotExit", for: "25-40s", set: { headlights: "on" }, do: "Out of the lot. Headlights on; the sky is getting dim." },
         { drive: "roadWorkW", for: "15-25s", do: "Onto the road." },
-        { drive: "signalW", fill: true, micro: { pools: ["driving", "mind"], every: "1.5-4m" }, do: ["The drive home.", "Traffic.", "He follows the car ahead.", "The road home."] },
+        { drive: "signalW", for: "10-16s", micro: { pools: ["driving", "mind"], every: "1.5-4m" }, do: ["The drive home.", "Along the avenue.", "He follows the car ahead."] },
+        { pose: "sitCar", hand: "wheel", fill: true, micro: DRIVE_MICRO, do: ["The light near home. A long line.", "He waits."] },
       ],
     },
     {
@@ -966,7 +1004,10 @@ window.DAY_CONFIG = {
       time: "18:44",
       title: "The last streets",
       chapter: "commute",
-      steps: [{ drive: "roadHomeW", fill: true, micro: DRIVE_MICRO, do: ["The last streets.", "His street."] }],
+      steps: [
+        { drive: "roadHomeW", for: "10-14s", micro: DRIVE_MICRO, do: ["The last streets.", "His street."] },
+        { pose: "sitCar", hand: "wheel", fill: true, micro: DRIVE_MICRO, do: ["Almost home. He looks for the driveway."] },
+      ],
     },
     {
       time: "18:48",
