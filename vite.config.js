@@ -32,7 +32,7 @@ export default defineConfig({
   optimizeDeps: { exclude: ['@babylonjs/havok'] }, // its .wasm is loaded by URL (js/app.js)
   build: {
     target: 'es2022',
-    chunkSizeWarningLimit: 8000, // Babylon is one big chunk, as the CDN file was
+    chunkSizeWarningLimit: 9000, // Babylon is one big chunk, as the CDN file was
   },
   server: {
     host: '0.0.0.0',

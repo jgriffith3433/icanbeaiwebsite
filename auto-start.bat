@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-if not exist node_modules (
+if not exist node_modules\@babylonjs\havok (
   echo Installing dependencies...
   call npm install
 )
