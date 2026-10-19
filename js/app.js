@@ -30,4 +30,14 @@ HavokPhysics({ locateFile: () => havokWasm })
     status.error = String((err && err.message) || err);
     console.error("[world] Havok physics didn't load:", err);
   })
-  .finally(() => window.dispatchEvent(new CustomEvent("day:engine", { detail: { ...status } })));
+  .finally(() => {
+    // The side panel's foot says what's running.
+    const foot = document.querySelector(".foot");
+    if (foot) {
+      const s = document.createElement("span");
+      s.className = "engine";
+      s.textContent = ` Babylon ${status.babylon} · physics ${status.physics === "havok" ? "on (Havok)" : status.physics}.`;
+      foot.appendChild(s);
+    }
+    window.dispatchEvent(new CustomEvent("day:engine", { detail: { ...status } }));
+  });

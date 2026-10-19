@@ -40,7 +40,11 @@ ok(cfg.person && cfg.person.name === 'Small Weather', `day.config.js person.name
 const day = sandbox.DayEngine.build(cfg, '2026-10-19');
 ok(!day.errors.length, `day.config.js errors: ${day.errors.join('; ')}`);
 ok(day.actions.length > 300, `only ${day.actions.length} actions in the day`);
-const theyLines = [...new Set(day.actions.map((a) => a.text))].filter((t) => /\b(they|them|their|themselves)\b/i.test(t));
+// A week of days, so lines that only happen by chance are read too.
+const texts = new Set();
+for (let d = 12; d <= 25; d++) sandbox.DayEngine.build(cfg, `2026-10-${d}`).actions.forEach((a) => texts.add(a.text));
+const theyLines = [...texts].filter((t) => /\b(they|their|theirs|themselves)\b/i.test(t));
+ok([...texts].some((t) => t.includes('Small Weather')), 'no line in the day names Small Weather');
 ok(!theyLines.length, `lines that still say "they": ${theyLines.slice(0, 5).join(' | ')}`);
 
 const world = sandbox.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);

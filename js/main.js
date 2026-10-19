@@ -30,6 +30,7 @@
     side: $("side"),
     errors: $("errors"),
     title: $("mark-title"),
+    logTitle: $("log-title"),
   };
 
   if (!cfg || !E) {
@@ -37,6 +38,8 @@
     return;
   }
   el.title.textContent = cfg.title || "A day";
+  const who = (cfg.person && cfg.person.name) || "";
+  if (who && el.logTitle) el.logTitle.textContent = `${who} · every action`;
   const dayStart = E.parseClock(cfg.dayStart || "7:30");
 
   /* ---------------- days ---------------- */
