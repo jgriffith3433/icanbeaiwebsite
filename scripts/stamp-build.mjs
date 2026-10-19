@@ -6,8 +6,13 @@
 //
 // Hawkes Studio runs it on beta before every go live (products.json deploy.prebuild). This is not the product's
 // version: that is releases.json (written by Hawkes Studio at each go live, shown on whatsnew.html).
+//
+// It also writes window.HAWKES_BUILD = { version, commit, date } into every page that has one (Hawkes Analytics tags
+// each event with it): version = releases.json's current + the build stamp, commit = the HEAD it was built from, date
+// = when. When the version is unchanged the commit and date stay, so a second run changes nothing.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 const root = new URL('../', import.meta.url);
 const htmlPath = new URL('index.html', root);
@@ -33,5 +38,40 @@ html = html.replace(local, (m, attr, file) => {
   return `${attr}="${file}?v=${build}"`;
 });
 html = html.replace(/<meta name="(version|build)" content="[^"]*"\s*\/?>/, `<meta name="build" content="${build}" />`);
+
+// The build for Hawkes Analytics.
+const BUILD_RE = /window\.HAWKES_BUILD = (\{[^\n]*?\});/;
+let current = 'dev';
+try {
+  current = JSON.parse(fs.readFileSync(new URL('releases.json', root), 'utf8')).current || current;
+} catch {
+  // No releases yet.
+}
+const version = `${current}+${build}`;
+let info = null;
+try {
+  const old = JSON.parse(BUILD_RE.exec(html)?.[1] ?? 'null');
+  if (old && old.version === version && old.commit) info = old;
+} catch {
+  // An old or hand-edited line: write a new one.
+}
+if (!info) {
+  info = { version, date: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  try {
+    info.commit = execFileSync('git', ['rev-parse', '--short=10', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    // Not a git checkout: version and date only.
+  }
+  info = { version: info.version, commit: info.commit, date: info.date };
+}
+const line = `window.HAWKES_BUILD = ${JSON.stringify(info)};`;
+html = html.replace(BUILD_RE, line);
 fs.writeFileSync(htmlPath, html);
-console.log(`Build ${build} (${count} links stamped in index.html)`);
+for (const page of ['whatsnew.html', 'privacy.html']) {
+  const p = new URL(page, root);
+  if (!fs.existsSync(p)) continue;
+  const before = fs.readFileSync(p, 'utf8');
+  const after = before.replace(BUILD_RE, line);
+  if (after !== before) fs.writeFileSync(p, after);
+}
+console.log(`Build ${build} (${count} links stamped in index.html), ${line}`);

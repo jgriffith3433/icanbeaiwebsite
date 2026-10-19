@@ -16,6 +16,7 @@ Double-click `auto-start.bat`. The first time, it installs Vite. Then it serves 
 | `js/schedule.js` | The engine. It compiles the config into one continuous timeline (about 700 actions) for each date. |
 | `js/world.js` | The 3D stage (Babylon.js). Furniture is placed from the spots in the config, and props react to the things. |
 | `js/main.js` | Clock, playback, the action log, body meters, the things panel |
+| `js/analytics.js` | Hawkes Analytics: what viewers watch and touch (see [AGENTS.md](AGENTS.md#analytics-hawkes-analytics)) |
 | `simulation-checklist.md` | The original rules the simulation follows |
 
 ## Versions and publishing
@@ -107,6 +108,7 @@ calls `window.hawkesPlaytest.start()` or the URL has `?playtest=<id>`.
 | --- | --- |
 | `smoke` (~15 s) | Boot, check the person is on screen, watch the live clock tick, play one day-minute at 10×, pause, Esc back to live. |
 | `day` (~75 s) | Drag the day bar to the start of the day, play at 1200× to the end, and check every block in today's timeline started and every action was reached. `?speed=` multiplies the speed. |
+| `analytics` (~4 min) | Camera, speed buttons and keys, the day bar, the panels, with every analytics event that goes out on the timeline; then waits for the 3-minute question ("What would you want this to be?") and dismisses it. |
 
 Problems it reports: a block (activity) that never starts, actions never reached, the clock stopping, NaN in the
 body stats or the person's position, the person mesh not where the engine puts them, config errors and warnings,

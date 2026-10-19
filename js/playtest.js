@@ -343,6 +343,151 @@ async function wholeDay(options, t) {
   t.progress(1);
 }
 
+/* ---------------- analytics: the events going out, then the question after 3 minutes ---------------- */
+// The page turns on the SDK's debug mode for a bot's tab (index.html), so hawkesAnalytics.debugLog holds
+// every event and marks it `sent` when its batch goes out. Every interaction is real input.
+const sent = () => ((window.hawkesAnalytics && window.hawkesAnalytics.debugLog) || []).filter((e) => e.sent);
+const has = (name, test) => (window.hawkesAnalytics.debugLog || []).some((e) => e.name === name && (!test || test(e)));
+
+function pointer(type, x, y, id = 1) {
+  const c = $("view");
+  const r = c.getBoundingClientRect();
+  const ev = new PointerEvent(type, { pointerId: id, pointerType: "mouse", isPrimary: true, clientX: r.left + x * r.width, clientY: r.top + y * r.height, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true });
+  c.dispatchEvent(ev);
+}
+
+/** Drag on the 3D view to turn the camera, like a mouse does. */
+async function dragCamera(dx) {
+  pointer("pointerdown", 0.5, 0.55);
+  for (let i = 1; i <= 12; i++) {
+    pointer("pointermove", 0.5 + (dx * i) / 12, 0.55);
+    await sleep(40);
+  }
+  pointer("pointerup", 0.5 + dx, 0.55);
+}
+
+async function analytics(options, t) {
+  t.scene("Live");
+  checkBasics(t);
+  const A = window.hawkesAnalytics;
+  if (!A) {
+    t.problem("bug", "Hawkes Analytics didn't load (js/hawkes-analytics.js)");
+    return;
+  }
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const c = A.config();
+  t.log(`analytics product ${c.product}, env ${c.env}, build ${JSON.stringify(c.build)}, debug ${c.debug}, session ${c.session}`);
+  t.event("analytics-config", `env ${c.env} · build ${c.build && c.build.version} ${c.build && c.build.commit ? "@" + c.build.commit : ""}`);
+  t.metric("analyticsEnv", c.env);
+  t.metric("analyticsBuild", (c.build && c.build.version) || "none");
+  if (c.product !== "icanbe") t.problem("bug", `Analytics product is "${c.product}", not icanbe`);
+  if (!c.build || !c.build.version || c.build.version === "dev") {
+    if (c.env === "beta" || c.env === "live") t.problem("bug", `The page has no build for analytics (HAWKES_BUILD is ${JSON.stringify(c.build)}): scripts/stamp-build.mjs didn't run`);
+  }
+  if (!c.debug) t.problem("warning", "The SDK's debug mode is off, so the events going out can't be shown (open with ?hawkes-analytics-debug=1)");
+
+  // Every event the page sends shows on the timeline once its batch goes out.
+  let shown = 0;
+  const showSent = () => {
+    const list = sent();
+    for (; shown < list.length; shown++) {
+      const e = list[shown];
+      const p = e.props || {};
+      const detail = p.name || p.label || p.action || p.minutes || "";
+      t.event("analytics", `${e.name}${detail !== "" ? " " + detail : ""}${p.via ? " (" + p.via + ")" : ""} · ${e.ctx && e.ctx.time ? e.ctx.time + " " : ""}${(e.ctx && e.ctx.activity) || ""}`);
+    }
+  };
+  const showing = setInterval(showSent, 500);
+  stopRun = () => clearInterval(showing);
+  try {
+    await t.until(() => has("game_ready"), 10000, "game_ready");
+    t.progress(0.05);
+
+    // The camera: turn it, zoom it, tap the room.
+    t.scene("Camera");
+    await dragCamera(0.18);
+    await sleep(800);
+    $("view").dispatchEvent(new WheelEvent("wheel", { deltaY: -240, clientX: innerWidth / 2, clientY: innerHeight / 2, bubbles: true, cancelable: true }));
+    await sleep(800);
+    pointer("pointerdown", 0.5, 0.5);
+    await sleep(80);
+    pointer("pointerup", 0.5, 0.5);
+    await sleep(800);
+    t.progress(0.1);
+
+    // Speed: the 60× button, then 300× for a few seconds (activities pass: progress).
+    t.scene("Playing 300×");
+    clickSpeed(60);
+    await sleep(1500);
+    pressKey("4"); // 300×
+    await sleep(6000);
+    pressKey(" "); // pause
+    await sleep(1000);
+    t.progress(0.15);
+
+    // The day bar: drag to noon and stay; then step on with the arrows.
+    t.scene("Day bar");
+    scrubTo(12 * 60);
+    await sleep(3000);
+    pressKey("ArrowRight");
+    await sleep(200);
+    pressKey("ArrowRight");
+    await sleep(2500);
+    // The panel and sound buttons (the HUD is hidden on the public site, but the buttons work).
+    $("details").click();
+    await sleep(300);
+    $("details").click();
+    $("sound").click();
+    await sleep(300);
+    $("sound").click();
+    pressKey("Escape"); // back to now
+    t.scene("Live");
+    t.progress(0.2);
+
+    // Wait for the batches to go out.
+    await t.until(() => ["page_view", "game_ready", "screen", "progress", "feature"].every((n) => sent().some((e) => e.name === n)), 15000, "page_view, progress and feature events to be sent").catch(() => {});
+    showSent();
+    for (const n of ["page_view", "session_start", "game_ready", "screen", "progress", "feature"]) {
+      if (!sent().some((e) => e.name === n)) t.problem("bug", `No ${n} event went out`);
+    }
+    const features = new Set(sent().filter((e) => e.name === "feature").map((e) => e.props.name));
+    t.metric("featuresSent", [...features].join(","));
+    ["camera", "speed", "pause", "scrub", "step", "details", "sound", "live"].forEach((f) => !features.has(f) && t.problem("warning", `No feature event for ${f}`));
+    t.metric("progressSent", sent().filter((e) => e.name === "progress").length);
+    if (!sent().some((e) => e.name === "feature" && e.ctx && e.ctx.time && e.ctx.activity)) t.problem("warning", "Events don't carry the time of day and the activity in their context");
+
+    // The question: after 3 minutes on screen, when the viewer isn't touching anything.
+    t.scene("Watching (the question comes after 3 minutes)");
+    const after = window.day.analytics.askAfter;
+    const card = () => document.querySelector(`[data-hawkes-ask="${window.day.analytics.askId}"]`);
+    while (!card() && window.day.analytics.watched() < after + 20) {
+      await sleep(2000);
+      t.progress(0.2 + 0.6 * Math.min(1, window.day.analytics.watched() / after));
+    }
+    if (!card()) {
+      t.problem("bug", `The feedback question didn't show after ${window.day.analytics.watched()} s on screen`);
+      return;
+    }
+    t.scene("The question");
+    t.event("feedback-prompt", `shown after ${window.day.analytics.watched()} s: "What would you want this to be?"`);
+    await sleep(5000); // long enough to read in the footage
+    const close = card().shadowRoot && card().shadowRoot.querySelector(".ha-x");
+    if (!close) t.problem("bug", "The feedback question has no close button");
+    else close.click();
+    await sleep(600);
+    if (card()) t.problem("bug", "The feedback question didn't close");
+    else t.event("feedback-prompt", "dismissed");
+    t.scene("Live");
+    await t.until(() => sent().some((e) => e.name === "feedback_prompt" && e.props.action === "dismissed"), 12000, "the dismissal to be sent").catch(() =>
+      t.problem("warning", "The feedback_prompt dismissed event didn't go out"));
+    showSent();
+    t.metric("eventsSent", sent().length);
+    t.progress(1);
+  } finally {
+    clearInterval(showing);
+  }
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -350,12 +495,14 @@ installPlaytest({
   scenarios: [
     { id: "smoke", title: "Boot, see the person, a minute of the day at 10×, pause, back to live", seconds: 20, tags: ["smoke"] },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
+    { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
     try {
       if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
+      else if (id === "analytics") await analytics(options, t);
     } finally {
       stopWatching();
     }

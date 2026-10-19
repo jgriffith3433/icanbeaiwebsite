@@ -26,6 +26,22 @@
         if (!local) document.documentElement.classList.add("public");
       })();
     </script>
+    <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
+    <script>window.HAWKES_BUILD = { version: "dev" };</script>
+    <script>
+      /* A playtest bot's tab logs what it sends (the SDK's debug mode), so the playtest can show the events going out. */
+      (function () {
+        try {
+          var q = new URLSearchParams(location.search);
+          if ((navigator.webdriver || q.get("playtest")) && !q.get("hawkes-analytics-debug")) {
+            q.set("hawkes-analytics-debug", "1");
+            history.replaceState(history.state, "", location.pathname + "?" + q.toString() + location.hash);
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script src="js/hawkes-analytics.js?v=1051956c89" data-product="icanbe"></script>
+    <script>window.hawkesAnalytics && hawkesAnalytics.loadStart();</script>
   </head>
   <body>
     <canvas id="view" aria-label="A 3D view of the person's day"></canvas>
@@ -63,7 +79,7 @@
         <h2>Things</h2>
         <div class="chips" id="things"></div>
       </section>
-      <p class="foot">Edit <code>day.config.js</code> to change the day.</p>
+      <p class="foot">Edit <code>day.config.js</code> to change the day. <a href="privacy.html">Privacy</a></p>
     </aside>
 
     <footer class="hud bottom panel">
@@ -88,6 +104,8 @@
 
     <!-- The version (releases.json, written at each release): a quiet link to What's new, also in the public view. -->
     <a class="version-tag" href="whatsnew.html" data-hawkes-version hidden></a>
+    <!-- Anonymous viewing statistics (Hawkes Analytics): what is collected is on privacy.html. -->
+    <a class="privacy-tag" href="privacy.html">Privacy</a>
 
     <!-- Local only: preview the page the way the public sees it (no HUD). Shortcut: H -->
     <button type="button" class="public-toggle" id="public-toggle" aria-pressed="false" title="Preview the public view (H)">Public view</button>
@@ -117,6 +135,7 @@
     <script src="js/schedule.js?v=1051956c89"></script>
     <script src="js/world.js?v=1051956c89"></script>
     <script src="js/main.js?v=1051956c89"></script>
+    <script src="js/analytics.js?v=1051956c89"></script>
     <!-- Hawkes playtest hooks. Idle unless the runner calls them or the URL has ?playtest=<id>. -->
     <script type="module" src="js/playtest.js?v=1051956c89"></script>
     <script src="js/hawkes-release.js?v=1051956c89" data-releases="releases.json" defer></script>

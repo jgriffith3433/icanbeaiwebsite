@@ -25,7 +25,11 @@
       .hawkes-release-date { margin-left: auto; color: var(--soft); font: 500 0.8rem Outfit, sans-serif; letter-spacing: 0.06em; }
       .hawkes-release ul { margin: 0; padding-left: 1.2em; }
       .hawkes-release li { margin: 0.3em 0; }
+      .privacy { margin-top: 40px; color: var(--soft); font-size: 0.85rem; }
     </style>
+    <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
+    <script>window.HAWKES_BUILD = { version: "dev" };</script>
+    <script src="js/hawkes-analytics.js" data-product="icanbe" defer></script>
   </head>
   <body>
     <main>
@@ -33,6 +37,7 @@
       <h1>What's new</h1>
       <p class="lede">What changed in the day, newest first. <span data-hawkes-version data-prefix="Now: v" hidden></span></p>
       <div data-hawkes-releases><p>Loading&hellip;</p></div>
+      <p class="privacy">This site collects anonymous viewing statistics to improve it: no cookies, no personal data, no IP stored. <a href="privacy.html">Privacy</a></p>
     </main>
     <script src="js/hawkes-release.js" data-releases="releases.json" defer></script>
   </body>
