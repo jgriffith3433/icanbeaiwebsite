@@ -1063,6 +1063,11 @@
       lie: { y: 0.8, pitch: -PI / 2, roll: 0, torso: 0, hip: 0, knee: 0, sh: 0.08, el: -0.15 },
       side: { y: 0.86, pitch: -PI / 2, roll: 1.35, torso: 0.1, hip: -0.55, knee: 0.95, sh: -0.7, el: -1.1 },
       recline: { y: 0.88, pitch: -1.0, roll: 0, torso: 0, hip: -0.6, knee: 0.08, sh: -0.2, el: -0.7 },
+      /* the player's moves (js/control.js): the stand-in for a rigged model's clips */
+      run: { y: 1.0, pitch: 0, roll: 0, torso: 0.2, hip: -0.1, knee: 0.15, sh: 0.0, el: -1.35, swing: 1.7 },
+      jump: { y: 1.01, pitch: 0, roll: 0, torso: 0.12, hip: -0.75, knee: 1.25, sh: -0.9, el: -0.7 },
+      fall: { y: 1.01, pitch: 0, roll: 0, torso: -0.05, hip: -0.2, knee: 0.35, sh: -0.5, el: -0.3 },
+      float: { y: 1.01, pitch: 0, roll: 0, torso: -0.1, hip: -0.3, knee: 0.6, sh: -0.15, el: -0.15 },
     };
 
     function gesture(hand, pose, t) {
@@ -1102,6 +1107,12 @@
           return { shR: -0.65, elR: -2.35, head: 0.12 };
         case "nod":
           return { head: Math.max(0, Math.sin(t * 3)) * 0.3 };
+        case "air": // jumping, falling: arms out for balance
+          return { shLz: 0.75 + s(9, 0.08), shRz: -0.75 - s(9, 0.08), head: -0.1 };
+        case "float": // the slow fall: arms spread wide, like riding the wind
+          return { shL: -0.1, shR: -0.1, shLz: 1.35 + s(2.5, 0.06), shRz: -1.35 - s(2.5, 0.06), elL: -0.15, elR: -0.15, head: -0.2 };
+        case "cast": // one hand up to the sky (the weather, later)
+          return { shR: -2.9, elR: -0.1, shL: -0.6, elL: -0.8, shLz: 0.3, head: -0.35 };
         default:
           return {};
       }
@@ -1110,7 +1121,7 @@
     function posePerson(p, poseName, hand, dt, moving, snap, t) {
       const spec = POSE[poseName] || POSE.stand;
       const g = gesture(hand, poseName, t);
-      const sw = moving ? Math.sin(p.phase) : 0;
+      const sw = moving ? Math.sin(p.phase) * (spec.swing || 1) : 0;
       const breathe = Math.sin(t * 1.7) * 0.015;
       const target = {
         pitch: spec.pitch,
@@ -1126,8 +1137,8 @@
         elR: g.elR != null ? g.elR : spec.el,
         hipL: spec.hip + (moving ? sw * 0.55 : 0),
         hipR: spec.hip - (moving ? sw * 0.55 : 0),
-        knL: spec.knee + (moving ? Math.max(0, -Math.sin(p.phase - 0.9)) * 0.8 : 0),
-        knR: spec.knee + (moving ? Math.max(0, Math.sin(p.phase - 0.9)) * 0.8 : 0),
+        knL: spec.knee + (moving ? Math.max(0, -Math.sin(p.phase - 0.9)) * 0.8 * (spec.swing || 1) : 0),
+        knR: spec.knee + (moving ? Math.max(0, Math.sin(p.phase - 0.9)) * 0.8 * (spec.swing || 1) : 0),
       };
       const k = snap || !p.inited ? 1 : 1 - Math.exp(-9 * dt);
       const kk = snap || !p.inited ? 1 : 1 - Math.exp(-5 * dt);
@@ -1157,6 +1168,36 @@
       if (p.cup) p.cup.setEnabled(!!g.cup);
       return spec;
     }
+
+    /* ---------------- the player's stand-in ---------------- */
+    /* While the player has him (js/control.js), Small Weather is drawn through this, not from the day.
+       It's the box-built figure with a pose for each clip a rigged model will have (js/avatar.js says
+       how a GLB drops in): idle, walk, run, jump, fall, float, cast. */
+    const FOOT = POSE.stand.y - FLOOR; // from his feet to the root
+    const CLIP_POSE = { idle: ["stand", "none"], walk: ["walk", "none"], run: ["run", "none"], jump: ["jump", "air"], fall: ["fall", "air"], float: ["float", "float"], cast: ["stand", "cast"] };
+    const avatar = {
+      kind: "stand-in",
+      clips: Object.keys(CLIP_POSE),
+      root: me.root,
+      place(x, feetY, z, yaw) {
+        if (me.root.parent) me.root.parent = null;
+        me.root.position.set(x, feetY + FOOT, z);
+        me.root.rotation.y = yaw;
+        state.yaw = yaw;
+        state.lastX = x;
+        state.lastZ = z;
+      },
+      /* speed: metres per second over the ground, for the stride */
+      play(clip, speed, dt) {
+        const cp = CLIP_POSE[clip] || CLIP_POSE.idle;
+        const moving = clip === "walk" || clip === "run";
+        if (moving) me.phase += speed * dt * (clip === "run" ? 2.9 : 4.2);
+        posePerson(me, cp[0], cp[1], dt, moving, false, elapsed);
+      },
+      show(on) {
+        me.root.setEnabled(on);
+      },
+    };
 
     /* ---------------- sky ---------------- */
     const SR = window.DayEngine.parseClock(((cfg.sky || {}).sunrise) || "6:45") / 60;
@@ -1314,7 +1355,9 @@
       }
 
       /* quilt */
-      const pp = fr.person;
+      /* opts.player: the player has him (js/control.js), which places and poses him; the day still runs the rest */
+      const player = opts.player || null;
+      const pp = player ? Object.assign({}, fr.person, { x: player.x, z: player.z, pose: "stand", walking: player.speed > 0.2, inCar: false }) : fr.person;
       const inBed = spots.bed && Math.hypot(pp.x - spots.bed.x, pp.z - spots.bed.z) < 0.4 && ["lie", "side", "recline"].includes(pp.pose);
       if (quiltUp) {
         quiltUp.setEnabled(inBed && things.blanket !== "down");
@@ -1363,7 +1406,9 @@
       me.top.diffuseColor = C(outfit.top);
       me.bottom.diffuseColor = C(outfit.bottom);
       me.shoes.diffuseColor = C(outfit.feet || P.shoes || "#241f1c");
-      if (pp.inCar) {
+      if (player) {
+        // placed and posed by the player's controller
+      } else if (pp.inCar) {
         if (me.root.parent !== myCar.root) me.root.parent = myCar.root;
         me.root.position.set(-0.4, POSE.sitCar.y, 0.05);
         me.root.rotation.y = 0;
@@ -1375,11 +1420,13 @@
         state.yaw = dampAngle(state.yaw, pp.yaw, dt, pp.walking ? 12 : 7);
         me.root.rotation.y = state.yaw;
       }
-      const moved = state.lastX == null ? 0 : Math.hypot(pp.x - state.lastX, pp.z - state.lastZ);
-      state.lastX = pp.x;
-      state.lastZ = pp.z;
-      if (pp.walking && !pp.inCar) me.phase += Math.min(moved, 0.4) * 5.2;
-      posePerson(me, pp.inCar ? "sitCar" : pp.walking ? "walk" : pp.pose, pp.walking && !["hold", "phone", "nod", "drink"].includes(pp.hand) ? "none" : pp.hand, dt, pp.walking && !pp.inCar, snap, t);
+      if (!player) {
+        const moved = state.lastX == null ? 0 : Math.hypot(pp.x - state.lastX, pp.z - state.lastZ);
+        state.lastX = pp.x;
+        state.lastZ = pp.z;
+        if (pp.walking && !pp.inCar) me.phase += Math.min(moved, 0.4) * 5.2;
+        posePerson(me, pp.inCar ? "sitCar" : pp.walking ? "walk" : pp.pose, pp.walking && !["hold", "phone", "nod", "drink"].includes(pp.hand) ? "none" : pp.hand, dt, pp.walking && !pp.inCar, snap, t);
+      }
       if (me.bag) me.bag.setEnabled(String(things.carrying || "").includes("bag") && !pp.inCar);
 
       npcs.forEach((n) => {
@@ -1404,7 +1451,20 @@
         elevatorDoors.r.position.x = elevatorDoors.cx + elevatorDoors.w + elevatorDoors.open * elevatorDoors.w * 1.6;
       }
 
-      /* camera */
+      /* camera: the player's orbit camera while he's theirs; the automatic one picks up from where it is */
+      if (player) {
+        cam.x = camera.target.x;
+        cam.y = camera.target.y;
+        cam.z = camera.target.z;
+        cam.alpha = camera.alpha;
+        cam.beta = camera.beta;
+        cam.radius = camera.radius;
+        cam.inited = true;
+        cam.wasInCar = false;
+        cam.user = 0;
+        sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
+        return;
+      }
       const roomCam = pp.inCar ? (rooms.road && rooms.road.camera) : rooms[fr.room] && rooms[fr.room].camera;
       const shot = Object.assign({ alpha: 1.3, beta: 1.05, radius: 8 }, roomCam || {});
       const aspect = engine.getRenderWidth() / Math.max(1, engine.getRenderHeight());
@@ -1550,6 +1610,10 @@
       },
       person: me.root, // read by the playtest
       car: myCar.root,
+      camera, // the player's orbit camera drives it while he's theirs (js/control.js)
+      avatar, // the stand-in figure the player moves
+      rooms,
+      spots,
     };
   }
 

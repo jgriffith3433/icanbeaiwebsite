@@ -548,3 +548,109 @@ html:not(.public):not(.preview-public) .version-tag { display: none; }
 .privacy-tag:hover, .privacy-tag:focus-visible { opacity: 1; }
 html:not(.public):not(.preview-public) .privacy-tag { display: none; }
 .foot a { color: inherit; }
+
+/* ---------- taking control (js/control.js): also on the public site ---------- */
+.control-btn {
+  position: fixed;
+  z-index: 4;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 150px;
+  appearance: none;
+  border: 1px solid rgba(240, 194, 122, 0.55);
+  background: rgba(14, 16, 22, 0.62);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
+}
+.control-btn:hover { background: rgba(240, 194, 122, 0.16); }
+.control-btn[aria-pressed="true"] { background: var(--accent); color: #1a1c22; border-color: transparent; }
+.control-btn:disabled { opacity: 0.45; cursor: default; }
+.public .control-btn,
+.preview-public .control-btn { bottom: 34px; }
+
+.control-hint {
+  position: fixed;
+  z-index: 3;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 196px;
+  margin: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(14, 16, 22, 0.5);
+  color: var(--muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.control-hint[hidden] { display: none; }
+.public .control-hint,
+.preview-public .control-hint { bottom: 80px; }
+.what.steered { color: var(--accent); }
+.log li.note span { color: var(--accent); }
+
+/* the touch stick and jump button, on phones while he's the player's */
+.touchpad { position: fixed; inset: auto 0 150px 0; z-index: 4; height: 0; pointer-events: none; }
+.touchpad[hidden] { display: none; }
+.public .touchpad,
+.preview-public .touchpad { bottom: 34px; }
+.touchpad .stick,
+.touchpad .jump {
+  position: absolute;
+  bottom: 0;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.touchpad .stick {
+  left: max(22px, env(safe-area-inset-left));
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  border: 1px solid rgba(246, 241, 232, 0.28);
+  background: rgba(14, 16, 22, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.touchpad .stick i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(246, 241, 232, 0.78);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.touchpad .stick.held i { background: var(--accent); }
+.touchpad .jump {
+  right: max(22px, env(safe-area-inset-right));
+  bottom: 18px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 1px solid rgba(240, 194, 122, 0.6);
+  background: rgba(14, 16, 22, 0.5);
+  color: var(--accent);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.touchpad .jump.held { background: var(--accent); color: #1a1c22; }
+/* on a phone, Let go moves out of the way of the stick and the jump button */
+@media (max-width: 700px) {
+  .in-control .control-btn { bottom: auto; top: 50%; left: auto; right: 12px; transform: none; padding: 8px 14px; font-size: 0.82rem; }
+}
+
+/* catching up with his day: a quick fade */
+#view { transition: opacity 0.35s ease; }
+.catching-up #view { opacity: 0; }

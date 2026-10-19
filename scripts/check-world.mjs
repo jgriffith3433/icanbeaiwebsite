@@ -1,6 +1,7 @@
 // Builds the day and the 3D world without a browser (Babylon's NullEngine) and turns Havok physics on, the way the
 // page does, then checks what the page relies on: Babylon 9, the day compiles without errors, the colliders exist and
-// stand where the world is (ground, a building floor, a wall, a house), and the person is Small Weather.
+// stand where the world is (ground, a building floor, a wall, a house), and the person is Small Weather; then taking
+// control: he walks, runs, jumps three times, floats, and walks back to his day by its routes.
 //
 //   npm test
 //
@@ -85,7 +86,78 @@ for (let i = 0; i < 180; i++) physicsEngine._step(1 / 60);
 ok(near(cap.position.y, 0.9, 0.1), `a person-sized capsule ended at y=${cap.position.y.toFixed(2)}, not standing on the ground`);
 agg.dispose();
 
-const summary = `Babylon ${core.Engine.Version}, Havok: ${p.colliders} colliders in ${p.bodies} bodies; ${day.actions.length} actions; field ${g && g.y.toFixed(2)}, road ${r && r.y.toFixed(2)}, home floor ${inside && inside.y.toFixed(2)}, bed ${onBed && onBed.y.toFixed(2)}, capsule at ${cap.position.y.toFixed(2)}`;
+// Taking control (js/control.js): he stands up beside the couch, walks, runs, jumps three times and floats down,
+// then walks back by the day's route (through the doors) to the bed. The page isn't needed: createMover is the movement.
+const { createMover, MOVE_DEFAULTS } = await import(new URL('js/control.js', root).href);
+const E = sandbox.DayEngine;
+const couch = day.spots.couch;
+const bedSpot = day.spots.bed;
+const walkRoute = E.route(day.rooms, { x: couch.x, z: couch.z, room: couch.room }, bedSpot);
+const bedDoors = day.rooms.bedroom.doors;
+ok(walkRoute.length === 2 + bedDoors.length && walkRoute.some((q) => near(q.x, bedDoors[0].x, 1e-6) && near(q.z, bedDoors[0].z, 1e-6)), `the route from the couch to the bed doesn't go through the bedroom's doors (${JSON.stringify(walkRoute)})`);
+ok(E.roomAt(day.rooms, couch.x, couch.z) === 'living', `roomAt the couch is ${E.roomAt(day.rooms, couch.x, couch.z)}, not living`);
+const mover = createMover(world, cfg);
+const M = mover.move;
+const ms = mover.state;
+const DT = 1 / 60;
+const physicsStep = () => physicsEngine._step(DT);
+const hold = (sec, input) => {
+  for (let i = 0; i < Math.round(sec * 60); i++) {
+    mover.step(DT, i === 0 ? input : { ...input, jump: 0 });
+    physicsStep();
+  }
+};
+const at = mover.start(couch.x, couch.z, couch.face);
+ok(mover.hasPhysics(), 'taking control made no Havok character controller');
+ok(Math.hypot(at.x - couch.x, at.z - couch.z) > 0.2 && ms.y < 0.3, `taking control on the couch didn't stand him up beside it (at ${at.x.toFixed(2)},${at.z.toFixed(2)} y ${ms.y.toFixed(2)})`);
+hold(0.4, { x: 0, z: 0 });
+ok(ms.grounded && ms.anim === 'idle', `standing still he isn't grounded and idle (${ms.anim}, grounded ${ms.grounded})`);
+let x0 = ms.x;
+hold(1, { x: 1, z: 0 });
+const walked = ms.x - x0;
+ok(walked > M.walk * 0.8 && ms.anim === 'walk', `walking for 1 s moved him ${walked.toFixed(2)} m (${ms.anim})`);
+x0 = ms.x;
+hold(0.8, { x: -1, z: 0, sprint: true });
+ok(ms.speed > M.walk * 1.8 && ms.anim === 'run', `sprinting: ${ms.speed.toFixed(2)} m/s (${ms.anim}), walking is ${M.walk}`);
+hold(0.6, { x: 0, z: 0 });
+const y0 = ms.y;
+let peak = y0;
+let floatFall = 0;
+for (let i = 0; i < 60 * 6; i++) {
+  const jump = i === 0 || i === 40 || i === 80 || i === 120 ? 1 : 0; // the 4th press is one too many
+  mover.step(DT, { x: 0, z: 0, jump, hold: i > 140 });
+  physicsStep();
+  peak = Math.max(peak, ms.y);
+  if (ms.anim === 'float') floatFall = Math.max(floatFall, -ms.vy);
+}
+ok(ms.lastFlight && ms.lastFlight.jumps === 1 + M.airJumps, `jumping four times in the air made ${ms.lastFlight && ms.lastFlight.jumps} jumps, not ${1 + M.airJumps}`);
+ok(peak - y0 > M.jumpHeight + M.airJumpHeight, `three jumps only reached ${(peak - y0).toFixed(2)} m`);
+ok(floatFall > 0 && floatFall <= M.floatFall + 1e-6, `holding jump while falling: he fell at ${floatFall.toFixed(2)} m/s (float is ${M.floatFall})`);
+ok(ms.grounded, 'he never landed after the jumps');
+let steps = 0;
+let back;
+do {
+  back = mover.walkBack(DT, { x: bedSpot.x, z: bedSpot.z, room: 'bedroom' });
+  steps++;
+} while (back === 'walking' && steps < 60 * 60);
+ok(back === 'arrived' && Math.hypot(ms.x - bedSpot.x, ms.z - bedSpot.z) < 0.02, `the walk back to the bed ended "${back}" at ${ms.x.toFixed(2)},${ms.z.toFixed(2)}`);
+ok(MOVE_DEFAULTS.airJumps === 2 && (!cfg.control || !cfg.control.move || cfg.control.move.airJumps === 2), 'Small Weather has two air jumps (his DoD fighter has two)');
+// The stand-in plays every clip a rigged model will have, and the world draws him where the player put him.
+const fr1 = E.frame(day, day.dayStart + 60);
+for (const clip of world.avatar.clips) {
+  world.avatar.place(1, 0.1, 2, 0.5);
+  world.avatar.play(clip, 3, DT);
+  world.update(fr1, DT, { player: { x: 1, y: 0.1, z: 2, yaw: 0.5, speed: 3, anim: clip } });
+  const q = world.person.position;
+  ok([q.x, q.y, q.z].every(Number.isFinite) && near(q.x, 1, 1e-6) && near(q.z, 2, 1e-6), `the stand-in isn't where the player put him after "${clip}"`);
+}
+['idle', 'walk', 'run', 'jump', 'fall', 'float', 'cast'].forEach((c) => ok(world.avatar.clips.includes(c), `the stand-in has no "${c}" clip`));
+const lines = (cfg.control && cfg.control.lines) || {};
+const controlTexts = Object.values(lines).flat();
+ok(['take', 'letGo', 'back', 'steering'].every((k) => lines[k]), 'day.config.js control.lines needs take, steering, letGo and back');
+ok(!controlTexts.some((t) => /\b(they|their|theirs|themselves)\b/i.test(t)), `control lines that say "they" for him: ${controlTexts.join(' | ')}`);
+
+const summary = `Babylon ${core.Engine.Version}, Havok: ${p.colliders} colliders in ${p.bodies} bodies; ${day.actions.length} actions; field ${g && g.y.toFixed(2)}, road ${r && r.y.toFixed(2)}, home floor ${inside && inside.y.toFixed(2)}, bed ${onBed && onBed.y.toFixed(2)}, capsule at ${cap.position.y.toFixed(2)}; control: walk ${walked.toFixed(2)} m/s, three jumps ${(peak - y0).toFixed(2)} m, walked back in ${(steps / 60).toFixed(1)} s`;
 if (problems.length) {
   console.error(`check-world: ${problems.length} problem(s)\n- ${problems.join('\n- ')}\n${summary}`);
   process.exit(1);

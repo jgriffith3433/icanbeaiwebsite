@@ -1,6 +1,7 @@
 /* ==========================================================================
    The page's entry (Vite bundles it). The files keep their old roles and order:
-   Babylon, the day, the engine, the world, the page, analytics. Each one sets its
+   Babylon, the day, the engine, the world, the page, analytics, then taking control
+   (js/control.js, a real module). Each of the others sets its
    globals on window (DAY_CONFIG, DayEngine, DayWorld, day), as before.
    Havok physics loads after the first frame is possible: the day never waits for
    it, and if it can't load the day still plays (without colliders).
@@ -11,6 +12,7 @@ import "./schedule.js";
 import "./world.js";
 import "./main.js";
 import "./analytics.js";
+import "./control.js"; // the player can take control of him
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 

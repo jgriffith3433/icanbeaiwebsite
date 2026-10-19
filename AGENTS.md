@@ -9,14 +9,45 @@ I Can Be is becoming a **third-person game** (J, 2026-10-19, memory m_b34b3a2627
 (he/him; canon m_9743a1dfe970: the same Small Weather as Dose Of Destruction's storm caller, art in
 `AllTheCharacters/SmallWeather`). He lives his developer's day on autopilot, the simulated day in `day.config.js`; a
 player can take control, walk the city in third person and command the weather, and feel like a god doing it. The
-levels get redone over time. Until the player-control part exists, the page is the day playing on its own.
+levels get redone over time. The page is the day playing on its own until someone takes control (below).
 
 - **His name and voice:** the day's lines call him "He", plainly, and name him "Small Weather" at a few moments (the
   alarm, out the door, the work lot, home, setting the alarm, the first line of work). `person.name` in
   `day.config.js` is what the side panel shows. Keep lines short and matter-of-fact, as they are; no "they" for him.
   Other people (coworkers, someone in the elevator) are still "they".
-- **Not yet:** player control, the weather powers, his look (the person is still the box-built figure in
-  `js/world.js` makePerson), the city. Those are next steps, not this foundation.
+- **Taking control** (`js/control.js`, lines and feel in `day.config.js` `control`): "Take control" (Enter, a
+  gamepad's Start, a tap) takes him off his day at that moment. The clock and the day keep running without him (if
+  the day was paused, it plays). He's the player's in third person: WASD/arrows, a gamepad, or the touch stick on a
+  phone; Shift (a bumper, the stick pushed to its edge) runs; Space jumps, twice more in the air, and held while
+  falling he floats down (his Dose Of Destruction fighter's two extra jumps and floaty fall). The camera orbits him
+  (drag, right stick, wheel or pinch to zoom) and pulls in rather than go through a wall. "Let go" (Esc, B) and he
+  walks back by the day's own routes (`DayEngine.route`, through the doors) to where his day says he should be by
+  now, then the day has him again. Where he can't walk to (the day has him driving, or in the other building) he
+  catches up with it in a quick fade. He can't be taken while he's driving. The log gets a line for each of these
+  (`day.note()`), and the panel says `control.lines.steering` while he's the player's.
+- **Not yet:** the weather powers (the stand-in has a `cast` pose for them), his look (the person is still the
+  box-built figure in `js/world.js` makePerson), the city. Those are next steps.
+
+### Taking control: how it's built
+
+- `js/control.js` is a real module (imported last by `js/app.js`). `createMover(world, cfg)` is the movement alone:
+  a Havok `PhysicsCharacterController` (capsule 1.7 × 0.28 m, steps up 0.3 m) or, if Havok didn't load, a flat
+  mover without colliders; `step(dt, input)` for the player, `walkBack(dt, target)` for the way back (kinematic along
+  the route, like the day's own walks, dropping off whatever he stood on but never climbing furniture). `npm test`
+  drives it. The rest of the file is the page: the button, keys, gamepad, the touch pad, the orbit camera.
+- `main.js` calls the controller every frame through `day.pilot(fn)` before drawing; while it returns
+  `{ x, y, z, yaw, speed, anim, text }`, `world.update(fr, dt, { player })` leaves him and the camera to it and
+  draws the rest of the day as usual. `null` = the day has him.
+- He's drawn through an **avatar**: `{ place(x, feetY, z, yaw), play(clip, speed, dt), show(on) }`. Today it's
+  `world.avatar`, the box-built figure with a pose per clip (`idle walk run jump fall float cast`, POSE and gesture
+  in `world.js`). The rigged GLB drops in with `clipAvatar()` in `js/avatar.js` (clip names matched by word,
+  cross-faded, walk/run speed matched to the ground speed) and `day.control.setAvatar()`; it needs
+  `@babylonjs/loaders` added first. Its origin at his feet, facing +z, in metres.
+- The key handler runs in the capture phase and swallows the keys it uses only while he's the player's, so ← →,
+  Space and Esc keep their day meanings otherwise. `day.control` (console, playtest): `mode()`, `state()`,
+  `take()`, `letGo()`, `touch(on)` (show the phone controls on any screen; `?touch=1` too).
+- Touch controls show while he's the player's on a coarse pointer or a window 700 px wide or less. The button is on
+  the public site too (it isn't part of the HUD).
 
 ## How it's built (Babylon 9, Havok, Vite)
 
@@ -38,7 +69,8 @@ levels get redone over time. Until the player-control part exists, the page is t
 - **Checks:** `npm test` (`scripts/check-world.mjs`) builds the day and the world under Babylon's NullEngine in Node,
   turns Havok on and checks Babylon 9, no config errors, colliders under the field, the road, the home floor, a wall
   and the bed, a person-sized capsule coming to rest on the ground, and that two weeks of days name Small Weather and
-  never say "they" for him. `npm run build` must pass too (it takes about 4 minutes: Babylon is big).
+  never say "they" for him. Then taking control: he stands up beside the couch, walks, runs, makes three jumps in one
+  flight and floats down, walks back to the bed through the doors, and the stand-in plays every clip. `npm run build` must pass too (it takes about 4 minutes: Babylon is big).
 - **Publishing:** `.github/workflows/pages.yml` builds `dist/` (tests, then `vite build`) and deploys it to GitHub
   Pages on main; `vite.config.js` copies the static pages, their classic scripts, `css/`, `releases.json` and the
   CNAME into `dist/`. The first time pages.yml reaches main, Studio switches the repo's Pages source to Actions (the
@@ -88,7 +120,8 @@ keys, the canvas and `day.watch()`, and it never changes the day.
 - `progress` for each block of the day the viewer reaches. `step` is the block's place in today's timeline (1…n),
   plus 100 for each later day. It only grows in a session (kept in sessionStorage `icanbe.progress`). `label` is the
   block title, plus `chapter`, `clock`, and `via` (live, play, or jump; a jump counts after 1.5 s on the block).
-- `feature`, one per interaction: `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
+- `feature`, one per interaction: `control` {action: take or let-go, via key/button/touch/gamepad; then back,
+  how: walk or catch-up}, `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
   {to, activity} once the day bar settles, `step` {presses, to} for ← →, `camera` {action: turn, zoom, pinch, tap;
   `on` for a tap: person, car, the spot name (`at-<spot>` node), room, nothing}, `sound`, `details`, `whatsnew`,
   `privacy`.
