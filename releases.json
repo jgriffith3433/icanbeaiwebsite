@@ -1,8 +1,19 @@
 {
   "product": "icanbe",
   "name": "I Can Be",
-  "current": "1.0.0",
+  "current": "1.1.0",
   "releases": [
+    {
+      "version": "1.1.0",
+      "date": "2026-10-19",
+      "build": "c793572",
+      "title": "Smoother camera on the commute",
+      "notes": [
+        "The camera now finds the car straight away at the start of each drive.",
+        "During the commute, the camera stays on the person instead of showing the car park interior.",
+        "The camera no longer swings into buildings beside the road while driving."
+      ]
+    },
     {
       "version": "1.0.0",
       "date": "2026-10-16",
