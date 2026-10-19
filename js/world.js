@@ -1303,13 +1303,14 @@
       if (!s) return;
       s.root.parent = me.spin;
       s.glowMeshes.concat(s.boltMeshes || []).forEach(glowing);
-      s.meshes.forEach((m) => {
+      const drawn = s.meshes.filter((m) => m.getTotalVertices && m.getTotalVertices() > 0);
+      drawn.forEach((m) => {
         m.receiveShadows = true;
         shadows.addShadowCaster(m, false);
       });
       /* the room lights only touch what they list: add him */
-      roomLights.forEach((rl) => rl.light.includedOnlyMeshes.push(...s.meshes));
-      officeLights.forEach((L) => L.includedOnlyMeshes.push(...s.meshes));
+      roomLights.forEach((rl) => rl.light.includedOnlyMeshes.push(...drawn));
+      officeLights.forEach((L) => L.includedOnlyMeshes.push(...drawn));
     }
 
     /* ---------------- sky ---------------- */
