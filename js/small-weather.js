@@ -36,6 +36,8 @@ export function makeSkin(B, scene, res, hipsTarget) {
   const wrap = new B.TransformNode("small-weather", scene);
   glbRoot.parent = wrap;
   const meshes = res.meshes.filter((m) => m.getTotalVertices && m.getTotalVertices() > 0);
+  /* __root__ has no vertices but parents the mesh; it stays enabled, so it counts as his */
+  if (glbRoot && !meshes.includes(glbRoot)) meshes.unshift(glbRoot);
   const groups = res.animationGroups;
   const named = (c) => groups.find((g) => g.name.toLowerCase() === c) || groups.find((g) => new RegExp(`(^|[^a-z])${c}([^a-z]|$)`, "i").test(g.name));
 

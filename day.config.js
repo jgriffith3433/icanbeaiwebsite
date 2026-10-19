@@ -154,7 +154,7 @@ window.DAY_CONFIG = {
        over the box figure on his day and under control (js/small-weather.js). Clips: idle,
        walk, run, jump, fall, float, cast, throw, and the day's sit, type, phone, lie, side,
        recline. null = the box-built figure. */
-    model: null,
+    model: "models/small-weather.glb",
   },
 
   /* ------------------------------------------------------------------------
