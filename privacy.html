@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="What this site collects: anonymous viewing statistics, nothing personal." />
+    <meta name="theme-color" content="#10131a" />
+    <title>Privacy · A day</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310131a'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23f6f1e8' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,420&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root { color-scheme: dark; --bg: #10131a; --ink: #f6f1e8; --soft: rgba(246, 241, 232, 0.62); --accent: #f0c27a; --line: rgba(246, 241, 232, 0.12); }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font: 400 1.02rem/1.6 Outfit, system-ui, sans-serif; }
+      main { width: min(680px, 100%); margin: 0 auto; padding: 48px 20px 64px; }
+      a { color: var(--accent); }
+      .back { font-size: 0.85rem; text-decoration: none; letter-spacing: 0.04em; }
+      h1 { font: 600 2.4rem/1.1 Fraunces, Georgia, serif; margin: 18px 0 6px; }
+      .lede { color: var(--soft); margin: 0 0 28px; }
+      ul { padding-left: 1.2em; }
+      li { margin: 0.4em 0; }
+      button { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+      button:hover, button:focus-visible { border-color: var(--accent); }
+      .state { color: var(--soft); font-size: 0.9rem; margin-left: 10px; }
+    </style>
+    <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
+    <script>window.HAWKES_BUILD = { version: "dev" };</script>
+    <script src="js/hawkes-analytics.js" data-product="icanbe"></script>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="./">&larr; Back to the day</a>
+      <h1>Privacy</h1>
+      <p class="lede">This site collects anonymous viewing statistics to improve it. No cookies, no personal data, no IP address stored.</p>
+      <ul>
+        <li>What is counted: which parts of the day are watched and for how long, which controls are used (speed, the day bar, the camera), the browser and device type, the screen size, the language, the country and city, and errors.</li>
+        <li>How: a random id kept in this browser's local storage, never tied to a person. Your IP address is used once to look up the country and city, then thrown away.</li>
+        <li>Where it goes: to our own server (Hawkes Gen). No advertising or third-party trackers.</li>
+        <li>If you answer the feedback question, your answer and comment are kept with the same anonymous id.</li>
+      </ul>
+      <p><button type="button" id="optout">Stop collecting in this browser</button><span class="state" id="state" aria-live="polite"></span></p>
+    </main>
+    <script>
+      (function () {
+        var a = window.hawkesAnalytics, btn = document.getElementById("optout"), state = document.getElementById("state");
+        if (!a) { btn.hidden = true; return; }
+        function show() {
+          var off = a.config().optedOut;
+          btn.textContent = off ? "Start collecting again" : "Stop collecting in this browser";
+          state.textContent = off ? "Nothing is collected in this browser." : "";
+        }
+        btn.addEventListener("click", function () {
+          if (a.config().optedOut) a.optIn(); else a.optOut();
+          show();
+        });
+        show();
+      })();
+    </script>
+  </body>
+</html>
