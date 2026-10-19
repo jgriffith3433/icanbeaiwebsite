@@ -22,8 +22,10 @@ const FALLBACK = { run: "walk", walk: "idle", fall: "jump", jump: "fall", float:
 const LOOPS = new Set(["idle", "walk", "run", "fall", "float"]);
 
 export function clipAvatar(root, animationGroups, opts = {}) {
+  const names = opts.clips || CLIPS; // js/small-weather.js adds the day's clips (sit, type, lie...)
+  const loops = opts.loops ? new Set(opts.loops) : LOOPS;
   const groups = {};
-  CLIPS.forEach((c) => {
+  names.forEach((c) => {
     const g = animationGroups.find((a) => new RegExp(`(^|[^a-z])${c}([^a-z]|$)`, "i").test(a.name));
     if (g) groups[c] = g;
   });
@@ -42,7 +44,7 @@ export function clipAvatar(root, animationGroups, opts = {}) {
   root.rotationQuaternion = null;
   return {
     kind: "clips",
-    clips: CLIPS.filter((c) => groups[c]),
+    clips: names.filter((c) => groups[c]),
     root,
     place(x, feetY, z, yaw) {
       root.position.set(x, feetY, z);
@@ -52,8 +54,8 @@ export function clipAvatar(root, animationGroups, opts = {}) {
       const g = pick(clip);
       if (g && g !== current) {
         current = g;
-        if (!g.isPlaying) g.start(LOOPS.has(clip), 1, g.from, g.to);
-        if (!LOOPS.has(clip)) g.goToFrame(g.from);
+        if (!g.isPlaying) g.start(loops.has(clip), 1, g.from, g.to);
+        if (!loops.has(clip)) g.goToFrame(g.from);
       }
       if (g && strideOf[clip] && g.to > g.from) {
         const loopSeconds = (g.to - g.from) / (g.targetedAnimations[0]?.animation.framePerSecond || 30);

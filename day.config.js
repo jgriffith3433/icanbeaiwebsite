@@ -150,8 +150,10 @@ window.DAY_CONFIG = {
       floatFall: 1.6, // holding jump while falling: he drifts down this slowly
       airControl: 0.55, // how much he can steer in the air (1 = like on the ground)
     },
-    /* The 3D model, later: a rigged GLB with clips named idle, walk, run, jump, fall,
-       float, cast (js/avatar.js). null = the box-built stand-in. */
+    /* Small Weather's 3D model: the rigged GLB from Hawkes Gen (hawkes.assets.json), worn
+       over the box figure on his day and under control (js/small-weather.js). Clips: idle,
+       walk, run, jump, fall, float, cast, throw, and the day's sit, type, phone, lie, side,
+       recline. null = the box-built figure. */
     model: null,
   },
 

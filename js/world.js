@@ -1193,11 +1193,45 @@
         const moving = clip === "walk" || clip === "run";
         if (moving) me.phase += speed * dt * (clip === "run" ? 2.9 : 4.2);
         posePerson(me, cp[0], cp[1], dt, moving, false, elapsed);
+        if (skin) skin.play(clip, speed, dt, true);
       },
       show(on) {
         me.root.setEnabled(on);
       },
     };
+
+    /* ---------------- his model ---------------- */
+    /* Small Weather's rigged GLB (js/small-weather.js), once it has loaded: worn over the figure above, which
+       still places, tilts and seats him (its boxes hide). The figure's pose and gesture pick the clip. */
+    let skin = null;
+    const SEATED = ["sitChair", "sitCouch", "sitBed", "toilet", "sitCar"];
+    function skinClip(pose, hand) {
+      if (pose === "walk") return "walk";
+      if (pose === "lie" || pose === "side" || pose === "recline") return pose;
+      if (SEATED.includes(pose)) return ["type", "wheel", "phone", "remote", "eat", "cook", "hold"].includes(hand) ? "type" : "sit";
+      if (hand === "phone" || hand === "remote" || hand === "brush" || hand === "face" || hand === "drink") return "phone";
+      if (hand === "stretch" || hand === "towel") return "cast";
+      return "idle";
+    }
+    const boxProps = () => [me.phone, me.phone && me.phone.screen, me.cup, me.bag].filter(Boolean);
+    function setSkin(s) {
+      if (skin) skin.root.dispose();
+      const keep = boxProps();
+      me.root.getChildMeshes(false).forEach((m) => {
+        if (!keep.includes(m) && (!s || !s.meshes.includes(m))) m.setEnabled(!s);
+      });
+      skin = s;
+      if (!s) return;
+      s.root.parent = me.spin;
+      s.glowMeshes.concat(s.boltMeshes || []).forEach(glowing);
+      s.meshes.forEach((m) => {
+        m.receiveShadows = true;
+        shadows.addShadowCaster(m, false);
+      });
+      /* the room lights only touch what they list: add him */
+      roomLights.forEach((rl) => rl.light.includedOnlyMeshes.push(...s.meshes));
+      officeLights.forEach((L) => L.includedOnlyMeshes.push(...s.meshes));
+    }
 
     /* ---------------- sky ---------------- */
     const SR = window.DayEngine.parseClock(((cfg.sky || {}).sunrise) || "6:45") / 60;
@@ -1425,7 +1459,10 @@
         state.lastX = pp.x;
         state.lastZ = pp.z;
         if (pp.walking && !pp.inCar) me.phase += Math.min(moved, 0.4) * 5.2;
-        posePerson(me, pp.inCar ? "sitCar" : pp.walking ? "walk" : pp.pose, pp.walking && !["hold", "phone", "nod", "drink"].includes(pp.hand) ? "none" : pp.hand, dt, pp.walking && !pp.inCar, snap, t);
+        const myPose = pp.inCar ? "sitCar" : pp.walking ? "walk" : pp.pose;
+        const myHand = pp.walking && !["hold", "phone", "nod", "drink"].includes(pp.hand) ? "none" : pp.hand;
+        posePerson(me, myPose, myHand, dt, pp.walking && !pp.inCar, snap, t);
+        if (skin) skin.play(skinClip(myPose, myHand), pp.walking && dt > 0 ? Math.min(moved / dt, 3) : 0, dt, false);
       }
       if (me.bag) me.bag.setEnabled(String(things.carrying || "").includes("bag") && !pp.inCar);
 
@@ -1612,6 +1649,10 @@
       car: myCar.root,
       camera, // the player's orbit camera drives it while he's theirs (js/control.js)
       avatar, // the stand-in figure the player moves
+      /* his rigged model (js/small-weather.js) over the figure; null takes it off */
+      setSkin,
+      skin: () => skin,
+      skinHips: FOOT, // his hips' height standing: the model is scaled to it
       rooms,
       spots,
     };

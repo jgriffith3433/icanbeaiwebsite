@@ -1,0 +1,64 @@
+{
+ "project": "icanbe",
+ "_about": "Generated assets as data (Hawkes Studio, docs/projects/AGENTS.md): each recipe made through Hawkes Gen and where its output lives.",
+ "assets": [
+  {
+   "id": "small-weather",
+   "note": "Small Weather, the player character (canon m_9743a1dfe970, the same storm caller as Dose Of Destruction): a clean A-pose front sheet from DoD's art (AllTheCharacters/SmallWeather/anims/_reference.png, library a_02d916892b5b8a2d), a textured mesh (best of 3, picked against the reference from mesh.rig's turntables: the chain can't judge meshes), then Gen's auto-rig with 14 Mixamo-skeleton clips. The clips are scripts/small-weather-clips.mjs's output (art/small-weather/clips, from PH Origins' ch33 hero's Mixamo rig: Idle, Walk, Run, Jump, Sitting Idle, plus posed fall, float, cast, throw and the day's poses), uploaded to the entity icanbe/small-weather (slots clip-src/*). The glow on the seams and boots and the arm lightning are added in the page (js/small-weather.js). Entity: icanbe/small-weather.",
+   "steps": [
+    {
+     "tool": "image.edit",
+     "inputs": { "images": ["$input:0"] },
+     "params": {
+      "prompt": "Clean 3D character model reference sheet of this exact young man, front view, facing the camera: standing straight in an A-pose, both arms held straight and angled down and away from the body at about 40 degrees so there is clear space between the arms and the torso, hands open with fingers together, feet apart at shoulder width, full body from the top of his hair to the soles of his boots, centered. Keep his face, black messy hair, black glasses, dark navy tech jacket with glowing blue seams down the chest, shoulder straps, grey tee, fingerless gloves, black cargo pants with pockets, black knee armor, black boots with glowing blue lights. Stylized 3D game character render with clean shapes and saturated colors. Plain flat light grey background, no lightning, no clouds, no rain, no smoke, no effects around him, no shadow, even soft studio lighting.",
+      "width": 832,
+      "height": 1216
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "mesh.textured",
+     "inputs": { "image": "$prev" },
+     "params": { "faces": 40000, "texture": 1024 },
+     "save": "mesh"
+    },
+    {
+     "tool": "mesh.rig",
+     "inputs": {
+      "mesh": "$prev",
+      "clips": ["$input:1", "$input:2", "$input:3", "$input:4", "$input:5", "$input:6", "$input:7", "$input:8", "$input:9", "$input:10", "$input:11", "$input:12", "$input:13", "$input:14"]
+     },
+     "params": {
+      "names": ["idle", "walk", "run", "jump", "fall", "float", "cast", "throw", "sit", "type", "phone", "lie", "side", "recline"],
+      "height": 1.75
+     },
+     "save": "rigged"
+    }
+   ],
+   "inputs": {
+    "files": [
+     "asset:a_02d916892b5b8a2d",
+     "art/small-weather/clips/idle.glb",
+     "art/small-weather/clips/walk.glb",
+     "art/small-weather/clips/run.glb",
+     "art/small-weather/clips/jump.glb",
+     "art/small-weather/clips/fall.glb",
+     "art/small-weather/clips/float.glb",
+     "art/small-weather/clips/cast.glb",
+     "art/small-weather/clips/throw.glb",
+     "art/small-weather/clips/sit.glb",
+     "art/small-weather/clips/type.glb",
+     "art/small-weather/clips/phone.glb",
+     "art/small-weather/clips/lie.glb",
+     "art/small-weather/clips/side.glb",
+     "art/small-weather/clips/recline.glb"
+    ]
+   },
+   "pickAt": 1,
+   "candidates": 4,
+   "pick": "on-model with the reference: black messy hair, black glasses, dark navy tech jacket with glowing blue seams, grey tee, black cargo pants, knee armor, glowing boots; a clean A-pose with the arms clear of the body, the whole body in frame, no effects",
+   "refs": [0],
+   "files": { "rigged": "models/small-weather.glb" }
+  }
+ ]
+}
