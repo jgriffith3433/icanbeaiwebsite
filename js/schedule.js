@@ -113,6 +113,41 @@
     return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, yaw: Math.atan2(b.x - a.x, b.z - a.z) };
   }
 
+  /* A walk from one place to another: through the doors of both rooms when they are in the same building,
+     otherwise straight. `from` and `to` are { x, z, room }. The day's walks use it, and so does the walk back
+     to his day after the player lets go (js/control.js). */
+  function route(rooms, from, to) {
+    const start = { x: from.x, z: from.z };
+    const end = { x: to.x, z: to.z };
+    if (from.room === to.room || !rooms[from.room] || !rooms[to.room]) return [start, end];
+    const a = rooms[from.room];
+    const b = rooms[to.room];
+    if (a.building !== b.building) return [start, end];
+    const pts = [start].concat(a.doors, b.doors.slice().reverse(), [end]);
+    const out = [pts[0]];
+    for (let i = 1; i < pts.length; i++) {
+      const p = out[out.length - 1];
+      if (Math.hypot(pts[i].x - p.x, pts[i].z - p.z) > 0.01) out.push(pts[i]);
+    }
+    return out;
+  }
+
+  /* The room whose area holds (x, z), or null (the street, the field). The smallest one wins. */
+  function roomAt(rooms, x, z) {
+    let best = null;
+    let bestArea = Infinity;
+    Object.values(rooms).forEach((r) => {
+      const a = r.area;
+      if (!a || x < a[0] || x > a[2] || z < a[1] || z > a[3]) return;
+      const size = (a[2] - a[0]) * (a[3] - a[1]);
+      if (size < bestArea) {
+        best = r.id;
+        bestArea = size;
+      }
+    });
+    return best;
+  }
+
   /* ---------------- places ---------------- */
 
   function buildPlaces(cfg, errors) {
@@ -241,18 +276,7 @@
     }
 
     function routeTo(to) {
-      const from = { x: S.x, z: S.z };
-      if (S.room === to.room || !rooms[S.room] || !rooms[to.room]) return [from, { x: to.x, z: to.z }];
-      const a = rooms[S.room];
-      const b = rooms[to.room];
-      if (a.building !== b.building) return [from, { x: to.x, z: to.z }];
-      const pts = [from].concat(a.doors, b.doors.slice().reverse(), [{ x: to.x, z: to.z }]);
-      const out = [pts[0]];
-      for (let i = 1; i < pts.length; i++) {
-        const p = out[out.length - 1];
-        if (Math.hypot(pts[i].x - p.x, pts[i].z - p.z) > 0.01) out.push(pts[i]);
-      }
-      return out;
+      return route(rooms, { x: S.x, z: S.z, room: S.room }, to);
     }
 
     function walkMinutes(fromState, to) {
@@ -799,5 +823,5 @@
     };
   }
 
-  root.DayEngine = { build, frame, parseClock, parseDur, fmtClock, along };
+  root.DayEngine = { build, frame, parseClock, parseDur, fmtClock, along, route, roomAt, pathInfo };
 })(typeof window !== "undefined" ? window : globalThis);

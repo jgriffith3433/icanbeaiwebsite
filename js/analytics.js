@@ -48,6 +48,11 @@
   $("live").addEventListener("click", safe(() => feature("live", { via: via() })));
   $("sound").addEventListener("click", safe(() => feature("sound", { value: $("sound").getAttribute("aria-pressed") === "true" ? "on" : "off" })));
   $("details").addEventListener("click", safe(() => feature("details", { value: $("details").getAttribute("aria-pressed") === "true" ? "open" : "closed" })));
+  // Taking control of him (js/control.js): take, let-go, and back (walked back, or caught up with his day).
+  window.addEventListener("day:control", safe((e) => {
+    const d = e.detail || {};
+    feature("control", d.via ? { action: d.action, via: d.via } : { action: d.action, how: d.how });
+  }));
   document.querySelectorAll('a[href="whatsnew.html"]').forEach((a) => a.addEventListener("click", () => feature("whatsnew")));
   document.querySelectorAll('a[href="privacy.html"]').forEach((a) => a.addEventListener("click", () => feature("privacy")));
 

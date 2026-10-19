@@ -120,6 +120,42 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     TAKING CONTROL — the player can take Small Weather off his day
+     "Take control" (or Enter) and he's the player's: his day stops steering him
+     at that moment, but the clock and the day keep going without him. "Let go"
+     (or Esc) and he walks back (the same routes his day uses) to where the day
+     says he should be by now, and carries on from there.
+     The lines go into the action log at the minute they happen; `steering`
+     is what the panel says while the player has him. He is "he", as everywhere.
+     ------------------------------------------------------------------------ */
+  control: {
+    lines: {
+      take: "You take over. His day keeps going without him.",
+      steering: ["You have him.", "He goes where you go.", "His day is still running, somewhere else."],
+      letGo: "You let go. He walks back to his day.",
+      back: "Back where his day says. He carries on.",
+      catchUp: "His day is too far off to walk. He catches up with it.",
+      driving: "He's driving. Take control once he's out of the car.",
+    },
+    /* How he moves for the player. Metres and seconds. Floaty on purpose: the same
+       two extra jumps and slow fall as his Dose Of Destruction fighter. */
+    move: {
+      walk: 2.4, // walking (the stick or keys alone)
+      sprint: 5.6, // Shift; a gamepad bumper or stick click; the touch stick pushed to its edge
+      jumpHeight: 1.5, // the first jump, from the ground
+      airJumps: 2, // extra jumps in the air
+      airJumpHeight: 1.2,
+      gravity: 6.5, // lower than Earth's 9.8: floaty
+      maxFall: 7, // fastest fall
+      floatFall: 1.6, // holding jump while falling: he drifts down this slowly
+      airControl: 0.55, // how much he can steer in the air (1 = like on the ground)
+    },
+    /* The 3D model, later: a rigged GLB with clips named idle, walk, run, jump, fall,
+       float, cast (js/avatar.js). null = the box-built stand-in. */
+    model: null,
+  },
+
+  /* ------------------------------------------------------------------------
      CHAPTERS — the coloured sections of the day bar
      ------------------------------------------------------------------------ */
   chapters: {

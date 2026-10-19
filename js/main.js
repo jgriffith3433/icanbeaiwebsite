@@ -312,19 +312,37 @@
   }
 
   /* ---------------- log ---------------- */
+  /* Notes: lines that aren't in the day's timeline (taking control, letting go, back on his day), written
+     into the log at the minute they happened by day.note() (js/control.js). Kept per day. */
+  const notes = new Map(); // dateKey -> [{ start, text }]
   let logKey = "";
-  function renderLog(day, idx) {
-    const key = day.dateKey + ":" + idx;
+  function renderLog(day, idx, now, steering) {
+    const mine = (notes.get(day.dateKey) || []).filter((n) => n.start <= now + 1e-6);
+    const key = day.dateKey + ":" + idx + ":" + mine.length + ":" + !!steering;
     if (key === logKey) return;
     logKey = key;
     const rows = day.rows;
     const from = Math.max(0, idx - 6);
     const to = Math.min(rows.length - 1, idx + 2);
-    el.log.innerHTML = "";
+    const list = [];
     for (let i = from; i <= to; i++) {
       const r = rows[i];
+      list.push({ at: r.start, start: r.start, text: r.text, cls: (i < idx ? "past" : i === idx ? "now" : "soon") + (r.kind === "micro" ? " micro" : "") });
+    }
+    // Notes since the earliest row shown. While the player has him, the latest note is what's happening; after,
+    // the day's current line comes back under the notes, from the minute he was back.
+    const lastNote = mine.filter((n) => n.start >= rows[from].start).pop();
+    mine.filter((n) => n.start >= rows[from].start).forEach((n) => {
+      list.push({ at: n.start, start: n.start, text: n.text, cls: (steering && n === lastNote ? "now" : "past") + " note" });
+    });
+    const cur = list.find((r) => r.cls.startsWith("now") && !r.cls.includes("note"));
+    if (cur && steering) cur.cls = cur.cls.replace("now", "past");
+    else if (cur && lastNote && lastNote.start > rows[idx].start) cur.at = cur.start = lastNote.start + 1e-6;
+    list.sort((a, b) => a.at - b.at);
+    el.log.innerHTML = "";
+    list.slice(-10).forEach((r) => {
       const li = document.createElement("li");
-      li.className = (i < idx ? "past" : i === idx ? "now" : "soon") + (r.kind === "micro" ? " micro" : "");
+      li.className = r.cls;
       const t = document.createElement("time");
       t.textContent = E.fmtClock(r.start, true).replace(/ (AM|PM)/, "");
       const s = document.createElement("span");
@@ -332,7 +350,7 @@
       li.appendChild(t);
       li.appendChild(s);
       el.log.appendChild(li);
-    }
+    });
   }
 
   /* ---------------- world ---------------- */
@@ -352,6 +370,7 @@
   let lastMinutes = null;
   let lastFr = null;
   const watchers = []; // playtest hooks (js/playtest.js); empty unless a playtest is running
+  let pilot = null; // js/control.js: while the player has him, it says where he is and what's happening
   let lastThings = null;
   let rowIdx = -1;
 
@@ -371,19 +390,22 @@
     if (!day.actions.length) return;
     const fr = E.frame(day, loc.minutes);
     const a = fr.action;
+    const steer = pilot ? pilot(fr, dt, day) : null;
 
     const clock = E.fmtClock(loc.minutes, true).split(" ");
     el.time.textContent = clock[0];
     el.ampm.textContent = clock[1];
     rowIdx = rowAt(day.rows, loc.minutes);
     const row = day.rows[rowIdx];
-    if (el.what.textContent !== row.text) {
-      el.what.textContent = row.text;
+    const whatText = steer && steer.text ? steer.text : row.text;
+    if (el.what.textContent !== whatText) {
+      el.what.textContent = whatText;
       el.what.classList.remove("fresh");
       void el.what.offsetWidth;
       el.what.classList.add("fresh");
     }
-    el.what.classList.toggle("micro", row.kind === "micro");
+    el.what.classList.toggle("micro", !steer && row.kind === "micro");
+    el.what.classList.toggle("steered", !!steer);
     el.prog.style.width = (Math.max(0, Math.min(1, (loc.minutes - row.start) / Math.max(1e-6, row.end - row.start))) * 100).toFixed(1) + "%";
     const ch = (cfg.chapters || {})[a.chapter] || { label: a.chapter, color: "#888" };
     el.chapter.textContent = ch.label;
@@ -392,7 +414,7 @@
     el.where.textContent = room;
     const nb = day.blocks.find((b) => b.start > loc.minutes + 1e-6);
     el.next.textContent = nb ? `Next · ${E.fmtClock(nb.start)} · ${nb.title}` : "Next · the alarm";
-    renderLog(day, rowIdx);
+    renderLog(day, rowIdx, loc.minutes, !!steer);
     if (!dragging) el.scrub.value = String(loc.minutes);
     document.documentElement.style.setProperty("--marker", ((loc.minutes - day.dayStart) / (day.dayEnd - day.dayStart)) * 100 + "%");
 
@@ -441,11 +463,11 @@
     lastMinutes = loc.minutes;
     lastThings = fr.things;
     if (world) {
-      world.update(fr, dt, { snap });
+      world.update(fr, dt, { snap, player: steer });
       world.scene.render();
     }
     if (watchers.length) {
-      const info = { key: loc.key, day, fr, from: fromMinutes, to: loc.minutes, jumped: userJumped, dt };
+      const info = { key: loc.key, day, fr, from: fromMinutes, to: loc.minutes, jumped: userJumped, dt, steered: !!steer };
       watchers.slice().forEach((fn) => fn(info));
     }
   }
@@ -490,5 +512,14 @@
       watchers.push(fn);
       return () => watchers.splice(watchers.indexOf(fn), 1);
     },
+    /* for the player's controller (js/control.js) */
+    pilot: (fn) => (pilot = fn),
+    note: (text) => {
+      const loc = locate(simMs);
+      if (!notes.has(loc.key)) notes.set(loc.key, []);
+      notes.get(loc.key).push({ start: loc.minutes, text });
+      if (notes.size > 3) notes.delete(notes.keys().next().value);
+    },
+    notes: () => (notes.get(locate(simMs).key) || []).slice(),
   };
 })();
