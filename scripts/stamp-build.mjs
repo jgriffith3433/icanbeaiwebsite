@@ -19,7 +19,10 @@ const htmlPath = new URL('index.html', root);
 let html = fs.readFileSync(htmlPath, 'utf8');
 
 const local = /\b(src|href)="(?!https?:|\/\/|data:|#)([^"?]+)(\?v=[^"]*)?"/g;
-const files = [...new Set([...html.matchAll(local)].map((m) => m[2]).filter((f) => /\.(js|css|json|png|jpe?g|svg|webp|mp3|glb|gltf)$/i.test(f)))].sort();
+const linked = [...html.matchAll(local)].map((m) => m[2]).filter((f) => /\.(js|css|json|png|jpe?g|svg|webp|mp3|glb|gltf)$/i.test(f));
+// js/app.js is Vite's entry: what it bundles (the day, every script, the packages) is part of the build too.
+const bundled = ['day.config.js', 'package-lock.json', ...fs.readdirSync(new URL('js/', root)).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`)];
+const files = [...new Set([...linked, ...bundled])].sort();
 const hash = crypto.createHash('sha1');
 for (const f of files) {
   hash.update(f);
