@@ -1,20 +1,25 @@
 # A day
 
-A person living through today, in real time, one action at a time. Open `index.html` and you see what they're doing right now. Drag the day bar to look around the day, or play it at 10×–1200×.
+Small Weather living through today, in real time, one action at a time. Open the site and you see what he's doing right now. Drag the day bar to look around the day, or play it at 10×–1200×.
+
+Where it's going: a third-person game. Small Weather (he/him, the storm caller from Dose Of Destruction) lives his developer's day on autopilot; the player can take control, walk the city and command the weather. Today the page is the day on autopilot, on Babylon.js 9 with Havok physics and colliders for the world. More in [AGENTS.md](AGENTS.md#direction).
 
 **The whole day is defined in [`day.config.js`](day.config.js).** Change it, save it, and reload the page.
 
 ## Run it locally
 
-Double-click `auto-start.bat`. The first time, it installs Vite. Then it serves the site at **http://localhost:8092** and opens your browser. `auto-stop.bat` stops whatever is running on port 8092. From a terminal you can also use `npm run dev`, `npm run build`, or `npm run preview` (which serves on port 8093).
+Double-click `auto-start.bat`. The first time, it installs the packages (Vite, Babylon.js 9, Havok). Then it serves the site at **http://localhost:8092** and opens your browser. `auto-stop.bat` stops whatever is running on port 8092. From a terminal you can also use `npm run dev`, `npm test` (builds the day and the world in Node and checks the physics), `npm run build` (the site in `dist/`, about 4 minutes), or `npm run preview` (serves `dist/` on port 8093).
+
+The page needs Vite: opening `index.html` straight from disk no longer works, because Babylon and Havok come from npm.
 
 ## How it fits together
 
 | File | What it does |
 | --- | --- |
-| `day.config.js` | **Everything about the day:** rooms and spots, the clock spine, behavior pools, body stats, things in the world |
+| `day.config.js` | **Everything about the day:** rooms and spots, the clock spine, behavior pools, body stats, things in the world, his name (`person.name`) |
+| `js/app.js` | The page's entry (Vite): Babylon 9 (`js/babylon.js`), then the files below in order, then Havok physics |
 | `js/schedule.js` | The engine. It compiles the config into one continuous timeline (about 700 actions) for each date. |
-| `js/world.js` | The 3D stage (Babylon.js). Furniture is placed from the spots in the config, and props react to the things. |
+| `js/world.js` | The 3D stage (Babylon.js 9). Furniture is placed from the spots in the config, and props react to the things. `enablePhysics` gives the ground, buildings and furniture Havok colliders. |
 | `js/main.js` | Clock, playback, the action log, body meters, the things panel |
 | `js/analytics.js` | Hawkes Analytics: what viewers watch and touch (see [AGENTS.md](AGENTS.md#analytics-hawkes-analytics)) |
 | `simulation-checklist.md` | The original rules the simulation follows |
@@ -45,7 +50,7 @@ Every line on the clock is a **block** in `spine`:
   title: "Microwave",
   chapter: "lunch",
   steps: [
-    { go: "microwave", for: "1.5-2m", do: "They walk to the break room." },
+    { go: "microwave", for: "1.5-2m", do: "He walks to the break room." },
     { at: "microwave", hand: "reach", for: "20-40s", set: { microwave: "on" }, do: "Container into the microwave." },
     { chance: 0.35, at: "microwave", for: "10-20s", do: "They open it early, check, and close it again." },
   ],
@@ -106,7 +111,7 @@ calls `window.hawkesPlaytest.start()` or the URL has `?playtest=<id>`.
 
 | Scenario | What it does |
 | --- | --- |
-| `smoke` (~15 s) | Boot, check the person is on screen, watch the live clock tick, play one day-minute at 10×, pause, Esc back to live. |
+| `smoke` (~25 s) | Boot, check Small Weather is on screen, watch the live clock tick, play one day-minute at 10×, pause, Esc back to live. Then an `engine` event (Babylon version, Havok, the colliders), `collider-under-person`, and his name: `name-in-panel`, then the day bar to the alarm for `name-in-log`, and Esc back to live. |
 | `day` (~75 s) | Drag the day bar to the start of the day, play at 1200× to the end, and check every block in today's timeline started and every action was reached. `?speed=` multiplies the speed. |
 | `analytics` (~4 min) | Camera, speed buttons and keys, the day bar, the panels, with every analytics event that goes out on the timeline; then waits for the 3-minute question ("What would you want this to be?") and dismisses it. |
 
@@ -117,7 +122,7 @@ are listed as `skipped-today` events, not problems.
 
 Try it: open http://localhost:8092/?playtest=day and, when it's done, run `hawkesPlaytest.report()` in the console.
 
-Hooks it uses in the game: `day.now()` and `day.watch(fn)` in `js/main.js` (a frame callback, empty unless a
+Hooks it uses in the game: `day.engineInfo()` in `js/app.js`, `world.groundAt()` in `js/world.js`, `day.now()` and `day.watch(fn)` in `js/main.js` (a frame callback, empty unless a
 playtest runs) and `world.person` in `js/world.js`. `main.js` caps a frame at 0.1 s, so on a slow renderer
 (software WebGL in a headless browser runs at 1–2 fps) playback is slower than its label; the `day` scenario raises
 the speed every few seconds to finish in about 75 s.

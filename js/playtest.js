@@ -16,7 +16,7 @@ function world() {
 
 /** Problems anyone can see at a glance: no Babylon, no world, a config error panel, NaN. */
 function checkBasics(t) {
-  if (!window.BABYLON) t.problem("bug", "Babylon.js didn't load (CDN script missing)");
+  if (!window.BABYLON) t.problem("bug", "Babylon.js didn't load (the js/app.js bundle)");
   if (!window.DAY_CONFIG) t.problem("bug", "day.config.js didn't load");
   const w = world();
   if (!w) t.problem("bug", "The 3D world wasn't created");
@@ -105,6 +105,42 @@ function stopWatching() {
   unwatch = null;
 }
 
+/** The engine (Babylon 9, Havok physics and its colliders) and Small Weather's name in the side panel and the log. */
+async function checkFoundation(t) {
+  t.scene("Engine and name");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const info = window.day.engineInfo ? window.day.engineInfo() : { babylon: window.BABYLON && window.BABYLON.Engine.Version, physics: "unknown" };
+  t.event("engine", `Babylon ${info.babylon}, physics ${info.physics}${info.colliders ? ` (${info.colliders} colliders in ${info.bodies} bodies)` : ""}`);
+  t.log(`engine: ${JSON.stringify(info)}`);
+  t.metric("babylon", info.babylon);
+  if (info.colliders) t.metric("colliders", info.colliders);
+  if (!/^9\./.test(String(info.babylon))) t.problem("bug", `Babylon ${info.babylon} is running, not Babylon 9`);
+  if (info.physics !== "havok") t.problem("bug", `Physics isn't on (${info.physics}${info.error ? `: ${info.error}` : ""})`);
+  const w = world();
+  const fr = window.day.now().frame;
+  if (info.physics === "havok" && w && fr && !fr.person.inCar) {
+    const g = w.groundAt(fr.person.x, fr.person.z, 3);
+    if (g) t.event("collider-under-person", `y ${g.y.toFixed(2)} (${g.body})`);
+    else t.problem("bug", "No collider under the person: the floor isn't solid there");
+  }
+
+  // The side panel and the log name him. The log is checked at the alarm, the first block (the day bar, like a player).
+  const name = (window.DAY_CONFIG.person && window.DAY_CONFIG.person.name) || "";
+  const heading = ($("log-title") && $("log-title").textContent) || "";
+  if (name === "Small Weather" && heading.includes(name)) t.event("name-in-panel", heading);
+  else t.problem("bug", `The side panel doesn't call him Small Weather ("${heading}")`);
+  const day = window.day.today();
+  scrubTo(day.dayStart + 0.2);
+  await t.until(() => $("log").textContent.includes("Small Weather"), 4000, "his name in the log").catch(() => {});
+  const row = [...$("log").querySelectorAll("li")].map((li) => li.textContent).find((x) => x.includes("Small Weather"));
+  if (row) t.event("name-in-log", row);
+  else t.problem("bug", "The action log doesn't call him Small Weather at the alarm");
+  await sleep(1500);
+  pressKey("Escape");
+  await sleep(500);
+  t.scene("Live");
+}
+
 /* ---------------- smoke: boot, see the character, let a minute of the day run ---------------- */
 async function smoke(options, t) {
   t.scene("Live");
@@ -159,6 +195,9 @@ async function smoke(options, t) {
   if (window.day.now().mode !== "live") t.problem("bug", "Esc didn't go back to live");
   t.scene("Live");
   t.event("back-to-live");
+  t.progress(0.9);
+
+  await checkFoundation(t);
   t.progress(1);
 }
 
@@ -493,7 +532,7 @@ const E = () => window.DayEngine;
 installPlaytest({
   product: "icanbe",
   scenarios: [
-    { id: "smoke", title: "Boot, see the person, a minute of the day at 10×, pause, back to live", seconds: 20, tags: ["smoke"] },
+    { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live; Babylon 9, physics, his name in the panel and log", seconds: 30, tags: ["smoke"] },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
   ],

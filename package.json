@@ -7,9 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 8093 --strictPort",
+    "test": "node scripts/check-world.mjs",
     "stamp": "node scripts/stamp-build.mjs"
   },
   "devDependencies": {
     "vite": "^5.4.10"
+  },
+  "dependencies": {
+    "@babylonjs/core": "9.30.0",
+    "@babylonjs/havok": "1.3.14"
   }
 }

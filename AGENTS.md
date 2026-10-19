@@ -1,7 +1,64 @@
 # I Can Be (icanbe.ai): notes for agents
 
 How the site works, how to run it, versions, playtests and Hawkes Gen are in [README.md](README.md). The day is
-`day.config.js`. The product's direction is undecided: build what J asks for, and don't invent a direction.
+`day.config.js`.
+
+## Direction
+
+I Can Be is becoming a **third-person game** (J, 2026-10-19, memory m_b34b3a2627df). The character is **Small Weather**
+(he/him; canon m_9743a1dfe970: the same Small Weather as Dose Of Destruction's storm caller, art in
+`AllTheCharacters/SmallWeather`). He lives his developer's day on autopilot, the simulated day in `day.config.js`; a
+player can take control, walk the city in third person and command the weather, and feel like a god doing it. The
+levels get redone over time. Until the player-control part exists, the page is the day playing on its own.
+
+- **His name and voice:** the day's lines call him "He", plainly, and name him "Small Weather" at a few moments (the
+  alarm, out the door, the work lot, home, setting the alarm, the first line of work). `person.name` in
+  `day.config.js` is what the side panel shows. Keep lines short and matter-of-fact, as they are; no "they" for him.
+  Other people (coworkers, someone in the elevator) are still "they".
+- **Not yet:** player control, the weather powers, his look (the person is still the box-built figure in
+  `js/world.js` makePerson), the city. Those are next steps, not this foundation.
+
+## How it's built (Babylon 9, Havok, Vite)
+
+- **Packages:** `@babylonjs/core` 9 and `@babylonjs/havok` from npm (`package.json`, exact versions), bundled by
+  Vite. No CDN. `index.html` loads one module, `js/app.js`, which imports in order: `js/babylon.js` (sets
+  `window.BABYLON`), `day.config.js`, `js/schedule.js`, `js/world.js`, `js/main.js`, `js/analytics.js`. Those files
+  are still plain-JS IIFEs that put their API on `window` (`DAY_CONFIG`, `DayEngine`, `DayWorld`, `day`); keep that
+  pattern so the order is the only coupling. New code can be a real module imported from `js/app.js`.
+- **Physics:** `js/app.js` loads Havok after the page is up (`HavokPhysics` with the wasm URL from Vite) and calls
+  `world.enablePhysics(havok)`. If Havok fails, the day still plays and `day.engineInfo().physics` is `off`.
+  `enablePhysics` (`js/world.js`) builds three static bodies of box colliders: `ground` (a slab under the ground plane,
+  the road and sidewalks), `town` (houses, shops, tree trunks, lamp posts: the `solids` list, since those are thin
+  instances) and `rooms` (building floors and walls, and every furniture mesh at least 25 cm tall or a big flat one;
+  doors that swing or slide and the bag are left out). The person isn't a physics body yet: the day still moves him.
+  `world.groundAt(x, z, from)` raycasts straight down (the playtest uses it; a future walker can too).
+  `day.engineInfo()` says `{ babylon, physics, bodies, colliders }`, and the side panel's foot shows it.
+- **New furniture** gets a collider by itself if it's built in the furniture section of `world.js` (between
+  `furnitureFrom` and the parked cars). Something that moves must be added to the `moving` list there.
+- **Checks:** `npm test` (`scripts/check-world.mjs`) builds the day and the world under Babylon's NullEngine in Node,
+  turns Havok on and checks Babylon 9, no config errors, colliders under the field, the road, the home floor, a wall
+  and the bed, a person-sized capsule coming to rest on the ground, and that two weeks of days name Small Weather and
+  never say "they" for him. `npm run build` must pass too (it takes about 4 minutes: Babylon is big).
+- **Publishing:** `.github/workflows/pages.yml` builds `dist/` (tests, then `vite build`) and deploys it to GitHub
+  Pages on main; `vite.config.js` copies the static pages, their classic scripts, `css/`, `releases.json` and the
+  CNAME into `dist/`. The first time pages.yml reaches main, Studio switches the repo's Pages source to Actions (the
+  github-pages skill). **Studio's staging site needs a build recipe** for `icanbe` in `hawkesstudio/src/previews.ts`
+  (`{ build: 'npm run build', site: 'none', out: { from: 'dist', to: '' } }`): without it the beta site copies the
+  source, and the page can't load `@babylonjs/core`. The playtests use `npm run dev`, which works without it.
+
+## Hawkes Gen art direction (for a later Gen change)
+
+`hawkesgen/presets/icanbe.json` lives in Gen; change it there. Its notes still say "direction undecided". The new
+style line, matching Dose Of Destruction's look since Small Weather is the same character:
+
+> Stylized 3D cartoon render, same look as Dose Of Destruction: clean shapes, bold readable silhouettes, saturated
+> colors. A city at human scale for a third-person game; weather is the drama: storm light, rain sheets, lightning,
+> clouds breaking open. Small Weather: young man, black messy hair, glasses, dark navy tech jacket with glowing blue
+> seams, grey tee, black cargo pants, knee armor, glowing boots.
+
+Notes for the preset: "Third-person game: Small Weather (he/him) lives a developer's day on autopilot; the player can
+take control and command the weather. Same art as DoD (AllTheCharacters/SmallWeather). The current build is still the
+box-built diorama of js/world.js." Negative: `text, watermark, extra limbs`.
 
 ## Analytics (Hawkes Analytics)
 
@@ -10,7 +67,7 @@ Hawkes Analytics is the only analytics here (J, 2026-10-18): never add another t
 
 **Where it's loaded.** `js/hawkes-analytics.js` is a copy of `hawkesgen/clients/js/hawkes-analytics.js`. Don't edit
 it here: copy it again from Gen. It's loaded with `data-product="icanbe"` on every page people see: `index.html`
-(in `<head>`, then `loadStart()` straight after it, so `game_ready.ms` includes the Babylon download),
+(a classic script in `<head>`, then `loadStart()` straight after it, so `game_ready.ms` includes the bundle's download),
 `whatsnew.html` and `privacy.html`. A new public page needs the same two lines (`HAWKES_BUILD` and the script tag).
 
 **The build.** Each page has `window.HAWKES_BUILD = { version: "dev" }`. `scripts/stamp-build.mjs`, which is Studio's
@@ -19,7 +76,7 @@ it here: copy it again from Gen. It's loaded with `data-product="icanbe"` on eve
 again changes nothing. Don't commit stamped output from a task branch: Studio stamps beta, and that way the commit
 is beta's.
 
-**What the page sends** (`js/analytics.js`, a classic script after `main.js`). It only listens to the controls, the
+**What the page sends** (`js/analytics.js`, imported by `js/app.js` after `main.js`). It only listens to the controls, the
 keys, the canvas and `day.watch()`, and it never changes the day.
 - Automatic (the SDK): `session_start`, `page_view`, `page_load`, `perf`, `error`, `rage_click`, `outbound`, `exit`,
   `session_end`.

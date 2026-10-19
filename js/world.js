@@ -65,6 +65,9 @@
     }
 
     const casters = [];
+    /* Solid things the physics colliders are built from (enablePhysics): boxes and the meshes below. */
+    const solids = []; // { x, y, z, w, h, d, yaw }: thin-instanced houses, shops, trees and lamp posts
+    const solidMeshes = []; // building shells and furniture: a box around each
     function box(name, w, h, d, x, y, z, m, parent, cast) {
       const mesh = B.MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, scene);
       mesh.position.set(x, y, z);
@@ -172,6 +175,7 @@
     box("walkN", street.to - street.from, 0.06, 1.2, (street.from + street.to) / 2, 0.03, RZ + 2.9, curbM, null, false).receiveShadows = true;
     const dash = box("dash", 1.6, 0.012, 0.12, 0, 0.05, RZ, mat("#e8e1cf", { emissive: "#2a281f" }), null, false);
     for (let x = street.from; x < street.to; x += 6) dash.thinInstanceAdd(B.Matrix.Translation(x, 0, 0));
+    const streetMeshes = [road, ...scene.meshes.filter((m) => m.name === "walkS" || m.name === "walkN")];
 
     const rng = makeRng(20261013);
 
@@ -202,6 +206,7 @@
         const m = B.Matrix.Compose(B.Vector3.One(), B.Quaternion.FromEulerAngles(0, i ? PI : 0, 0), V3(x, 0, z));
         pole.thinInstanceAdd(m);
         lampHead.thinInstanceAdd(m);
+        solids.push({ x, y: 2.1, z, w: 0.28, h: 4.2, d: 0.28 });
       });
     }
 
@@ -219,6 +224,7 @@
     function tree(x, z, s) {
       const k = Math.floor(rng() * crowns.length);
       trunk.thinInstanceAdd(B.Matrix.Compose(V3(s, s, s), B.Quaternion.Identity(), V3(x, 0, z)));
+      solids.push({ x, y: 0.8 * s, z, w: 0.4 * s, h: 1.6 * s, d: 0.4 * s });
       crowns[k].thinInstanceAdd(B.Matrix.Compose(V3(s * (0.9 + rng() * 0.3), s * (0.8 + rng() * 0.4), s * (0.9 + rng() * 0.3)), B.Quaternion.Identity(), V3(x, 0, z)));
     }
 
@@ -243,6 +249,7 @@
     function house(x, z, w, d, h, facing) {
       const k = Math.floor(rng() * houseBody.length);
       houseBody[k].thinInstanceAdd(B.Matrix.Compose(V3(w, h, d), B.Quaternion.Identity(), V3(x, 0, z)));
+      solids.push({ x, y: h / 2, z, w, h, d });
       const rk = Math.floor(rng() * roofs.length);
       const ry = d * 0.45;
       roofs[rk].thinInstanceAdd(B.Matrix.Compose(V3(w * 1.06, ry, d * 1.12), B.Quaternion.Identity(), V3(x, h + 0.25 * ry, z)));
@@ -261,6 +268,7 @@
     function shop(x, z, w, d, h, facing) {
       const k = Math.floor(rng() * shopBodies.length);
       shopBodies[k].thinInstanceAdd(B.Matrix.Compose(V3(w, h, d), B.Quaternion.Identity(), V3(x, 0, z)));
+      solids.push({ x, y: h / 2, z, w, h, d });
       const fz = z + (facing > 0 ? d / 2 + 0.03 : -d / 2 - 0.03);
       const floors = Math.max(1, Math.floor(h / 3));
       for (let f = 0; f < floors; f++) {
@@ -434,6 +442,7 @@
     }
 
     /* ---------------- furniture ---------------- */
+    const furnitureFrom = scene.meshes.length;
     const wood = mat("#8d6844");
     const woodDark = mat("#6b4c33");
     const woodLight = mat("#b48a5c");
@@ -839,6 +848,16 @@
       glowing(box("signtext", 2.8, 0.18, 0.01, x, 3.2, z + 0.1, glowMat("#e8e4da", "#8a8578"), null, false));
       sign.receiveShadows = false;
     }
+
+    /* Everything built since "furniture" is furniture: big enough to bump into, and it doesn't move. */
+    {
+      const moving = [frontDoorNode, fridgeDoor, elevatorDoors && elevatorDoors.l, elevatorDoors && elevatorDoors.r, props.bag].filter(Boolean);
+      const moves = (m) => moving.some((n) => m === n || m.isDescendantOf(n));
+      scene.meshes.slice(furnitureFrom).forEach((m) => {
+        if (!m.hasThinInstances && !moves(m)) solidMeshes.push(m);
+      });
+    }
+    Object.values(buildingMeshes).forEach((list) => list.forEach((m) => solidMeshes.push(m)));
 
     /* Parked cars that never move, in the work lot */
     function makeCar(color) {
@@ -1457,10 +1476,72 @@
       sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
     }
 
+    /* ---------------- physics (Havok) ---------------- */
+    /* Static colliders for the ground, the street, the buildings and the furniture, so a physics character can
+       walk the world. The day itself doesn't use them: the person still follows the timeline. */
+    let physics = null;
+    function enablePhysics(havok) {
+      if (physics) return physics;
+      const plugin = new B.HavokPlugin(true, havok);
+      scene.enablePhysics(V3(0, -9.81, 0), plugin);
+      let colliders = 0;
+      let bodies = 0;
+      const scl = new B.Vector3();
+      const rot = new B.Quaternion();
+      const pos = new B.Vector3();
+      function body(name, fill) {
+        const container = new B.PhysicsShapeContainer(scene);
+        const add = (center, rotation, size) => {
+          container.addChild(new B.PhysicsShapeBox(center, rotation, size, scene));
+          colliders++;
+        };
+        fill(add);
+        if (!container.getNumChildren()) {
+          container.dispose();
+          return;
+        }
+        const node = new B.TransformNode("collide-" + name, scene);
+        const b = new B.PhysicsBody(node, B.PhysicsMotionType.STATIC, false, scene);
+        b.shape = container;
+        bodies++;
+      }
+      /* a box around a mesh, turned the way it is turned; small things (cups, plates, rugs) aren't in the way */
+      function meshBox(add, m) {
+        if (!m.getTotalVertices || !m.getTotalVertices()) return;
+        m.computeWorldMatrix(true);
+        const bb = m.getBoundingInfo().boundingBox;
+        m.getWorldMatrix().decompose(scl, rot, pos);
+        const size = new B.Vector3(bb.extendSize.x * 2 * Math.abs(scl.x), bb.extendSize.y * 2 * Math.abs(scl.y), bb.extendSize.z * 2 * Math.abs(scl.z));
+        const big = size.y >= 0.25 || (size.y >= 0.03 && Math.max(size.x, size.z) >= 1.5);
+        if (!big || Math.max(size.x, size.z) < 0.04) return;
+        add(B.Vector3.TransformCoordinates(bb.center, m.getWorldMatrix()), rot.clone(), size);
+      }
+      body("ground", (add) => {
+        // a thick slab under the ground plane: nothing tunnels through it
+        add(V3(ground.position.x, -0.5, ground.position.z), B.Quaternion.Identity(), V3(groundLen, 1, 160));
+        streetMeshes.forEach((m) => meshBox(add, m));
+      });
+      body("town", (add) => solids.forEach((o) => add(V3(o.x, o.y, o.z), B.Quaternion.FromEulerAngles(0, o.yaw || 0, 0), V3(o.w, o.h, o.d))));
+      body("rooms", (add) => solidMeshes.forEach((m) => meshBox(add, m)));
+      physics = { plugin, bodies, colliders };
+      return physics;
+    }
+    /* What's under (x, z), straight down from `from` metres: { y, name } or null. For playtests and a future walker. */
+    const rayHit = new B.PhysicsRaycastResult();
+    function groundAt(x, z, from) {
+      if (!physics) return null;
+      physics.plugin.raycast(V3(x, from == null ? 6 : from, z), V3(x, -2, z), rayHit);
+      if (!rayHit.hasHit) return null;
+      return { y: rayHit.hitPoint.y, body: rayHit.body && rayHit.body.transformNode ? rayHit.body.transformNode.name : "" };
+    }
+
     return {
       engine,
       scene,
       update,
+      enablePhysics,
+      groundAt,
+      physics: () => physics,
       resize() {
         engine.resize();
       },
