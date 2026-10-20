@@ -245,8 +245,20 @@ export function startWeather(world, dayApi) {
   const hemi = stage.hemi || scene.getLightByName("sky");
   const pipeline = stage.pipeline;
   const roadMat = stage.road || (scene.getMeshByName("road") && scene.getMeshByName("road").material);
+  const roadIsPbr = !!(roadMat && roadMat.getClassName && roadMat.getClassName() === "PBRMaterial");
 
-  const live = { sky: "#888888", gloss: roadMat ? roadMat.specularColor.r : 0, heard: 0, flashes: 0, particles: "off", puddles: 0 };
+  const live = {
+    sky: "#888888",
+    gloss: roadMat
+      ? (roadIsPbr
+        ? (roadMat.clearCoat && roadMat.clearCoat.isEnabled ? roadMat.clearCoat.intensity : 0.04)
+        : (roadMat.specularColor ? roadMat.specularColor.r : 0))
+      : 0,
+    heard: 0,
+    flashes: 0,
+    particles: "off",
+    puddles: 0,
+  };
   let flash = 0;
   let nextFlash = 1.6;
   let booted = false;
@@ -302,7 +314,14 @@ export function startWeather(world, dayApi) {
   }
 
   /* ---- wet road + puddles that mirror the street ---- */
-  const dryDiffuse = roadMat ? roadMat.diffuseColor.clone() : null;
+  // Look dresses the avenue in PBR asphalt (albedoColor × texture); older builds used StandardMaterial diffuseColor.
+  const dryDiffuse = roadMat
+    ? (roadIsPbr
+      ? (roadMat.albedoColor ? roadMat.albedoColor.clone() : new B.Color3(1, 1, 1))
+      : roadMat.diffuseColor.clone())
+    : null;
+  const dryRough = roadIsPbr ? roadMat.roughness : null;
+  const dryCoat = roadIsPbr && roadMat.clearCoat ? roadMat.clearCoat.intensity : null;
   const scratch = {
     tod: new B.Color3(),
     sky: new B.Color3(),
@@ -789,13 +808,26 @@ export function startWeather(world, dayApi) {
     if (pipeline && pipeline.imageProcessing) pipeline.imageProcessing.exposure *= L.exposure * (1 + flash * 1.6);
     if (roadMat && dryDiffuse) {
       const wet = L.wet;
-      dryDiffuse.scaleToRef(1 - wet * 0.62, scratch.diff);
-      scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.05);
-      roadMat.diffuseColor.copyFrom(scratch.diff);
-      roadMat.ambientColor.copyFrom(scratch.diff).scaleInPlace(0.55);
       const g = 0.04 + wet * 0.66;
-      roadMat.specularColor.set(g, g * 1.02, g * 1.08);
-      roadMat.specularPower = 64 - wet * 40;
+      if (roadIsPbr) {
+        dryDiffuse.scaleToRef(1 - wet * 0.55, scratch.diff);
+        scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.06);
+        if (!roadMat.albedoColor) roadMat.albedoColor = scratch.diff.clone();
+        else roadMat.albedoColor.copyFrom(scratch.diff);
+        roadMat.roughness = Math.max(0.08, (dryRough == null ? 0.32 : dryRough) - wet * 0.22);
+        if (roadMat.clearCoat) {
+          roadMat.clearCoat.isEnabled = true;
+          roadMat.clearCoat.intensity = Math.min(1, (dryCoat == null ? 0.42 : dryCoat) + wet * 0.45);
+          roadMat.clearCoat.roughness = 0.08 + (1 - wet) * 0.06;
+        }
+      } else {
+        dryDiffuse.scaleToRef(1 - wet * 0.62, scratch.diff);
+        scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.05);
+        roadMat.diffuseColor.copyFrom(scratch.diff);
+        roadMat.ambientColor.copyFrom(scratch.diff).scaleInPlace(0.55);
+        roadMat.specularColor.set(g, g * 1.02, g * 1.08);
+        roadMat.specularPower = 64 - wet * 40;
+      }
       live.gloss = g;
     }
     if (mirror) {

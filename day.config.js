@@ -790,7 +790,9 @@ window.DAY_CONFIG = {
   /* A few blocks, built by hand (J, q_843c2557747c: a made-up city, not a map).
      Avenues run east-west, crosses north-south. Blocks are solid buildings;
      ones with `stair` have a walkable roof (a ramp along +x on the north
-     face, from x0 at the ground to x1 at the roof). */
+     face, from x0 at the ground to x1 at the roof).
+     The district is dark and cinematic, navy and black with electric blue at
+     night (js/look.js). These colours are the flat fallback under that. */
   city: {
     park: { x0: -34, z0: 20, x1: 30, z1: 68 },
     avenues: [
@@ -805,16 +807,16 @@ window.DAY_CONFIG = {
       { x: 168, from: -48, to: 90 },
     ],
     blocks: [
-      { id: "apt", x: -24, z: 0.5, w: 16, d: 12, h: 6.16, color: "#7a8794", stair: { x0: -31, x1: -17, z: 7.2, w: 1.45 } },
-      { id: "shop", x: 50, z: 0.5, w: 16, d: 12, h: 3.3, color: "#a68462", stair: { x0: 43, x1: 50.5, z: 7.2, w: 1.45 } },
-      { id: "annex", x: 157, z: 0.5, w: 16, d: 12, h: 5.72, color: "#5c6b7a", stair: { x0: 150, x1: 163, z: 7.2, w: 1.45 } },
-      { id: "row-west", x: -24, z: -20, w: 18, d: 10, h: 5, color: "#6d635c" },
-      { id: "row-south", x: 52, z: -20, w: 22, d: 10, h: 8, color: "#7a6a60" },
-      { id: "mid", x: 86, z: 0.5, w: 12, d: 12, h: 11, color: "#59636e" },
-      { id: "corner", x: 112, z: 0.5, w: 10, d: 12, h: 9, color: "#4c5966" },
-      { id: "north-mid", x: 68, z: 46, w: 36, d: 22, h: 15, color: "#45515c" },
-      { id: "north-east", x: 140, z: 48, w: 32, d: 20, h: 20, color: "#3c4650" },
-      { id: "south-office", x: 146, z: -20, w: 24, d: 10, h: 8, color: "#6a6560" },
+      { id: "apt", x: -24, z: 0.5, w: 16, d: 12, h: 6.16, color: "#46525f", stair: { x0: -31, x1: -17, z: 7.2, w: 1.45 } },
+      { id: "shop", x: 50, z: 0.5, w: 16, d: 12, h: 3.3, color: "#5a4550", stair: { x0: 43, x1: 50.5, z: 7.2, w: 1.45 } },
+      { id: "annex", x: 157, z: 0.5, w: 16, d: 12, h: 5.72, color: "#3c4a58", stair: { x0: 150, x1: 163, z: 7.2, w: 1.45 } },
+      { id: "row-west", x: -24, z: -20, w: 18, d: 10, h: 5, color: "#4c433e" },
+      { id: "row-south", x: 52, z: -20, w: 22, d: 10, h: 8, color: "#554940" },
+      { id: "mid", x: 86, z: 0.5, w: 12, d: 12, h: 11, color: "#3a4654" },
+      { id: "corner", x: 112, z: 0.5, w: 10, d: 12, h: 9, color: "#343e4c" },
+      { id: "north-mid", x: 68, z: 46, w: 36, d: 22, h: 15, color: "#2f3a48" },
+      { id: "north-east", x: 140, z: 48, w: 32, d: 20, h: 20, color: "#2a3340" },
+      { id: "south-office", x: 146, z: -20, w: 24, d: 10, h: 8, color: "#4a4540" },
     ],
   },
 

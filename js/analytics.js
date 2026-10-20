@@ -57,6 +57,8 @@
     }
     feature("control", d.via ? { action: d.action, via: d.via } : { action: d.action, how: d.how });
   }));
+  // Graphics quality (js/look.js): high or low, from the button.
+  window.addEventListener("day:quality", safe((e) => feature("quality", { value: (e.detail || {}).value, via: (e.detail || {}).via || "click" })));
   // The weather wheel (js/weather.js): a key, the radial, or a phone tap. The day's own forecast isn't an interaction.
   window.addEventListener("day:weather", safe((e) => {
     const d = e.detail || {};
