@@ -747,6 +747,11 @@ export function startPowers(world, dayApi) {
 .powerpad button{appearance:none;border:1px solid rgba(126,200,255,.55);background:rgba(10,14,22,.55);color:#d5e8ff;border-radius:12px;padding:10px 6px;font:600 0.78rem system-ui,sans-serif;touch-action:none}
 .powerpad button.held{background:#7ec8ff;color:#102033}
 .preview-public .pressure,.public .pressure{bottom:92px}
+html.touch-ui .pressure,html.touch-ui.public .pressure,html.touch-ui.preview-public .pressure{left:max(12px,env(safe-area-inset-left));right:auto;bottom:auto;top:max(78px,calc(env(safe-area-inset-top) + 72px));width:min(148px,40vw)}
+html.touch-ui .powerpad{right:max(12px,env(safe-area-inset-right));bottom:max(168px,calc(env(safe-area-inset-bottom) + 156px));width:148px;gap:6px}
+html.touch-ui.public .powerpad,html.touch-ui.preview-public .powerpad{bottom:max(150px,calc(env(safe-area-inset-bottom) + 138px))}
+html.touch-ui:not(.public):not(.preview-public) .powerpad{bottom:276px}
+html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
 `;
     document.head.appendChild(style);
     meter = document.createElement("div");
