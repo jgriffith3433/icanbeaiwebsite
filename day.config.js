@@ -138,7 +138,8 @@ window.DAY_CONFIG = {
       driving: "He's driving. Take control once he's out of the car.",
     },
     /* How he moves for the player. Metres and seconds. Floaty on purpose: the same
-       two extra jumps and slow fall as his Dose Of Destruction fighter. */
+       two extra jumps as his Dose Of Destruction fighter; hold jump in the air to
+       ride the wind (glide) across streets and between roofs. */
     move: {
       walk: 2.4, // walking (the stick or keys alone)
       sprint: 5.6, // Shift; a gamepad bumper or stick click; the touch stick pushed to its edge
@@ -147,8 +148,26 @@ window.DAY_CONFIG = {
       airJumpHeight: 1.2,
       gravity: 6.5, // lower than Earth's 9.8: floaty
       maxFall: 7, // fastest fall
-      floatFall: 1.6, // holding jump while falling: he drifts down this slowly
+      floatFall: 1.6, // kept for older checks; glide uses glideFall
+      glideFall: 0.42, // hold jump in the air: fall this slowly while riding
+      glideSpeed: 10.5, // horizontal speed while gliding
       airControl: 0.55, // how much he can steer in the air (1 = like on the ground)
+      glideAirControl: 0.9,
+      softLand: 2.4, // horizontal speed after a soft glide landing
+    },
+    /* Storm-riding: wind trails, whoosh, camera pull-back, and updraft columns
+       (ambient at avenue crosses; a Gust plants one he can ride). */
+    ride: {
+      cameraPull: 3.4,
+      whoosh: "audio/sfx/glide-whoosh.mp3",
+      trails: true,
+      updraft: {
+        radius: 4.2,
+        lift: 8, // m/s upward at the centre of a player gust
+        life: 7, // seconds a gust updraft lasts
+        ambient: true,
+        weather: { clear: 0.08, clouds: 0.15, rain: 0.35, storm: 1, fog: 0.1, wind: 0.92, snow: 0.2 },
+      },
     },
     /* Small Weather's 3D model: the rigged GLB from Hawkes Gen (hawkes.assets.json), worn
        over the box figure on his day and under control (js/small-weather.js). Clips: idle,
@@ -207,6 +226,8 @@ window.DAY_CONFIG = {
       snow: "audio/music/snow.mp3",
     },
     sting: "audio/music/take-control.mp3",
+    whoosh: "audio/sfx/glide-whoosh.mp3",
+    whooshVol: 0.62,
     ambience: {
       air: "audio/sfx/city-hum.mp3",
       rain: "audio/sfx/rain-asphalt.mp3",
@@ -226,7 +247,8 @@ window.DAY_CONFIG = {
      lightning where the reticle sits. G (left trigger, Gust) shoves what's
      in front of him. T (right trigger, Tornado) sends one down the street.
      Loose bins and people with umbrellas stand near the avenue so a gust
-     has something to take. `dz` is metres from the avenue's centre line.
+     has something to take. A Gust also plants a short updraft he can ride.
+     `dz` is metres from the avenue's centre line.
      ------------------------------------------------------------------------ */
   powers: {
     max: 100,
@@ -242,7 +264,7 @@ window.DAY_CONFIG = {
       gather: "The sky draws in over him.",
       storm: "He calls the storm down.",
       bolt: "Lightning. Where he aimed.",
-      gust: "A hard gust.",
+      gust: "A hard gust. The air lifts under him.",
       tornado: "He sends a tornado down the street.",
       dry: "Not enough pressure.",
     },

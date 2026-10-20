@@ -48,9 +48,13 @@
   $("live").addEventListener("click", safe(() => feature("live", { via: via() })));
   $("sound").addEventListener("click", safe(() => feature("sound", { value: $("sound").getAttribute("aria-pressed") === "true" ? "on" : "off" })));
   $("details").addEventListener("click", safe(() => feature("details", { value: $("details").getAttribute("aria-pressed") === "true" ? "open" : "closed" })));
-  // Taking control of him (js/control.js): take, let-go, and back (walked back, or caught up with his day).
+  // Taking control of him (js/control.js): take, let-go, back, glide and updraft.
   window.addEventListener("day:control", safe((e) => {
     const d = e.detail || {};
+    if (d.action === "glide" || d.action === "soft-land" || d.action === "updraft") {
+      feature("control", { action: d.action, via: d.via, y: d.y, speed: d.speed, lift: d.lift, kind: d.kind });
+      return;
+    }
     feature("control", d.via ? { action: d.action, via: d.via } : { action: d.action, how: d.how });
   }));
   // The weather wheel (js/weather.js): a key, the radial, or a phone tap. The day's own forecast isn't an interaction.

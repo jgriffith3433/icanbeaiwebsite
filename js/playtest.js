@@ -1745,6 +1745,178 @@ async function voice(options, t) {
   t.progress(1);
 }
 
+/* ---------------- storm-ride: glide on the wind, ride an updraft to a roof, cross rooftop to rooftop ---------------- */
+// Real input: Enter, WASD, Space held, G for a gust updraft, 4 for storm weather. Setup: day bar beside the car.
+async function stormRide(options, t) {
+  t.scene("Street");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control (js/control.js didn't install)");
+    return;
+  }
+  const cfg = window.DAY_CONFIG;
+  const day = window.day.today();
+  const roofs = ((cfg.city && cfg.city.blocks) || []).filter((b) => b.stair);
+  const apt = roofs.find((b) => b.id === "apt") || roofs[0];
+  const shop = roofs.find((b) => b.id === "shop") || roofs[1];
+  if (!apt || !shop) {
+    t.problem("bug", "Need two roofs with stairs (apt and shop) for storm-riding");
+    return;
+  }
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  t.event("start-at", `${E().fmtClock(outside.start)} beside the car · storm-ride`);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  if (!C.state().physics) t.problem("bug", "He moves without the Havok character controller");
+  // Storm weather: ambient updrafts are strongest.
+  pressKey("4");
+  await sleep(500);
+  if (window.weather && window.weather.set) window.weather.set("storm", 1, "playtest");
+  if (C.refreshUpdrafts) C.refreshUpdrafts();
+  t.event("weather-storm", `storm for stronger updrafts · ${C.state().updrafts || 0} columns`);
+  t.progress(0.08);
+
+  // 1. Hold jump in the air → glide with wind trails.
+  t.scene("Glide");
+  let glided = false;
+  let trails = 0;
+  let pull = 0;
+  const watchGlide = setInterval(() => {
+    const st = C.state();
+    if (st.gliding || st.floating) {
+      glided = true;
+      trails = Math.max(trails, st.trails || 0);
+      pull = Math.max(pull, st.cameraPull || 0);
+    }
+  }, 40);
+  try {
+    await tapKey(" ");
+    await sleep(280);
+    await tapKey(" ");
+    keyDown(" ");
+    keyDown("w");
+    await sleep(1800);
+    keyUp("w");
+    keyUp(" ");
+    await t.until(() => C.state().grounded, 8000, "him to land after the glide").catch(() => {});
+  } finally {
+    clearInterval(watchGlide);
+    releaseHeld();
+  }
+  const glideLog = C.log().filter((e) => e.what === "glide");
+  if (glided) t.event("glide-hold", `held Space in the air · trails ${trails} · camera pull ${pull.toFixed(2)} · log ${glideLog.length}`);
+  else t.problem("bug", "Holding Space in the air never set gliding");
+  if (trails < 1 && RIDE_TRAILS_OK()) t.problem("polish", "No wind trail particles while gliding");
+  else if (trails >= 1) t.event("wind-trails", `${trails} wind streak particles while gliding`);
+  if (pull < 0.4) t.problem("polish", `Camera didn't pull back while gliding (pull ${pull.toFixed(2)})`);
+  else t.event("camera-glide", `camera pulled back by ${pull.toFixed(2)}`);
+  t.progress(0.28);
+
+  // 2. Updraft from the street lifts him to rooftop height.
+  t.scene("Updraft");
+  const street = cfg.street || { z: 12.6 };
+  const liftX = apt.stair ? apt.stair.x0 - 1.2 : apt.x - apt.w / 2 - 2;
+  const liftZ = street.z;
+  if (!(await goTo(liftX, liftZ, t, { sprint: true, progress: 0.32, ms: 28000, close: 1.2 }))) {
+    t.problem("bug", `Couldn't reach the street under the apt for an updraft (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+  }
+  await t.until(() => {
+    const P = window.powers || (window.day && window.day.powers);
+    return P && P.now().pressure + 0.05 >= 16;
+  }, 14000, "Pressure for a gust").catch(() => {});
+  const yStreet = C.state().y;
+  pressKey("g");
+  await sleep(200);
+  const drafts = C.updrafts ? C.updrafts() : [];
+  const gustDraft = drafts.find((u) => u.kind === "gust");
+  if (gustDraft) t.event("updraft-spawned", `gust updraft at ${gustDraft.x.toFixed(1)},${gustDraft.z.toFixed(1)} lift ${gustDraft.lift}`);
+  else t.problem("bug", "Gust didn't plant an updraft");
+  let upPeak = yStreet;
+  const watchUp = setInterval(() => {
+    upPeak = Math.max(upPeak, C.state().y);
+  }, 40);
+  try {
+    await tapKey(" ");
+    keyDown(" ");
+    await sleep(4200);
+    keyUp(" ");
+  } finally {
+    clearInterval(watchUp);
+    releaseHeld();
+  }
+  const gain = upPeak - yStreet;
+  t.metric("updraftLift", Math.round(gain * 100) / 100);
+  if (gain >= apt.h - 0.8) t.event("updraft-lift", `lifted ${gain.toFixed(2)} m from the street (roof ${apt.h})`);
+  else t.problem("bug", `Updraft only lifted him ${gain.toFixed(2)} m; need ~${apt.h.toFixed(1)} m to reach the rooftop`);
+  t.progress(0.55);
+
+  // 3. Rooftop to rooftop without touching the ground.
+  t.scene("Roof to roof");
+  async function climbRoof(b, progress) {
+    const s = b.stair;
+    const lip = b.z + b.d / 2 - 1.1;
+    const topX = s.x1 - 0.25;
+    if (!(await goTo(s.x0 - 0.9, s.z, t, { sprint: true, progress, ms: 30000 }))) return false;
+    if (!(await goTo(topX, s.z, t, { close: 0.4, progress, ms: 22000 }))) return false;
+    if (C.state().y < b.h - 0.5) return false;
+    await goTo(topX, lip, t, { close: 0.55, progress, ms: 8000 });
+    return goTo(b.x, b.z, t, { close: 0.9, progress, ms: 10000 });
+  }
+  if (!(await climbRoof(apt, 0.6))) {
+    t.problem("bug", `Couldn't climb the ${apt.id} roof to glide from (y ${C.state().y.toFixed(2)})`);
+    t.progress(1);
+    return;
+  }
+  t.event("roof-start", `on ${apt.id} at y ${C.state().y.toFixed(2)}`);
+  // Face the shop (east) and glide across the street.
+  const targetX = shop.x - shop.w / 2 + 1.5;
+  const targetZ = shop.z;
+  let minY = C.state().y;
+  let touchedGround = false;
+  const watchCross = setInterval(() => {
+    const st = C.state();
+    minY = Math.min(minY, st.y);
+    if (st.y < 1.1 && st.grounded) touchedGround = true;
+  }, 40);
+  try {
+    // Edge of the apt roof toward the shop, then jump + hold + steer.
+    await goTo(apt.x + apt.w / 2 - 1.2, apt.z, t, { close: 0.7, progress: 0.7, ms: 10000 });
+    await tapKey(" ");
+    await sleep(200);
+    await tapKey(" ");
+    keyDown(" ");
+    const crossStart = performance.now();
+    while (performance.now() - crossStart < 9000) {
+      const st = C.state();
+      if (st.y > shop.h - 0.6 && Math.abs(st.x - shop.x) < shop.w / 2 - 0.5 && Math.abs(st.z - shop.z) < shop.d / 2 - 0.5) break;
+      setHeld(steerKeys(targetX, targetZ, false).concat([" "]));
+      await sleep(120);
+    }
+    keyUp(" ");
+    releaseHeld();
+    await sleep(800);
+  } finally {
+    clearInterval(watchCross);
+    releaseHeld();
+  }
+  const stEnd = C.state();
+  const onShop = stEnd.y > shop.h - 0.55 && Math.abs(stEnd.x - shop.x) < shop.w / 2 && Math.abs(stEnd.z - shop.z) < shop.d / 2;
+  t.metric("crossMinY", Math.round(minY * 100) / 100);
+  if (touchedGround) t.problem("bug", `He touched the ground crossing roofs (min y ${minY.toFixed(2)})`);
+  else if (onShop) t.event("roof-to-roof", `apt → shop without touching the ground · min y ${minY.toFixed(2)} · landed y ${stEnd.y.toFixed(2)}`);
+  else t.problem("bug", `Didn't land on the shop roof (y ${stEnd.y.toFixed(2)} at ${stEnd.x.toFixed(1)},${stEnd.z.toFixed(1)}; min y ${minY.toFixed(2)})`);
+  t.progress(1);
+}
+function RIDE_TRAILS_OK() {
+  return !(window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.ride && window.DAY_CONFIG.control.ride.trails === false);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -1755,6 +1927,7 @@ installPlaytest({
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
+    { id: "storm-ride", title: "Storm-riding: hold Space in the air to glide with wind trails; a Gust updraft lifts him from the street to rooftop height; glide apt roof to shop roof without touching the ground", seconds: 150, tags: ["control", "powers"], description: "Day bar beside the car. Storm weather (4), real keys for glide, G for updraft, climb apt then glide to shop." },
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
@@ -1768,6 +1941,7 @@ installPlaytest({
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);
       else if (id === "control") await control(options, t);
+      else if (id === "storm-ride") await stormRide(options, t);
       else if (id === "model") await model(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "weather") await weather(options, t);

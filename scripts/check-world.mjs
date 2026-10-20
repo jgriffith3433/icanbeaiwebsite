@@ -123,16 +123,18 @@ hold(0.6, { x: 0, z: 0 });
 const y0 = ms.y;
 let peak = y0;
 let floatFall = 0;
-for (let i = 0; i < 60 * 6; i++) {
+for (let i = 0; i < 60 * 14; i++) {
   const jump = i === 0 || i === 40 || i === 80 || i === 120 ? 1 : 0; // the 4th press is one too many
-  mover.step(DT, { x: 0, z: 0, jump, hold: i > 140 });
+  // Hold to glide for a bit, then release so the slow glide fall still lands inside the window.
+  const hold = i > 140 && i < 60 * 4;
+  mover.step(DT, { x: 0, z: 0, jump, hold });
   physicsStep();
   peak = Math.max(peak, ms.y);
-  if (ms.anim === 'float') floatFall = Math.max(floatFall, -ms.vy);
+  if (ms.anim === 'float' || ms.gliding) floatFall = Math.max(floatFall, -ms.vy);
 }
 ok(ms.lastFlight && ms.lastFlight.jumps === 1 + M.airJumps, `jumping four times in the air made ${ms.lastFlight && ms.lastFlight.jumps} jumps, not ${1 + M.airJumps}`);
 ok(peak - y0 > M.jumpHeight + M.airJumpHeight, `three jumps only reached ${(peak - y0).toFixed(2)} m`);
-ok(floatFall > 0 && floatFall <= M.floatFall + 1e-6, `holding jump while falling: he fell at ${floatFall.toFixed(2)} m/s (float is ${M.floatFall})`);
+ok(floatFall > 0 && floatFall <= M.glideFall + 1e-6, `holding jump while falling: he fell at ${floatFall.toFixed(2)} m/s (glide is ${M.glideFall})`);
 ok(ms.grounded, 'he never landed after the jumps');
 let steps = 0;
 let back;
@@ -141,6 +143,37 @@ do {
   steps++;
 } while (back === 'walking' && steps < 60 * 60);
 ok(back === 'arrived' && Math.hypot(ms.x - bedSpot.x, ms.z - bedSpot.z) < 0.02, `the walk back to the bed ended "${back}" at ${ms.x.toFixed(2)},${ms.z.toFixed(2)}`);
+// Storm-riding: hold jump in the air and he glides forward; an updraft lifts him to rooftop height.
+mover.start(0, 0, 0);
+hold(0.3, { x: 0, z: 0 });
+const gy0 = ms.y;
+let glided = false;
+let glideSpeed = 0;
+for (let i = 0; i < 60 * 3; i++) {
+  const jump = i === 0 ? 1 : 0;
+  mover.step(DT, { x: 0, z: 1, jump, hold: i > 20 });
+  physicsStep();
+  if (ms.gliding) {
+    glided = true;
+    glideSpeed = Math.max(glideSpeed, Math.hypot(ms.vx, ms.vz));
+  }
+}
+ok(glided, 'holding jump in the air never set gliding');
+ok(glideSpeed > M.sprint * 0.85, `glide speed only ${glideSpeed.toFixed(2)} m/s (sprint is ${M.sprint})`);
+ok(ms.y > gy0 + 0.4 || ms.anim === 'float' || ms.gliding || ms.grounded, 'glide flight ended in a bad state');
+const roofH = ((cfg.city && cfg.city.blocks) || []).filter((b) => b.stair).reduce((h, b) => Math.max(h, b.h), 6);
+mover.start(0, 0, 0);
+hold(0.2, { x: 0, z: 0 });
+mover.spawnUpdraft(ms.x, ms.z, { r: 5, lift: 9, life: 8, kind: 'gust' });
+const uy0 = ms.y;
+let upPeak = uy0;
+for (let i = 0; i < 60 * 5; i++) {
+  const jump = i === 0 ? 1 : 0;
+  mover.step(DT, { x: 0, z: 0, jump, hold: true });
+  physicsStep();
+  upPeak = Math.max(upPeak, ms.y);
+}
+ok(upPeak - uy0 > roofH - 0.5, `an updraft only lifted him ${(upPeak - uy0).toFixed(2)} m (rooftop needs ~${roofH.toFixed(1)} m)`);
 
 // The district: the park is solid ground, three roofs hold him, a stair gets him up and back down,
 // and a building stops him. createMover's step() is world-direction input (the playtest uses keys).
