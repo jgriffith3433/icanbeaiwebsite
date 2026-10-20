@@ -1,227 +1,119 @@
-{
- "project": "icanbe",
- "_about": "Generated assets as data (Hawkes Studio, docs/projects/AGENTS.md): each recipe made through Hawkes Gen and where its output lives.",
- "assets": [
+   "files": {
+    "music": "audio/music/take-control.mp3"
+   }
+  },
   {
-   "id": "small-weather",
-   "note": "Small Weather, the player character (canon m_9743a1dfe970, the same storm caller as Dose Of Destruction): a clean A-pose front sheet from DoD's art (AllTheCharacters/SmallWeather/anims/_reference.png, library a_02d916892b5b8a2d), a textured mesh (best of 3, picked against the reference from mesh.rig's turntables: the chain can't judge meshes), then Gen's auto-rig with 14 Mixamo-skeleton clips. The clips are scripts/small-weather-clips.mjs's output (art/small-weather/clips, from PH Origins' ch33 hero's Mixamo rig: Idle, Walk, Run, Jump, Sitting Idle, plus posed fall, float, cast, throw and the day's poses), uploaded to the entity icanbe/small-weather (slots clip-src/*). The glow on the seams and boots and the arm lightning are added in the page (js/small-weather.js). Entity: icanbe/small-weather.",
+   "id": "sfx-rain-asphalt",
+   "note": "Rain on asphalt loop (score.ambience.rain).",
    "steps": [
     {
-     "tool": "image.edit",
-     "inputs": { "images": ["$input:0"] },
+     "tool": "audio.sfx",
      "params": {
-      "prompt": "Clean 3D character model reference sheet of this exact young man, front view, facing the camera: standing straight in an A-pose, both arms held straight and angled down and away from the body at about 40 degrees so there is clear space between the arms and the torso, hands open with fingers together, feet apart at shoulder width, full body from the top of his hair to the soles of his boots, centered. Keep his face, black messy hair, black glasses, dark navy tech jacket with glowing blue seams down the chest, shoulder straps, grey tee, fingerless gloves, black cargo pants with pockets, black knee armor, black boots with glowing blue lights. Stylized 3D game character render with clean shapes and saturated colors. Plain flat light grey background, no lightning, no clouds, no rain, no smoke, no effects around him, no shadow, even soft studio lighting.",
-      "width": 832,
-      "height": 1216
+      "text": "Steady rain falling on wet city asphalt, soft tire hiss and droplet patter, continuous loopable ambience, no music, no voices",
+      "duration": 12,
+      "loop": true,
+      "influence": 0.65
      },
-     "save": "sheet"
-    },
-    {
-     "tool": "mesh.textured",
-     "inputs": { "image": "$prev" },
-     "params": { "faces": 40000, "texture": 1024 },
-     "save": "mesh"
-    },
-    {
-     "tool": "mesh.rig",
-     "inputs": {
-      "mesh": "$prev",
-      "clips": ["$input:1", "$input:2", "$input:3", "$input:4", "$input:5", "$input:6", "$input:7", "$input:8", "$input:9", "$input:10", "$input:11", "$input:12", "$input:13", "$input:14"]
-     },
-     "params": {
-      "names": ["idle", "walk", "run", "jump", "fall", "float", "cast", "throw", "sit", "type", "phone", "lie", "side", "recline"],
-      "height": 1.75
-     },
-     "save": "rigged"
+     "save": "sfx"
     }
    ],
-   "inputs": {
-    "files": [
-     "asset:a_02d916892b5b8a2d",
-     "art/small-weather/clips/idle.glb",
-     "art/small-weather/clips/walk.glb",
-     "art/small-weather/clips/run.glb",
-     "art/small-weather/clips/jump.glb",
-     "art/small-weather/clips/fall.glb",
-     "art/small-weather/clips/float.glb",
-     "art/small-weather/clips/cast.glb",
-     "art/small-weather/clips/throw.glb",
-     "art/small-weather/clips/sit.glb",
-     "art/small-weather/clips/type.glb",
-     "art/small-weather/clips/phone.glb",
-     "art/small-weather/clips/lie.glb",
-     "art/small-weather/clips/side.glb",
-     "art/small-weather/clips/recline.glb"
-    ]
-   },
-   "pickAt": 1,
-   "candidates": 4,
-   "pick": "on-model with the reference: black messy hair, black glasses, dark navy tech jacket with glowing blue seams, grey tee, black cargo pants, knee armor, glowing boots; a clean A-pose with the arms clear of the body, the whole body in frame, no effects",
-   "refs": [0],
-   "files": { "rigged": "models/small-weather.glb" }
-  },
-  {
-   "id": "city-asphalt",
-   "note": "Wet asphalt for the avenues (js/look.js). Dark navy, rain-wet, stylized like Dose Of Destruction. texture.maps makes the normal and roughness from the albedo.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark wet asphalt, nearly black with deep navy, rain-wet sheen, faint electric-blue reflections in the damp, fine grain and a few soft cracks, even all over, no focal point. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, not a photograph. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    { "tool": "texture.maps", "inputs": { "image": "$prev" }, "params": { "strength": 1.6 }, "save": "maps" }
-   ],
    "files": {
-    "take": "textures/city/asphalt-take.png",
-    "maps.albedo": "textures/city/asphalt-albedo.png",
-    "maps.normal": "textures/city/asphalt-normal.png",
-    "maps.roughness": "textures/city/asphalt-roughness.png"
+    "sfx": "audio/sfx/rain-asphalt.mp3"
    }
   },
   {
-   "id": "city-concrete",
-   "note": "Wet concrete for sidewalks, the driveway and the ramps.",
+   "id": "sfx-wind",
+   "note": "City wind loop (score.ambience.wind).",
    "steps": [
     {
-     "tool": "image.generate",
+     "tool": "audio.sfx",
      "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Continuous poured wet concrete sidewalk only: cool grey with a navy cast, rain-darkened, fine aggregate grit, soft stains and hairline cracks, porous pitted surface, even all over. NOT metal, NOT steel plates, NOT diamond plate, NOT rivets, NOT bolts, NOT panel seams, NOT tile grid, NOT manhole. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
+      "text": "Strong city wind howling through buildings and street canyons, continuous loopable ambience, no music, no voices",
+      "duration": 12,
+      "loop": true,
+      "influence": 0.65
      },
-     "save": "take"
-    },
-    { "tool": "texture.maps", "inputs": { "image": "$prev" }, "params": { "strength": 1.6 }, "save": "maps" }
-   ],
-   "files": {
-    "take": "textures/city/concrete-take.png",
-    "maps.albedo": "textures/city/concrete-albedo.png",
-    "maps.normal": "textures/city/concrete-normal.png",
-    "maps.roughness": "textures/city/concrete-roughness.png"
-   }
-  },
-  {
-   "id": "city-brick",
-   "note": "Dark wet brick for the shorter blocks.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark brick wall in running bond, bricks a deep navy-brown, mortar a cooler grey, surfaces rain-wet. Even all over, no single featured brick. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    { "tool": "texture.maps", "inputs": { "image": "$prev" }, "params": { "strength": 1.6 }, "save": "maps" }
-   ],
-   "files": {
-    "take": "textures/city/brick-take.png",
-    "maps.albedo": "textures/city/brick-albedo.png",
-    "maps.normal": "textures/city/brick-normal.png",
-    "maps.roughness": "textures/city/brick-roughness.png"
-   }
-  },
-  {
-   "id": "city-glass",
-   "note": "Dark glass curtain wall for the tall blocks.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark glass curtain wall, navy-black reflective panes divided by thin darker mullions, a faint electric-blue reflection, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark, no people.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    { "tool": "texture.maps", "inputs": { "image": "$prev" }, "params": { "strength": 1.2 }, "save": "maps" }
-   ],
-   "files": {
-    "take": "textures/city/glass-take.png",
-    "maps.albedo": "textures/city/glass-albedo.png",
-    "maps.normal": "textures/city/glass-normal.png",
-    "maps.roughness": "textures/city/glass-roughness.png"
-   }
-  },
-  {
-   "id": "city-roof",
-   "note": "Wet tar rooftops.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Flat rooftop, dark wet tar, navy-black, soft seams and a few shallow puddles reflecting a dull blue, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    { "tool": "texture.maps", "inputs": { "image": "$prev" }, "params": { "strength": 1.6 }, "save": "maps" }
-   ],
-   "files": {
-    "take": "textures/city/roof-take.png",
-    "maps.albedo": "textures/city/roof-albedo.png",
-    "maps.normal": "textures/city/roof-normal.png",
-    "maps.roughness": "textures/city/roof-roughness.png"
-   }
-  },
-  {
-   "id": "city-sky-day",
-   "note": "Day sky for the dome in js/look.js. Bright enough that noon stays readable. The weather system blends it with dusk and night.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Wide stylized sky panorama, horizon along the lower third, no ground, no buildings, no people. Bright readable daylight, soft blue sky, pale scattered clouds, clear and not dark, cinematic cartoon like Dose Of Destruction. No text, no watermark, no sun flare covering the frame.",
-      "width": 1024,
-      "height": 512
-     },
-     "save": "sky"
+     "save": "sfx"
     }
    ],
-   "files": { "sky": "textures/city/sky-day.png" }
+   "files": {
+    "sfx": "audio/sfx/wind.mp3"
+   }
   },
   {
-   "id": "city-sky-dusk",
-   "note": "Dusk sky. Deep navy above, amber and electric blue at the horizon.",
+   "id": "sfx-glide-whoosh",
+   "note": "Whoosh when Small Weather starts riding the wind (score.whoosh / control.ride.whoosh).",
    "steps": [
     {
-     "tool": "image.generate",
+     "tool": "audio.sfx",
      "params": {
-      "prompt": "Wide stylized dusk sky panorama, horizon along the lower third, no ground, no buildings, no people. Deep navy above, amber and electric blue at the horizon, a few dramatic clouds, cinematic cartoon like Dose Of Destruction. No text, no watermark.",
-      "width": 1024,
-      "height": 512
+      "text": "Whoosh of rushing wind past the ears while gliding fast through storm air: airy, cinematic pass-by, no music, no voice",
+      "duration": 1.4,
+      "loop": false
      },
-     "save": "sky"
+     "save": "sfx"
     }
    ],
-   "files": { "sky": "textures/city/sky-dusk.png" }
+   "files": {
+    "sfx": "audio/sfx/glide-whoosh.mp3"
+   }
   },
   {
-   "id": "city-sky-night",
-   "note": "Night sky. Near-black navy, a few stars, electric-blue glow on the horizon. Not a pure black frame.",
+   "id": "sfx-thunder-near",
+   "note": "Close thunder crack (score.ambience.thunderNear).",
    "steps": [
     {
-     "tool": "image.generate",
+     "tool": "audio.sfx",
      "params": {
-      "prompt": "Full-frame wide stylized night sky only, filled edge to edge with sky. Soft atmospheric electric-blue glow along the lower third as air glow, then deep navy to near-black above with sparse small stars. Absolutely no ground, no earth, no silhouette, no skyline, no buildings, no mountains, no trees, no city lights as objects, no black floor half. Dark but not a pure black frame. Cinematic cartoon like Dose Of Destruction. No text, no watermark.",
-      "width": 1024,
-      "height": 512
+      "text": "Close loud thunder crack and deep rumble right after a lightning strike over a city street, 4 seconds, no rain bed, no music",
+      "duration": 4,
+      "loop": false,
+      "influence": 0.7
      },
-     "save": "sky"
+     "save": "sfx"
     }
    ],
-   "files": { "sky": "textures/city/sky-night.png" }
+   "files": {
+    "sfx": "audio/sfx/thunder-near.mp3"
+   }
+  },
+  {
+   "id": "sfx-thunder-far",
+   "note": "Distant thunder (score.ambience.thunderFar).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Distant thunder rumble rolling across a city, muffled and rolling, about 5 seconds, no music",
+      "duration": 5,
+      "loop": false,
+      "influence": 0.65
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/thunder-far.mp3"
+   }
+  },
+  {
+   "id": "sfx-city-hum",
+   "note": "Quiet city air for clear days (score.ambience.air).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Soft urban city hum, distant traffic and air conditioning, quiet continuous loopable ambience, no music, no voices",
+      "duration": 12,
+      "loop": true,
+      "influence": 0.6
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/city-hum.mp3"
+   }
   }
  ]
 }

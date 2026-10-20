@@ -29,13 +29,17 @@ levels get redone over time. The page is the day playing on its own until someon
   messy hair, glasses, the navy tech jacket with glowing blue seams, cargo pants, glowing boots; lightning coils his
   arms while he's the player's. It's the same him all day (no pyjamas or towel colours: `person.outfits` only colours
   the box figure, which shows until the model loads or if it fails).
-- **The city:** a few blocks in `day.config.js` `city` (avenues, crosses, the park, solid blocks). Three of the blocks have a stair up the north face onto the roof (`stair`). His rooms and the office stay the cutaway interiors; the office origin is a few blocks east on the main avenue (`street`). The look is `js/look.js`: PBR asphalt, wet concrete, brick, glass and rooftops (Gen textures in `textures/city/` when `manifest.json` is there; painted stand-ins until then), neon and electric-blue windows after dusk, a sky dome that blends day, dusk and night. Daylight stays bright. **Quality** (`#quality`, also on the public site; `day.look.quality("low"|"high")`, remembered in `icanbe.quality`) drops bloom, MSAA, FXAA and the shadow map and renders at CSS pixels, so a phone stays smooth. A coarse pointer, a window 700 px wide or less, or `navigator.deviceMemory` ≤ 4 starts on low. The weather system blends the sky with `day.look.setSky({ day, dusk, night, fogDensity, fogColor, exposure })` (pass `null` to follow the clock again).
-- **The weather** (`js/weather.js`, the forecast and the lines in `day.config.js` `weather`): clear, clouds, rain, storm, fog, wind and snow. With nobody in control the day follows a forecast seeded by the date. Take control and 1–7, hold Q, or a tap on a phone sets it; it blends over a few seconds on top of the time-of-day sky. Rain and storm wet the road. `weather.now()` and `weather.set(state, intensity)` are what the rest of the page reads.
-- **Not yet:** his storm-caller powers (the model has `cast` and `throw` clips for them). The weather above is the sky, not those.
+
+- **The city:** a few blocks in `day.config.js` `city` (avenues, crosses, the park, solid blocks). Three of the blocks have a stair up the north face onto the roof (`stair`). His rooms and the office stay the cutaway interiors; the office origin is a few blocks east on the main avenue (`street`). Untextured shapes; the art pass is later.
+- **The weather** (`js/weather.js`, the forecast and the lines in `day.config.js` `weather`): clear, clouds, rain, storm, fog, wind and snow. With nobody in control the day follows a forecast seeded by the date. Take control and 1–7, hold Q, or a tap on a phone sets it; it blends over a few seconds on top of the time-of-day sky. After let-go it **holds** for `weather.hold` real seconds (`react` lines in the log), then drifts back to the forecast. Rain and storm wet the road; street people open umbrellas and cars use wipers (`world.streetNow()`). Steps and pools can use `when: { weather: "rain" }` against the forecast. `weather.now()` and `weather.set(state, intensity)` are what the rest of the page reads.
+- **The score** (`js/score.js`, paths in `day.config.js` `score`, recipes in `hawkes.assets.json`): loopable music beds per weather (clear, clouds, rain, storm, fog, snow; wind reuses clear), crossfaded as the weather changes; sampled rain, wind, city hum and thunder; a short sting on take control (`day:control`). Respects the Sound button and autoplay (silent until Sound is on). Missing files leave the procedural noise in `weather.js`. Playtest: `weather-audio`.
+- **His powers** (`js/powers.js`, numbers and lines in `day.config.js` `powers`): while he's the player's, a Pressure meter fills over time (faster in a storm) and each call spends some. Hold F (gamepad Y, or Storm on a phone) and a cloud gathers over him, then the sky goes to storm and it rains. E (X, right-click, Bolt) throws lightning at the reticle: a flash, thunder delayed by distance, a scorch, knocked props, a car alarm, and the nearest building's lights out for a few seconds. G (left trigger, Gust) shoves bins and umbrellas in a cone; T (right trigger, Tornado) sends a funnel down the street for a few seconds. Camera shake sells each one. The model plays `cast` / `throw`. `day.powers` / `window.powers`: `now()`, `command(name, via)`, `hold(on)`, `pose()`.
+- **His voice** (`js/voice.js`, lines in `day.config.js` `voice`): the same DoD ElevenLabs voice (Eric, `cjVigY5qzO86Huf0OWal`). Short first-person lines for powers (chance + cooldown, not every call), each weather state when it starts, episode open/close on take control and let go, glide while floating, and a few autopilot mutters on his day. MP3s under `audio/voice/` from Hawkes Gen `audio.voice`. `day.voice` / `window.voice`: `now()`, `say(group)`, `play(id)`.
+- **Episodes** (`js/episodes.js`, list in `day.config.js` `episodes`): four playable weather missions on his day's chapters — Morning (clear the sky), Lunch (rooftop storm / three lightning rods), Commute home (hurricane walk home through wind and debris; starts on the lot, not in the car), Night (timed lightning show). Taking control in a matching chapter offers that episode; the Episodes menu jumps the clock there. Goals show in a HUD; finishing (or time / let-go) shows a forecast-style score card kept in localStorage. Playtest: `episodes`.
 
 ### Taking control: how it's built
 
-- `js/control.js` is a real module (imported by `js/app.js`, then `js/weather.js`). `createMover(world, cfg)` is the movement alone:
+- `js/control.js` is a real module (imported by `js/app.js`, then `js/weather.js`, then `js/score.js`, then `js/powers.js`). `createMover(world, cfg)` is the movement alone:
   a Havok `PhysicsCharacterController` (capsule 1.7 × 0.28 m, steps up 0.3 m) or, if Havok didn't load, a flat
   mover without colliders; `step(dt, input)` for the player, `walkBack(dt, target)` for the way back (kinematic along
   the route, like the day's own walks, dropping off whatever he stood on but never climbing furniture). `npm test`
@@ -97,7 +101,8 @@ levels get redone over time. The page is the day playing on its own until someon
   turns Havok on and checks Babylon 9, no config errors, colliders under the field, the road, the home floor, a wall
   and the bed, a person-sized capsule coming to rest on the ground, and that two weeks of days name Small Weather and
   never say "they" for him. Then taking control: he stands up beside the couch, walks, runs, makes three jumps in one
-  flight and floats down, walks back to the bed through the doors, and the stand-in plays every clip. `npm run build` must pass too (it takes about 4 minutes: Babylon is big).
+  flight and floats down, walks back to the bed through the doors, and the stand-in plays every clip. `scripts/check-powers.mjs`
+  (also under `npm test`) spends the Pressure meter dry and checks the cone, thunder delay and street helpers. `npm run build` must pass too (it takes about 4 minutes: Babylon is big).
 - **Publishing:** `.github/workflows/pages.yml` builds `dist/` (tests, then `vite build`) and deploys it to GitHub
   Pages on main; `vite.config.js` copies the static pages, their classic scripts, `css/`, `releases.json` and the
   CNAME into `dist/`. The first time pages.yml reaches main, Studio switches the repo's Pages source to Actions (the
@@ -149,7 +154,9 @@ keys, the canvas and `day.watch()`, and it never changes the day.
   plus 100 for each later day. It only grows in a session (kept in sessionStorage `icanbe.progress`). `label` is the
   block title, plus `chapter`, `clock`, and `via` (live, play, or jump; a jump counts after 1.5 s on the block).
 - `feature`, one per interaction: `control` {action: take or let-go, via key/button/touch/gamepad; then back,
-  how: walk or catch-up}, `weather` {state, via key/wheel/touch, intensity}, `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
+  how: walk or catch-up}, `weather` {state, via key/wheel/touch, intensity}, `power` {action, via, power, pressure},
+  `voice` {id, group, via} when a spoken line plays, `episode` {action: offer/start/goal/score/…, id, goal, pct, why},
+  `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
   {to, activity} once the day bar settles, `step` {presses, to} for ← →, `camera` {action: turn, zoom, pinch, tap;
   `on` for a tap: person, car, the spot name (`at-<spot>` node), room, nothing}, `sound`, `details`, `quality`
   {value: high or low, via click or api}, `whatsnew`, `privacy`.

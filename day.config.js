@@ -43,6 +43,7 @@
      do, for, pose, hand, set, body   (same meaning as a step)
      steps:   [ ... ]       multi-part ("go: '$back'" returns to where they were)
      when:    { deskGlass: "empty", thirst: ">0.5" }   only if these are true
+              { weather: "rain" } or { weather: ["rain","storm"] } for the day's forecast
      likes:   { boredom: 2 }   more likely when that stat is high
      after / before: "13:00"   only in that part of the day
      max:     1             at most this many times a day
@@ -138,7 +139,8 @@ window.DAY_CONFIG = {
       driving: "He's driving. Take control once he's out of the car.",
     },
     /* How he moves for the player. Metres and seconds. Floaty on purpose: the same
-       two extra jumps and slow fall as his Dose Of Destruction fighter. */
+       two extra jumps as his Dose Of Destruction fighter; hold jump in the air to
+       ride the wind (glide) across streets and between roofs. */
     move: {
       walk: 2.4, // walking (the stick or keys alone)
       sprint: 5.6, // Shift; a gamepad bumper or stick click; the touch stick pushed to its edge
@@ -147,8 +149,26 @@ window.DAY_CONFIG = {
       airJumpHeight: 1.2,
       gravity: 6.5, // lower than Earth's 9.8: floaty
       maxFall: 7, // fastest fall
-      floatFall: 1.6, // holding jump while falling: he drifts down this slowly
+      floatFall: 1.6, // kept for older checks; glide uses glideFall
+      glideFall: 0.42, // hold jump in the air: fall this slowly while riding
+      glideSpeed: 10.5, // horizontal speed while gliding
       airControl: 0.55, // how much he can steer in the air (1 = like on the ground)
+      glideAirControl: 0.9,
+      softLand: 2.4, // horizontal speed after a soft glide landing
+    },
+    /* Storm-riding: wind trails, whoosh, camera pull-back, and updraft columns
+       (ambient at avenue crosses; a Gust plants one he can ride). */
+    ride: {
+      cameraPull: 3.4,
+      whoosh: "audio/sfx/glide-whoosh.mp3",
+      trails: true,
+      updraft: {
+        radius: 4.2,
+        lift: 8, // m/s upward at the centre of a player gust
+        life: 7, // seconds a gust updraft lasts
+        ambient: true,
+        weather: { clear: 0.08, clouds: 0.15, rain: 0.35, storm: 1, fog: 0.1, wind: 0.92, snow: 0.2 },
+      },
     },
     /* Small Weather's 3D model: the rigged GLB from Hawkes Gen (hawkes.assets.json), worn
        over the box figure on his day and under control (js/small-weather.js). Clips: idle,
@@ -163,11 +183,15 @@ window.DAY_CONFIG = {
      With nobody in control, the day follows a forecast seeded by the date
      (the same idea as `seed: "date"`): each 3-hour block is one state, the
      same every time you open that date. Take control and 1–7, hold Q, or a
-     tap on a phone sets it; let go and the forecast has it again. The blend
-     is in real seconds. Lines are his, short, for the action log.
+     tap on a phone sets it; let go and that weather holds for `hold` real
+     seconds, then drifts back to the forecast. The blend is in real seconds.
+     Lines are his, short, for the action log. `react` lines go in the log
+     while autopilot still has the weather he left behind. Steps and pools
+     can use `when: { weather: "rain" }` (or an array) against the forecast.
      ------------------------------------------------------------------------ */
   weather: {
     blend: 3.4,
+    hold: 22, // real seconds the player's weather lasts after let-go
     forecast: {
       hours: 3,
       weight: { clear: 26, clouds: 22, rain: 16, storm: 8, fog: 10, wind: 10, snow: 8 },
@@ -181,6 +205,272 @@ window.DAY_CONFIG = {
       wind: "Wind.",
       snow: "Snow.",
     },
+    /* Autopilot log while the weather he left still holds (after let-go). */
+    react: {
+      cooldown: 16,
+      clear: ["He looks up. Clear again.", "The sky opened. He notices."],
+      clouds: ["Clouds. He glances at the window.", "Grey out there. He keeps going."],
+      rain: ["He cancels the walk. It's raining.", "Rain on the glass. He watches a second."],
+      storm: ["He watches the storm from the window.", "Thunder. He stays put.", "A storm. He isn't going out in that."],
+      fog: ["Fog. Soft edges out the window.", "He can barely see the lot."],
+      wind: ["Wind rattles something. He listens.", "Gusty. He pulls his jacket closer."],
+      snow: ["Snow. Quiet out there.", "He smiles at the snow for a second."],
+    },
+  },
+
+  /* ------------------------------------------------------------------------
+     SCORE — adaptive music and ambience that follow the weather (js/score.js)
+     ------------------------------------------------------------------------
+     Loopable beds from Hawkes Gen audio.music (ACE-Step), ambience and thunder
+     from audio.sfx. They crossfade with the weather blend. A short sting plays
+     when you take control. Paths are relative to the site root; missing files
+     leave the procedural weather noise in place. Sound stays off until the
+     Sound button (browser autoplay). Wind reuses the clear bed.
+     ------------------------------------------------------------------------ */
+  score: {
+    fade: 2.8,
+    musicVol: 0.3,
+    ambVol: 0.62,
+    stingVol: 0.55,
+    music: {
+      clear: "audio/music/clear.mp3",
+      clouds: "audio/music/clouds.mp3",
+      rain: "audio/music/rain.mp3",
+      storm: "audio/music/storm.mp3",
+      fog: "audio/music/fog.mp3",
+      wind: "audio/music/clear.mp3",
+      snow: "audio/music/snow.mp3",
+    },
+    sting: "audio/music/take-control.mp3",
+    whoosh: "audio/sfx/glide-whoosh.mp3",
+    whooshVol: 0.62,
+    ambience: {
+      air: "audio/sfx/city-hum.mp3",
+      rain: "audio/sfx/rain-asphalt.mp3",
+      wind: "audio/sfx/wind.mp3",
+      thunderNear: "audio/sfx/thunder-near.mp3",
+      thunderFar: "audio/sfx/thunder-far.mp3",
+    },
+  },
+
+  /* ------------------------------------------------------------------------
+     POWERS — what he can call down while you have him
+     ------------------------------------------------------------------------
+     He is a storm caller. Pressure fills while you have him, and faster in a
+     storm. Each call spends some, so they land hard and then he has to wait.
+     Hold F (Y, or the Storm button) and the sky darkens over him, then the
+     storm spreads and the rain starts. E (X, right-click, Bolt) throws
+     lightning where the reticle sits. G (left trigger, Gust) shoves what's
+     in front of him. T (right trigger, Tornado) sends one down the street.
+     Loose bins and people with umbrellas stand near the avenue so a gust
+     has something to take. A Gust also plants a short updraft he can ride.
+     `dz` is metres from the avenue's centre line.
+     ------------------------------------------------------------------------ */
+  powers: {
+    max: 100,
+    regen: 12, // per second, while you have him
+    stormRegen: 14, // added on top while the weather is a storm
+    hold: 0.7, // seconds the storm takes to answer
+    aim: 3.6, // metres past him the reticle rests, along the camera
+    cone: 52, // gust half-angle, degrees
+    reach: 11, // gust length, metres
+    costs: { storm: 40, bolt: 24, gust: 16, tornado: 48 },
+    keys: { storm: "f", bolt: "e", gust: "g", tornado: "t" },
+    lines: {
+      gather: "The sky draws in over him.",
+      storm: "He calls the storm down.",
+      bolt: "Lightning. Where he aimed.",
+      gust: "A hard gust. The air lifts under him.",
+      tornado: "He sends a tornado down the street.",
+      dry: "Not enough pressure.",
+    },
+    loose: [
+      { kind: "umbrella", x: -1.6, dz: -2.6 },
+      { kind: "umbrella", x: -2.3, dz: -3.3 },
+      { kind: "bin", x: -2.0, dz: -1.3 },
+      { kind: "bin", x: -8.5, dz: 2.8 },
+      { kind: "umbrella", x: 8.2, dz: 2.8 },
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
+     VOICE — Small Weather speaks (js/voice.js), same DoD voice (Eric)
+     ------------------------------------------------------------------------
+     Cocky, calm, a storm god who is also a developer. Lines are short. Each
+     has text and an MP3 from Hawkes Gen audio.voice (hawkes.assets.json). A
+     cooldown keeps him from chattering. Powers roll a chance so he does not
+     bark every call. Weather reactions fire when a state starts. Take control
+     / let go are an episode open and a score-card close. Autopilot mutters
+     while his day has him. Glide is the floaty fall (Space held).
+     ------------------------------------------------------------------------ */
+  voice: {
+    voiceId: "cjVigY5qzO86Huf0OWal", // DoD Eric (doseofdestructionwebsite/content/voice.json)
+    cooldown: 2.6, // seconds between any spoken lines
+    powerChance: 0.48, // powers only: he does not talk every call
+    volume: 0.88,
+    dayEvery: 90, // wall seconds between autopilot mutter rolls while on his day
+    dayChance: 0.55,
+    lines: [
+      // powers
+      { id: "bolt-1", group: "bolt", text: "Point and flash.", file: "audio/voice/bolt-1.mp3" },
+      { id: "bolt-2", group: "bolt", text: "That one felt personal.", file: "audio/voice/bolt-2.mp3" },
+      { id: "bolt-3", group: "bolt", text: "Keep the count. I'll keep the bolts.", file: "audio/voice/bolt-3.mp3" },
+      { id: "gust-1", group: "gust", text: "Move.", file: "audio/voice/gust-1.mp3" },
+      { id: "gust-2", group: "gust", text: "Wind's on my side.", file: "audio/voice/gust-2.mp3" },
+      { id: "gust-3", group: "gust", text: "Bins don't get a vote.", file: "audio/voice/gust-3.mp3" },
+      { id: "storm-1", group: "storm", text: "I brought the weather.", file: "audio/voice/storm-1.mp3" },
+      { id: "storm-2", group: "storm", text: "Pressure's rising. Good.", file: "audio/voice/storm-2.mp3" },
+      { id: "storm-3", group: "storm", text: "Sky's mine for a minute.", file: "audio/voice/storm-3.mp3" },
+      { id: "tornado-1", group: "tornado", text: "Watch the street.", file: "audio/voice/tornado-1.mp3" },
+      { id: "tornado-2", group: "tornado", text: "Funnel's going.", file: "audio/voice/tornado-2.mp3" },
+      { id: "tornado-3", group: "tornado", text: "Drama, delivered.", file: "audio/voice/tornado-3.mp3" },
+      { id: "glide-1", group: "glide", text: "Easy.", file: "audio/voice/glide-1.mp3" },
+      { id: "glide-2", group: "glide", text: "I don't fall. I float.", file: "audio/voice/glide-2.mp3" },
+      // weather reactions (group = weather-<state>)
+      { id: "wx-clear", group: "weather-clear", text: "Clear skies. Boring, but fine.", file: "audio/voice/wx-clear.mp3" },
+      { id: "wx-clear-2", group: "weather-clear", text: "Sun's out. I'm not.", file: "audio/voice/wx-clear-2.mp3" },
+      { id: "wx-clouds", group: "weather-clouds", text: "Clouds. Warming up.", file: "audio/voice/wx-clouds.mp3" },
+      { id: "wx-rain", group: "weather-rain", text: "Rain. Finally something useful.", file: "audio/voice/wx-rain.mp3" },
+      { id: "wx-rain-2", group: "weather-rain", text: "Wet road. Good.", file: "audio/voice/wx-rain-2.mp3" },
+      { id: "wx-storm", group: "weather-storm", text: "There it is.", file: "audio/voice/wx-storm.mp3" },
+      { id: "wx-storm-2", group: "weather-storm", text: "This is more like it.", file: "audio/voice/wx-storm-2.mp3" },
+      { id: "wx-fog", group: "weather-fog", text: "Fog. Soft edges.", file: "audio/voice/wx-fog.mp3" },
+      { id: "wx-wind", group: "weather-wind", text: "Wind's restless.", file: "audio/voice/wx-wind.mp3" },
+      { id: "wx-snow", group: "weather-snow", text: "Snow. Quiet drama.", file: "audio/voice/wx-snow.mp3" },
+      // episode open (take control) and score-card close (let go)
+      { id: "ep-open-1", group: "episode-open", text: "Alright. My turn.", file: "audio/voice/ep-open-1.mp3" },
+      { id: "ep-open-2", group: "episode-open", text: "The day's on autopilot. I'm not.", file: "audio/voice/ep-open-2.mp3" },
+      { id: "ep-open-3", group: "episode-open", text: "The Orchestrator asked for drama, so I brought the weather.", file: "audio/voice/ep-open-3.mp3" },
+      { id: "ep-close-1", group: "episode-close", text: "Back to the day. It kept going without me.", file: "audio/voice/ep-close-1.mp3" },
+      { id: "ep-close-2", group: "episode-close", text: "Not bad for a lunch break.", file: "audio/voice/ep-close-2.mp3" },
+      { id: "ep-close-3", group: "episode-close", text: "Pressure spent. Worth it.", file: "audio/voice/ep-close-3.mp3" },
+      { id: "ep-close-4", group: "episode-close", text: "Clock's still running. So am I.", file: "audio/voice/ep-close-4.mp3" },
+      // autopilot mutters on his developer day
+      { id: "day-1", group: "day", text: "Another commit. Another cloud somewhere.", file: "audio/voice/day-1.mp3" },
+      { id: "day-2", group: "day", text: "Code compiles. Sky doesn't.", file: "audio/voice/day-2.mp3" },
+      { id: "day-3", group: "day", text: "Standing desk. Sitting storm.", file: "audio/voice/day-3.mp3" },
+      { id: "day-4", group: "day", text: "Coffee's cold. Forecast isn't.", file: "audio/voice/day-4.mp3" },
+      { id: "day-5", group: "day", text: "Traffic's nothing. Weather's everything.", file: "audio/voice/day-5.mp3" },
+      { id: "day-6", group: "day", text: "Alarm set. Atmosphere optional.", file: "audio/voice/day-6.mp3" },
+      { id: "day-7", group: "day", text: "Pull request. Push weather.", file: "audio/voice/day-7.mp3" },
+      { id: "day-8", group: "day", text: "Meeting at ten. Storm whenever.", file: "audio/voice/day-8.mp3" },
+      { id: "day-9", group: "day", text: "I type. The sky waits.", file: "audio/voice/day-9.mp3" },
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
+     EPISODES — playable weather missions tied to chapters of his day
+     ------------------------------------------------------------------------
+     Story: Small Weather lives the developer day on autopilot, but when you
+     take him he feels like a god — he brought the weather. Four episodes sit
+     on the day's chapters (data here, play in js/episodes.js). Taking control
+     during a matching chapter offers that episode; the Episodes menu jumps
+     the clock there. Each has 2–3 goals, an optional timer, and ends on a
+     forecast-style score card kept in localStorage (`storageKey`). He can't
+     be taken while driving, so Hurricane drive starts as he walks the work
+     lot — you walk or glide home through the storm you made.
+     ------------------------------------------------------------------------ */
+  episodes: {
+    storageKey: "icanbe.episodes.best",
+    offerOnTake: true,
+    lines: {
+      offer: "An episode is open.",
+      accept: "Take it",
+      decline: "Just walk",
+      menu: "Episodes",
+      scoreTitle: "Today's forecast",
+      best: "Best",
+      done: "Episode clear.",
+      timeUp: "Time's up.",
+      letGo: "Episode paused — score stands.",
+    },
+    /* Bands for the score card copy: "N% chance of <word>". */
+    bands: [
+      { min: 90, word: "awesome" },
+      { min: 70, word: "great weather" },
+      { min: 40, word: "drama" },
+      { min: 0, word: "drizzle" },
+    ],
+    list: [
+      {
+        id: "morning",
+        title: "Clear the sky",
+        tagline: "Break up the forecast's clouds before he leaves.",
+        chapters: ["wake", "ready"],
+        clock: "7:55",
+        timer: 150,
+        goals: [
+          { id: "clouds", kind: "weather", state: "clouds", label: "Gather the clouds" },
+          { id: "clear", kind: "weather", state: "clear", label: "Clear the sky", after: "clouds" },
+          { id: "street", kind: "reach", spot: "carSideHome", r: 6, label: "Reach the car" },
+        ],
+        lines: {
+          start: "Morning air. His to rewrite.",
+          done: "Clear skies for the commute. He did that.",
+        },
+      },
+      {
+        id: "lunch",
+        title: "Rooftop storm",
+        tagline: "Build a storm and strike the lightning rods on three rooftops.",
+        chapters: ["lunch"],
+        clock: "12:20",
+        timer: 240,
+        rods: ["apt", "shop", "annex"],
+        goals: [
+          { id: "storm", kind: "storm", label: "Call the storm" },
+          { id: "rod-one", kind: "rods", count: 1, label: "Strike a lightning rod" },
+          { id: "rod-all", kind: "rods", count: 3, label: "Hit all three rods" },
+        ],
+        lines: {
+          start: "Lunch break. The roofs are waiting.",
+          done: "Three rods. One sky. His.",
+        },
+      },
+      {
+        id: "commute-home",
+        title: "Hurricane drive",
+        tagline: "Get home through the storm you made, with wind and debris.",
+        /* Offer as he leaves the office / walks the lot (still "work"), and
+           during the drive-home chapter if he isn't in the car. */
+        chapters: ["work", "commute"],
+        after: "17:45",
+        before: "18:55",
+        /* 17:53: still on foot in the office (elevator). 17:55+ he's in the car
+           and Take control is locked — the episode is a walk/glide home. */
+        clock: "17:53",
+        timer: 300,
+        debris: true,
+        goals: [
+          { id: "blow", kind: "weather-any", states: ["storm", "wind"], label: "Whip up storm or wind" },
+          { id: "debris", kind: "debris", count: 2, label: "Shove the debris (gust or tornado)" },
+          { id: "home", kind: "reach", spot: "parkHome", r: 8, label: "Get home" },
+        ],
+        lines: {
+          start: "The lot. Home is through what he makes.",
+          done: "Home. The storm came with him.",
+        },
+      },
+      {
+        id: "night",
+        title: "Light show",
+        tagline: "A lightning show over the skyline — timed hits.",
+        chapters: ["computer", "bedtime"],
+        clock: "22:05",
+        timer: 180,
+        rods: ["apt", "shop", "annex"],
+        cue: { every: 4.2, window: 1.6 },
+        goals: [
+          { id: "storm", kind: "storm", label: "Storm over the skyline" },
+          { id: "timed", kind: "timed-bolts", count: 3, label: "Land three timed bolts" },
+          { id: "finale", kind: "bolts", count: 5, label: "Five bolts for the show" },
+        ],
+        lines: {
+          start: "Night. The skyline wants a show.",
+          done: "Curtain call. Thunder takes a bow.",
+        },
+      },
+    ],
   },
 
   /* ------------------------------------------------------------------------
@@ -838,7 +1128,27 @@ window.DAY_CONFIG = {
       chapter: "lunch",
       steps: [
         { go: "hallEnd", activity: "walk", do: "A short walk down the hall." },
-        { at: "hallEnd", fill: true, micro: { pools: ["idle"], every: "20-40s" }, do: ["He stops at the window and looks out.", "Clouds over the parking lot."] },
+        {
+          when: { weather: ["rain", "storm"] },
+          at: "hallEnd",
+          fill: true,
+          micro: { pools: ["idle"], every: "20-40s" },
+          do: ["He stops at the window. Rain on the glass.", "He watches the storm from the window."],
+        },
+        {
+          when: { weather: "snow" },
+          at: "hallEnd",
+          fill: true,
+          micro: { pools: ["idle"], every: "20-40s" },
+          do: ["He stops at the window. Snow over the lot.", "He smiles at the sky for a second."],
+        },
+        {
+          when: { weather: ["clear", "clouds", "fog", "wind"] },
+          at: "hallEnd",
+          fill: true,
+          micro: { pools: ["idle"], every: "20-40s" },
+          do: ["He stops at the window and looks out.", "Clouds over the parking lot."],
+        },
         { go: "elevatorCall", activity: "walk", do: "He walks the length of the hall." },
         { at: "elevatorCall", for: "20-40s", do: "He reads a notice on the wall." },
         { go: "hallMid", activity: "walk", do: "He heads back." },
@@ -1057,10 +1367,27 @@ window.DAY_CONFIG = {
         { at: "carSideHome", hand: "reach", for: "2-4s", set: { car: "locked" }, do: "Small Weather locks the car." },
         {
           chance: 0.3,
+          when: { weather: ["clear", "clouds", "fog", "wind"] },
           steps: [
             { go: "mailbox", hand: "hold", do: "He walks to the mailbox." },
             { at: "mailbox", hand: "reach", for: "15-30s", do: "He checks the mail. Mostly junk." },
           ],
+        },
+        {
+          chance: 0.55,
+          when: { weather: ["rain", "storm"] },
+          at: "carSideHome",
+          hand: "hold",
+          for: "4-8s",
+          do: "He cancels the walk to the mailbox. It's raining.",
+        },
+        {
+          chance: 0.4,
+          when: { weather: "snow" },
+          at: "carSideHome",
+          hand: "hold",
+          for: "4-8s",
+          do: "He skips the mailbox. Snow.",
         },
         { go: "frontDoorOut", hand: "hold", do: "He walks to the front door." },
         { at: "frontDoorOut", hand: "reach", for: "4-10s", set: { frontDoor: "open" }, do: "He finds the right key and unlocks it." },
@@ -1491,6 +1818,9 @@ window.DAY_CONFIG = {
       { do: "He thinks of something to buy, searches for it, and gives up.", for: "1-2m", hand: "phone", max: 1 },
       { do: "He remembers a personal errand.", for: "5-10s", hand: "none" },
       { do: "Tired. He thinks about a nap.", for: "5-10s", hand: "face", when: { energy: "<0.4" }, likes: { fatigue: 3 } },
+      { do: "Rain on the window. He watches a second.", for: "5-12s", hand: "none", when: { weather: ["rain", "storm"] }, max: 2 },
+      { do: "Thunder. He listens, then types again.", for: "4-8s", hand: "none", when: { weather: "storm" }, max: 1 },
+      { do: "Snow out there. Quiet.", for: "5-10s", hand: "none", when: { weather: "snow" }, max: 1 },
     ],
 
     waiting: [

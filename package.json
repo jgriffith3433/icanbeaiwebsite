@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 8093 --strictPort",
-    "test": "node scripts/check-world.mjs",
+    "test": "node scripts/check-world.mjs && node scripts/check-powers.mjs && node scripts/check-voice.mjs && node scripts/check-episodes.mjs",
+    "voice": "node scripts/make-voice.mjs",
     "stamp": "node scripts/stamp-build.mjs"
   },
   "devDependencies": {

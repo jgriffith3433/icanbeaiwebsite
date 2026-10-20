@@ -949,6 +949,7 @@
       const root = new B.TransformNode("car", scene);
       const body = mat(color, { spec: 0.35 });
       const glass = mat("#26303a", { spec: 0.8 });
+      const black = mat("#1a1a1c", { spec: 0.15 });
       box("lower", 1.78, 0.55, 4.1, 0, 0.55, 0, body, root);
       const cabinMesh = box("cabin", 1.6, 0.55, 2.1, 0, 1.08, -0.25, glass, root);
       const roofMesh = box("roof", 1.5, 0.08, 1.9, 0, 1.38, -0.3, body, root);
@@ -969,7 +970,12 @@
       glowing(box("hlR", 0.38, 0.14, 0.04, 0.6, 0.7, 2.06, hl, root, false));
       glowing(box("tlL", 0.38, 0.12, 0.04, -0.6, 0.72, -2.06, tl, root, false));
       glowing(box("tlR", 0.38, 0.12, 0.04, 0.6, 0.72, -2.06, tl, root, false));
-      return { root, wheels, hl, tl, roof: roofMesh, cabin: cabinMesh };
+      /* Wipers: thin rods on the windshield; shown and swung in rain/storm. */
+      const wiperL = box("wiperL", 0.035, 0.02, 0.72, -0.32, 1.02, 0.72, black, root);
+      const wiperR = box("wiperR", 0.035, 0.02, 0.72, 0.32, 1.02, 0.72, black, root);
+      wiperL.setEnabled(false);
+      wiperR.setEnabled(false);
+      return { root, wheels, hl, tl, roof: roofMesh, cabin: cabinMesh, wipers: [wiperL, wiperR], wipersOn: false };
     }
     if (pw) {
       ["#9a3b3b", "#d8d8d2", "#2f3c52", "#6c7a5e", "#c9a04f"].forEach((c, i) => {
@@ -1084,6 +1090,45 @@
         return { def: p, person: n };
       })
       .filter(Boolean);
+
+    /* Street people along the sidewalks: umbrellas in rain, run in storms, huddle in snow. */
+    function makeUmbrella(parent) {
+      const root = new B.TransformNode("umbrella", scene);
+      root.parent = parent;
+      root.position.set(0.28, 1.55, 0.05);
+      const cloth = mat("#1a2740", { spec: 0.2 });
+      const poleM = mat("#3a3a3c", { spec: 0.3 });
+      const cap = sphere("uCap", 0.55, cloth, root, 8);
+      cap.position.y = 0.35;
+      cap.scaling.y = 0.22;
+      const pole = cyl("uPole", 0.7, 0.035, 0.035, poleM, root, 6);
+      pole.position.y = 0.0;
+      root.setEnabled(false);
+      return root;
+    }
+    const streetFolk = [];
+    [
+      { top: "#5a6d82", bottom: "#2e333c", skin: "#c9967a", hair: "#2a2422" },
+      { top: "#8a5a4a", bottom: "#3a3e46", skin: "#e2b394", hair: "#4a3028" },
+      { top: "#4a6b5a", bottom: "#2c3038", skin: "#d4a574", hair: "#1a1512" },
+      { top: "#6a5a78", bottom: "#3a3e46", skin: "#c8a080", hair: "#3b2a22" },
+      { top: "#7a6a4a", bottom: "#2e333c", skin: "#b8896a", hair: "#1e1814" },
+      { top: "#3a5a6a", bottom: "#3a3e46", skin: "#e8c4a8", hair: "#5a4030" },
+    ].forEach((col, i) => {
+      const p = makePerson(col, false);
+      const umb = makeUmbrella(p.root);
+      const side = i % 2;
+      streetFolk.push({
+        person: p,
+        umbrella: umb,
+        lane: side ? RZ + 4.4 : RZ - 4.4,
+        dir: side ? -1 : 1,
+        speed: 1.1 + (i % 3) * 0.25,
+        offset: i * 211 + 40,
+        umbrellaOn: false,
+        mood: "walk",
+      });
+    });
 
     const myCar = makeCar("#355848");
     const headSpot = new B.SpotLight("headbeam", V3(0, 0.8, 2.2), V3(0, -0.15, 1), PI / 3, 6, scene);
@@ -1504,23 +1549,69 @@
       }
       state.lastCarX = car.x;
       state.lastCarZ = car.z;
-      const lights = things.headlights === "on" || (things.engine === "on" && night > 0.4);
+
+      /* weather the street reacts to (js/weather.js): umbrellas, wipers, slower cars */
+      const wx = (typeof window !== "undefined" && window.weather && window.weather.now && window.weather.now()) || null;
+      const raining = !!(wx && (wx.rain > 0.35 || wx.state === "rain" || wx.state === "storm"));
+      const storming = !!(wx && (wx.state === "storm" || (wx.lightning || 0) > 0.4));
+      const snowing = !!(wx && (wx.snow > 0.4 || wx.state === "snow"));
+      const foggy = !!(wx && (wx.state === "fog" || (wx.fog || 0) > 0.05));
+      const driveScale = raining ? 0.52 : snowing ? 0.62 : foggy ? 0.78 : 1;
+
+      const lights = things.headlights === "on" || (things.engine === "on" && (night > 0.4 || raining || foggy));
       setEmissive(myCar.hl, "#fff3d0", lights ? 1.6 : 0.05);
       setEmissive(myCar.tl, "#ff2a2a", things.engine === "on" ? (car.moving ? 0.7 : 1.4) : 0.05);
-      headSpot.intensity = lights ? 1.6 * night : 0;
+      headSpot.intensity = lights ? 1.6 * Math.max(night, raining || foggy ? 0.55 : 0) : 0;
 
       /* traffic */
       const tSec = minutes * 60;
       traffic.forEach((tr) => {
         const len = street.to - street.from - 40;
-        let x = ((tSec * tr.speed + tr.offset) % len + len) % len;
+        let x = ((tSec * tr.speed * driveScale + tr.offset) % len + len) % len;
         x = tr.dir > 0 ? street.from + 20 + x : street.to - 20 - x;
         const tooClose = Math.hypot(x - car.x, tr.lane - car.z) < 9;
         tr.car.root.setEnabled(!tooClose);
         tr.car.root.position.set(x, 0, tr.lane);
         tr.car.root.rotation.y = tr.dir > 0 ? PI / 2 : -PI / 2;
-        setEmissive(tr.car.hl, "#fff3d0", night > 0.3 ? 1.4 : 0.05);
-        setEmissive(tr.car.tl, "#ff2a2a", night > 0.3 ? 0.8 : 0.1);
+        const lit = night > 0.3 || raining || foggy;
+        setEmissive(tr.car.hl, "#fff3d0", lit ? 1.4 : 0.05);
+        setEmissive(tr.car.tl, "#ff2a2a", lit ? 0.8 : 0.1);
+        tr.car.wipersOn = raining;
+        (tr.car.wipers || []).forEach((w, wi) => {
+          w.setEnabled(raining);
+          if (raining) w.rotation.y = Math.sin(t * 7 + wi * 1.2) * 0.7;
+        });
+      });
+      /* his car wipers while the road is wet */
+      myCar.wipersOn = raining && (things.engine === "on" || car.moving);
+      (myCar.wipers || []).forEach((w, wi) => {
+        w.setEnabled(myCar.wipersOn);
+        if (myCar.wipersOn) w.rotation.y = Math.sin(t * 7 + wi * 1.2) * 0.7;
+      });
+
+      /* street people */
+      streetFolk.forEach((f, fi) => {
+        const len = street.to - street.from - 30;
+        const spd = storming ? f.speed * 2.2 : snowing ? f.speed * 0.55 : f.speed;
+        let x = ((tSec * spd + f.offset) % len + len) % len;
+        x = f.dir > 0 ? street.from + 15 + x : street.to - 15 - x;
+        const tooClose = Math.hypot(x - car.x, f.lane - car.z) < 6 || Math.hypot(x - pp.x, f.lane - pp.z) < 2.2;
+        f.person.root.setEnabled(!tooClose);
+        if (tooClose) return;
+        f.person.root.position.set(x, 1.01, f.lane);
+        f.person.root.rotation.y = f.dir > 0 ? PI / 2 : -PI / 2;
+        f.umbrellaOn = raining;
+        f.umbrella.setEnabled(raining);
+        f.mood = storming ? "run" : snowing ? "huddle" : raining ? "umbrella" : "walk";
+        const walk = !snowing;
+        f.person.phase += (walk ? 0.18 : 0.06) * (storming ? 1.8 : 1) * Math.max(0.016, dt) * 60;
+        const hand = raining ? "hold" : snowing ? "hold" : storming && wx && wx.flashes ? "face" : "none";
+        const pose = snowing ? "stand" : "walk";
+        posePerson(f.person, pose, hand, dt, walk, snap, t + fi * 1.7);
+        if (storming && wx && (wx.flashes || 0) > 0) {
+          /* a glance at the sky after lightning */
+          if (f.person.J && f.person.J.head) f.person.J.head.rotation.x = -0.35;
+        }
       });
 
       /* person */
@@ -1720,6 +1811,21 @@
       return { y: rayHit.hitPoint.y, body: rayHit.body && rayHit.body.transformNode ? rayHit.body.transformNode.name : "" };
     }
 
+    /** What the street is doing for the weather (playtest / console). */
+    function streetNow() {
+      const wx = (typeof window !== "undefined" && window.weather && window.weather.now && window.weather.now()) || {};
+      const umbrellas = streetFolk.filter((f) => f.umbrellaOn && f.person.root.isEnabled()).length;
+      const wipers = traffic.filter((tr) => tr.car.wipersOn && tr.car.root.isEnabled()).length + (myCar.wipersOn ? 1 : 0);
+      return {
+        folk: streetFolk.length,
+        umbrellas,
+        wipers,
+        moods: streetFolk.map((f) => f.mood),
+        raining: !!(wx.rain > 0.35 || wx.state === "rain" || wx.state === "storm"),
+        state: wx.state || null,
+      };
+    }
+
     return {
       engine,
       scene,
@@ -1745,6 +1851,7 @@
       skinHips: FOOT, // his hips' height standing: the model is scaled to it
       rooms,
       spots,
+      streetNow,
     };
   }
 

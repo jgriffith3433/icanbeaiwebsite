@@ -1381,6 +1381,902 @@ async function weather(options, t) {
   t.progress(1);
 }
 
+/* ---------------- weather-audio: music beds crossfade, ambience levels, autoplay silence ---------------- */
+// Real input: day bar to the door, confirm Sound is off (silent), a real pointer on Sound, Enter
+// (sting), walk out, then keys through clear → rain → storm → fog → snow. Events show the bed and
+// ambience levels so the review can judge the three acceptance criteria.
+async function weatherAudio(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const W = window.weather;
+  const S = window.day && window.day.score;
+  const C = window.day.control;
+  if (!W) {
+    t.problem("bug", "There's no weather");
+    return;
+  }
+  if (!S) {
+    t.problem("bug", "There's no score (js/score.js didn't install)");
+    return;
+  }
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const day = window.day.today();
+  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  await sleep(400);
+  clickSpeed(1);
+  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}"`);
+  t.progress(0.05);
+
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") === "true") {
+    sound.click();
+    await sleep(200);
+  }
+  const silent = S.now();
+  t.event("sound-off", `on=${silent.on} unlocked=${silent.unlocked} heard=${silent.heard.toFixed(3)}`);
+  if (silent.on) t.problem("bug", "Sound is on before anyone pressed it");
+  if (silent.heard > 0.02) t.problem("bug", `Heard audio while Sound is off (heard ${silent.heard.toFixed(3)})`);
+  t.progress(0.12);
+
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 5, pointerType: "mouse" }));
+    sound.click();
+    await sleep(400);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+    if (sound.getAttribute("aria-pressed") !== "true") t.problem("bug", "Sound button didn't turn on");
+  }
+  t.progress(0.2);
+
+  const stingBefore = S.now().stingAt;
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  await sleep(350);
+  const afterTake = S.now();
+  t.event("control-taken", `stingAt ${afterTake.stingAt} (was ${stingBefore}); bed ${afterTake.bed}`);
+  if (afterTake.on && afterTake.samples && afterTake.stingAt <= stingBefore) {
+    t.problem("warning", "Take control didn't fire the sting (samples may still be loading)");
+  } else if (afterTake.stingAt > stingBefore) {
+    t.event("sting", `take-control sting at ${afterTake.stingAt}`);
+  }
+  t.progress(0.3);
+
+  const street = window.DAY_CONFIG.street || { z: 12.6 };
+  const at = C.state();
+  await goTo(at.x, street.z, t, { close: 1.4, ms: 16000, progress: 0.4 });
+  t.scene("On the road");
+  t.progress(0.45);
+
+  const order = [
+    ["1", "clear", "Clear"],
+    ["3", "rain", "Rain"],
+    ["4", "storm", "Storm"],
+    ["5", "fog", "Fog"],
+    ["7", "snow", "Snow"],
+  ];
+  const beds = {};
+  for (let i = 0; i < order.length; i++) {
+    const [key, state, label] = order[i];
+    const before = S.now();
+    pressKey(key);
+    await sleep(200);
+    const early = S.now();
+    const want = S.bedFor(state);
+    t.event("music-set", `${label} via ${key}: weather ${W.now().state}, bed target ${early.target}, fade ${early.fade.toFixed(2)}, from ${before.bed}`);
+    if (W.now().state !== state) t.problem("bug", `Key ${key} left weather on ${W.now().state}`);
+    if (before.bed && before.bed !== want && early.fade > 0.92 && early.target === want) {
+      // snapped somehow — still ok if target is right
+    } else if (before.bed && before.bed !== want && early.target === want && early.fade > 0.85) {
+      t.problem("bug", `${label} music popped in (fade ${early.fade.toFixed(2)})`);
+    }
+    await sleep(1200);
+    const mid = S.now();
+    if (before.bed && before.bed !== want) {
+      t.event("music-blend", `${label} at 1.2s: fade ${mid.fade.toFixed(2)}, bed ${mid.bed}→${mid.target}`);
+      if (mid.target !== want) t.problem("bug", `${label} score target is ${mid.target}, not ${want}`);
+      if (mid.fade < 0.15 || (mid.bed === mid.target && mid.fade > 0.95 && before.bed !== want && mid.fade === 1 && early.fade < 0.5)) {
+        // allow settled early if fade was fast
+      } else if (before.bed !== want && mid.bed === before.bed && mid.fade < 0.2) {
+        t.problem("bug", `${label} music isn't crossfading (fade ${mid.fade.toFixed(2)})`);
+      }
+    }
+    await t.until(() => W.now().state === state && W.now().blend > 0.9, 9000, `${label} weather settle`);
+    await sleep(900);
+    const done = S.now();
+    beds[state] = done;
+    t.scene(`Music ${label}`);
+    t.event(`music-${state}`, `bed ${done.bed} target ${done.target} fade ${done.fade.toFixed(2)} amb rain ${done.amb.rain.toFixed(2)} wind ${done.amb.wind.toFixed(2)} air ${done.amb.air.toFixed(2)} samples ${done.samples}`);
+    if (done.target !== want && done.bed !== want) t.problem("bug", `${label} settled on bed ${done.bed}, not ${want}`);
+    t.progress(0.5 + i * 0.08);
+  }
+
+  const rain = beds.rain;
+  const storm = beds.storm;
+  const clear = beds.clear;
+  const fog = beds.fog;
+  const snow = beds.snow;
+  if (rain && clear && rain.amb.rain <= clear.amb.rain) t.problem("bug", "Rain ambience isn't wetter than clear");
+  if (storm && storm.amb.rain < 0.5) t.problem("bug", "Storm ambience has no rain");
+  if (fog && clear && fog.bed === clear.bed && fog.target === clear.target) {
+    // fog should use fog bed
+    if (fog.bed !== "fog" && fog.target !== "fog") t.problem("bug", `Fog didn't switch the music bed (still ${fog.bed})`);
+  }
+  if (snow && snow.bed !== "snow" && snow.target !== "snow") t.problem("bug", `Snow didn't switch the music bed (still ${snow.bed})`);
+  if (clear && rain && clear.bed === rain.bed && clear.target === rain.target && clear.bed === "clear") {
+    t.problem("bug", "Clear and rain share the same music bed");
+  }
+  const distinct = new Set(Object.values(beds).map((b) => b.bed || b.target));
+  t.metric("music-beds", distinct.size);
+  if (distinct.size < 3) t.problem("bug", `Only ${distinct.size} distinct music beds across clear/rain/storm/fog/snow`);
+
+  // Storm thunder level in the weather sound envelope (sample crack is one-shot).
+  if (storm && W.now().sound.thunder < 0.4) t.problem("bug", "Storm has no thunder in the weather sound levels");
+  else if (storm) t.event("thunder-level", `storm thunder ${W.now().sound.thunder.toFixed(2)}`);
+
+  t.progress(1);
+}
+
+/* ---------------- powers: storm, lightning, gust, tornado, and the Pressure meter ---------------- */
+// Real input: day bar beside the car (setup), Sound on, Enter, WASD to the avenue near the loose props,
+// hold F for the storm, E bolt, G gust, T tornado; then try one dry so the meter refuses.
+async function powers(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const P = window.powers || (window.day && window.day.powers);
+  if (!P) {
+    t.problem("bug", "There's no powers (js/powers.js didn't install)");
+    return;
+  }
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1)
+    || day.actions.find((a) => /steps out/.test(a.text || ""))
+    || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  t.event("start-at", `${E().fmtClock(outside.start)} "${outside.text || outside.block}"`);
+  t.progress(0.05);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+    sound.click();
+    await sleep(200);
+  }
+
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  t.event("control-taken", "Enter, so his powers work");
+  const meter = $("pressure");
+  if (!meter || meter.hidden) t.problem("bug", "The Pressure meter isn't showing while he's the player's");
+  else t.event("pressure-meter", "Pressure is on screen");
+
+  // Near the loose bins and umbrellas on the avenue (day.config.js powers.loose).
+  const nearLoose = { x: -2.2, z: street.z - 1.8 };
+  const reached = await goTo(nearLoose.x, nearLoose.z, t, { close: 1.6, ms: 20000, sprint: true, progress: 0.12 });
+  const stood = C.state();
+  t.scene("On the avenue");
+  if (reached) t.event("at-props", `at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)} near the loose props`);
+  else t.problem("bug", `He didn't reach the avenue props (at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)})`);
+  t.progress(0.18);
+
+  async function waitPressure(cost, label) {
+    await t.until(() => P.now().pressure + 0.05 >= cost, 12000, `Pressure for ${label} (${cost})`);
+    t.metric(`pressure-before-${label}`, Math.round(P.now().pressure));
+  }
+
+  // 1. Hold F: cloud over him, then the storm and rain.
+  t.scene("Summon storm");
+  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.storm) || 40, "storm");
+  const beforeStorm = window.weather ? window.weather.now() : null;
+  keyDown("f");
+  await t.until(() => P.now().charging || P.now().radius > 1, 2000, "the cloud to gather").catch(() => {});
+  if (P.now().radius > 0.8 || P.now().charging) t.event("storm-gather", `cloud radius ${P.now().radius.toFixed(1)}, charging ${P.now().charging}`);
+  else t.problem("bug", "Holding F didn't darken the sky over him");
+  await sleep(900);
+  keyUp("f");
+  await t.until(() => P.now().called || (window.weather && window.weather.now().state === "storm"), 5000, "the storm he called");
+  const afterStorm = P.now();
+  const wx = window.weather && window.weather.now();
+  if (afterStorm.called || (wx && wx.state === "storm")) {
+    t.event("storm-called", `local rain ${afterStorm.localRain}, weather ${wx && wx.state}, rain ${wx && wx.rain.toFixed(2)}, sky ${wx && wx.sky}`);
+  } else t.problem("bug", "Holding F didn't summon a storm");
+  if (beforeStorm && wx && wx.rain <= beforeStorm.rain && !(afterStorm.localRain || afterStorm.called)) {
+    t.problem("bug", "Summoning a storm didn't start rain");
+  }
+  if ($("log") && !$("log").textContent.includes("storm")) t.problem("polish", "Calling the storm isn't in the action log");
+  t.progress(0.35);
+
+  // 2. E: lightning at the reticle — flash, thunder, a mark on the world.
+  t.scene("Lightning");
+  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.bolt) || 24, "bolt");
+  const props0 = (P.now().props || []).map((p) => ({ ...p }));
+  pressKey("e");
+  await sleep(200);
+  await t.until(() => P.now().strike, 2000, "a lightning strike");
+  const strike = P.now().strike;
+  if (!strike) {
+    t.problem("bug", "E didn't throw lightning");
+  } else {
+    t.event("bolt-struck", `at ${strike.x.toFixed(1)},${strike.z.toFixed(1)} · flash ${P.now().flash.toFixed(2)} · alarm ${strike.alarm} · blackout ${strike.blackout || "none"} · knocked ${strike.knocked}`);
+    if (!(P.now().flash > 0.05 || strike.thunder)) {
+      await t.until(() => P.now().strike && P.now().strike.thunder, 3000, "thunder").catch(() => {});
+    }
+    if (P.now().strike && P.now().strike.thunder) t.event("thunder", `thunder after ${P.now().strike.delay.toFixed(2)} s`);
+    else if (!(P.now().flash > 0)) t.problem("bug", "The strike had no flash or thunder");
+    const moved = (P.now().props || []).some((p, i) => props0[i] && Math.hypot(p.x - props0[i].x, p.z - props0[i].z) > 0.3);
+    const worldHit = !!(strike.alarm || strike.blackout || strike.knocked > 0 || moved || P.now().alarm || P.now().blackout);
+    if (worldHit) t.event("bolt-world", `alarm ${!!(strike.alarm || P.now().alarm)}, lights out ${P.now().blackout || strike.blackout || "none"}, props moved ${moved}, knocked ${strike.knocked}`);
+    else t.problem("bug", "Lightning left no mark on the world (no alarm, lights out or knocked prop)");
+  }
+  t.progress(0.55);
+
+  // 3. G: a gust that pushes what's in front of him.
+  t.scene("Gust");
+  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.gust) || 16, "gust");
+  const beforeGust = (P.now().props || []).map((p) => ({ ...p }));
+  pressKey("g");
+  await sleep(350);
+  const gust = P.now().gust;
+  if (!gust) t.problem("bug", "G didn't cast a gust");
+  else {
+    const pushed = (P.now().props || []).filter((p, i) => beforeGust[i] && Math.hypot(p.x - beforeGust[i].x, p.z - beforeGust[i].z) > 0.25).length;
+    t.event("gust-cast", `pushes ${gust.pushes}, props moved ${pushed}`);
+    if (gust.pushes < 1 && pushed < 1) t.problem("bug", "The gust didn't push anything");
+  }
+  t.progress(0.7);
+
+  // 4. T: a tornado down the street.
+  t.scene("Tornado");
+  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.tornado) || 48, "tornado");
+  pressKey("t");
+  await sleep(200);
+  await t.until(() => P.now().tornado && P.now().tornado.life > 0, 2000, "a tornado");
+  const tw0 = P.now().tornado;
+  if (!tw0) t.problem("bug", "T didn't send a tornado");
+  else {
+    t.event("tornado-start", `on the ${tw0.axis} street at ${tw0.x.toFixed(1)},${tw0.z.toFixed(1)}, life ${tw0.life.toFixed(1)} s`);
+    await sleep(1800);
+    const tw1 = P.now().tornado;
+    const travelled = tw1 ? tw1.travelled : tw0.travelled;
+    if (travelled > 2) t.event("tornado-ran", `travelled ${travelled.toFixed(1)} m down the street`);
+    else t.problem("bug", `The tornado barely moved (${(travelled || 0).toFixed(1)} m)`);
+  }
+  t.progress(0.85);
+
+  // 5. Pressure limits him: spend what's left, then a refused call.
+  t.scene("Pressure");
+  let denied = false;
+  for (let i = 0; i < 8 && !denied; i++) {
+    const before = P.now().pressure;
+    pressKey("t");
+    await sleep(180);
+    const snap = P.now();
+    if (snap.blocked && snap.blocked.power) {
+      denied = true;
+      t.event("pressure-denied", `refused ${snap.blocked.power} at pressure ${snap.blocked.pressure} (had ${before.toFixed(0)})`);
+    }
+  }
+  if (!denied) {
+    // Drain with gusts if tornado never refused (still filling).
+    while (P.now().pressure > 5) {
+      pressKey("g");
+      await sleep(120);
+    }
+    pressKey("t");
+    await sleep(200);
+    if (P.now().blocked) {
+      denied = true;
+      t.event("pressure-denied", `refused ${P.now().blocked.power} at ${P.now().blocked.pressure}`);
+    }
+  }
+  if (!denied) t.problem("bug", "The Pressure meter never refused a power");
+  else t.metric("pressure-floor", P.now().blocked ? P.now().blocked.pressure : Math.round(P.now().pressure));
+
+  C.touch(true);
+  await sleep(250);
+  const pad = $("powerpad");
+  if (!pad || pad.hidden) t.problem("polish", "The power pad isn't showing with touch controls on");
+  else t.event("power-pad", "Storm / Bolt / Gust / Tornado on the phone");
+  t.progress(1);
+}
+
+/* ---------------- voice: DoD Eric lines on powers, weather, episode open/close ---------------- */
+// Real input: Sound (pointer), Enter, weather keys 1–7 with gaps for cooldown, bolts for chance/cooldown skips,
+// one forced power bark, Esc for the score-card close. Events: voice-play / voice-skip.
+async function voice(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const V = window.voice || (window.day && window.day.voice);
+  if (!V) {
+    t.problem("bug", "There's no voice (js/voice.js didn't install)");
+    return;
+  }
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const cfg = window.DAY_CONFIG && window.DAY_CONFIG.voice;
+  if (!cfg || !Array.isArray(cfg.lines) || cfg.lines.length < 30) {
+    t.problem("bug", `voice.lines is short (${cfg && cfg.lines ? cfg.lines.length : 0})`);
+  }
+  if (cfg && cfg.voiceId !== "cjVigY5qzO86Huf0OWal") {
+    t.problem("bug", `voiceId is ${cfg && cfg.voiceId}, not DoD Eric (cjVigY5qzO86Huf0OWal)`);
+  }
+  t.event("voice-ready", `${V.now().lines} lines, voice ${V.now().voiceId}`);
+  t.progress(0.05);
+
+  const day = window.day.today();
+  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  clickSpeed(1);
+  await sleep(400);
+  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}"`);
+
+  const plays = [];
+  const skips = [];
+  const onVoice = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "play") plays.push(d);
+    if (d.action === "skip") skips.push(d);
+  };
+  window.addEventListener("day:voice", onVoice);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+    sound.click();
+    await sleep(250);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+  }
+
+  // Episode open
+  t.scene("Episode open");
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  await t.until(() => plays.some((p) => p.group === "episode-open"), 4000, "episode-open line").catch(() => {});
+  const open = plays.find((p) => p.group === "episode-open");
+  if (open) t.event("voice-play", `episode-open ${open.id}: "${open.text}"`);
+  else t.problem("bug", "Taking control didn't play an episode-open line");
+  t.progress(0.15);
+
+  // Weather reactions for every state (wait past cooldown between keys)
+  const order = [
+    ["1", "clear"],
+    ["2", "clouds"],
+    ["3", "rain"],
+    ["4", "storm"],
+    ["5", "fog"],
+    ["6", "wind"],
+    ["7", "snow"],
+  ];
+  for (let i = 0; i < order.length; i++) {
+    const [key, state] = order[i];
+    await sleep(2800);
+    const before = plays.length;
+    pressKey(key);
+    await t.until(() => plays.length > before && plays.some((p) => p.group === `weather-${state}`), 5000, `weather-${state} line`).catch(() => {});
+    const hit = [...plays].reverse().find((p) => p.group === `weather-${state}`);
+    if (hit) t.event(`voice-weather-${state}`, `${hit.id}: "${hit.text}"`);
+    else t.problem("bug", `No voice reaction when weather became ${state}`);
+    t.scene(state.charAt(0).toUpperCase() + state.slice(1));
+    t.progress(0.2 + i * 0.07);
+  }
+
+  // Powers: one forced bark, then several bolts so chance/cooldown skips some
+  t.scene("Power bark");
+  const P = window.powers || (window.day && window.day.powers);
+  if (P) {
+    await t.until(() => P.now().pressure + 0.05 >= 24, 12000, "Pressure for bolt").catch(() => {});
+    const forced = V.say("bolt", { force: true, ignoreCooldown: true, via: "playtest" });
+    if (forced) t.event("voice-play", `forced bolt ${forced.id}: "${forced.text}"`);
+    else t.problem("bug", "Forced bolt line didn't play");
+    await sleep(200);
+    let barked = 0;
+    let quiet = 0;
+    for (let i = 0; i < 6; i++) {
+      await t.until(() => P.now().pressure + 0.05 >= 24, 10000, "Pressure for bolt").catch(() => {});
+      const before = plays.length;
+      const skipBefore = skips.length;
+      pressKey("e");
+      await sleep(350);
+      if (plays.length > before) barked++;
+      else if (skips.length > skipBefore) quiet++;
+      else quiet++;
+    }
+    t.metric("powerVoicePlays", barked);
+    t.metric("powerVoiceSkips", quiet);
+    if (barked < 1 && !forced) t.problem("bug", "No power voice line played");
+    else t.event("voice-power", `${barked} natural barks, ${quiet} skips (chance/cooldown)`);
+    if (quiet < 1) t.problem("polish", "Every power call got a voice line; chance/cooldown should skip some");
+  } else t.problem("bug", "powers missing, can't check power barks");
+  t.progress(0.85);
+
+  // Episode close / score card
+  t.scene("Episode close");
+  await sleep(2800);
+  const beforeClose = plays.length;
+  pressKey("Escape");
+  await t.until(() => C.mode() !== "control", 4000, "Let go (Esc)");
+  await t.until(() => plays.length > beforeClose && plays.some((p) => p.group === "episode-close"), 4000, "episode-close line").catch(() => {});
+  const close = [...plays].reverse().find((p) => p.group === "episode-close");
+  if (close) t.event("voice-play", `episode-close ${close.id}: "${close.text}"`);
+  else t.problem("bug", "Letting go didn't play an episode-close / score-card line");
+
+  window.removeEventListener("day:voice", onVoice);
+  t.metric("voicePlays", plays.length);
+  t.metric("voiceSkips", skips.length);
+  t.event("voice-summary", `${plays.length} plays, ${skips.length} skips, DoD voice ${V.now().voiceId}`);
+  t.progress(1);
+}
+
+/* ---------------- storm-ride: glide on the wind, ride an updraft to a roof, cross rooftop to rooftop ---------------- */
+// Real input: Enter, WASD, Space held, G for a gust updraft, 4 for storm weather. Setup: day bar beside the car.
+async function stormRide(options, t) {
+  t.scene("Street");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control (js/control.js didn't install)");
+    return;
+  }
+  const cfg = window.DAY_CONFIG;
+  const day = window.day.today();
+  const roofs = ((cfg.city && cfg.city.blocks) || []).filter((b) => b.stair);
+  const apt = roofs.find((b) => b.id === "apt") || roofs[0];
+  const shop = roofs.find((b) => b.id === "shop") || roofs[1];
+  if (!apt || !shop) {
+    t.problem("bug", "Need two roofs with stairs (apt and shop) for storm-riding");
+    return;
+  }
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  t.event("start-at", `${E().fmtClock(outside.start)} beside the car · storm-ride`);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  if (!C.state().physics) t.problem("bug", "He moves without the Havok character controller");
+  // Storm weather: ambient updrafts are strongest.
+  pressKey("4");
+  await sleep(500);
+  if (window.weather && window.weather.set) window.weather.set("storm", 1, "playtest");
+  if (C.refreshUpdrafts) C.refreshUpdrafts();
+  t.event("weather-storm", `storm for stronger updrafts · ${C.state().updrafts || 0} columns`);
+  t.progress(0.08);
+
+  // 1. Hold jump in the air → glide with wind trails.
+  t.scene("Glide");
+  let glided = false;
+  let trails = 0;
+  let pull = 0;
+  const watchGlide = setInterval(() => {
+    const st = C.state();
+    if (st.gliding || st.floating) {
+      glided = true;
+      trails = Math.max(trails, st.trails || 0);
+      pull = Math.max(pull, st.cameraPull || 0);
+    }
+  }, 40);
+  try {
+    await tapKey(" ");
+    await sleep(280);
+    await tapKey(" ");
+    keyDown(" ");
+    keyDown("w");
+    await sleep(1800);
+    keyUp("w");
+    keyUp(" ");
+    await t.until(() => C.state().grounded, 8000, "him to land after the glide").catch(() => {});
+  } finally {
+    clearInterval(watchGlide);
+    releaseHeld();
+  }
+  const glideLog = C.log().filter((e) => e.what === "glide");
+  if (glided) t.event("glide-hold", `held Space in the air · trails ${trails} · camera pull ${pull.toFixed(2)} · log ${glideLog.length}`);
+  else t.problem("bug", "Holding Space in the air never set gliding");
+  if (trails < 1 && RIDE_TRAILS_OK()) t.problem("polish", "No wind trail particles while gliding");
+  else if (trails >= 1) t.event("wind-trails", `${trails} wind streak particles while gliding`);
+  if (pull < 0.4) t.problem("polish", `Camera didn't pull back while gliding (pull ${pull.toFixed(2)})`);
+  else t.event("camera-glide", `camera pulled back by ${pull.toFixed(2)}`);
+  t.progress(0.28);
+
+  // 2. Updraft from the street lifts him to rooftop height.
+  t.scene("Updraft");
+  const street = cfg.street || { z: 12.6 };
+  const liftX = apt.stair ? apt.stair.x0 - 1.2 : apt.x - apt.w / 2 - 2;
+  const liftZ = street.z;
+  if (!(await goTo(liftX, liftZ, t, { sprint: true, progress: 0.32, ms: 28000, close: 1.2 }))) {
+    t.problem("bug", `Couldn't reach the street under the apt for an updraft (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+  }
+  await t.until(() => {
+    const P = window.powers || (window.day && window.day.powers);
+    return P && P.now().pressure + 0.05 >= 16;
+  }, 14000, "Pressure for a gust").catch(() => {});
+  const yStreet = C.state().y;
+  pressKey("g");
+  await sleep(200);
+  const drafts = C.updrafts ? C.updrafts() : [];
+  const gustDraft = drafts.find((u) => u.kind === "gust");
+  if (gustDraft) t.event("updraft-spawned", `gust updraft at ${gustDraft.x.toFixed(1)},${gustDraft.z.toFixed(1)} lift ${gustDraft.lift}`);
+  else t.problem("bug", "Gust didn't plant an updraft");
+  let upPeak = yStreet;
+  const watchUp = setInterval(() => {
+    upPeak = Math.max(upPeak, C.state().y);
+  }, 40);
+  try {
+    await tapKey(" ");
+    keyDown(" ");
+    await sleep(4200);
+    keyUp(" ");
+  } finally {
+    clearInterval(watchUp);
+    releaseHeld();
+  }
+  const gain = upPeak - yStreet;
+  t.metric("updraftLift", Math.round(gain * 100) / 100);
+  if (gain >= apt.h - 0.8) t.event("updraft-lift", `lifted ${gain.toFixed(2)} m from the street (roof ${apt.h})`);
+  else t.problem("bug", `Updraft only lifted him ${gain.toFixed(2)} m; need ~${apt.h.toFixed(1)} m to reach the rooftop`);
+  t.progress(0.55);
+
+  // 3. Rooftop to rooftop without touching the ground.
+  t.scene("Roof to roof");
+  async function climbRoof(b, progress) {
+    const s = b.stair;
+    const lip = b.z + b.d / 2 - 1.1;
+    const topX = s.x1 - 0.25;
+    if (!(await goTo(s.x0 - 0.9, s.z, t, { sprint: true, progress, ms: 30000 }))) return false;
+    if (!(await goTo(topX, s.z, t, { close: 0.4, progress, ms: 22000 }))) return false;
+    if (C.state().y < b.h - 0.5) return false;
+    await goTo(topX, lip, t, { close: 0.55, progress, ms: 8000 });
+    return goTo(b.x, b.z, t, { close: 0.9, progress, ms: 10000 });
+  }
+  if (!(await climbRoof(apt, 0.6))) {
+    t.problem("bug", `Couldn't climb the ${apt.id} roof to glide from (y ${C.state().y.toFixed(2)})`);
+    t.progress(1);
+    return;
+  }
+  t.event("roof-start", `on ${apt.id} at y ${C.state().y.toFixed(2)}`);
+  // Face the shop (east) and glide across the street.
+  const targetX = shop.x - shop.w / 2 + 1.5;
+  const targetZ = shop.z;
+  let minY = C.state().y;
+  let touchedGround = false;
+  const watchCross = setInterval(() => {
+    const st = C.state();
+    minY = Math.min(minY, st.y);
+    if (st.y < 1.1 && st.grounded) touchedGround = true;
+  }, 40);
+  try {
+    // Edge of the apt roof toward the shop, then jump + hold + steer.
+    await goTo(apt.x + apt.w / 2 - 1.2, apt.z, t, { close: 0.7, progress: 0.7, ms: 10000 });
+    await tapKey(" ");
+    await sleep(200);
+    await tapKey(" ");
+    keyDown(" ");
+    const crossStart = performance.now();
+    while (performance.now() - crossStart < 9000) {
+      const st = C.state();
+      if (st.y > shop.h - 0.6 && Math.abs(st.x - shop.x) < shop.w / 2 - 0.5 && Math.abs(st.z - shop.z) < shop.d / 2 - 0.5) break;
+      setHeld(steerKeys(targetX, targetZ, false).concat([" "]));
+      await sleep(120);
+    }
+    keyUp(" ");
+    releaseHeld();
+    await sleep(800);
+  } finally {
+    clearInterval(watchCross);
+    releaseHeld();
+  }
+  const stEnd = C.state();
+  const onShop = stEnd.y > shop.h - 0.55 && Math.abs(stEnd.x - shop.x) < shop.w / 2 && Math.abs(stEnd.z - shop.z) < shop.d / 2;
+  t.metric("crossMinY", Math.round(minY * 100) / 100);
+  if (touchedGround) t.problem("bug", `He touched the ground crossing roofs (min y ${minY.toFixed(2)})`);
+  else if (onShop) t.event("roof-to-roof", `apt → shop without touching the ground · min y ${minY.toFixed(2)} · landed y ${stEnd.y.toFixed(2)}`);
+  else t.problem("bug", `Didn't land on the shop roof (y ${stEnd.y.toFixed(2)} at ${stEnd.x.toFixed(1)},${stEnd.z.toFixed(1)}; min y ${minY.toFixed(2)})`);
+  t.progress(1);
+}
+function RIDE_TRAILS_OK() {
+  return !(window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.ride && window.DAY_CONFIG.control.ride.trails === false);
+}
+
+/* ---------------- weather-life: street reacts, autopilot log after let-go, forecast drift ---------------- */
+// Real input: day bar to the door, Enter, WASD to the avenue, key 3 (rain) then 4 (storm), Esc.
+// Checks umbrellas + wipers in rain, a react line in the log after let-go, then hold expires → forecast.
+async function weatherLife(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const W = window.weather;
+  const C = window.day.control;
+  const w = world();
+  if (!W) {
+    t.problem("bug", "There's no weather");
+    return;
+  }
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  if (!w || typeof w.streetNow !== "function") {
+    t.problem("bug", "The world has no streetNow() (street people / wipers)");
+    return;
+  }
+  const day = window.day.today();
+  // The forecast is seeded by the date in 3-hour slots. Start where it isn't a storm,
+  // so the drift back after the player's storm is a change you can see.
+  const dateKey = window.day.now().key;
+  const calm = (a) => [a.start, a.start + 15].every((m) => W.forecast(dateKey, m).state !== "storm");
+  // Outside at home, in the yard: out the front door in the morning, out of the car in the evening.
+  const outs = day.actions.filter((a) => a.room === "yard" && !a.inCar && !a.path);
+  const out = outs.find(calm) || outs[0] || quietMoment(day);
+  const startAt = out.start + Math.min(0.4, (out.end - out.start) / 2);
+  scrubTo(startAt);
+  await sleep(400);
+  clickSpeed(1);
+  const fc = W.forecast(dateKey, startAt).state;
+  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}" · forecast ${fc}`);
+  t.progress(0.05);
+
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  t.event("control-taken", "Enter");
+  const street = window.DAY_CONFIG.street || { z: 12.6 };
+  const at = C.state();
+  await goTo(at.x, street.z, t, { close: 1.4, ms: 18000, progress: 0.15 });
+  t.scene("On the road");
+  t.progress(0.2);
+
+  pressKey("3");
+  await t.until(() => W.now().state === "rain" && W.now().blend > 0.85, 9000, "rain to settle");
+  await sleep(600);
+  // One more frame so world.update sees the wet weather
+  await sleep(200);
+  const rainStreet = w.streetNow();
+  t.scene("Rain on the street");
+  t.event("street-rain", `umbrellas ${rainStreet.umbrellas}/${rainStreet.folk}, wipers ${rainStreet.wipers}, moods ${rainStreet.moods.join(",")}`);
+  t.metric("umbrellas", rainStreet.umbrellas);
+  t.metric("wipers", rainStreet.wipers);
+  if (rainStreet.umbrellas < 1) t.problem("bug", "In rain, nobody on the street opened an umbrella");
+  if (rainStreet.wipers < 1) t.problem("bug", "In rain, no car wipers are on");
+  else t.event("umbrellas-and-wipers", `${rainStreet.umbrellas} umbrellas, ${rainStreet.wipers} wipers`);
+  t.progress(0.4);
+
+  pressKey("4");
+  await t.until(() => W.now().state === "storm" && W.now().blend > 0.85, 9000, "storm to settle");
+  t.event("weather-storm", `manual ${W.now().manual}, forecast ${W.now().forecast}`);
+  t.scene("Storm");
+  await sleep(400);
+  t.progress(0.5);
+
+  const logBefore = ($("log") && $("log").textContent) || "";
+  pressKey("Escape");
+  await t.until(() => C.mode() === "returning" || C.mode() === "schedule", 5000, "let go");
+  t.event("let-go", `mode ${C.mode()}, weather still ${W.now().state}, hold ${W.now().hold.toFixed(1)}s`);
+  if (!W.now().manual) t.problem("bug", "Letting go cleared the storm immediately instead of holding it");
+  await t.until(() => C.mode() === "schedule", 25000, "back on his day");
+  t.event("back-on-day", `mode schedule, weather ${W.now().state}, hold ${W.now().hold.toFixed(1)}s, manual ${W.now().manual}`);
+  t.progress(0.65);
+
+  const reactLines = ((window.DAY_CONFIG.weather && window.DAY_CONFIG.weather.react && window.DAY_CONFIG.weather.react.storm) || []);
+  await t.until(() => {
+    const log = ($("log") && $("log").textContent) || "";
+    return reactLines.some((line) => log.includes(line)) || /storm|Thunder|window/i.test(log.replace(logBefore, ""));
+  }, 12000, "an autopilot weather react line").catch(() => {});
+  const logAfter = ($("log") && $("log").textContent) || "";
+  const reacted = reactLines.some((line) => logAfter.includes(line));
+  if (reacted) t.event("autopilot-react", reactLines.find((line) => logAfter.includes(line)));
+  else t.problem("bug", "After letting go of a storm, the autopilot log never reacted to the weather");
+  t.scene("Autopilot reacts");
+  t.progress(0.78);
+
+  // On a date whose forecast is a storm here too, a storm drifting into a storm shows nothing.
+  // Take him again, clear the sky (1), let go, and watch the storm forecast come back instead.
+  let left = "storm";
+  if (W.now().forecast === "storm") {
+    t.event("forecast-is-storm", "today's forecast here is a storm too: leave him a clear sky instead");
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 5000, "Take control again (Enter)");
+    pressKey("1");
+    await t.until(() => W.now().state === "clear" && W.now().blend > 0.85, 9000, "clear to settle");
+    t.scene("Clear, against the forecast");
+    await sleep(400);
+    pressKey("Escape");
+    await t.until(() => C.mode() === "schedule", 25000, "back on his day again");
+    left = "clear";
+  }
+  t.progress(0.82);
+
+  const holdLeft = W.now().hold;
+  const holdSec = W.now().holdSec || 22;
+  t.event("hold-wait", `${left} holding ${holdLeft.toFixed(1)}s of ${holdSec}s, then drift to forecast ${W.now().forecast}`);
+  let drift = null;
+  const onDrift = (e) => (drift = (e && e.detail) || {});
+  window.addEventListener("day:weather-drift", onDrift);
+  try {
+    await t.until(() => !W.now().manual, Math.max(8000, (holdLeft + 4) * 1000), "weather hold ends");
+  } finally {
+    window.removeEventListener("day:weather-drift", onDrift);
+  }
+  const held = W.now();
+  t.event("weather-drift", `hold over: ${(drift && drift.from) || left} → forecast ${(drift && drift.to) || held.forecast}, blend ${held.blend.toFixed(2)}`);
+  // Let the blend finish so the footage shows the sky actually turning.
+  await t.until(() => W.now().blend > 0.9 && W.now().shown === W.now().state, 10000, "the forecast to blend in").catch(() => {});
+  await sleep(600);
+  const drifted = W.now();
+  t.scene(`Forecast again: ${drifted.state}`);
+  if (drifted.manual) t.problem("bug", "The weather never drifted back to the day's forecast");
+  else if (drifted.state !== drifted.forecast) t.problem("bug", `After the hold, state is ${drifted.state} but forecast is ${drifted.forecast}`);
+  else if (drifted.state === left) t.problem("polish", `Drifted back, but the forecast is also ${left}, so nothing visibly changed`);
+  else t.event("forecast-back", `${left} → ${drifted.state} (forecast ${drifted.forecast}), shown ${drifted.shown}, blend ${drifted.blend.toFixed(2)}`);
+  t.progress(1);
+}
+
+/* ---------------- episodes: chapter missions, goals, forecast score card ---------------- */
+// Starts each of the four via the Episodes menu (clock jump + take), completes at least
+// one goal on Morning (clouds then clear), checks the score card and localStorage best.
+// Events: episode-offer / episode-start / episode-goal / episode-score / episode-best.
+async function episodes(options, t) {
+  t.scene("Episodes");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const Ep = window.episodes || (window.day && window.day.episodes);
+  const C = window.day.control;
+  if (!Ep) {
+    t.problem("bug", "There's no episodes API (js/episodes.js didn't install)");
+    return;
+  }
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const cfg = window.DAY_CONFIG && window.DAY_CONFIG.episodes;
+  if (!cfg || !Array.isArray(cfg.list) || cfg.list.length < 4) {
+    t.problem("bug", `episodes.list is short (${cfg && cfg.list ? cfg.list.length : 0})`);
+  }
+  t.event("episodes-ready", `${Ep.list().length} episodes, storage ${cfg && cfg.storageKey}`);
+  t.progress(0.05);
+
+  const key = (cfg && cfg.storageKey) || "icanbe.episodes.best";
+  try {
+    localStorage.removeItem(key);
+  } catch (err) {
+    /* ignore */
+  }
+
+  const events = [];
+  const onEp = (e) => events.push((e && e.detail) || {});
+  window.addEventListener("day:episode", onEp);
+
+  const ids = ["morning", "lunch", "commute-home", "night"];
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    const ep = cfg.list.find((e) => e.id === id);
+    t.scene(ep ? ep.title : id);
+    if (C.mode() === "control") {
+      pressKey("Escape");
+      await t.until(() => C.mode() === "schedule" || C.mode() === "returning", 5000, "let go before next").catch(() => {});
+      await t.until(() => C.mode() === "schedule", 25000, "back on day").catch(() => {});
+    }
+    // Dismiss a leftover score card if any.
+    const scoreOk = document.querySelector("#episode-score button.ok");
+    if (scoreOk && !$("episode-score").hidden) scoreOk.click();
+    await sleep(200);
+
+    if (window.day.jump && ep && ep.clock) window.day.jump(ep.clock);
+    else if (ep && ep.clock) {
+      const mins = window.DayEngine.parseClock(ep.clock, window.DAY_CONFIG.dayStart);
+      scrubTo(mins);
+    }
+    clickSpeed(1);
+    await sleep(400);
+    t.event("start-at", `${ep.clock} ${id}`);
+
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 5000, `Take control for ${id}`);
+    await sleep(350);
+    const offer = $("episode-offer");
+    if (!offer || offer.hidden) {
+      // Menu path: start directly if the offer didn't match (clock edge).
+      Ep.start(id, "playtest");
+      t.event("episode-start", `${id} via api (no offer)`);
+    } else {
+      t.event("episode-offer", `${id} offered`);
+      const accept = offer.querySelector("button.accept");
+      if (accept) accept.click();
+      else Ep.start(id, "playtest");
+    }
+    await t.until(() => Ep.now() && Ep.now().id === id, 4000, `${id} running`);
+    const hud = $("episode-hud");
+    if (!hud || hud.hidden) t.problem("bug", `Episode HUD hidden for ${id}`);
+    else t.event("episode-hud", `${id}: ${Ep.now().goals.length} goals`);
+    t.progress(0.15 + i * 0.12);
+
+    if (id === "morning") {
+      // Complete at least one goal: gather clouds, then clear.
+      pressKey("2");
+      await t.until(() => {
+        const n = Ep.now();
+        return n && n.goals.some((g) => g.id === "clouds" && g.done);
+      }, 8000, "clouds goal");
+      t.event("episode-goal", "morning clouds");
+      pressKey("1");
+      await t.until(() => {
+        const n = Ep.now();
+        return n && n.goals.some((g) => g.id === "clear" && g.done);
+      }, 8000, "clear goal");
+      t.event("episode-goal", "morning clear");
+      // End with let-go so the score card shows.
+      pressKey("Escape");
+      await t.until(() => !$("episode-score").hidden || !Ep.now(), 8000, "score card after let-go");
+      const card = $("episode-score");
+      if (card && !card.hidden) {
+        const text = (card.querySelector(".forecast") || {}).textContent || "";
+        t.event("episode-score", text || "score shown");
+        if (!/Today's forecast:/.test(text)) t.problem("bug", `Score card text is "${text}"`);
+        const okBtn = card.querySelector("button.ok");
+        if (okBtn) okBtn.click();
+      } else t.problem("bug", "Morning episode never showed a score card");
+      await t.until(() => C.mode() === "schedule", 30000, "back after morning").catch(() => {});
+      const best = Ep.best();
+      if (!best.morning || !(best.morning.pct >= 0)) t.problem("bug", "Best score for morning wasn't kept");
+      else t.event("episode-best", `morning ${best.morning.pct}% (${best.morning.word})`);
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw || !JSON.parse(raw).morning) t.problem("bug", "localStorage has no morning best");
+        else t.event("episode-storage", "icanbe.episodes.best has morning");
+      } catch (err) {
+        t.problem("bug", `localStorage best unreadable: ${err}`);
+      }
+    } else {
+      // Smoke-start the others: goals visible, then let go for a score.
+      await sleep(600);
+      const n = Ep.now();
+      if (!n || !n.goals.length) t.problem("bug", `${id} has no goals while running`);
+      else t.event("episode-goals", `${id}: ${n.goals.map((g) => g.label).join(" · ")}`);
+      pressKey("Escape");
+      await t.until(() => !$("episode-score").hidden || !Ep.now(), 8000, `score for ${id}`).catch(() => {});
+      const card = $("episode-score");
+      if (card && !card.hidden) {
+        t.event("episode-score", `${id}: ${(card.querySelector(".forecast") || {}).textContent || "shown"}`);
+        const okBtn = card.querySelector("button.ok");
+        if (okBtn) okBtn.click();
+      }
+      await t.until(() => C.mode() === "schedule" || C.mode() === "returning", 5000, "leaving control").catch(() => {});
+      await t.until(() => C.mode() === "schedule", 30000, "schedule again").catch(() => {});
+    }
+  }
+
+  window.removeEventListener("day:episode", onEp);
+  const started = events.filter((e) => e.action === "start").map((e) => e.id);
+  ids.forEach((id) => {
+    if (!started.includes(id) && !events.some((e) => e.action === "score" && e.id === id)) {
+      t.problem("polish", `No start/score event logged for ${id}`);
+    }
+  });
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -1391,9 +2287,15 @@ installPlaytest({
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
+    { id: "storm-ride", title: "Storm-riding: hold Space in the air to glide with wind trails; a Gust updraft lifts him from the street to rooftop height; glide apt roof to shop roof without touching the ground", seconds: 150, tags: ["control", "powers"], description: "Day bar beside the car. Storm weather (4), real keys for glide, G for updraft, climb apt then glide to shop." },
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
+    { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
+    { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
+    { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
+    { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
+    { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -1402,10 +2304,16 @@ installPlaytest({
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);
       else if (id === "control") await control(options, t);
+      else if (id === "storm-ride") await stormRide(options, t);
       else if (id === "model") await model(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "weather") await weather(options, t);
+      else if (id === "weather-audio") await weatherAudio(options, t);
+      else if (id === "weather-life") await weatherLife(options, t);
+      else if (id === "powers") await powers(options, t);
+      else if (id === "voice") await voice(options, t);
+      else if (id === "episodes") await episodes(options, t);
     } finally {
       releaseHeld();
       stopWatching();

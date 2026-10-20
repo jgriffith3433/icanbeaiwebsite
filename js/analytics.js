@@ -48,9 +48,13 @@
   $("live").addEventListener("click", safe(() => feature("live", { via: via() })));
   $("sound").addEventListener("click", safe(() => feature("sound", { value: $("sound").getAttribute("aria-pressed") === "true" ? "on" : "off" })));
   $("details").addEventListener("click", safe(() => feature("details", { value: $("details").getAttribute("aria-pressed") === "true" ? "open" : "closed" })));
-  // Taking control of him (js/control.js): take, let-go, and back (walked back, or caught up with his day).
+  // Taking control of him (js/control.js): take, let-go, back, glide and updraft.
   window.addEventListener("day:control", safe((e) => {
     const d = e.detail || {};
+    if (d.action === "glide" || d.action === "soft-land" || d.action === "updraft") {
+      feature("control", { action: d.action, via: d.via, y: d.y, speed: d.speed, lift: d.lift, kind: d.kind });
+      return;
+    }
     feature("control", d.via ? { action: d.action, via: d.via } : { action: d.action, how: d.how });
   }));
   // Graphics quality (js/look.js): high or low, from the button.
@@ -59,6 +63,20 @@
   window.addEventListener("day:weather", safe((e) => {
     const d = e.detail || {};
     if (d.via && d.via !== "forecast") feature("weather", { state: d.state, via: d.via, intensity: d.intensity });
+  }));
+  // Storm, lightning, gust, tornado (js/powers.js), and a call the Pressure meter refused.
+  window.addEventListener("day:power", safe((e) => {
+    const d = e.detail || {};
+    feature("power", { action: d.action, via: d.via, power: d.power, pressure: d.pressure });
+  }));
+  window.addEventListener("day:voice", safe((e) => {
+    const d = e.detail || {};
+    if (d.action === "play") feature("voice", { id: d.id, group: d.group, via: d.via });
+  }));
+  // Chapter episodes (js/episodes.js): offer, start, goals, score card.
+  window.addEventListener("day:episode", safe((e) => {
+    const d = e.detail || {};
+    feature("episode", { action: d.action, id: d.id, goal: d.goal, pct: d.pct, why: d.why, via: d.via });
   }));
   document.querySelectorAll('a[href="whatsnew.html"]').forEach((a) => a.addEventListener("click", () => feature("whatsnew")));
   document.querySelectorAll('a[href="privacy.html"]').forEach((a) => a.addEventListener("click", () => feature("privacy")));
