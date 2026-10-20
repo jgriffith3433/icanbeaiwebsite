@@ -8,7 +8,11 @@
    "steps": [
     {
      "tool": "image.edit",
-     "inputs": { "images": ["$input:0"] },
+     "inputs": {
+      "images": [
+       "$input:0"
+      ]
+     },
      "params": {
       "prompt": "Clean 3D character model reference sheet of this exact young man, front view, facing the camera: standing straight in an A-pose, both arms held straight and angled down and away from the body at about 40 degrees so there is clear space between the arms and the torso, hands open with fingers together, feet apart at shoulder width, full body from the top of his hair to the soles of his boots, centered. Keep his face, black messy hair, black glasses, dark navy tech jacket with glowing blue seams down the chest, shoulder straps, grey tee, fingerless gloves, black cargo pants with pockets, black knee armor, black boots with glowing blue lights. Stylized 3D game character render with clean shapes and saturated colors. Plain flat light grey background, no lightning, no clouds, no rain, no smoke, no effects around him, no shadow, even soft studio lighting.",
       "width": 832,
@@ -18,18 +22,53 @@
     },
     {
      "tool": "mesh.textured",
-     "inputs": { "image": "$prev" },
-     "params": { "faces": 40000, "texture": 1024 },
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "faces": 40000,
+      "texture": 1024
+     },
      "save": "mesh"
     },
     {
      "tool": "mesh.rig",
      "inputs": {
       "mesh": "$prev",
-      "clips": ["$input:1", "$input:2", "$input:3", "$input:4", "$input:5", "$input:6", "$input:7", "$input:8", "$input:9", "$input:10", "$input:11", "$input:12", "$input:13", "$input:14"]
+      "clips": [
+       "$input:1",
+       "$input:2",
+       "$input:3",
+       "$input:4",
+       "$input:5",
+       "$input:6",
+       "$input:7",
+       "$input:8",
+       "$input:9",
+       "$input:10",
+       "$input:11",
+       "$input:12",
+       "$input:13",
+       "$input:14"
+      ]
      },
      "params": {
-      "names": ["idle", "walk", "run", "jump", "fall", "float", "cast", "throw", "sit", "type", "phone", "lie", "side", "recline"],
+      "names": [
+       "idle",
+       "walk",
+       "run",
+       "jump",
+       "fall",
+       "float",
+       "cast",
+       "throw",
+       "sit",
+       "type",
+       "phone",
+       "lie",
+       "side",
+       "recline"
+      ],
       "height": 1.75
      },
      "save": "rigged"
@@ -57,134 +96,152 @@
    "pickAt": 1,
    "candidates": 4,
    "pick": "on-model with the reference: black messy hair, black glasses, dark navy tech jacket with glowing blue seams, grey tee, black cargo pants, knee armor, glowing boots; a clean A-pose with the arms clear of the body, the whole body in frame, no effects",
-   "refs": [0],
-   "files": { "rigged": "models/small-weather.glb" }
+   "refs": [
+    0
+   ],
+   "files": {
+    "rigged": "models/small-weather.glb"
+   }
   },
   {
    "id": "music-clear",
-   "note": "Calm clear-day city music bed. Crossfaded by js/weather-audio.js with the other weather beds.",
+   "note": "Calm city bed for clear weather (js/weather-audio.js, day.config.js weather.audio.music.clear).",
    "steps": [
     {
      "tool": "audio.music",
      "params": {
-      "prompt": "Calm city morning ambient, soft electric piano and muted warm pads, quiet distant traffic bed, peaceful clear sky mood, clean and loopable instrumental, no vocals, 88 BPM",
+      "prompt": "Calm cinematic city ambient bed, soft warm pads, quiet distant traffic pulse, electric-blue night city mood like Dose Of Destruction, gentle and spacious, seamless loop, instrumental, 72 BPM",
       "lyrics": "[Instrumental]",
-      "seconds": 32,
-      "bpm": 88,
-      "key": "C major"
-     },
-     "save": "music"
-    }
-   ],
-   "files": { "music": "audio/music/clear.mp3" }
-  },
-  {
-   "id": "music-clouds",
-   "note": "Overcast city bed: a step up from clear as the sky builds.",
-   "steps": [
-    {
-     "tool": "audio.music",
-     "params": {
-      "prompt": "Overcast city ambient, darker muted pads building slowly, soft low pulse, grey sky tension, still loopable instrumental, no vocals, 92 BPM",
-      "lyrics": "[Instrumental]",
-      "seconds": 32,
-      "bpm": 92,
+      "seconds": 30,
+      "bpm": 72,
       "key": "A minor"
      },
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/clouds.mp3" }
+   "files": {
+    "music": "audio/music/clear.mp3"
+   }
   },
   {
-   "id": "music-rain",
-   "note": "Rainy city bed for wet streets.",
+   "id": "music-clouds",
+   "note": "Building cloudy bed (weather.audio.music.clouds).",
    "steps": [
     {
      "tool": "audio.music",
      "params": {
-      "prompt": "Rainy city ambient, melancholy soft synth pads, gentle shimmer like rain on glass, slow pulse, wet asphalt night mood, loopable instrumental, no vocals, 90 BPM",
+      "prompt": "Building cloudy city ambient, darker pads than clear, soft muted drums entering, tension rising under an overcast sky, cinematic cartoon mood, seamless loop, instrumental, 80 BPM",
       "lyrics": "[Instrumental]",
-      "seconds": 32,
-      "bpm": 90,
+      "seconds": 30,
+      "bpm": 80,
+      "key": "A minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/clouds.mp3"
+   }
+  },
+  {
+   "id": "music-rain",
+   "note": "Rainy city bed (weather.audio.music.rain).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Rainy city score, soft piano droplets, wet asphalt mood, mid tempo pulse, melancholic but calm, navy and electric blue night, seamless loop, instrumental, 84 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 84,
       "key": "D minor"
      },
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/rain.mp3" }
+   "files": {
+    "music": "audio/music/rain.mp3"
+   }
   },
   {
    "id": "music-storm",
-   "note": "Intense storm track while Small Weather commands the weather.",
+   "note": "Intense storm track (weather.audio.music.storm).",
    "steps": [
     {
      "tool": "audio.music",
      "params": {
-      "prompt": "Intense cinematic storm electronic, dark driving bass, rising tension, electric crackle energy, powerful storm-caller mood, loopable instrumental, no vocals, 110 BPM",
+      "prompt": "Intense cinematic storm track, deep drums, thunderous bass, electric synth stabs, dramatic weather power, storm caller energy, seamless loop, instrumental, 100 BPM",
       "lyrics": "[Instrumental]",
-      "seconds": 32,
-      "bpm": 110,
+      "seconds": 30,
+      "bpm": 100,
       "key": "E minor"
      },
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/storm.mp3" }
+   "files": {
+    "music": "audio/music/storm.mp3"
+   }
   },
   {
    "id": "music-fog",
-   "note": "Eerie muffled fog bed.",
+   "note": "Eerie fog bed (weather.audio.music.fog).",
    "steps": [
     {
      "tool": "audio.music",
      "params": {
-      "prompt": "Eerie fog ambient, sparse distant hollow tones, heavy reverb, uncanny quiet city in mist, soft dissonant pads, loopable instrumental, no vocals, 70 BPM",
+      "prompt": "Eerie fog ambient, hollow pads, distant unresolved tones, muffled city hush, mysterious and still, seamless loop, instrumental, 60 BPM",
       "lyrics": "[Instrumental]",
-      "seconds": 32,
-      "bpm": 70,
-      "key": "F# minor"
+      "seconds": 30,
+      "bpm": 60,
+      "key": "C minor"
      },
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/fog.mp3" }
+   "files": {
+    "music": "audio/music/fog.mp3"
+   }
   },
   {
    "id": "music-snow",
-   "note": "Soft quiet snow variant of the city bed.",
+   "note": "Soft snow bed (weather.audio.music.snow).",
    "steps": [
     {
      "tool": "audio.music",
      "params": {
-      "prompt": "Soft snow ambient, delicate bells and hushed piano, sparse winter city hush, gentle and warm, loopable instrumental, no vocals, 78 BPM",
+      "prompt": "Soft snow ambient, delicate bells, soft choir pads, quiet winter city, gentle and cold, seamless loop, instrumental, 66 BPM",
       "lyrics": "[Instrumental]",
-      "seconds": 32,
-      "bpm": 78,
-      "key": "G major"
+      "seconds": 30,
+      "bpm": 66,
+      "key": "F major"
      },
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/snow.mp3" }
+   "files": {
+    "music": "audio/music/snow.mp3"
+   }
   },
   {
    "id": "music-control-sting",
-   "note": "Short heroic sting when the player takes control of Small Weather.",
+   "note": "Heroic sting when the player takes control (js/weather-audio.js, day.config.js weather.audio.sting).",
    "steps": [
     {
      "tool": "audio.music",
      "params": {
-      "prompt": "Heroic short cinematic sting, rising electric synth and punchy drums, storm-caller power hit, brief triumphant flourish then settle, instrumental, no vocals, 128 BPM",
+      "prompt": "Heroic short sting, rising synth brass and electric crackle, storm caller taking control of the weather, one triumphant hit then a short tail, instrumental",
       "lyrics": "[Instrumental]",
-      "seconds": 12,
-      "bpm": 128,
+      "seconds": 10,
+      "bpm": 120,
       "key": "E minor"
      },
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/control-sting.mp3" }
+   "files": {
+    "music": "audio/music/control-sting.mp3"
+   }
   },
   {
    "id": "sfx-rain-asphalt",
@@ -201,7 +258,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/rain-asphalt.mp3" }
+   "files": {
+    "sfx": "audio/sfx/rain-asphalt.mp3"
+   }
   },
   {
    "id": "sfx-wind",
@@ -218,7 +277,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/wind.mp3" }
+   "files": {
+    "sfx": "audio/sfx/wind.mp3"
+   }
   },
   {
    "id": "sfx-city-hum",
@@ -235,7 +296,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/city-hum.mp3" }
+   "files": {
+    "sfx": "audio/sfx/city-hum.mp3"
+   }
   },
   {
    "id": "sfx-thunder-near",
@@ -252,7 +315,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/thunder-near.mp3" }
+   "files": {
+    "sfx": "audio/sfx/thunder-near.mp3"
+   }
   },
   {
    "id": "sfx-thunder-far",
@@ -269,7 +334,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/thunder-far.mp3" }
+   "files": {
+    "sfx": "audio/sfx/thunder-far.mp3"
+   }
   }
  ]
 }
