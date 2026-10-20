@@ -1,0 +1,21 @@
+{
+  "asphalt": {
+    "albedo": "textures/city/asphalt-albedo.png",
+    "normal": "textures/city/asphalt-normal.png",
+    "roughness": "textures/city/asphalt-roughness.png"
+  },
+  "brick": {
+    "albedo": "textures/city/brick-albedo.png",
+    "normal": "textures/city/brick-normal.png",
+    "roughness": "textures/city/brick-roughness.png"
+  },
+  "glass": {
+    "albedo": "textures/city/glass-albedo.png",
+    "normal": "textures/city/glass-normal.png",
+    "roughness": "textures/city/glass-roughness.png"
+  },
+  "sky": {
+    "day": "textures/city/sky-day.png",
+    "dusk": "textures/city/sky-dusk.png"
+  }
+}
