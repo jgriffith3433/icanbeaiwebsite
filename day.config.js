@@ -43,6 +43,7 @@
      do, for, pose, hand, set, body   (same meaning as a step)
      steps:   [ ... ]       multi-part ("go: '$back'" returns to where they were)
      when:    { deskGlass: "empty", thirst: ">0.5" }   only if these are true
+              { weather: "rain" } or { weather: ["rain","storm"] } for the day's forecast
      likes:   { boredom: 2 }   more likely when that stat is high
      after / before: "13:00"   only in that part of the day
      max:     1             at most this many times a day
@@ -182,11 +183,15 @@ window.DAY_CONFIG = {
      With nobody in control, the day follows a forecast seeded by the date
      (the same idea as `seed: "date"`): each 3-hour block is one state, the
      same every time you open that date. Take control and 1–7, hold Q, or a
-     tap on a phone sets it; let go and the forecast has it again. The blend
-     is in real seconds. Lines are his, short, for the action log.
+     tap on a phone sets it; let go and that weather holds for `hold` real
+     seconds, then drifts back to the forecast. The blend is in real seconds.
+     Lines are his, short, for the action log. `react` lines go in the log
+     while autopilot still has the weather he left behind. Steps and pools
+     can use `when: { weather: "rain" }` (or an array) against the forecast.
      ------------------------------------------------------------------------ */
   weather: {
     blend: 3.4,
+    hold: 22, // real seconds the player's weather lasts after let-go
     forecast: {
       hours: 3,
       weight: { clear: 26, clouds: 22, rain: 16, storm: 8, fog: 10, wind: 10, snow: 8 },
@@ -199,6 +204,17 @@ window.DAY_CONFIG = {
       fog: "Fog.",
       wind: "Wind.",
       snow: "Snow.",
+    },
+    /* Autopilot log while the weather he left still holds (after let-go). */
+    react: {
+      cooldown: 16,
+      clear: ["He looks up. Clear again.", "The sky opened. He notices."],
+      clouds: ["Clouds. He glances at the window.", "Grey out there. He keeps going."],
+      rain: ["He cancels the walk. It's raining.", "Rain on the glass. He watches a second."],
+      storm: ["He watches the storm from the window.", "Thunder. He stays put.", "A storm. He isn't going out in that."],
+      fog: ["Fog. Soft edges out the window.", "He can barely see the lot."],
+      wind: ["Wind rattles something. He listens.", "Gusty. He pulls his jacket closer."],
+      snow: ["Snow. Quiet out there.", "He smiles at the snow for a second."],
     },
   },
 
@@ -995,7 +1011,27 @@ window.DAY_CONFIG = {
       chapter: "lunch",
       steps: [
         { go: "hallEnd", activity: "walk", do: "A short walk down the hall." },
-        { at: "hallEnd", fill: true, micro: { pools: ["idle"], every: "20-40s" }, do: ["He stops at the window and looks out.", "Clouds over the parking lot."] },
+        {
+          when: { weather: ["rain", "storm"] },
+          at: "hallEnd",
+          fill: true,
+          micro: { pools: ["idle"], every: "20-40s" },
+          do: ["He stops at the window. Rain on the glass.", "He watches the storm from the window."],
+        },
+        {
+          when: { weather: "snow" },
+          at: "hallEnd",
+          fill: true,
+          micro: { pools: ["idle"], every: "20-40s" },
+          do: ["He stops at the window. Snow over the lot.", "He smiles at the sky for a second."],
+        },
+        {
+          when: { weather: ["clear", "clouds", "fog", "wind"] },
+          at: "hallEnd",
+          fill: true,
+          micro: { pools: ["idle"], every: "20-40s" },
+          do: ["He stops at the window and looks out.", "Clouds over the parking lot."],
+        },
         { go: "elevatorCall", activity: "walk", do: "He walks the length of the hall." },
         { at: "elevatorCall", for: "20-40s", do: "He reads a notice on the wall." },
         { go: "hallMid", activity: "walk", do: "He heads back." },
@@ -1214,10 +1250,27 @@ window.DAY_CONFIG = {
         { at: "carSideHome", hand: "reach", for: "2-4s", set: { car: "locked" }, do: "Small Weather locks the car." },
         {
           chance: 0.3,
+          when: { weather: ["clear", "clouds", "fog", "wind"] },
           steps: [
             { go: "mailbox", hand: "hold", do: "He walks to the mailbox." },
             { at: "mailbox", hand: "reach", for: "15-30s", do: "He checks the mail. Mostly junk." },
           ],
+        },
+        {
+          chance: 0.55,
+          when: { weather: ["rain", "storm"] },
+          at: "carSideHome",
+          hand: "hold",
+          for: "4-8s",
+          do: "He cancels the walk to the mailbox. It's raining.",
+        },
+        {
+          chance: 0.4,
+          when: { weather: "snow" },
+          at: "carSideHome",
+          hand: "hold",
+          for: "4-8s",
+          do: "He skips the mailbox. Snow.",
         },
         { go: "frontDoorOut", hand: "hold", do: "He walks to the front door." },
         { at: "frontDoorOut", hand: "reach", for: "4-10s", set: { frontDoor: "open" }, do: "He finds the right key and unlocks it." },
@@ -1648,6 +1701,9 @@ window.DAY_CONFIG = {
       { do: "He thinks of something to buy, searches for it, and gives up.", for: "1-2m", hand: "phone", max: 1 },
       { do: "He remembers a personal errand.", for: "5-10s", hand: "none" },
       { do: "Tired. He thinks about a nap.", for: "5-10s", hand: "face", when: { energy: "<0.4" }, likes: { fatigue: 3 } },
+      { do: "Rain on the window. He watches a second.", for: "5-12s", hand: "none", when: { weather: ["rain", "storm"] }, max: 2 },
+      { do: "Thunder. He listens, then types again.", for: "4-8s", hand: "none", when: { weather: "storm" }, max: 1 },
+      { do: "Snow out there. Quiet.", for: "5-10s", hand: "none", when: { weather: "snow" }, max: 1 },
     ],
 
     waiting: [

@@ -5,6 +5,7 @@
    few real seconds on top of the time-of-day sky js/world.js already draws.
    With nobody in control, the day follows a forecast seeded by the date. While
    he's the player's, 1–7, hold Q (a radial), or a tap on a phone sets it.
+   After let-go the set weather holds for a few real seconds, then drifts back.
    ========================================================================== */
 
 export const STATES = ["clear", "clouds", "rain", "storm", "fog", "wind", "snow"];
@@ -116,11 +117,13 @@ function withIntensity(mixed, k) {
 /**
  * The state machine, with no scene. `step(dt, snap)` moves the blend.
  * `follow(date, minutes, dt, snap, mode)` is what the page calls each frame:
- * schedule mode returns him to the forecast when control is let go.
+ * while he's the player's the set weather sticks; after let-go it holds for
+ * `hold` real seconds, then drifts back to the day's forecast.
  */
 export function createWeather(opt) {
   opt = opt || {};
   const blendSec = opt.blend > 0 ? opt.blend : 3.4;
+  const holdSec = opt.hold > 0 ? opt.hold : 24;
   const tau = blendSec / 3;
   const weights = {};
   STATES.forEach((s) => (weights[s] = s === "clear" ? 1 : 0));
@@ -129,6 +132,7 @@ export function createWeather(opt) {
   let level = 1;
   let manual = false;
   let wasHeld = false;
+  let holdLeft = 0;
   let lastForecast = { state: "clear", intensity: 1, slot: 0 };
 
   function step(dt, snap) {
@@ -181,6 +185,8 @@ export function createWeather(opt) {
       cover: L.cover,
       sound: Object.assign({}, L.sound),
       manual,
+      hold: holdLeft,
+      holdSec,
       forecast: lastForecast.state,
       forecastIntensity: lastForecast.intensity,
     };
@@ -192,6 +198,7 @@ export function createWeather(opt) {
     targetIntensity = intensity == null || !Number.isFinite(intensity) ? 1 : Math.max(0, Math.min(1, intensity));
     if (via !== "forecast") {
       manual = true;
+      holdLeft = 0;
       if (opt.onSet) opt.onSet({ state, intensity: targetIntensity, via: via || "set" });
     }
     return true;
@@ -199,17 +206,29 @@ export function createWeather(opt) {
 
   function follow(dateKey, minutes, dt, snap, mode) {
     const held = mode === "control" || mode === "returning";
-    if (wasHeld && !held) manual = false;
+    if (wasHeld && !held) {
+      // Keep what he left behind for a while, then hand it back to the forecast.
+      if (manual) holdLeft = holdSec;
+      else holdLeft = 0;
+    }
     wasHeld = held;
     lastForecast = forecastAt(dateKey, minutes, opt.forecast);
+    if (!held && holdLeft > 0 && !snap) {
+      holdLeft = Math.max(0, holdLeft - Math.max(0, dt));
+      if (holdLeft <= 0 && manual) {
+        manual = false;
+        if (opt.onDrift) opt.onDrift({ from: target, to: lastForecast.state });
+      }
+    }
     if (!manual) {
       target = lastForecast.state;
       targetIntensity = lastForecast.intensity;
+      holdLeft = 0;
     }
     step(dt, snap);
   }
 
-  return { set, step, follow, now, look, blendSec };
+  return { set, step, follow, now, look, blendSec, holdSec };
 }
 
 /* ---------------- the page: sky, particles, wet roads, wind, sound, the wheel ---------------- */
@@ -233,9 +252,11 @@ export function startWeather(world, dayApi) {
   let booted = false;
   let lastWall = typeof performance !== "undefined" ? performance.now() : 0;
   const noted = { state: null };
+  const react = { state: null, at: 0, cool: (cfg.react && cfg.react.cooldown) || 18 };
 
   const weather = createWeather({
     blend: cfg.blend,
+    hold: cfg.hold,
     forecast: cfg.forecast,
     onSet(detail) {
       const line = (cfg.lines && cfg.lines[detail.state]) || STATE_NAMES[detail.state];
@@ -245,7 +266,34 @@ export function startWeather(world, dayApi) {
         window.dispatchEvent(new CustomEvent("day:weather", { detail }));
       }
     },
+    onDrift(detail) {
+      if (typeof CustomEvent === "function" && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent("day:weather-drift", { detail }));
+      }
+    },
   });
+
+  /** Autopilot log lines while the weather he left behind still holds (day.config.js weather.react). */
+  function tickReact(mode, n, wall) {
+    if (mode !== "schedule" || !n.manual) {
+      if (mode === "control" || mode === "returning") react.state = null;
+      return;
+    }
+    const lines = (cfg.react && cfg.react[n.state]) || null;
+    if (!lines || !lines.length) return;
+    const due = react.state !== n.state || react.at <= 0;
+    if (!due) {
+      react.at -= wall;
+      return;
+    }
+    const text = lines[Math.floor(Math.random() * lines.length)];
+    if (day.note) day.note(text);
+    react.state = n.state;
+    react.at = react.cool;
+    if (typeof CustomEvent === "function" && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent("day:weather-react", { detail: { state: n.state, text } }));
+    }
+  }
 
   function clock() {
     const n = day.now ? day.now() : { key: "date", minutes: 12 * 60 };
@@ -822,13 +870,15 @@ export function startWeather(world, dayApi) {
       lastWall = nowMs;
     }
     weather.follow(c.key, c.minutes, snap ? 0 : wall, snap, c.mode);
+    const n = weather.now();
+    tickReact(c.mode, n, snap ? 0 : wall);
     const L = weather.look();
     try {
       applyLook(L, wall);
     } catch (err) {
       console.error("[weather]", err);
     }
-    paintUi(weather.now());
+    paintUi(n);
   }
 
   const orig = world.update.bind(world);

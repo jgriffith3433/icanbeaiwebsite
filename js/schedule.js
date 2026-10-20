@@ -467,26 +467,57 @@
 
     /* ---------- micro-behaviours ---------- */
 
+    /* The day's forecast at this minute (same seed as js/weather.js). Steps and
+       pools use `when: { weather: "rain" }` or an array of states. */
+    function weatherStateAt(minutes) {
+      const wx = (cfg.weather && cfg.weather.forecast) || {};
+      const hours = wx.hours || 3;
+      const weight = wx.weight || { clear: 26, clouds: 22, rain: 16, storm: 8, fog: 10, wind: 10, snow: 8 };
+      const states = ["clear", "clouds", "rain", "storm", "fog", "wind", "snow"];
+      const span = hours * 60;
+      const dayMin = ((minutes % 1440) + 1440) % 1440;
+      const slot = Math.floor(dayMin / span);
+      const rngW = makeRng(hash(`weather:${dateKey}:${slot}`));
+      let total = 0;
+      states.forEach((s) => (total += weight[s] || 1));
+      let r = rngW() * total;
+      for (const s of states) {
+        r -= weight[s] || 1;
+        if (r <= 0) return s;
+      }
+      return states[0];
+    }
+
+    function whenOk(when) {
+      if (!when) return true;
+      for (const [k, want] of Object.entries(when)) {
+        if (k === "weather") {
+          const have = weatherStateAt(S.t);
+          const list = Array.isArray(want) ? want : [want];
+          if (!list.includes(have)) return false;
+          continue;
+        }
+        const s = stat(k);
+        if (s !== undefined) {
+          const m = /^\s*([<>]=?)\s*(\d*\.?\d+)\s*$/.exec(String(want));
+          if (!m) continue;
+          const v = Number(m[2]);
+          const ok = m[1] === ">" ? s > v : m[1] === ">=" ? s >= v : m[1] === "<" ? s < v : s <= v;
+          if (!ok) return false;
+        } else {
+          const have = S.things[k];
+          if (Array.isArray(want) ? !want.includes(have) : have !== want) return false;
+        }
+      }
+      return true;
+    }
+
     function eligible(entry, key, last) {
       if (entry === last) return false;
       if (entry.max != null && (S.uses[key] || 0) >= entry.max) return false;
       if (entry.after && S.t < parseClock(entry.after, dayStart)) return false;
       if (entry.before && S.t >= parseClock(entry.before, dayStart)) return false;
-      if (entry.when) {
-        for (const [k, want] of Object.entries(entry.when)) {
-          const s = stat(k);
-          if (s !== undefined) {
-            const m = /^\s*([<>]=?)\s*(\d*\.?\d+)\s*$/.exec(String(want));
-            if (!m) continue;
-            const v = Number(m[2]);
-            const ok = m[1] === ">" ? s > v : m[1] === ">=" ? s >= v : m[1] === "<" ? s < v : s <= v;
-            if (!ok) return false;
-          } else {
-            const have = S.things[k];
-            if (Array.isArray(want) ? !want.includes(have) : have !== want) return false;
-          }
-        }
-      }
+      if (!whenOk(entry.when)) return false;
       return true;
     }
 
@@ -617,6 +648,7 @@
           return;
         }
         if (s.chance != null && rng() >= s.chance) return;
+        if (!whenOk(s.when)) return;
         if (s.steps) out.push(...expand(s.steps, where));
         else out.push(s);
       });

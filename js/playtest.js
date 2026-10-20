@@ -1917,6 +1917,102 @@ function RIDE_TRAILS_OK() {
   return !(window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.ride && window.DAY_CONFIG.control.ride.trails === false);
 }
 
+/* ---------------- weather-life: street reacts, autopilot log after let-go, forecast drift ---------------- */
+// Real input: day bar to the door, Enter, WASD to the avenue, key 3 (rain) then 4 (storm), Esc.
+// Checks umbrellas + wipers in rain, a react line in the log after let-go, then hold expires → forecast.
+async function weatherLife(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const W = window.weather;
+  const C = window.day.control;
+  const w = world();
+  if (!W) {
+    t.problem("bug", "There's no weather");
+    return;
+  }
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  if (!w || typeof w.streetNow !== "function") {
+    t.problem("bug", "The world has no streetNow() (street people / wipers)");
+    return;
+  }
+  const day = window.day.today();
+  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  await sleep(400);
+  clickSpeed(1);
+  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}"`);
+  t.progress(0.05);
+
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  t.event("control-taken", "Enter");
+  const street = window.DAY_CONFIG.street || { z: 12.6 };
+  const at = C.state();
+  await goTo(at.x, street.z, t, { close: 1.4, ms: 18000, progress: 0.15 });
+  t.scene("On the road");
+  t.progress(0.2);
+
+  pressKey("3");
+  await t.until(() => W.now().state === "rain" && W.now().blend > 0.85, 9000, "rain to settle");
+  await sleep(600);
+  // One more frame so world.update sees the wet weather
+  await sleep(200);
+  const rainStreet = w.streetNow();
+  t.scene("Rain on the street");
+  t.event("street-rain", `umbrellas ${rainStreet.umbrellas}/${rainStreet.folk}, wipers ${rainStreet.wipers}, moods ${rainStreet.moods.join(",")}`);
+  t.metric("umbrellas", rainStreet.umbrellas);
+  t.metric("wipers", rainStreet.wipers);
+  if (rainStreet.umbrellas < 1) t.problem("bug", "In rain, nobody on the street opened an umbrella");
+  if (rainStreet.wipers < 1) t.problem("bug", "In rain, no car wipers are on");
+  else t.event("umbrellas-and-wipers", `${rainStreet.umbrellas} umbrellas, ${rainStreet.wipers} wipers`);
+  t.progress(0.4);
+
+  pressKey("4");
+  await t.until(() => W.now().state === "storm" && W.now().blend > 0.85, 9000, "storm to settle");
+  t.event("weather-storm", `manual ${W.now().manual}, forecast ${W.now().forecast}`);
+  t.scene("Storm");
+  await sleep(400);
+  t.progress(0.5);
+
+  const logBefore = ($("log") && $("log").textContent) || "";
+  pressKey("Escape");
+  await t.until(() => C.mode() === "returning" || C.mode() === "schedule", 5000, "let go");
+  t.event("let-go", `mode ${C.mode()}, weather still ${W.now().state}, hold ${W.now().hold.toFixed(1)}s`);
+  if (!W.now().manual) t.problem("bug", "Letting go cleared the storm immediately instead of holding it");
+  await t.until(() => C.mode() === "schedule", 25000, "back on his day");
+  t.event("back-on-day", `mode schedule, weather ${W.now().state}, hold ${W.now().hold.toFixed(1)}s, manual ${W.now().manual}`);
+  t.progress(0.65);
+
+  const reactLines = ((window.DAY_CONFIG.weather && window.DAY_CONFIG.weather.react && window.DAY_CONFIG.weather.react.storm) || []);
+  await t.until(() => {
+    const log = ($("log") && $("log").textContent) || "";
+    return reactLines.some((line) => log.includes(line)) || /storm|Thunder|window/i.test(log.replace(logBefore, ""));
+  }, 12000, "an autopilot weather react line").catch(() => {});
+  const logAfter = ($("log") && $("log").textContent) || "";
+  const reacted = reactLines.some((line) => logAfter.includes(line));
+  if (reacted) t.event("autopilot-react", reactLines.find((line) => logAfter.includes(line)));
+  else t.problem("bug", "After letting go of a storm, the autopilot log never reacted to the weather");
+  t.scene("Autopilot reacts");
+  t.progress(0.78);
+
+  const holdLeft = W.now().hold;
+  const holdSec = W.now().holdSec || 22;
+  t.event("hold-wait", `holding ${holdLeft.toFixed(1)}s of ${holdSec}s, then drift to forecast ${W.now().forecast}`);
+  await t.until(() => !W.now().manual, Math.max(8000, (holdLeft + 4) * 1000), "weather hold ends");
+  await sleep(800);
+  const drifted = W.now();
+  t.scene("Forecast again");
+  t.event("weather-drift", `manual ${drifted.manual}, state ${drifted.state}, forecast ${drifted.forecast}, blend ${drifted.blend.toFixed(2)}`);
+  if (drifted.manual) t.problem("bug", "The weather never drifted back to the day's forecast");
+  else if (drifted.state !== drifted.forecast) t.problem("bug", `After the hold, state is ${drifted.state} but forecast is ${drifted.forecast}`);
+  else t.event("forecast-back", `back to ${drifted.forecast}`);
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -1931,6 +2027,7 @@ installPlaytest({
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
+    { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 100, tags: ["weather"], description: "Day bar to the front door. Enter, WASD to the avenue, key 3 then 4, Esc. Events: street-rain, autopilot-react, weather-drift." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
   ],
@@ -1946,6 +2043,7 @@ installPlaytest({
       else if (id === "city") await city(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
+      else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "voice") await voice(options, t);
     } finally {
