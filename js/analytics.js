@@ -53,6 +53,8 @@
     const d = e.detail || {};
     feature("control", d.via ? { action: d.action, via: d.via } : { action: d.action, how: d.how });
   }));
+  // Graphics quality (js/look.js): high or low, from the button.
+  window.addEventListener("day:quality", safe((e) => feature("quality", { value: (e.detail || {}).value, via: (e.detail || {}).via || "click" })));
   document.querySelectorAll('a[href="whatsnew.html"]').forEach((a) => a.addEventListener("click", () => feature("whatsnew")));
   document.querySelectorAll('a[href="privacy.html"]').forEach((a) => a.addEventListener("click", () => feature("privacy")));
 

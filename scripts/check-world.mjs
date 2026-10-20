@@ -50,7 +50,32 @@ ok(!theyLines.length, `lines that still say "they": ${theyLines.slice(0, 5).join
 
 const world = sandbox.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 ok(world && world.person, 'the world has no person');
-world.update(sandbox.DayEngine.frame(day, day.dayStart + 1), 0.016, { snap: true });
+const { installLook } = await import(new URL('js/look.js', root).href);
+installLook(world);
+world.update(sandbox.DayEngine.frame(day, 12 * 60), 0.016, { snap: true });
+world.scene.render();
+const look = world.look && world.look.info();
+ok(look && look.pbr >= 4, `the city has ${look && look.pbr} PBR surfaces`);
+ok(look && look.textured >= 4, 'city surfaces have no textures');
+ok(look && look.neon >= 6, `only ${look && look.neon} neon signs`);
+const road = world.scene.getMeshByName('road');
+ok(road && road.material && road.material.getClassName() === 'PBRMaterial', 'the road is still a flat colour');
+const uv = road && road.getVerticesData(core.VertexBuffer.UVKind);
+let maxU = 0;
+if (uv) for (let i = 0; i < uv.length; i += 2) maxU = Math.max(maxU, Math.abs(uv[i]));
+ok(maxU > 2, `the road texture doesn't tile (uv ${maxU.toFixed(2)})`);
+const noonSky = world.look.skyAt(12);
+const duskSky = world.look.skyAt(18.5);
+const nightSky = world.look.skyAt(22);
+ok(noonSky.day > 0.8, `noon sky weight is ${noonSky.day.toFixed(2)}, not day`);
+ok(duskSky.dusk > 0.3, `dusk sky weight is ${duskSky.dusk.toFixed(2)}`);
+ok(nightSky.night > 0.8, `night sky weight is ${nightSky.night.toFixed(2)}`);
+ok(look.exposure >= 1, `noon exposure is ${look.exposure.toFixed(2)} (daylight went dark)`);
+world.look.quality('low');
+const low = world.look.info();
+ok(low.quality === 'low' && low.bloom === false && low.shadows === false && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
+world.look.quality('high');
+ok(world.look.info().bloom === true, 'high quality left bloom off');
 
 const wasmBinary = fs.readFileSync(require.resolve('@babylonjs/havok/lib/esm/HavokPhysics.wasm'));
 const havok = await HavokPhysics({ wasmBinary });

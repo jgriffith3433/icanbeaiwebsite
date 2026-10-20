@@ -576,6 +576,34 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
 .public .control-btn,
 .preview-public .control-btn { bottom: 34px; }
 
+/* Graphics quality (js/look.js). On the public site too: a phone needs the low setting. */
+.quality-btn {
+  position: fixed;
+  z-index: 4;
+  left: calc(50% + 108px);
+  bottom: 156px;
+  appearance: none;
+  border: 1px solid rgba(142, 198, 255, 0.55);
+  background: rgba(14, 16, 22, 0.62);
+  color: #d5e8ff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.quality-btn:hover { background: rgba(62, 160, 220, 0.2); }
+.quality-btn[aria-pressed="true"] { background: rgba(20, 28, 40, 0.85); color: #9eb4c8; }
+.public .quality-btn,
+.preview-public .quality-btn { bottom: 40px; }
+@media (max-width: 700px) {
+  .quality-btn { left: auto; right: max(12px, env(safe-area-inset-right)); bottom: auto; top: max(12px, env(safe-area-inset-top)); }
+  html:not(.public):not(.preview-public) .quality-btn { top: 12px; }
+}
+
 .control-hint {
   position: fixed;
   z-index: 3;

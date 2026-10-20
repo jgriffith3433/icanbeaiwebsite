@@ -7,7 +7,7 @@ import { defineConfig } from 'vite';
 // (js/hawkes-analytics.js and js/hawkes-release.js, copies of shared files), releases.json, the CNAME and models/
 // (Small Weather's GLB, loaded by URL from day.config.js control.model).
 // dist/ is the whole site: .github/workflows/pages.yml publishes it.
-const STATIC = ['whatsnew.html', 'privacy.html', 'releases.json', 'CNAME', 'css', 'models', 'js/hawkes-analytics.js', 'js/hawkes-release.js'];
+const STATIC = ['whatsnew.html', 'privacy.html', 'releases.json', 'CNAME', 'css', 'models', 'textures', 'js/hawkes-analytics.js', 'js/hawkes-release.js'];
 
 function copyStatic() {
   let outDir = 'dist';

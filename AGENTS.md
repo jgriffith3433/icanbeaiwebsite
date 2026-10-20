@@ -29,7 +29,7 @@ levels get redone over time. The page is the day playing on its own until someon
   messy hair, glasses, the navy tech jacket with glowing blue seams, cargo pants, glowing boots; lightning coils his
   arms while he's the player's. It's the same him all day (no pyjamas or towel colours: `person.outfits` only colours
   the box figure, which shows until the model loads or if it fails).
-- **The city:** a few blocks in `day.config.js` `city` (avenues, crosses, the park, solid blocks). Three of the blocks have a stair up the north face onto the roof (`stair`). His rooms and the office stay the cutaway interiors; the office origin is a few blocks east on the main avenue (`street`). Untextured shapes; the art pass is later.
+- **The city:** a few blocks in `day.config.js` `city` (avenues, crosses, the park, solid blocks). Three of the blocks have a stair up the north face onto the roof (`stair`). His rooms and the office stay the cutaway interiors; the office origin is a few blocks east on the main avenue (`street`). The look is `js/look.js`: PBR asphalt, wet concrete, brick, glass and rooftops (Gen textures in `textures/city/` when `manifest.json` is there; painted stand-ins until then), neon and electric-blue windows after dusk, a sky dome that blends day, dusk and night. Daylight stays bright. **Quality** (`#quality`, also on the public site; `day.look.quality("low"|"high")`, remembered in `icanbe.quality`) drops bloom, MSAA, FXAA and the shadow map and renders at CSS pixels, so a phone stays smooth. A coarse pointer, a window 700 px wide or less, or `navigator.deviceMemory` ≤ 4 starts on low. The weather system blends the sky with `day.look.setSky({ day, dusk, night, fogDensity, fogColor, exposure })` (pass `null` to follow the clock again).
 - **Not yet:** the weather powers (the model has `cast` and `throw` clips for them).
 
 ### Taking control: how it's built
@@ -106,17 +106,18 @@ levels get redone over time. The page is the day playing on its own until someon
 
 ## Hawkes Gen art direction (for a later Gen change)
 
-`hawkesgen/presets/icanbe.json` lives in Gen; change it there. Its notes still say "direction undecided". The new
-style line, matching Dose Of Destruction's look since Small Weather is the same character:
+`hawkesgen/presets/icanbe.json` lives in Gen; change it there. Its notes still say "direction undecided" and its style
+line still describes the old matte diorama. Replace that style line with:
 
-> Stylized 3D cartoon render, same look as Dose Of Destruction: clean shapes, bold readable silhouettes, saturated
-> colors. A city at human scale for a third-person game; weather is the drama: storm light, rain sheets, lightning,
-> clouds breaking open. Small Weather: young man, black messy hair, glasses, dark navy tech jacket with glowing blue
-> seams, grey tee, black cargo pants, knee armor, glowing boots.
+> Stylized 3D cartoon render, same look as Dose Of Destruction: clean shapes, bold readable silhouettes. The city is
+> dark and cinematic: navy and black, electric blue light, rain-wet surfaces. Daylight stays readable (a noon street
+> is not pitch black). Weather is the drama: storm light, rain sheets, lightning, clouds breaking open. Small Weather:
+> young man, black messy hair, glasses, dark navy tech jacket with glowing blue seams, grey tee, black cargo pants,
+> knee armor, glowing boots.
 
 Notes for the preset: "Third-person game: Small Weather (he/him) lives a developer's day on autopilot; the player can
-take control and command the weather. Same art as DoD (AllTheCharacters/SmallWeather). The current build is still the
-box-built diorama of js/world.js." Negative: `text, watermark, extra limbs`.
+take control and command the weather. Same art as DoD (AllTheCharacters/SmallWeather). City materials, neon, the
+day/dusk/night skies and the quality toggle are js/look.js." Negative: `text, watermark, extra limbs`.
 
 ## Analytics (Hawkes Analytics)
 
@@ -149,8 +150,8 @@ keys, the canvas and `day.watch()`, and it never changes the day.
 - `feature`, one per interaction: `control` {action: take or let-go, via key/button/touch/gamepad; then back,
   how: walk or catch-up}, `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
   {to, activity} once the day bar settles, `step` {presses, to} for ← →, `camera` {action: turn, zoom, pinch, tap;
-  `on` for a tap: person, car, the spot name (`at-<spot>` node), room, nothing}, `sound`, `details`, `whatsnew`,
-  `privacy`.
+  `on` for a tap: person, car, the spot name (`at-<spot>` node), room, nothing}, `sound`, `details`, `quality`
+  {value: high or low, via click or api}, `whatsnew`, `privacy`.
 - Custom: `watch_time` {minutes} at 1, 3, 5, 10, 20, 30, 60… minutes on screen. Watching needs no input, so the SDK's
   active time undercounts it: use this for "how long people watch". `day_end` when the clock rolls into the next day
   while playing or live. `feedback_prompt` {action: shown, answered or dismissed, context, commented}.

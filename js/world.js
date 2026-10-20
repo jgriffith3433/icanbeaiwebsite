@@ -158,6 +158,12 @@
     pipeline.imageProcessing.vignetteEnabled = true;
     pipeline.imageProcessing.vignetteWeight = 1.6;
     pipeline.imageProcessing.vignetteColor = new B.Color4(0.05, 0.05, 0.08, 0);
+    /* Bloom on the bright pixels (neon, windows, lamps). js/look.js turns it off on the low quality setting. */
+    pipeline.bloomEnabled = true;
+    pipeline.bloomThreshold = 0.52;
+    pipeline.bloomWeight = 0.36;
+    pipeline.bloomKernel = 32;
+    pipeline.bloomScale = 0.5;
 
     /* ---------------- ground, street ---------------- */
     const street = cfg.street || { z: 12.6, from: -80, to: 2500, signals: [] };
@@ -166,14 +172,14 @@
     const groundD = 180;
     const ground = B.MeshBuilder.CreateGround("ground", { width: groundLen, height: groundD }, scene);
     ground.position.set((street.from + street.to) / 2, 0, 12);
-    ground.material = mat("#4a6b4c");
+    ground.material = mat("#24362e");
     ground.receiveShadows = true;
     ground.isPickable = false;
     /* Streets from day.config.js `city`: the main avenue is one continuous road (his drive, and the
        raycast the checks use). Side streets stop where they meet it. Sidewalks stop at the corners. */
     const city = cfg.city || { avenues: [], crosses: [], blocks: [], park: null };
-    const roadM = mat("#3b3e44");
-    const curbM = mat("#b9b3a8");
+    const roadM = mat("#2a303a");
+    const curbM = mat("#3e464c");
     const streetMeshes = [];
     function gaps(from, to, cuts, gap) {
       const mids = cuts.filter((c) => c > from + gap && c < to - gap).sort((a, b) => a - b);
@@ -313,9 +319,9 @@
     /* Blocks: one solid box, a parapet, and (where `stair` is set) a ramp up the north face
        onto the roof. A ramp, not a stack of steps: the controller treats a sharp riser as a
        wall once the capsule's curve meets it, and a slope under 30° stays walkable. */
-    const trimM = mat("#3a424c");
-    const stepM = mat("#8a8174");
-    const winM = glowMat("#243044");
+    const trimM = mat("#2c333c");
+    const stepM = mat("#4a514c");
+    const winM = glowMat("#1a2838");
     const blockWin = box("bwin", 1.15, 1.25, 0.06, 0, 0, 0, winM, null, false);
     glowing(blockWin);
     blockWin.bakeCurrentTransformIntoVertices();
@@ -1324,17 +1330,19 @@
       return 0.7 + 0.3 * (1 - Math.abs(h - mid) / (mid - SR));
     }
     const C = (h) => B.Color3.FromHexString(h);
+    /* Fallback grade when the sky dome in js/look.js isn't up. Noon stays light; night is navy, not black.
+       look.js blends day, dusk and night over this and the weather system calls day.look.setSky. */
     const SKY = [
-      [0, C("#0d1220")],
-      [SR - 1, C("#141b2e")],
-      [SR - 0.2, C("#d98a6c")],
-      [SR + 0.9, C("#9cc4dc")],
-      [12, C("#86b8de")],
-      [SS - 0.9, C("#a7c2d6")],
-      [SS, C("#de8a5e")],
-      [SS + 0.7, C("#4a3d5c")],
-      [SS + 1.5, C("#141b2e")],
-      [24, C("#0d1220")],
+      [0, C("#070b14")],
+      [SR - 1, C("#10182a")],
+      [SR - 0.2, C("#c46a4a")],
+      [SR + 0.9, C("#9ec4de")],
+      [12, C("#b7d4ea")],
+      [SS - 0.9, C("#8eb4cc")],
+      [SS, C("#e08a52")],
+      [SS + 0.7, C("#243044")],
+      [SS + 1.5, C("#10182a")],
+      [24, C("#070b14")],
     ];
     function skyAt(h) {
       for (let i = 0; i < SKY.length - 1; i++) {
@@ -1391,9 +1399,9 @@
         w.material.emissiveColor.set(sky.r * (0.35 + day * 0.4), sky.g * (0.35 + day * 0.4), sky.b * (0.35 + day * 0.45));
       });
       const night = 1 - Math.min(1, day * 1.6);
-      setEmissive(lampHeadM, "#ffe2a6", 0.1 + night * 0.85);
-      setEmissive(winM, "#f2c27a", night * 0.9);
-      winM.diffuseColor = B.Color3.Lerp(C("#2b3340"), C("#f2c27a"), night * 0.5);
+      setEmissive(lampHeadM, "#d7e7ff", 0.12 + night * 1.05);
+      setEmissive(winM, "#8fd4ff", 0.06 + night * 1.2);
+      winM.diffuseColor = B.Color3.Lerp(C("#1a2433"), C("#8fd4ff"), night * 0.35);
 
       /* room lights */
       roomLights.forEach((rl) => {

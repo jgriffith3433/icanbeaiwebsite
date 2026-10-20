@@ -12,6 +12,7 @@ import "./schedule.js";
 import "./world.js";
 import "./main.js";
 import "./analytics.js";
+import "./look.js"; // the city: PBR, neon, skies, quality
 import "./control.js"; // the player can take control of him
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";

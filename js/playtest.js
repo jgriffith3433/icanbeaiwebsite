@@ -1141,6 +1141,89 @@ async function city(options, t) {
   t.progress(1);
 }
 
+/* ---------------- look: the city at noon, dusk and night, then the phone quality setting ---------------- */
+// Day bar to the sidewalk (setup), then real keys walk him in front of a block. Scrub holds the clock
+// (a scrub leaves the day paused) so the three times stay put for the shot. The quality button is a real click.
+async function look(options, t) {
+  t.scene("City noon");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.look, 8000, "the city look");
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const shop = ((cfg.city && cfg.city.blocks) || []).find((b) => b.id === "shop") || { x: 50, z: 0.5 };
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) {
+    t.problem("bug", "No moment beside the car to stand in the street");
+    return;
+  }
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  await sleep(500);
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  const walked = await goTo(shop.x, street.z - 3.4, t, { sprint: true, progress: 0.25, ms: 20000 });
+  if (!walked) t.problem("warning", `He didn't reach the shop front (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+  t.progress(0.35);
+
+  function shot(sceneName, minutes, eventName) {
+    t.scene(sceneName);
+    scrubTo(minutes);
+    return sleep(900).then(() => {
+      const info = window.day.look.info();
+      const sky = info.sky || {};
+      t.event(eventName, `${sceneName}: source ${info.source}, ${info.pbr} PBR, ${info.textured} textured, ${info.neon} neon, exposure ${info.exposure.toFixed(2)}, sky ${sky.day.toFixed(2)}/${sky.dusk.toFixed(2)}/${sky.night.toFixed(2)}, neon ${info.neonLevel.toFixed(2)}`);
+      if (info.pbr < 4 || info.textured < 4) t.problem("bug", "The city surfaces are still flat colours");
+      return info;
+    });
+  }
+
+  const noon = await shot("City noon", 12 * 60, "look-noon");
+  if (noon.sky.day < 0.6) t.problem("bug", `Noon isn't the day sky (${noon.sky.day.toFixed(2)})`);
+  if (noon.exposure < 1) t.problem("bug", `Noon exposure is ${noon.exposure.toFixed(2)} (the day went dark)`);
+  t.progress(0.5);
+
+  const dusk = await shot("City dusk", 18 * 60 + 30, "look-dusk");
+  if (dusk.sky.dusk < 0.25 && dusk.sky.night < 0.2) t.problem("bug", "Dusk didn't leave the noon sky");
+  t.progress(0.68);
+
+  const night = await shot("City night", 21 * 60 + 30, "look-night");
+  if (night.sky.night < 0.6) t.problem("bug", `Night isn't the night sky (${night.sky.night.toFixed(2)})`);
+  if (night.neon < 1) t.problem("bug", "No neon signs on the blocks");
+  if (night.neonLevel < 0.8) t.problem("bug", `Neon is dim at night (${night.neonLevel.toFixed(2)})`);
+  t.progress(0.82);
+
+  t.scene("Quality low");
+  const btn = $("quality");
+  if (!btn) {
+    t.problem("bug", "There's no quality toggle");
+    return;
+  }
+  if (window.day.look.quality() === "low") btn.click();
+  btn.click();
+  await sleep(300);
+  const low = window.day.look.info();
+  if (low.quality !== "low") t.problem("bug", `Quality toggle left it on ${low.quality}`);
+  if (low.bloom) t.problem("bug", "Low quality left bloom on");
+  if (low.shadows) t.problem("bug", "Low quality left the shadow map on");
+  if (low.samples > 1) t.problem("bug", `Low quality left MSAA at ${low.samples}`);
+  const samples = [];
+  const obs = world().scene.onAfterRenderObservable.add(() => samples.push(world().engine.getDeltaTime()));
+  await sleep(1200);
+  world().scene.onAfterRenderObservable.remove(obs);
+  const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
+  t.metric("frameMsLow", Math.round(avg * 10) / 10);
+  t.metric("qualityScaling", low.scaling);
+  t.event("quality-low", `low: bloom off, shadows off, samples ${low.samples}, scaling ${low.scaling}, ${avg.toFixed(1)} ms a frame over ${samples.length} frames`);
+  if (samples.length && avg > 40) t.problem("warning", `Low quality averaged ${avg.toFixed(1)} ms a frame`);
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -1152,6 +1235,7 @@ installPlaytest({
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
+    { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -1162,6 +1246,7 @@ installPlaytest({
       else if (id === "control") await control(options, t);
       else if (id === "model") await model(options, t);
       else if (id === "city") await city(options, t);
+      else if (id === "look") await look(options, t);
     } finally {
       releaseHeld();
       stopWatching();
