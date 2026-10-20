@@ -1961,7 +1961,9 @@ async function stormRide(options, t) {
   try {
     await tapKey(" ");
     keyDown(" ");
-    await sleep(4200);
+    // Game time runs behind the clock on a slow renderer: hold until he's at roof height (or the gust is long gone).
+    await sleep(1500);
+    await t.until(() => upPeak - yStreet >= apt.h + 0.2, 15000, "the updraft to lift him to roof height").catch(() => {});
     keyUp(" ");
   } finally {
     clearInterval(watchUp);
@@ -2001,6 +2003,8 @@ async function stormRide(options, t) {
     minY = Math.min(minY, st.y);
     if (st.y < 1.1 && st.grounded) touchedGround = true;
   }, 40);
+  const overShop = (st, m) => Math.abs(st.x - shop.x) < shop.w / 2 - m && Math.abs(st.z - shop.z) < shop.d / 2 - m;
+  let over = false;
   try {
     // Edge of the apt roof toward the shop, then jump + hold + steer.
     await goTo(apt.x + apt.w / 2 - 1.2, apt.z, t, { close: 0.7, progress: 0.7, ms: 10000 });
@@ -2008,16 +2012,38 @@ async function stormRide(options, t) {
     await sleep(200);
     await tapKey(" ");
     keyDown(" ");
+    heldKeys = [" "];
+    // The street is ~58 m wide: about 6 s of game time. The playtest browser renders slowly (main.js caps a frame
+    // at 0.1 s, so game time runs behind the clock): wait on where he is, not on a fixed number of seconds.
     const crossStart = performance.now();
-    while (performance.now() - crossStart < 9000) {
+    let lastX = C.state().x;
+    let stillSince = crossStart;
+    while (performance.now() - crossStart < 45000) {
       const st = C.state();
-      if (st.y > shop.h - 0.6 && Math.abs(st.x - shop.x) < shop.w / 2 - 0.5 && Math.abs(st.z - shop.z) < shop.d / 2 - 0.5) break;
+      if (st.y > shop.h - 0.6 && overShop(st, 0.5)) {
+        over = true;
+        break;
+      }
+      if (st.grounded && performance.now() - crossStart > 1500) break;
+      if (Math.abs(st.x - lastX) > 0.1) {
+        lastX = st.x;
+        stillSince = performance.now();
+      } else if (performance.now() - stillSince > 6000) break;
       setHeld(steerKeys(targetX, targetZ, false).concat([" "]));
+      t.progress(0.7 + 0.15 * Math.max(0, Math.min(1, (st.x - apt.x) / (targetX - apt.x))));
       await sleep(120);
     }
-    keyUp(" ");
+    if (over) {
+      // Over the shop he's still a few metres above its roof: let go of the wind to drop, then hold again
+      // just above the roof so he lands soft. Steer to the middle so the drop stays on the roof.
+      t.event("over-shop", `gliding over the ${shop.id} roof at y ${C.state().y.toFixed(2)} (roof ${shop.h})`);
+      setHeld(steerKeys(shop.x, shop.z, false));
+      await t.until(() => C.state().y < shop.h + 1.3 || C.state().grounded, 15000, "him to drop toward the shop roof").catch(() => {});
+      setHeld(steerKeys(shop.x, shop.z, false).concat([" "]));
+    }
+    await t.until(() => C.state().grounded, 20000, "him to land").catch(() => {});
     releaseHeld();
-    await sleep(800);
+    await sleep(300);
   } finally {
     clearInterval(watchCross);
     releaseHeld();
@@ -2026,7 +2052,7 @@ async function stormRide(options, t) {
   const onShop = stEnd.y > shop.h - 0.55 && Math.abs(stEnd.x - shop.x) < shop.w / 2 && Math.abs(stEnd.z - shop.z) < shop.d / 2;
   t.metric("crossMinY", Math.round(minY * 100) / 100);
   if (touchedGround) t.problem("bug", `He touched the ground crossing roofs (min y ${minY.toFixed(2)})`);
-  else if (onShop) t.event("roof-to-roof", `apt → shop without touching the ground · min y ${minY.toFixed(2)} · landed y ${stEnd.y.toFixed(2)}`);
+  else if (onShop) t.event("roof-to-roof", `apt → shop without touching the ground · min y ${minY.toFixed(2)} · landed y ${stEnd.y.toFixed(2)}${stEnd.lastFlight && stEnd.lastFlight.soft ? " · soft landing" : ""}`);
   else t.problem("bug", `Didn't land on the shop roof (y ${stEnd.y.toFixed(2)} at ${stEnd.x.toFixed(1)},${stEnd.z.toFixed(1)}; min y ${minY.toFixed(2)})`);
   t.progress(1);
 }
@@ -2500,7 +2526,7 @@ installPlaytest({
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
-    { id: "storm-ride", title: "Storm-riding: hold Space in the air to glide with wind trails; a Gust updraft lifts him from the street to rooftop height; glide apt roof to shop roof without touching the ground", seconds: 150, tags: ["control", "powers"], description: "Day bar beside the car. Storm weather (4), real keys for glide, G for updraft, climb apt then glide to shop." },
+    { id: "storm-ride", title: "Storm-riding: hold Space in the air to glide with wind trails; a Gust updraft lifts him from the street to rooftop height; glide apt roof to shop roof without touching the ground", seconds: 240, tags: ["control", "powers"], description: "Day bar beside the car. Storm weather (4), real keys for glide, G for updraft, climb apt then glide to shop." },
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },

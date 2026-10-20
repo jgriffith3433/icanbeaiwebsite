@@ -248,8 +248,36 @@ roofs.forEach((b) => {
   walkToward(s.x0 - 0.9, s.z, 22);
   ok(ms.y < 0.5, `${b.id}: he didn't walk back down the stair (y ${ms.y.toFixed(2)} at ${ms.x.toFixed(1)},${ms.z.toFixed(1)})`);
 });
-// Into a wall: the shop's south face. He must stay outside it.
+// Storm-riding roof to roof: from the apt roof's east edge, two jumps and hold to glide across the street to the
+// shop, let go over it to drop, hold again just above its roof, and land soft on it without touching the ground.
 const shop = (city.blocks || []).find((b) => b.id === "shop");
+const aptRoof = roofs.find((b) => b.id === "apt");
+if (aptRoof && shop) {
+  const s = aptRoof.stair;
+  mover.start(s.x0 - 0.9, s.z, 0);
+  walkToward(s.x1 - 0.25, s.z, 22, 0.2);
+  walkToward(s.x1 - 0.25, aptRoof.z + aptRoof.d / 2 - 1.1, 6);
+  walkToward(aptRoof.x, aptRoof.z, 8);
+  walkToward(aptRoof.x + aptRoof.w / 2 - 1.2, aptRoof.z, 10, 0.7);
+  const tx = shop.x - shop.w / 2 + 1.5;
+  let phase = 'glide';
+  let minY = ms.y;
+  for (let i = 0; i < 60 * 25; i++) {
+    const jump = i === 0 || i === 12 ? 1 : 0;
+    const [gx, gz] = phase === 'glide' ? [tx, shop.z] : [shop.x, shop.z];
+    const d = Math.hypot(gx - ms.x, gz - ms.z) || 1;
+    if (phase === 'glide' && ms.y > shop.h - 0.6 && Math.abs(ms.x - shop.x) < shop.w / 2 - 0.5) phase = 'drop';
+    if (phase === 'drop' && ms.y < shop.h + 1.3) phase = 'soft';
+    mover.step(DT, { x: (gx - ms.x) / d, z: (gz - ms.z) / d, jump, hold: phase !== 'drop' && i > 12 });
+    physicsStep();
+    minY = Math.min(minY, ms.y);
+    if (i > 60 && ms.grounded) break;
+  }
+  const onShop = ms.grounded && ms.y > shop.h - 0.35 && Math.abs(ms.x - shop.x) < shop.w / 2 && Math.abs(ms.z - shop.z) < shop.d / 2;
+  ok(onShop && minY > shop.h - 0.35, `apt → shop glide didn't land on the shop roof (${phase}, y ${ms.y.toFixed(2)} at ${ms.x.toFixed(1)},${ms.z.toFixed(1)}, min y ${minY.toFixed(2)})`);
+  ok(ms.lastFlight && ms.lastFlight.soft, 'the glide onto the shop roof wasn\'t a soft landing');
+}
+// Into a wall: the shop's south face. He must stay outside it.
 if (shop) {
   const face = shop.z - shop.d / 2;
   mover.start(shop.x, face - 1.4, 0);
