@@ -528,6 +528,8 @@ export function startWeather(world, dayApi) {
     return !!(btn && btn.getAttribute("aria-pressed") === "true");
   }
   function thunder() {
+    // Sampled crack from js/score.js when its files are in; else the procedural rumble.
+    if (day.score && day.score.crack && day.score.crack()) return;
     if (!audio || !soundOn()) return;
     const t = audio.ctx.currentTime;
     const src = audio.ctx.createBufferSource();
@@ -778,24 +780,31 @@ export function startWeather(world, dayApi) {
       });
     });
     placeEmitters(L);
+    // Adaptive beds + sampled rain/wind/city hum (js/score.js). Procedural noise stays as a
+    // fallback when the Gen files aren't there yet, and as a soft under-layer for hush/snow.
+    const scored = day.score && day.score.tick ? day.score.tick(L, dt) : null;
     if (audio) {
       const on = soundOn();
       if (on && audio.ctx.state === "suspended") audio.ctx.resume();
       const gust = 0.45 + 0.55 * Math.abs(Math.sin(windT * 0.45));
-      audio.master.gain.value = on ? 0.34 : 0;
-      audio.air.gain.value = L.sound.air * 0.22;
-      audio.rain.gain.value = L.sound.rain * 0.55;
-      audio.wind.gain.value = L.sound.wind * 0.4 * gust;
+      const sampleDrive = !!(scored && scored.driving);
+      const proc = sampleDrive ? 0.18 : 1; // soft under-layer when samples carry the bed
+      audio.master.gain.value = on ? 0.34 * (sampleDrive ? 0.55 : 1) : 0;
+      audio.air.gain.value = L.sound.air * 0.22 * (sampleDrive ? 0.25 : 1);
+      audio.rain.gain.value = L.sound.rain * 0.55 * proc;
+      audio.wind.gain.value = L.sound.wind * 0.4 * gust * proc;
       audio.hush.gain.value = L.sound.hush * 0.3;
       audio.snow.gain.value = (L.sound.snow || 0) * 0.35;
-      audio.rumble.gain.value = L.sound.thunder * 0.28;
+      audio.rumble.gain.value = L.sound.thunder * 0.28 * (sampleDrive ? 0.35 : 1);
       audio.analyser.getByteTimeDomainData(audio.data);
       let s = 0;
       for (let i = 0; i < audio.data.length; i++) {
         const x = (audio.data[i] - 128) / 128;
         s += x * x;
       }
-      live.heard = Math.sqrt(s / audio.data.length);
+      const procHeard = Math.sqrt(s / audio.data.length);
+      const scoreHeard = (day.score && day.score.now && day.score.now().heard) || 0;
+      live.heard = Math.max(procHeard, scoreHeard);
     }
     const hex = (n) => Math.round(Math.min(1, Math.max(0, n)) * 255).toString(16).padStart(2, "0");
     live.sky = "#" + hex(scratch.mixed.r) + hex(scratch.mixed.g) + hex(scratch.mixed.b);

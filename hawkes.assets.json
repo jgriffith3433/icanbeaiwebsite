@@ -822,6 +822,241 @@
    "files": {
     "audio": "audio/voice/day-9.mp3"
    }
+  },
+  {
+   "id": "music-clear",
+   "note": "Calm city bed for clear weather (js/score.js, day.config.js score.music.clear).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Calm cinematic city ambient bed, soft warm pads, quiet distant traffic pulse, electric-blue night city mood like Dose Of Destruction, gentle and spacious, seamless loop, instrumental, 72 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 72,
+      "key": "A minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/clear.mp3"
+   }
+  },
+  {
+   "id": "music-clouds",
+   "note": "Building cloudy bed (score.music.clouds).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Building cloudy city ambient, darker pads than clear, soft muted drums entering, tension rising under an overcast sky, cinematic cartoon mood, seamless loop, instrumental, 80 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 80,
+      "key": "A minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/clouds.mp3"
+   }
+  },
+  {
+   "id": "music-rain",
+   "note": "Rainy city bed (score.music.rain).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Rainy city score, soft piano droplets, wet asphalt mood, mid tempo pulse, melancholic but calm, navy and electric blue night, seamless loop, instrumental, 84 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 84,
+      "key": "D minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/rain.mp3"
+   }
+  },
+  {
+   "id": "music-storm",
+   "note": "Intense storm track (score.music.storm).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Intense cinematic storm track, deep drums, thunderous bass, electric synth stabs, dramatic weather power, storm caller energy, seamless loop, instrumental, 100 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 100,
+      "key": "E minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/storm.mp3"
+   }
+  },
+  {
+   "id": "music-fog",
+   "note": "Eerie fog bed (score.music.fog).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Eerie fog ambient, hollow pads, distant unresolved tones, muffled city hush, mysterious and still, seamless loop, instrumental, 60 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 60,
+      "key": "C minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/fog.mp3"
+   }
+  },
+  {
+   "id": "music-snow",
+   "note": "Soft snow bed (score.music.snow).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Soft snow ambient, delicate bells, soft choir pads, quiet winter city, gentle and cold, seamless loop, instrumental, 66 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 66,
+      "key": "F major"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/snow.mp3"
+   }
+  },
+  {
+   "id": "music-take-control",
+   "note": "Heroic sting when the player takes control (score.sting).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Heroic short sting, rising synth brass and electric crackle, storm caller taking control of the weather, one triumphant hit then a short tail, instrumental",
+      "lyrics": "[Instrumental]",
+      "seconds": 10,
+      "bpm": 120,
+      "key": "E minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/take-control.mp3"
+   }
+  },
+  {
+   "id": "sfx-rain-asphalt",
+   "note": "Rain on asphalt loop (score.ambience.rain).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Steady rain falling on wet city asphalt, soft tire hiss and droplet patter, continuous loopable ambience, no music, no voices",
+      "duration": 12,
+      "loop": true,
+      "influence": 0.65
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/rain-asphalt.mp3"
+   }
+  },
+  {
+   "id": "sfx-wind",
+   "note": "City wind loop (score.ambience.wind).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Strong city wind howling through buildings and street canyons, continuous loopable ambience, no music, no voices",
+      "duration": 12,
+      "loop": true,
+      "influence": 0.65
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/wind.mp3"
+   }
+  },
+  {
+   "id": "sfx-thunder-near",
+   "note": "Close thunder crack (score.ambience.thunderNear).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close loud thunder crack and deep rumble right after a lightning strike over a city street, 4 seconds, no rain bed, no music",
+      "duration": 4,
+      "loop": false,
+      "influence": 0.7
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/thunder-near.mp3"
+   }
+  },
+  {
+   "id": "sfx-thunder-far",
+   "note": "Distant thunder (score.ambience.thunderFar).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Distant thunder rumble rolling across a city, muffled and rolling, about 5 seconds, no music",
+      "duration": 5,
+      "loop": false,
+      "influence": 0.65
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/thunder-far.mp3"
+   }
+  },
+  {
+   "id": "sfx-city-hum",
+   "note": "Quiet city air for clear days (score.ambience.air).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Soft urban city hum, distant traffic and air conditioning, quiet continuous loopable ambience, no music, no voices",
+      "duration": 12,
+      "loop": true,
+      "influence": 0.6
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/city-hum.mp3"
+   }
   }
  ]
 }
