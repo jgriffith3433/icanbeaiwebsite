@@ -2398,14 +2398,22 @@ async function firstVisit(options, t) {
   }
 
   if (T.now().step !== "take") t.problem("bug", `Tutorial opened on ${T.now().step}, not take`);
+  // The bot's browser runs game time behind the clock (0.1 s a frame at most), so each input is
+  // repeated, as a player would, until the card moves on.
+  async function playUntil(id, act, tries) {
+    for (let i = 0; i < tries && T.blocking() && T.now().step !== id; i++) await act(i);
+  }
   pressKey("Enter");
   await untilStep("move");
-  await holdKeys(["w"], 900);
+  await playUntil("jump", () => holdKeys(["w"], 900), 8);
   await untilStep("jump");
-  await tapKey(" ", 80);
+  await playUntil("bolt", () => tapKey(" ", 160).then(() => sleep(700)), 5);
   await untilStep("bolt");
-  await t.until(() => window.day.powers && window.day.powers.now().pressure >= 24, 8000, "Pressure for the tutorial bolt").catch(() => {});
-  pressKey("e");
+  await playUntil("letgo", async () => {
+    await t.until(() => window.day.powers && window.day.powers.now().pressure >= 24, 20000, "Pressure for the tutorial bolt").catch(() => {});
+    pressKey("e");
+    await sleep(600);
+  }, 3);
   await untilStep("letgo");
   pressKey("Escape");
   await t.until(() => !T.blocking(), 4000, "the tutorial to finish on let go").catch(() => {});
@@ -2497,7 +2505,7 @@ async function firstVisit(options, t) {
   }
   const bolt = $("power-bolt");
   if (bolt) {
-    await t.until(() => window.day.powers && window.day.powers.now().pressure >= 24, 8000, "Pressure for the phone bolt").catch(() => {});
+    await t.until(() => window.day.powers && window.day.powers.now().pressure >= 24, 20000, "Pressure for the phone bolt").catch(() => {});
     await tapEl(bolt);
     await sleep(300);
   }
@@ -2534,7 +2542,7 @@ installPlaytest({
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
-    { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 120, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
+    { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
