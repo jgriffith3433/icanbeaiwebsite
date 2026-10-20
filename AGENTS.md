@@ -31,6 +31,7 @@ levels get redone over time. The page is the day playing on its own until someon
   the box figure, which shows until the model loads or if it fails).
 - **The city:** a few blocks in `day.config.js` `city` (avenues, crosses, the park, solid blocks). Three of the blocks have a stair up the north face onto the roof (`stair`). His rooms and the office stay the cutaway interiors; the office origin is a few blocks east on the main avenue (`street`). Untextured shapes; the art pass is later.
 - **The weather** (`js/weather.js`, the forecast and the lines in `day.config.js` `weather`): clear, clouds, rain, storm, fog, wind and snow. With nobody in control the day follows a forecast seeded by the date. Take control and 1–7, hold Q, or a tap on a phone sets it; it blends over a few seconds on top of the time-of-day sky. Rain and storm wet the road. `weather.now()` and `weather.set(state, intensity)` are what the rest of the page reads.
+- **The score** (`js/score.js`, paths in `day.config.js` `score`, recipes in `hawkes.assets.json`): loopable music beds per weather (clear, clouds, rain, storm, fog, snow; wind reuses clear), crossfaded as the weather changes; sampled rain, wind, city hum and thunder; a short sting on take control (`day:control`). Respects the Sound button and autoplay (silent until Sound is on). Missing files leave the procedural noise in `weather.js`. Playtest: `weather-audio`.
 - **Not yet:** his storm-caller powers (the model has `cast` and `throw` clips for them). The weather above is the sky, not those.
 
 ### Taking control: how it's built

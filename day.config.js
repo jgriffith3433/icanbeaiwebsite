@@ -184,6 +184,39 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     SCORE — adaptive music and ambience that follow the weather (js/score.js)
+     ------------------------------------------------------------------------
+     Loopable beds from Hawkes Gen audio.music (ACE-Step), ambience and thunder
+     from audio.sfx. They crossfade with the weather blend. A short sting plays
+     when you take control. Paths are relative to the site root; missing files
+     leave the procedural weather noise in place. Sound stays off until the
+     Sound button (browser autoplay). Wind reuses the clear bed.
+     ------------------------------------------------------------------------ */
+  score: {
+    fade: 2.8,
+    musicVol: 0.3,
+    ambVol: 0.62,
+    stingVol: 0.55,
+    music: {
+      clear: "audio/music/clear.mp3",
+      clouds: "audio/music/clouds.mp3",
+      rain: "audio/music/rain.mp3",
+      storm: "audio/music/storm.mp3",
+      fog: "audio/music/fog.mp3",
+      wind: "audio/music/clear.mp3",
+      snow: "audio/music/snow.mp3",
+    },
+    sting: "audio/music/take-control.mp3",
+    ambience: {
+      air: "audio/sfx/city-hum.mp3",
+      rain: "audio/sfx/rain-asphalt.mp3",
+      wind: "audio/sfx/wind.mp3",
+      thunderNear: "audio/sfx/thunder-near.mp3",
+      thunderFar: "audio/sfx/thunder-far.mp3",
+    },
+  },
+
+  /* ------------------------------------------------------------------------
      CHAPTERS — the coloured sections of the day bar
      ------------------------------------------------------------------------ */
   chapters: {

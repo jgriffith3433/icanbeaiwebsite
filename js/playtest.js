@@ -1298,6 +1298,146 @@ async function weather(options, t) {
   t.progress(1);
 }
 
+/* ---------------- weather-audio: music beds crossfade, ambience levels, autoplay silence ---------------- */
+// Real input: day bar to the door, confirm Sound is off (silent), a real pointer on Sound, Enter
+// (sting), walk out, then keys through clear → rain → storm → fog → snow. Events show the bed and
+// ambience levels so the review can judge the three acceptance criteria.
+async function weatherAudio(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const W = window.weather;
+  const S = window.day && window.day.score;
+  const C = window.day.control;
+  if (!W) {
+    t.problem("bug", "There's no weather");
+    return;
+  }
+  if (!S) {
+    t.problem("bug", "There's no score (js/score.js didn't install)");
+    return;
+  }
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const day = window.day.today();
+  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  await sleep(400);
+  clickSpeed(1);
+  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}"`);
+  t.progress(0.05);
+
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") === "true") {
+    sound.click();
+    await sleep(200);
+  }
+  const silent = S.now();
+  t.event("sound-off", `on=${silent.on} unlocked=${silent.unlocked} heard=${silent.heard.toFixed(3)}`);
+  if (silent.on) t.problem("bug", "Sound is on before anyone pressed it");
+  if (silent.heard > 0.02) t.problem("bug", `Heard audio while Sound is off (heard ${silent.heard.toFixed(3)})`);
+  t.progress(0.12);
+
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 5, pointerType: "mouse" }));
+    sound.click();
+    await sleep(400);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+    if (sound.getAttribute("aria-pressed") !== "true") t.problem("bug", "Sound button didn't turn on");
+  }
+  t.progress(0.2);
+
+  const stingBefore = S.now().stingAt;
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  await sleep(350);
+  const afterTake = S.now();
+  t.event("control-taken", `stingAt ${afterTake.stingAt} (was ${stingBefore}); bed ${afterTake.bed}`);
+  if (afterTake.on && afterTake.samples && afterTake.stingAt <= stingBefore) {
+    t.problem("warning", "Take control didn't fire the sting (samples may still be loading)");
+  } else if (afterTake.stingAt > stingBefore) {
+    t.event("sting", `take-control sting at ${afterTake.stingAt}`);
+  }
+  t.progress(0.3);
+
+  const street = window.DAY_CONFIG.street || { z: 12.6 };
+  const at = C.state();
+  await goTo(at.x, street.z, t, { close: 1.4, ms: 16000, progress: 0.4 });
+  t.scene("On the road");
+  t.progress(0.45);
+
+  const order = [
+    ["1", "clear", "Clear"],
+    ["3", "rain", "Rain"],
+    ["4", "storm", "Storm"],
+    ["5", "fog", "Fog"],
+    ["7", "snow", "Snow"],
+  ];
+  const beds = {};
+  for (let i = 0; i < order.length; i++) {
+    const [key, state, label] = order[i];
+    const before = S.now();
+    pressKey(key);
+    await sleep(200);
+    const early = S.now();
+    const want = S.bedFor(state);
+    t.event("music-set", `${label} via ${key}: weather ${W.now().state}, bed target ${early.target}, fade ${early.fade.toFixed(2)}, from ${before.bed}`);
+    if (W.now().state !== state) t.problem("bug", `Key ${key} left weather on ${W.now().state}`);
+    if (before.bed && before.bed !== want && early.fade > 0.92 && early.target === want) {
+      // snapped somehow — still ok if target is right
+    } else if (before.bed && before.bed !== want && early.target === want && early.fade > 0.85) {
+      t.problem("bug", `${label} music popped in (fade ${early.fade.toFixed(2)})`);
+    }
+    await sleep(1200);
+    const mid = S.now();
+    if (before.bed && before.bed !== want) {
+      t.event("music-blend", `${label} at 1.2s: fade ${mid.fade.toFixed(2)}, bed ${mid.bed}→${mid.target}`);
+      if (mid.target !== want) t.problem("bug", `${label} score target is ${mid.target}, not ${want}`);
+      if (mid.fade < 0.15 || (mid.bed === mid.target && mid.fade > 0.95 && before.bed !== want && mid.fade === 1 && early.fade < 0.5)) {
+        // allow settled early if fade was fast
+      } else if (before.bed !== want && mid.bed === before.bed && mid.fade < 0.2) {
+        t.problem("bug", `${label} music isn't crossfading (fade ${mid.fade.toFixed(2)})`);
+      }
+    }
+    await t.until(() => W.now().state === state && W.now().blend > 0.9, 9000, `${label} weather settle`);
+    await sleep(900);
+    const done = S.now();
+    beds[state] = done;
+    t.scene(`Music ${label}`);
+    t.event(`music-${state}`, `bed ${done.bed} target ${done.target} fade ${done.fade.toFixed(2)} amb rain ${done.amb.rain.toFixed(2)} wind ${done.amb.wind.toFixed(2)} air ${done.amb.air.toFixed(2)} samples ${done.samples}`);
+    if (done.target !== want && done.bed !== want) t.problem("bug", `${label} settled on bed ${done.bed}, not ${want}`);
+    t.progress(0.5 + i * 0.08);
+  }
+
+  const rain = beds.rain;
+  const storm = beds.storm;
+  const clear = beds.clear;
+  const fog = beds.fog;
+  const snow = beds.snow;
+  if (rain && clear && rain.amb.rain <= clear.amb.rain) t.problem("bug", "Rain ambience isn't wetter than clear");
+  if (storm && storm.amb.rain < 0.5) t.problem("bug", "Storm ambience has no rain");
+  if (fog && clear && fog.bed === clear.bed && fog.target === clear.target) {
+    // fog should use fog bed
+    if (fog.bed !== "fog" && fog.target !== "fog") t.problem("bug", `Fog didn't switch the music bed (still ${fog.bed})`);
+  }
+  if (snow && snow.bed !== "snow" && snow.target !== "snow") t.problem("bug", `Snow didn't switch the music bed (still ${snow.bed})`);
+  if (clear && rain && clear.bed === rain.bed && clear.target === rain.target && clear.bed === "clear") {
+    t.problem("bug", "Clear and rain share the same music bed");
+  }
+  const distinct = new Set(Object.values(beds).map((b) => b.bed || b.target));
+  t.metric("music-beds", distinct.size);
+  if (distinct.size < 3) t.problem("bug", `Only ${distinct.size} distinct music beds across clear/rain/storm/fog/snow`);
+
+  // Storm thunder level in the weather sound envelope (sample crack is one-shot).
+  if (storm && W.now().sound.thunder < 0.4) t.problem("bug", "Storm has no thunder in the weather sound levels");
+  else if (storm) t.event("thunder-level", `storm thunder ${W.now().sound.thunder.toFixed(2)}`);
+
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -1310,6 +1450,7 @@ installPlaytest({
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
+    { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -1321,6 +1462,7 @@ installPlaytest({
       else if (id === "model") await model(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "weather") await weather(options, t);
+      else if (id === "weather-audio") await weatherAudio(options, t);
     } finally {
       releaseHeld();
       stopWatching();

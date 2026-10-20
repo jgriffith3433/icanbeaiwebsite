@@ -14,6 +14,7 @@ import "./main.js";
 import "./analytics.js";
 import "./control.js"; // the player can take control of him
 import "./weather.js"; // the day's forecast, and the weather he commands while he's the player's
+import "./score.js"; // weather music beds, sampled ambience, take-control sting (after weather)
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 
