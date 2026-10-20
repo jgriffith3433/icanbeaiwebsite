@@ -53,6 +53,11 @@
     const d = e.detail || {};
     feature("control", d.via ? { action: d.action, via: d.via } : { action: d.action, how: d.how });
   }));
+  // The weather wheel (js/weather.js): a key, the radial, or a phone tap. The day's own forecast isn't an interaction.
+  window.addEventListener("day:weather", safe((e) => {
+    const d = e.detail || {};
+    if (d.via && d.via !== "forecast") feature("weather", { state: d.state, via: d.via, intensity: d.intensity });
+  }));
   document.querySelectorAll('a[href="whatsnew.html"]').forEach((a) => a.addEventListener("click", () => feature("whatsnew")));
   document.querySelectorAll('a[href="privacy.html"]').forEach((a) => a.addEventListener("click", () => feature("privacy")));
 
