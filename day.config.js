@@ -359,6 +359,121 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     EPISODES — playable weather missions tied to chapters of his day
+     ------------------------------------------------------------------------
+     Story: Small Weather lives the developer day on autopilot, but when you
+     take him he feels like a god — he brought the weather. Four episodes sit
+     on the day's chapters (data here, play in js/episodes.js). Taking control
+     during a matching chapter offers that episode; the Episodes menu jumps
+     the clock there. Each has 2–3 goals, an optional timer, and ends on a
+     forecast-style score card kept in localStorage (`storageKey`). He can't
+     be taken while driving, so Hurricane drive starts as he walks the work
+     lot — you walk or glide home through the storm you made.
+     ------------------------------------------------------------------------ */
+  episodes: {
+    storageKey: "icanbe.episodes.best",
+    offerOnTake: true,
+    lines: {
+      offer: "An episode is open.",
+      accept: "Take it",
+      decline: "Just walk",
+      menu: "Episodes",
+      scoreTitle: "Today's forecast",
+      best: "Best",
+      done: "Episode clear.",
+      timeUp: "Time's up.",
+      letGo: "Episode paused — score stands.",
+    },
+    /* Bands for the score card copy: "N% chance of <word>". */
+    bands: [
+      { min: 90, word: "awesome" },
+      { min: 70, word: "great weather" },
+      { min: 40, word: "drama" },
+      { min: 0, word: "drizzle" },
+    ],
+    list: [
+      {
+        id: "morning",
+        title: "Clear the sky",
+        tagline: "Break up the forecast's clouds before he leaves.",
+        chapters: ["wake", "ready"],
+        clock: "7:55",
+        timer: 150,
+        goals: [
+          { id: "clouds", kind: "weather", state: "clouds", label: "Gather the clouds" },
+          { id: "clear", kind: "weather", state: "clear", label: "Clear the sky", after: "clouds" },
+          { id: "street", kind: "reach", spot: "carSideHome", r: 6, label: "Reach the car" },
+        ],
+        lines: {
+          start: "Morning air. His to rewrite.",
+          done: "Clear skies for the commute. He did that.",
+        },
+      },
+      {
+        id: "lunch",
+        title: "Rooftop storm",
+        tagline: "Build a storm and strike the lightning rods on three rooftops.",
+        chapters: ["lunch"],
+        clock: "12:20",
+        timer: 240,
+        rods: ["apt", "shop", "annex"],
+        goals: [
+          { id: "storm", kind: "storm", label: "Call the storm" },
+          { id: "rod-one", kind: "rods", count: 1, label: "Strike a lightning rod" },
+          { id: "rod-all", kind: "rods", count: 3, label: "Hit all three rods" },
+        ],
+        lines: {
+          start: "Lunch break. The roofs are waiting.",
+          done: "Three rods. One sky. His.",
+        },
+      },
+      {
+        id: "commute-home",
+        title: "Hurricane drive",
+        tagline: "Get home through the storm you made, with wind and debris.",
+        /* Offer as he leaves the office / walks the lot (still "work"), and
+           during the drive-home chapter if he isn't in the car. */
+        chapters: ["work", "commute"],
+        after: "17:45",
+        before: "18:55",
+        /* 17:53: still on foot in the office (elevator). 17:55+ he's in the car
+           and Take control is locked — the episode is a walk/glide home. */
+        clock: "17:53",
+        timer: 300,
+        debris: true,
+        goals: [
+          { id: "blow", kind: "weather-any", states: ["storm", "wind"], label: "Whip up storm or wind" },
+          { id: "debris", kind: "debris", count: 2, label: "Shove the debris (gust or tornado)" },
+          { id: "home", kind: "reach", spot: "parkHome", r: 8, label: "Get home" },
+        ],
+        lines: {
+          start: "The lot. Home is through what he makes.",
+          done: "Home. The storm came with him.",
+        },
+      },
+      {
+        id: "night",
+        title: "Light show",
+        tagline: "A lightning show over the skyline — timed hits.",
+        chapters: ["computer", "bedtime"],
+        clock: "22:05",
+        timer: 180,
+        rods: ["apt", "shop", "annex"],
+        cue: { every: 4.2, window: 1.6 },
+        goals: [
+          { id: "storm", kind: "storm", label: "Storm over the skyline" },
+          { id: "timed", kind: "timed-bolts", count: 3, label: "Land three timed bolts" },
+          { id: "finale", kind: "bolts", count: 5, label: "Five bolts for the show" },
+        ],
+        lines: {
+          start: "Night. The skyline wants a show.",
+          done: "Curtain call. Thunder takes a bow.",
+        },
+      },
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
      CHAPTERS — the coloured sections of the day bar
      ------------------------------------------------------------------------ */
   chapters: {
