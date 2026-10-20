@@ -8,7 +8,11 @@
    "steps": [
     {
      "tool": "image.edit",
-     "inputs": { "images": ["$input:0"] },
+     "inputs": {
+      "images": [
+       "$input:0"
+      ]
+     },
      "params": {
       "prompt": "Clean 3D character model reference sheet of this exact young man, front view, facing the camera: standing straight in an A-pose, both arms held straight and angled down and away from the body at about 40 degrees so there is clear space between the arms and the torso, hands open with fingers together, feet apart at shoulder width, full body from the top of his hair to the soles of his boots, centered. Keep his face, black messy hair, black glasses, dark navy tech jacket with glowing blue seams down the chest, shoulder straps, grey tee, fingerless gloves, black cargo pants with pockets, black knee armor, black boots with glowing blue lights. Stylized 3D game character render with clean shapes and saturated colors. Plain flat light grey background, no lightning, no clouds, no rain, no smoke, no effects around him, no shadow, even soft studio lighting.",
       "width": 832,
@@ -18,18 +22,53 @@
     },
     {
      "tool": "mesh.textured",
-     "inputs": { "image": "$prev" },
-     "params": { "faces": 40000, "texture": 1024 },
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "faces": 40000,
+      "texture": 1024
+     },
      "save": "mesh"
     },
     {
      "tool": "mesh.rig",
      "inputs": {
       "mesh": "$prev",
-      "clips": ["$input:1", "$input:2", "$input:3", "$input:4", "$input:5", "$input:6", "$input:7", "$input:8", "$input:9", "$input:10", "$input:11", "$input:12", "$input:13", "$input:14"]
+      "clips": [
+       "$input:1",
+       "$input:2",
+       "$input:3",
+       "$input:4",
+       "$input:5",
+       "$input:6",
+       "$input:7",
+       "$input:8",
+       "$input:9",
+       "$input:10",
+       "$input:11",
+       "$input:12",
+       "$input:13",
+       "$input:14"
+      ]
      },
      "params": {
-      "names": ["idle", "walk", "run", "jump", "fall", "float", "cast", "throw", "sit", "type", "phone", "lie", "side", "recline"],
+      "names": [
+       "idle",
+       "walk",
+       "run",
+       "jump",
+       "fall",
+       "float",
+       "cast",
+       "throw",
+       "sit",
+       "type",
+       "phone",
+       "lie",
+       "side",
+       "recline"
+      ],
       "height": 1.75
      },
      "save": "rigged"
@@ -57,8 +96,732 @@
    "pickAt": 1,
    "candidates": 4,
    "pick": "on-model with the reference: black messy hair, black glasses, dark navy tech jacket with glowing blue seams, grey tee, black cargo pants, knee armor, glowing boots; a clean A-pose with the arms clear of the body, the whole body in frame, no effects",
-   "refs": [0],
-   "files": { "rigged": "models/small-weather.glb" }
+   "refs": [
+    0
+   ],
+   "files": {
+    "rigged": "models/small-weather.glb"
+   }
+  },
+  {
+   "id": "voice-bolt-1",
+   "note": "Small Weather spoken line (bolt): \"Point and flash.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Point and flash.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/bolt-1.mp3"
+   }
+  },
+  {
+   "id": "voice-bolt-2",
+   "note": "Small Weather spoken line (bolt): \"That one felt personal.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "That one felt personal.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/bolt-2.mp3"
+   }
+  },
+  {
+   "id": "voice-bolt-3",
+   "note": "Small Weather spoken line (bolt): \"Keep the count. I'll keep the bolts.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Keep the count. I'll keep the bolts.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/bolt-3.mp3"
+   }
+  },
+  {
+   "id": "voice-gust-1",
+   "note": "Small Weather spoken line (gust): \"Move.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Move.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/gust-1.mp3"
+   }
+  },
+  {
+   "id": "voice-gust-2",
+   "note": "Small Weather spoken line (gust): \"Wind's on my side.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Wind's on my side.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/gust-2.mp3"
+   }
+  },
+  {
+   "id": "voice-gust-3",
+   "note": "Small Weather spoken line (gust): \"Bins don't get a vote.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Bins don't get a vote.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/gust-3.mp3"
+   }
+  },
+  {
+   "id": "voice-storm-1",
+   "note": "Small Weather spoken line (storm): \"I brought the weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "I brought the weather.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/storm-1.mp3"
+   }
+  },
+  {
+   "id": "voice-storm-2",
+   "note": "Small Weather spoken line (storm): \"Pressure's rising. Good.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Pressure's rising. Good.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/storm-2.mp3"
+   }
+  },
+  {
+   "id": "voice-storm-3",
+   "note": "Small Weather spoken line (storm): \"Sky's mine for a minute.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Sky's mine for a minute.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/storm-3.mp3"
+   }
+  },
+  {
+   "id": "voice-tornado-1",
+   "note": "Small Weather spoken line (tornado): \"Watch the street.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Watch the street.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/tornado-1.mp3"
+   }
+  },
+  {
+   "id": "voice-tornado-2",
+   "note": "Small Weather spoken line (tornado): \"Funnel's going.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Funnel's going.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/tornado-2.mp3"
+   }
+  },
+  {
+   "id": "voice-tornado-3",
+   "note": "Small Weather spoken line (tornado): \"Drama, delivered.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Drama, delivered.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/tornado-3.mp3"
+   }
+  },
+  {
+   "id": "voice-glide-1",
+   "note": "Small Weather spoken line (glide): \"Easy.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Easy.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/glide-1.mp3"
+   }
+  },
+  {
+   "id": "voice-glide-2",
+   "note": "Small Weather spoken line (glide): \"I don't fall. I float.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "I don't fall. I float.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/glide-2.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-clear",
+   "note": "Small Weather spoken line (weather-clear): \"Clear skies. Boring, but fine.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Clear skies. Boring, but fine.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-clear.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-clear-2",
+   "note": "Small Weather spoken line (weather-clear): \"Sun's out. I'm not.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Sun's out. I'm not.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-clear-2.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-clouds",
+   "note": "Small Weather spoken line (weather-clouds): \"Clouds. Warming up.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Clouds. Warming up.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-clouds.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-rain",
+   "note": "Small Weather spoken line (weather-rain): \"Rain. Finally something useful.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Rain. Finally something useful.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-rain.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-rain-2",
+   "note": "Small Weather spoken line (weather-rain): \"Wet road. Good.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Wet road. Good.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-rain-2.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-storm",
+   "note": "Small Weather spoken line (weather-storm): \"There it is.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "There it is.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-storm.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-storm-2",
+   "note": "Small Weather spoken line (weather-storm): \"This is more like it.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "This is more like it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-storm-2.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-fog",
+   "note": "Small Weather spoken line (weather-fog): \"Fog. Soft edges.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Fog. Soft edges.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-fog.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-wind",
+   "note": "Small Weather spoken line (weather-wind): \"Wind's restless.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Wind's restless.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-wind.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-snow",
+   "note": "Small Weather spoken line (weather-snow): \"Snow. Quiet drama.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Snow. Quiet drama.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-snow.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-open-1",
+   "note": "Small Weather spoken line (episode-open): \"Alright. My turn.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Alright. My turn.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-open-1.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-open-2",
+   "note": "Small Weather spoken line (episode-open): \"The day's on autopilot. I'm not.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "The day's on autopilot. I'm not.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-open-2.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-open-3",
+   "note": "Small Weather spoken line (episode-open): \"The Orchestrator asked for drama, so I brought the weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "The Orchestrator asked for drama, so I brought the weather.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-open-3.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-close-1",
+   "note": "Small Weather spoken line (episode-close): \"Back to the day. It kept going without me.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Back to the day. It kept going without me.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-close-1.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-close-2",
+   "note": "Small Weather spoken line (episode-close): \"Not bad for a lunch break.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Not bad for a lunch break.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-close-2.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-close-3",
+   "note": "Small Weather spoken line (episode-close): \"Pressure spent. Worth it.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Pressure spent. Worth it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-close-3.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-close-4",
+   "note": "Small Weather spoken line (episode-close): \"Clock's still running. So am I.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Clock's still running. So am I.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-close-4.mp3"
+   }
+  },
+  {
+   "id": "voice-day-1",
+   "note": "Small Weather spoken line (day): \"Another commit. Another cloud somewhere.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Another commit. Another cloud somewhere.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-1.mp3"
+   }
+  },
+  {
+   "id": "voice-day-2",
+   "note": "Small Weather spoken line (day): \"Code compiles. Sky doesn't.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Code compiles. Sky doesn't.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-2.mp3"
+   }
+  },
+  {
+   "id": "voice-day-3",
+   "note": "Small Weather spoken line (day): \"Standing desk. Sitting storm.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Standing desk. Sitting storm.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-3.mp3"
+   }
+  },
+  {
+   "id": "voice-day-4",
+   "note": "Small Weather spoken line (day): \"Coffee's cold. Forecast isn't.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Coffee's cold. Forecast isn't.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-4.mp3"
+   }
+  },
+  {
+   "id": "voice-day-5",
+   "note": "Small Weather spoken line (day): \"Traffic's nothing. Weather's everything.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Traffic's nothing. Weather's everything.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-5.mp3"
+   }
+  },
+  {
+   "id": "voice-day-6",
+   "note": "Small Weather spoken line (day): \"Alarm set. Atmosphere optional.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Alarm set. Atmosphere optional.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-6.mp3"
+   }
+  },
+  {
+   "id": "voice-day-7",
+   "note": "Small Weather spoken line (day): \"Pull request. Push weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Pull request. Push weather.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-7.mp3"
+   }
+  },
+  {
+   "id": "voice-day-8",
+   "note": "Small Weather spoken line (day): \"Meeting at ten. Storm whenever.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Meeting at ten. Storm whenever.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-8.mp3"
+   }
+  },
+  {
+   "id": "voice-day-9",
+   "note": "Small Weather spoken line (day): \"I type. The sky waits.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "I type. The sky waits.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-9.mp3"
+   }
   },
   {
    "id": "music-clear",
@@ -76,7 +839,9 @@
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/clear.mp3" }
+   "files": {
+    "music": "audio/music/clear.mp3"
+   }
   },
   {
    "id": "music-clouds",
@@ -94,7 +859,9 @@
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/clouds.mp3" }
+   "files": {
+    "music": "audio/music/clouds.mp3"
+   }
   },
   {
    "id": "music-rain",
@@ -112,7 +879,9 @@
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/rain.mp3" }
+   "files": {
+    "music": "audio/music/rain.mp3"
+   }
   },
   {
    "id": "music-storm",
@@ -130,7 +899,9 @@
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/storm.mp3" }
+   "files": {
+    "music": "audio/music/storm.mp3"
+   }
   },
   {
    "id": "music-fog",
@@ -148,7 +919,9 @@
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/fog.mp3" }
+   "files": {
+    "music": "audio/music/fog.mp3"
+   }
   },
   {
    "id": "music-snow",
@@ -166,7 +939,9 @@
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/snow.mp3" }
+   "files": {
+    "music": "audio/music/snow.mp3"
+   }
   },
   {
    "id": "music-take-control",
@@ -184,7 +959,9 @@
      "save": "music"
     }
    ],
-   "files": { "music": "audio/music/take-control.mp3" }
+   "files": {
+    "music": "audio/music/take-control.mp3"
+   }
   },
   {
    "id": "sfx-rain-asphalt",
@@ -201,7 +978,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/rain-asphalt.mp3" }
+   "files": {
+    "sfx": "audio/sfx/rain-asphalt.mp3"
+   }
   },
   {
    "id": "sfx-wind",
@@ -218,7 +997,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/wind.mp3" }
+   "files": {
+    "sfx": "audio/sfx/wind.mp3"
+   }
   },
   {
    "id": "sfx-thunder-near",
@@ -235,7 +1016,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/thunder-near.mp3" }
+   "files": {
+    "sfx": "audio/sfx/thunder-near.mp3"
+   }
   },
   {
    "id": "sfx-thunder-far",
@@ -252,7 +1035,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/thunder-far.mp3" }
+   "files": {
+    "sfx": "audio/sfx/thunder-far.mp3"
+   }
   },
   {
    "id": "sfx-city-hum",
@@ -269,7 +1054,9 @@
      "save": "sfx"
     }
    ],
-   "files": { "sfx": "audio/sfx/city-hum.mp3" }
+   "files": {
+    "sfx": "audio/sfx/city-hum.mp3"
+   }
   }
  ]
 }

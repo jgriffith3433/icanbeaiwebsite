@@ -33,6 +33,7 @@ levels get redone over time. The page is the day playing on its own until someon
 - **The weather** (`js/weather.js`, the forecast and the lines in `day.config.js` `weather`): clear, clouds, rain, storm, fog, wind and snow. With nobody in control the day follows a forecast seeded by the date. Take control and 1–7, hold Q, or a tap on a phone sets it; it blends over a few seconds on top of the time-of-day sky. Rain and storm wet the road. `weather.now()` and `weather.set(state, intensity)` are what the rest of the page reads.
 - **The score** (`js/score.js`, paths in `day.config.js` `score`, recipes in `hawkes.assets.json`): loopable music beds per weather (clear, clouds, rain, storm, fog, snow; wind reuses clear), crossfaded as the weather changes; sampled rain, wind, city hum and thunder; a short sting on take control (`day:control`). Respects the Sound button and autoplay (silent until Sound is on). Missing files leave the procedural noise in `weather.js`. Playtest: `weather-audio`.
 - **His powers** (`js/powers.js`, numbers and lines in `day.config.js` `powers`): while he's the player's, a Pressure meter fills over time (faster in a storm) and each call spends some. Hold F (gamepad Y, or Storm on a phone) and a cloud gathers over him, then the sky goes to storm and it rains. E (X, right-click, Bolt) throws lightning at the reticle: a flash, thunder delayed by distance, a scorch, knocked props, a car alarm, and the nearest building's lights out for a few seconds. G (left trigger, Gust) shoves bins and umbrellas in a cone; T (right trigger, Tornado) sends a funnel down the street for a few seconds. Camera shake sells each one. The model plays `cast` / `throw`. `day.powers` / `window.powers`: `now()`, `command(name, via)`, `hold(on)`, `pose()`.
+- **His voice** (`js/voice.js`, lines in `day.config.js` `voice`): the same DoD ElevenLabs voice (Eric, `cjVigY5qzO86Huf0OWal`). Short first-person lines for powers (chance + cooldown, not every call), each weather state when it starts, episode open/close on take control and let go, glide while floating, and a few autopilot mutters on his day. MP3s under `audio/voice/` from Hawkes Gen `audio.voice`. `day.voice` / `window.voice`: `now()`, `say(group)`, `play(id)`.
 
 ### Taking control: how it's built
 
@@ -150,7 +151,8 @@ keys, the canvas and `day.watch()`, and it never changes the day.
   plus 100 for each later day. It only grows in a session (kept in sessionStorage `icanbe.progress`). `label` is the
   block title, plus `chapter`, `clock`, and `via` (live, play, or jump; a jump counts after 1.5 s on the block).
 - `feature`, one per interaction: `control` {action: take or let-go, via key/button/touch/gamepad; then back,
-  how: walk or catch-up}, `weather` {state, via key/wheel/touch, intensity}, `power` {action, via, power, pressure}, `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
+  how: walk or catch-up}, `weather` {state, via key/wheel/touch, intensity}, `power` {action, via, power, pressure},
+  `voice` {id, group, via} when a spoken line plays, `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
   {to, activity} once the day bar settles, `step` {presses, to} for ← →, `camera` {action: turn, zoom, pinch, tap;
   `on` for a tap: person, car, the spot name (`at-<spot>` node), room, nothing}, `sound`, `details`, `whatsnew`,
   `privacy`.

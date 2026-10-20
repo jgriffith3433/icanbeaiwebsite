@@ -16,6 +16,7 @@ import "./control.js"; // the player can take control of him
 import "./weather.js"; // the day's forecast, and the weather he commands while he's the player's
 import "./score.js"; // weather music beds, sampled ambience, take-control sting (after weather)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
+import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 

@@ -256,6 +256,71 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     VOICE — Small Weather speaks (js/voice.js), same DoD voice (Eric)
+     ------------------------------------------------------------------------
+     Cocky, calm, a storm god who is also a developer. Lines are short. Each
+     has text and an MP3 from Hawkes Gen audio.voice (hawkes.assets.json). A
+     cooldown keeps him from chattering. Powers roll a chance so he does not
+     bark every call. Weather reactions fire when a state starts. Take control
+     / let go are an episode open and a score-card close. Autopilot mutters
+     while his day has him. Glide is the floaty fall (Space held).
+     ------------------------------------------------------------------------ */
+  voice: {
+    voiceId: "cjVigY5qzO86Huf0OWal", // DoD Eric (doseofdestructionwebsite/content/voice.json)
+    cooldown: 2.6, // seconds between any spoken lines
+    powerChance: 0.48, // powers only: he does not talk every call
+    volume: 0.88,
+    dayEvery: 90, // wall seconds between autopilot mutter rolls while on his day
+    dayChance: 0.55,
+    lines: [
+      // powers
+      { id: "bolt-1", group: "bolt", text: "Point and flash.", file: "audio/voice/bolt-1.mp3" },
+      { id: "bolt-2", group: "bolt", text: "That one felt personal.", file: "audio/voice/bolt-2.mp3" },
+      { id: "bolt-3", group: "bolt", text: "Keep the count. I'll keep the bolts.", file: "audio/voice/bolt-3.mp3" },
+      { id: "gust-1", group: "gust", text: "Move.", file: "audio/voice/gust-1.mp3" },
+      { id: "gust-2", group: "gust", text: "Wind's on my side.", file: "audio/voice/gust-2.mp3" },
+      { id: "gust-3", group: "gust", text: "Bins don't get a vote.", file: "audio/voice/gust-3.mp3" },
+      { id: "storm-1", group: "storm", text: "I brought the weather.", file: "audio/voice/storm-1.mp3" },
+      { id: "storm-2", group: "storm", text: "Pressure's rising. Good.", file: "audio/voice/storm-2.mp3" },
+      { id: "storm-3", group: "storm", text: "Sky's mine for a minute.", file: "audio/voice/storm-3.mp3" },
+      { id: "tornado-1", group: "tornado", text: "Watch the street.", file: "audio/voice/tornado-1.mp3" },
+      { id: "tornado-2", group: "tornado", text: "Funnel's going.", file: "audio/voice/tornado-2.mp3" },
+      { id: "tornado-3", group: "tornado", text: "Drama, delivered.", file: "audio/voice/tornado-3.mp3" },
+      { id: "glide-1", group: "glide", text: "Easy.", file: "audio/voice/glide-1.mp3" },
+      { id: "glide-2", group: "glide", text: "I don't fall. I float.", file: "audio/voice/glide-2.mp3" },
+      // weather reactions (group = weather-<state>)
+      { id: "wx-clear", group: "weather-clear", text: "Clear skies. Boring, but fine.", file: "audio/voice/wx-clear.mp3" },
+      { id: "wx-clear-2", group: "weather-clear", text: "Sun's out. I'm not.", file: "audio/voice/wx-clear-2.mp3" },
+      { id: "wx-clouds", group: "weather-clouds", text: "Clouds. Warming up.", file: "audio/voice/wx-clouds.mp3" },
+      { id: "wx-rain", group: "weather-rain", text: "Rain. Finally something useful.", file: "audio/voice/wx-rain.mp3" },
+      { id: "wx-rain-2", group: "weather-rain", text: "Wet road. Good.", file: "audio/voice/wx-rain-2.mp3" },
+      { id: "wx-storm", group: "weather-storm", text: "There it is.", file: "audio/voice/wx-storm.mp3" },
+      { id: "wx-storm-2", group: "weather-storm", text: "This is more like it.", file: "audio/voice/wx-storm-2.mp3" },
+      { id: "wx-fog", group: "weather-fog", text: "Fog. Soft edges.", file: "audio/voice/wx-fog.mp3" },
+      { id: "wx-wind", group: "weather-wind", text: "Wind's restless.", file: "audio/voice/wx-wind.mp3" },
+      { id: "wx-snow", group: "weather-snow", text: "Snow. Quiet drama.", file: "audio/voice/wx-snow.mp3" },
+      // episode open (take control) and score-card close (let go)
+      { id: "ep-open-1", group: "episode-open", text: "Alright. My turn.", file: "audio/voice/ep-open-1.mp3" },
+      { id: "ep-open-2", group: "episode-open", text: "The day's on autopilot. I'm not.", file: "audio/voice/ep-open-2.mp3" },
+      { id: "ep-open-3", group: "episode-open", text: "The Orchestrator asked for drama, so I brought the weather.", file: "audio/voice/ep-open-3.mp3" },
+      { id: "ep-close-1", group: "episode-close", text: "Back to the day. It kept going without me.", file: "audio/voice/ep-close-1.mp3" },
+      { id: "ep-close-2", group: "episode-close", text: "Not bad for a lunch break.", file: "audio/voice/ep-close-2.mp3" },
+      { id: "ep-close-3", group: "episode-close", text: "Pressure spent. Worth it.", file: "audio/voice/ep-close-3.mp3" },
+      { id: "ep-close-4", group: "episode-close", text: "Clock's still running. So am I.", file: "audio/voice/ep-close-4.mp3" },
+      // autopilot mutters on his developer day
+      { id: "day-1", group: "day", text: "Another commit. Another cloud somewhere.", file: "audio/voice/day-1.mp3" },
+      { id: "day-2", group: "day", text: "Code compiles. Sky doesn't.", file: "audio/voice/day-2.mp3" },
+      { id: "day-3", group: "day", text: "Standing desk. Sitting storm.", file: "audio/voice/day-3.mp3" },
+      { id: "day-4", group: "day", text: "Coffee's cold. Forecast isn't.", file: "audio/voice/day-4.mp3" },
+      { id: "day-5", group: "day", text: "Traffic's nothing. Weather's everything.", file: "audio/voice/day-5.mp3" },
+      { id: "day-6", group: "day", text: "Alarm set. Atmosphere optional.", file: "audio/voice/day-6.mp3" },
+      { id: "day-7", group: "day", text: "Pull request. Push weather.", file: "audio/voice/day-7.mp3" },
+      { id: "day-8", group: "day", text: "Meeting at ten. Storm whenever.", file: "audio/voice/day-8.mp3" },
+      { id: "day-9", group: "day", text: "I type. The sky waits.", file: "audio/voice/day-9.mp3" },
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
      CHAPTERS — the coloured sections of the day bar
      ------------------------------------------------------------------------ */
   chapters: {
