@@ -181,6 +181,30 @@ window.DAY_CONFIG = {
       wind: "Wind.",
       snow: "Snow.",
     },
+    /* Music beds + ambience (js/weather-audio.js). Made through Hawkes Gen
+       (hawkes.assets.json); until a file is there the procedural noise still plays. */
+    audio: {
+      fade: 1.8,
+      musicVol: 0.28,
+      ambienceVol: 0.55,
+      stingVol: 0.55,
+      music: {
+        clear: "audio/music/clear.mp3",
+        clouds: "audio/music/clouds.mp3",
+        rain: "audio/music/rain.mp3",
+        storm: "audio/music/storm.mp3",
+        fog: "audio/music/fog.mp3",
+        snow: "audio/music/snow.mp3",
+      },
+      sting: "audio/music/control-sting.mp3",
+      sfx: {
+        rain: "audio/sfx/rain-asphalt.mp3",
+        wind: "audio/sfx/wind.mp3",
+        city: "audio/sfx/city-hum.mp3",
+        thunderNear: "audio/sfx/thunder-near.mp3",
+        thunderFar: "audio/sfx/thunder-far.mp3",
+      },
+    },
   },
 
   /* ------------------------------------------------------------------------

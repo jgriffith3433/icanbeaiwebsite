@@ -59,6 +59,217 @@
    "pick": "on-model with the reference: black messy hair, black glasses, dark navy tech jacket with glowing blue seams, grey tee, black cargo pants, knee armor, glowing boots; a clean A-pose with the arms clear of the body, the whole body in frame, no effects",
    "refs": [0],
    "files": { "rigged": "models/small-weather.glb" }
+  },
+  {
+   "id": "music-clear",
+   "note": "Calm clear-day city music bed. Crossfaded by js/weather-audio.js with the other weather beds.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Calm city morning ambient, soft electric piano and muted warm pads, quiet distant traffic bed, peaceful clear sky mood, clean and loopable instrumental, no vocals, 88 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 32,
+      "bpm": 88,
+      "key": "C major"
+     },
+     "save": "music"
+    }
+   ],
+   "files": { "music": "audio/music/clear.mp3" }
+  },
+  {
+   "id": "music-clouds",
+   "note": "Overcast city bed: a step up from clear as the sky builds.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Overcast city ambient, darker muted pads building slowly, soft low pulse, grey sky tension, still loopable instrumental, no vocals, 92 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 32,
+      "bpm": 92,
+      "key": "A minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": { "music": "audio/music/clouds.mp3" }
+  },
+  {
+   "id": "music-rain",
+   "note": "Rainy city bed for wet streets.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Rainy city ambient, melancholy soft synth pads, gentle shimmer like rain on glass, slow pulse, wet asphalt night mood, loopable instrumental, no vocals, 90 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 32,
+      "bpm": 90,
+      "key": "D minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": { "music": "audio/music/rain.mp3" }
+  },
+  {
+   "id": "music-storm",
+   "note": "Intense storm track while Small Weather commands the weather.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Intense cinematic storm electronic, dark driving bass, rising tension, electric crackle energy, powerful storm-caller mood, loopable instrumental, no vocals, 110 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 32,
+      "bpm": 110,
+      "key": "E minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": { "music": "audio/music/storm.mp3" }
+  },
+  {
+   "id": "music-fog",
+   "note": "Eerie muffled fog bed.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Eerie fog ambient, sparse distant hollow tones, heavy reverb, uncanny quiet city in mist, soft dissonant pads, loopable instrumental, no vocals, 70 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 32,
+      "bpm": 70,
+      "key": "F# minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": { "music": "audio/music/fog.mp3" }
+  },
+  {
+   "id": "music-snow",
+   "note": "Soft quiet snow variant of the city bed.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Soft snow ambient, delicate bells and hushed piano, sparse winter city hush, gentle and warm, loopable instrumental, no vocals, 78 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 32,
+      "bpm": 78,
+      "key": "G major"
+     },
+     "save": "music"
+    }
+   ],
+   "files": { "music": "audio/music/snow.mp3" }
+  },
+  {
+   "id": "music-control-sting",
+   "note": "Short heroic sting when the player takes control of Small Weather.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Heroic short cinematic sting, rising electric synth and punchy drums, storm-caller power hit, brief triumphant flourish then settle, instrumental, no vocals, 128 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 12,
+      "bpm": 128,
+      "key": "E minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": { "music": "audio/music/control-sting.mp3" }
+  },
+  {
+   "id": "sfx-rain-asphalt",
+   "note": "Loopable rain on wet asphalt for rain and storm ambience.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Steady rain falling on wet city asphalt and sidewalks, continuous natural rain ambience, no music, no thunder, seamless loop bed",
+      "duration": 10,
+      "loop": true,
+      "influence": 0.6
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": { "sfx": "audio/sfx/rain-asphalt.mp3" }
+  },
+  {
+   "id": "sfx-wind",
+   "note": "Loopable wind through city streets.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Strong wind blowing through city streets and past building corners, continuous whooshing gusts, no music, seamless loop bed",
+      "duration": 10,
+      "loop": true,
+      "influence": 0.6
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": { "sfx": "audio/sfx/wind.mp3" }
+  },
+  {
+   "id": "sfx-city-hum",
+   "note": "Quiet distant city hum for clear days.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Quiet distant city hum, far-off traffic and soft urban air, calm daytime ambience, no music, no voices, seamless loop bed",
+      "duration": 10,
+      "loop": true,
+      "influence": 0.55
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": { "sfx": "audio/sfx/city-hum.mp3" }
+  },
+  {
+   "id": "sfx-thunder-near",
+   "note": "Close thunder crack for storm lightning flashes.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close loud thunder crack then deep rumble, single strike, outdoor storm, no rain bed, no music",
+      "duration": 3.5,
+      "loop": false,
+      "influence": 0.65
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": { "sfx": "audio/sfx/thunder-near.mp3" }
+  },
+  {
+   "id": "sfx-thunder-far",
+   "note": "Distant thunder rumble for storm flashes.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Distant muffled thunder rumble rolling across the city, single far-away strike, no rain bed, no music",
+      "duration": 4,
+      "loop": false,
+      "influence": 0.65
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": { "sfx": "audio/sfx/thunder-far.mp3" }
   }
  ]
 }

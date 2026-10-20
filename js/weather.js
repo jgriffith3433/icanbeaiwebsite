@@ -5,7 +5,10 @@
    few real seconds on top of the time-of-day sky js/world.js already draws.
    With nobody in control, the day follows a forecast seeded by the date. While
    he's the player's, 1–7, hold Q (a radial), or a tap on a phone sets it.
+   Music beds and Gen ambience live in js/weather-audio.js (crossfade + sting).
    ========================================================================== */
+
+import { createWeatherAudio } from "./weather-audio.js";
 
 export const STATES = ["clear", "clouds", "rain", "storm", "fog", "wind", "snow"];
 
@@ -180,6 +183,7 @@ export function createWeather(opt) {
       light: L.light,
       cover: L.cover,
       sound: Object.assign({}, L.sound),
+      weights: Object.assign({}, weights),
       manual,
       forecast: lastForecast.state,
       forecastIntensity: lastForecast.intensity,
@@ -464,94 +468,18 @@ export function startWeather(world, dayApi) {
   let windT = 0;
   const canSway = !!(scene.getEngine().getCaps && scene.getEngine().getCaps().instancedArrays);
 
-  /* ---- ambience, in the page's Sound button ---- */
-  let audio = null;
-  function noiseBuffer(ctx) {
-    const len = ctx.sampleRate * 2;
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    let b0 = 0;
-    for (let i = 0; i < len; i++) {
-      const w = Math.random() * 2 - 1;
-      b0 = 0.98 * b0 + 0.08 * w;
-      d[i] = Math.max(-1, Math.min(1, b0 * 3.2));
-    }
-    return buf;
-  }
-  function ensureAudio() {
-    if (audio || !window.AudioContext && !window.webkitAudioContext) return audio;
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new Ctx();
-      const master = ctx.createGain();
-      master.gain.value = 0;
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      master.connect(analyser);
-      analyser.connect(ctx.destination);
-      const buffer = noiseBuffer(ctx);
-      function layer(type, freq) {
-        const src = ctx.createBufferSource();
-        src.buffer = buffer;
-        src.loop = true;
-        const filter = ctx.createBiquadFilter();
-        filter.type = type;
-        filter.frequency.value = freq;
-        const gain = ctx.createGain();
-        gain.gain.value = 0;
-        src.connect(filter);
-        filter.connect(gain);
-        gain.connect(master);
-        src.start();
-        return gain;
-      }
-      audio = {
-        ctx,
-        master,
-        analyser,
-        buffer,
-        data: new Uint8Array(analyser.fftSize),
-        air: layer("highpass", 1600),
-        rain: layer("bandpass", 1500),
-        wind: layer("lowpass", 480),
-        hush: layer("lowpass", 240),
-        snow: layer("bandpass", 620),
-        rumble: layer("lowpass", 110),
-      };
-    } catch (err) {
-      audio = null;
-    }
-    return audio;
-  }
-  function soundOn() {
-    const btn = document.getElementById("sound");
-    return !!(btn && btn.getAttribute("aria-pressed") === "true");
-  }
+  /* ---- ambience + music beds (js/weather-audio.js); Sound button unlocks ---- */
+  const wxAudio = createWeatherAudio(cfg.audio || {});
   function thunder() {
-    if (!audio || !soundOn()) return;
-    const t = audio.ctx.currentTime;
-    const src = audio.ctx.createBufferSource();
-    src.buffer = audio.buffer;
-    const filter = audio.ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(220, t);
-    filter.frequency.exponentialRampToValueAtTime(50, t + 1.5);
-    const g = audio.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.85, t + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
-    src.connect(filter);
-    filter.connect(g);
-    g.connect(audio.master);
-    src.start(t);
-    src.stop(t + 1.8);
+    wxAudio.thunder(L_forThunder());
   }
-  const soundBtn = document.getElementById && document.getElementById("sound");
-  if (soundBtn) soundBtn.addEventListener("click", () => ensureAudio());
-  window.addEventListener("pointerdown", () => {
-    const a = ensureAudio();
-    if (a && a.ctx.state === "suspended") a.ctx.resume();
-  }, true);
+  function L_forThunder() {
+    try {
+      return weather.look().lightning;
+    } catch (err) {
+      return 1;
+    }
+  }
 
   /* ---- the wheel: keys 1–7, hold Q, tap on a phone ---- */
   const canUi = !!(document.body && typeof document.body.append === "function");
@@ -778,25 +706,9 @@ export function startWeather(world, dayApi) {
       });
     });
     placeEmitters(L);
-    if (audio) {
-      const on = soundOn();
-      if (on && audio.ctx.state === "suspended") audio.ctx.resume();
-      const gust = 0.45 + 0.55 * Math.abs(Math.sin(windT * 0.45));
-      audio.master.gain.value = on ? 0.34 : 0;
-      audio.air.gain.value = L.sound.air * 0.22;
-      audio.rain.gain.value = L.sound.rain * 0.55;
-      audio.wind.gain.value = L.sound.wind * 0.4 * gust;
-      audio.hush.gain.value = L.sound.hush * 0.3;
-      audio.snow.gain.value = (L.sound.snow || 0) * 0.35;
-      audio.rumble.gain.value = L.sound.thunder * 0.28;
-      audio.analyser.getByteTimeDomainData(audio.data);
-      let s = 0;
-      for (let i = 0; i < audio.data.length; i++) {
-        const x = (audio.data[i] - 128) / 128;
-        s += x * x;
-      }
-      live.heard = Math.sqrt(s / audio.data.length);
-    }
+    const gust = 0.45 + 0.55 * Math.abs(Math.sin(windT * 0.45));
+    const heard = wxAudio.tick(L, weather.now(), gust);
+    if (heard) live.heard = heard.heard;
     const hex = (n) => Math.round(Math.min(1, Math.max(0, n)) * 255).toString(16).padStart(2, "0");
     live.sky = "#" + hex(scratch.mixed.r) + hex(scratch.mixed.g) + hex(scratch.mixed.b);
   }
@@ -829,6 +741,7 @@ export function startWeather(world, dayApi) {
   };
 
   function apiNow() {
+    const a = wxAudio.now();
     return Object.assign(weather.now(), {
       sky: live.sky,
       gloss: live.gloss,
@@ -836,6 +749,12 @@ export function startWeather(world, dayApi) {
       flashes: live.flashes,
       particles: live.particles,
       puddles: live.puddles,
+      music: a.music,
+      beds: a.beds,
+      ambience: a.ambience,
+      sting: a.sting,
+      audioReady: a.ready,
+      audioFiles: a.files,
     });
   }
   const api = {
@@ -846,6 +765,7 @@ export function startWeather(world, dayApi) {
     /** The wheel, for a phone tap the playtest sends as a pointer. */
     open: (on) => openWheel(on !== false),
     wheel: () => !wheel.hidden,
+    audio: wxAudio,
   };
   world.__weather = api;
   window.weather = api;
