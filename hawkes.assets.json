@@ -1002,6 +1002,24 @@
    }
   },
   {
+   "id": "sfx-glide-whoosh",
+   "note": "Whoosh when Small Weather starts riding the wind (score.whoosh / control.ride.whoosh).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Whoosh of rushing wind past the ears while gliding fast through storm air: airy, cinematic pass-by, no music, no voice",
+      "duration": 1.4,
+      "loop": false
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/glide-whoosh.mp3"
+   }
+  },
+  {
    "id": "sfx-thunder-near",
    "note": "Close thunder crack (score.ambience.thunderNear).",
    "steps": [

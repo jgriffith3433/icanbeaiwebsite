@@ -24,6 +24,7 @@ const DEFAULT_PATHS = {
     snow: "audio/music/snow.mp3",
   },
   sting: "audio/music/take-control.mp3",
+  whoosh: "audio/sfx/glide-whoosh.mp3",
   ambience: {
     air: "audio/sfx/city-hum.mp3",
     rain: "audio/sfx/rain-asphalt.mp3",
@@ -42,6 +43,8 @@ function cfg() {
     stingVol: s.stingVol != null ? s.stingVol : STING_VOL,
     music: Object.assign({}, DEFAULT_PATHS.music, s.music || {}),
     sting: s.sting || DEFAULT_PATHS.sting,
+    whoosh: s.whoosh || DEFAULT_PATHS.whoosh,
+    whooshVol: s.whooshVol != null ? s.whooshVol : 0.62,
     ambience: Object.assign({}, DEFAULT_PATHS.ambience, s.ambience || {}),
   };
 }
@@ -77,6 +80,7 @@ export function startScore(dayApi) {
   let fadeLeft = 0;
   let fadeTotal = c0.fade;
   let stingAt = 0;
+  let whooshAt = 0;
   let lastCrack = 0;
   const live = {
     bed: null,
@@ -88,6 +92,7 @@ export function startScore(dayApi) {
     unlocked: false,
     on: false,
     stingAt: 0,
+    whooshAt: 0,
     heard: 0,
   };
 
@@ -140,6 +145,7 @@ export function startScore(dayApi) {
     BEDS.forEach((b) => urls.add(c.music[b]));
     urls.add(c.music.wind);
     urls.add(c.sting);
+    if (c.whoosh) urls.add(c.whoosh);
     Object.keys(c.ambience).forEach((k) => urls.add(c.ambience[k]));
     await Promise.all([...urls].map(loadUrl));
     live.samples = BEDS.some((b) => !!buffers[c.music[b]]) || AMB_LOOPS.some((k) => !!buffers[c.ambience[k]]);
@@ -274,6 +280,21 @@ export function startScore(dayApi) {
     return ok;
   }
 
+  /** Short whoosh when he starts riding the wind (js/control.js). */
+  function whoosh() {
+    if (!soundOn()) return false;
+    unlock();
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (now - whooshAt < 700) return false;
+    const c = cfg();
+    const ok = playOneShot(c.whoosh, c.whooshVol);
+    if (ok) {
+      whooshAt = now;
+      live.whooshAt = whooshAt;
+    }
+    return ok;
+  }
+
   /** Near or far thunder crack; weather calls this on a lightning flash. */
   function crack(kind) {
     if (!soundOn() || !unlocked) return false;
@@ -358,6 +379,7 @@ export function startScore(dayApi) {
       unlocked: live.unlocked,
       on: live.on,
       stingAt: live.stingAt,
+      whooshAt: live.whooshAt || 0,
       heard: live.heard,
       missing: Object.keys(missing).length,
     };
@@ -388,6 +410,7 @@ export function startScore(dayApi) {
     tick,
     now,
     sting,
+    whoosh,
     crack,
     unlock,
     usingSamples: () => live.samples,

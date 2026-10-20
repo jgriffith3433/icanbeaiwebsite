@@ -520,6 +520,16 @@ export function startPowers(world, dayApi) {
     gustMesh.position.set(p.x + f.x * (reach * 0.45), 1.05, p.z + f.z * (reach * 0.45));
     gustMesh.rotation.y = Math.atan2(f.x, f.z);
     gustFx = { id: (gustFx ? gustFx.id : 0) + 1, until: age + 0.42, pushes, dirX: f.x, dirZ: f.z, at: age };
+    // A hard gust also plants a short updraft he can ride (storm-riding traversal).
+    if (day.control && day.control.spawnUpdraft) {
+      const ride = (window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.ride && window.DAY_CONFIG.control.ride.updraft) || {};
+      day.control.spawnUpdraft(p.x, p.z, {
+        r: ride.radius != null ? ride.radius : 4.2,
+        lift: ride.lift != null ? ride.lift : 8,
+        life: ride.life != null ? ride.life : 7,
+        kind: "gust",
+      });
+    }
     shake = Math.max(shake, 0.012);
     note(line("gust"));
     say("gust", via, "gust");

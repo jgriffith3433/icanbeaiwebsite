@@ -80,6 +80,15 @@
       "audio/sfx/wind.mp3": "772192db718541cec17c37e0940ff48587fb87496e6a38e51bd0c9acfe9e4600"
     }
   },
+  "sfx-glide-whoosh": {
+    "recipe": "glide-whoosh",
+    "job": "j_2e7f89fbd93e",
+    "asset": "a_4c8f77716c9d9b97",
+    "made": "2026-10-20T01:30:00.000Z",
+    "files": {
+      "audio/sfx/glide-whoosh.mp3": "28de5c1f9dcfdee11d52e9d8267f7050bbe6b2bfeefdede6b57208cae73be8a3"
+    }
+  },
   "sfx-thunder-near": {
     "recipe": "ac8d672bb838d54c",
     "job": "j_eb691beebba4",

@@ -5,10 +5,10 @@
    moment. The clock and the day keep going; he goes where the player says:
    WASD or the arrows, a gamepad's left stick, or the touch stick on a phone,
    Shift (a bumper, the stick pushed to its edge) to run, Space (A, the touch
-   button) to jump and twice more in the air, held to float down. The camera
-   orbits him (drag, the right stick) and pulls in rather than go through a wall.
-   "Let go" (or Esc, B) and he walks back, by the day's own routes, to where his
-   day says he should be by now, then carries on.
+   button) to jump and twice more in the air, held to ride the wind (glide).
+   Updrafts (weather columns, or a Gust) lift him; the camera pulls back while
+   he glides. "Let go" (or Esc, B) and he walks back, by the day's own routes,
+   to where his day says he should be by now, then carries on.
 
    The lines and the feel are in day.config.js (`control`). He's drawn through
    world.avatar, the box-built stand-in; js/avatar.js says how a rigged GLB drops in.
@@ -22,7 +22,21 @@ const dampAngle = (cur, target, dt, speed) => {
   return cur + d * (1 - Math.exp(-speed * dt));
 };
 
-export const MOVE_DEFAULTS = { walk: 2.4, sprint: 5.6, jumpHeight: 1.5, airJumps: 2, airJumpHeight: 1.2, gravity: 6.5, maxFall: 7, floatFall: 1.6, airControl: 0.55 };
+export const MOVE_DEFAULTS = {
+  walk: 2.4,
+  sprint: 5.6,
+  jumpHeight: 1.5,
+  airJumps: 2,
+  airJumpHeight: 1.2,
+  gravity: 6.5,
+  maxFall: 7,
+  floatFall: 1.6, // legacy slow fall (glide uses glideFall when riding)
+  glideFall: 0.42, // hold jump in the air: ride the wind, fall this slowly
+  glideSpeed: 10.5, // horizontal ride speed while gliding
+  airControl: 0.55,
+  glideAirControl: 0.9,
+  softLand: 2.4, // horizontal speed after a soft glide landing
+};
 
 /* ---------------- the movement (no page needed) ---------------- */
 /* world: js/world.js's world (physics may be off: then he moves without colliders, on the floor).
@@ -43,13 +57,28 @@ export function createMover(world, cfg) {
   const s = {
     x: 0, y: 0, z: 0, yaw: 0, vx: 0, vy: 0, vz: 0,
     grounded: true, coyote: 0, jumpsLeft: M.airJumps, jumps: 0, takeoffY: 0, peak: 0,
-    floating: false, anim: "idle", speed: 0,
-    flights: 0, lastFlight: null, // { jumps, height } of the last time he was in the air
+    floating: false, gliding: false, softLand: false, lift: 0, anim: "idle", speed: 0,
+    flights: 0, lastFlight: null, // { jumps, height, soft?, glide? } of the last time he was in the air
   };
   let cc = null;
   let route = null; // the walk back: { path, i, room, catchUp }
+  let updrafts = []; // { x, z, r, lift, until? } — ambient columns and player gusts
+  let age = 0;
   const ray = new B.PhysicsRaycastResult();
   const physics = () => (world.physics && world.physics()) || null;
+
+  function liftAt(x, z) {
+    let best = 0;
+    for (let i = 0; i < updrafts.length; i++) {
+      const u = updrafts[i];
+      if (u.until != null && age >= u.until) continue;
+      const d = Math.hypot(x - u.x, z - u.z);
+      if (d >= u.r) continue;
+      const t = 1 - d / u.r;
+      best = Math.max(best, u.lift * t * t);
+    }
+    return best;
+  }
 
   const buildings = Object.values(cfg.buildings || {}).filter((b) => b.bounds);
   function guessFloor(x, z) {
@@ -111,9 +140,18 @@ export function createMover(world, cfg) {
   }
 
   function sub(h, input, jumpPresses) {
-    const top = input.sprint ? M.sprint : M.walk;
-    const wantX = (input.x || 0) * top;
-    const wantZ = (input.z || 0) * top;
+    const riding = !!input.hold && !s.grounded;
+    const top = riding ? M.glideSpeed : input.sprint ? M.sprint : M.walk;
+    let ix = input.x || 0;
+    let iz = input.z || 0;
+    const steered = Math.hypot(ix, iz) > 0.1;
+    // Hold jump in the air with no stick: keep coasting on the wind in the facing direction.
+    if (riding && !steered) {
+      ix = Math.sin(s.yaw);
+      iz = Math.cos(s.yaw);
+    }
+    const wantX = ix * top;
+    const wantZ = iz * top;
     let support = null;
     let onGround;
     if (cc) {
@@ -123,8 +161,22 @@ export function createMover(world, cfg) {
 
     if (onGround) {
       if (!s.grounded && s.jumps) {
-        s.lastFlight = { jumps: s.jumps, height: Math.round((s.peak - s.takeoffY) * 100) / 100 };
+        s.lastFlight = {
+          jumps: s.jumps,
+          height: Math.round((s.peak - s.takeoffY) * 100) / 100,
+          soft: !!s.gliding,
+          glide: !!s.gliding,
+        };
         s.flights++;
+        if (s.gliding) {
+          s.softLand = true;
+          const hs = Math.hypot(s.vx, s.vz);
+          if (hs > M.softLand) {
+            const k = M.softLand / hs;
+            s.vx *= k;
+            s.vz *= k;
+          }
+        }
       }
       s.grounded = true;
       s.coyote = 0.12;
@@ -134,6 +186,7 @@ export function createMover(world, cfg) {
       if (s.grounded) s.takeoffY = s.y; // walked off an edge
       s.grounded = false;
       s.coyote = Math.max(0, s.coyote - h);
+      s.softLand = false;
     }
     for (let j = 0; j < jumpPresses; j++) {
       if (s.grounded || s.coyote > 0) {
@@ -150,29 +203,49 @@ export function createMover(world, cfg) {
         s.jumps++;
       }
     }
-    const accel = onGround ? 14 : 14 * M.airControl;
+    const accel = onGround ? 14 : 14 * (riding ? M.glideAirControl : M.airControl);
     s.vx = damp(s.vx, wantX, h, accel);
     s.vz = damp(s.vz, wantZ, h, accel);
+    const lift = onGround ? 0 : liftAt(s.x, s.z);
+    s.lift = lift;
     if (onGround && s.vy <= 0) {
       s.vy = 0;
       s.floating = false;
+      s.gliding = false;
     } else {
-      s.vy -= M.gravity * h;
-      s.floating = !!input.hold && s.vy < 0;
-      s.vy = Math.max(s.vy, s.floating ? -M.floatFall : -M.maxFall);
+      if (lift > 0.35) {
+        // lift is m/s upward at the column centre: climb at that rate
+        s.vy = Math.max(s.vy, lift);
+      } else {
+        s.vy -= M.gravity * h;
+      }
+      // Hold jump: ride the wind (glide). Rising in an updraft while held still counts as gliding.
+      s.floating = !!input.hold && (s.vy < 0.15 || lift > 0.35);
+      s.gliding = s.floating;
+      const fallCap = s.floating ? -M.glideFall : -M.maxFall;
+      s.vy = Math.max(s.vy, fallCap);
     }
 
     const x0 = s.x;
     const z0 = s.z;
     if (cc) {
-      cc.setVelocity(new B.Vector3(s.vx, s.vy, s.vz));
-      cc.integrate(h, support, GRAV);
-      const p = cc.getPosition();
-      const v = cc.getVelocity();
-      s.x = p.x;
-      s.y = p.y - H / 2;
-      s.z = p.z;
-      if (s.vy > 0 && v.y < s.vy - 0.5) s.vy = Math.max(0, v.y); // bumped his head
+      if (lift > 0.35) {
+        // Kinematic climb: Havok's character integrate fights a sustained updraft, so move him ourselves.
+        s.x += s.vx * h;
+        s.z += s.vz * h;
+        s.y += s.vy * h;
+        cc.setPosition(new B.Vector3(s.x, s.y + H / 2, s.z));
+        cc.setVelocity(new B.Vector3(s.vx, s.vy, s.vz));
+      } else {
+        cc.setVelocity(new B.Vector3(s.vx, s.vy, s.vz));
+        cc.integrate(h, support, GRAV);
+        const p = cc.getPosition();
+        const v = cc.getVelocity();
+        s.x = p.x;
+        s.y = p.y - H / 2;
+        s.z = p.z;
+        if (s.vy > 0 && v.y < s.vy - 0.5) s.vy = Math.max(0, v.y); // bumped his head
+      }
     } else {
       s.x += s.vx * h;
       s.z += s.vz * h;
@@ -183,12 +256,14 @@ export function createMover(world, cfg) {
   }
 
   function pickAnim(speed) {
-    if (!s.grounded) return s.vy > 0.4 ? "jump" : s.floating ? "float" : "fall";
+    if (!s.grounded) return s.vy > 0.4 && !s.gliding ? "jump" : s.floating || s.gliding ? "float" : "fall";
     if (speed < 0.25) return "idle";
     return speed > (M.walk + M.sprint) / 2 ? "run" : "walk";
   }
 
   function step(dt, input) {
+    age += dt;
+    if (updrafts.length) updrafts = updrafts.filter((u) => u.until == null || age < u.until);
     const n = Math.max(1, Math.ceil(dt / (1 / 30)));
     let speed = 0;
     for (let i = 0; i < n; i++) speed += sub(dt / n, input, i === 0 ? input.jump || 0 : 0) / n;
@@ -251,6 +326,33 @@ export function createMover(world, cfg) {
     walkBackSpeed,
     route: () => route,
     hasPhysics: () => !!cc,
+    /** Replace ambient + lasting columns. Player gusts use spawnUpdraft. */
+    setUpdrafts(list) {
+      updrafts = (list || []).map((u) => ({
+        x: u.x,
+        z: u.z,
+        r: u.r != null ? u.r : 4.2,
+        lift: u.lift != null ? u.lift : 6,
+        until: u.until,
+        kind: u.kind || "ambient",
+      }));
+    },
+    spawnUpdraft(x, z, opt) {
+      const o = opt || {};
+      const life = o.life != null ? o.life : 7;
+      const draft = {
+        x,
+        z,
+        r: o.r != null ? o.r : 4.2,
+        lift: o.lift != null ? o.lift : 8,
+        until: age + life,
+        kind: o.kind || "gust",
+      };
+      updrafts.push(draft);
+      return draft;
+    },
+    updrafts: () => updrafts.slice(),
+    age: () => age,
     stop() {
       route = null;
     },
@@ -295,7 +397,7 @@ function install() {
   btn.className = "control-btn";
   const hint = document.createElement("p");
   hint.className = "control-hint";
-  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold to float) · drag to look · hold F for a storm, E lightning, G a gust, T a tornado · 1–7 or hold Q for the weather · Esc to let go";
+  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold in the air to glide) · drag to look · hold F for a storm, E lightning, G a gust (and an updraft), T a tornado · 1–7 or hold Q for the weather · Esc to let go";
   const pad = document.createElement("div");
   pad.className = "touchpad";
   pad.hidden = true;
@@ -334,42 +436,142 @@ function install() {
   const saved = {};
   let wantRadius = 5.5;
   let lastRadius = null;
+  let glidePull = 0;
   const camRay = new B.PhysicsRaycastResult();
+  const RIDE = Object.assign({
+    cameraPull: 3.4,
+    whoosh: "audio/sfx/glide-whoosh.mp3",
+    trails: true,
+    updraft: { radius: 4.2, lift: 8, life: 7, ambient: true, weather: { clear: 0.08, clouds: 0.15, rain: 0.35, storm: 1, fog: 0.1, wind: 0.92, snow: 0.2 } },
+  }, C.ride || {});
+  const UD = Object.assign({ radius: 4.2, lift: 8, life: 7, ambient: true, weather: {} }, RIDE.updraft || {});
   function cameraTake() {
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (saved[k] = camera[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => ((saved[k] = kb[k]), (kb[k] = [])));
     camera.lowerRadiusLimit = 1.2;
-    camera.upperRadiusLimit = 14;
+    camera.upperRadiusLimit = 16;
     camera.lowerBetaLimit = 0.25;
     camera.upperBetaLimit = 1.62;
     wantRadius = Math.max(3.5, Math.min(6.5, camera.radius));
     camera.beta = Math.min(camera.beta, 1.3);
     lastRadius = null;
+    glidePull = 0;
   }
   function cameraGive() {
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (camera[k] = saved[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
+    glidePull = 0;
   }
   function cameraFollow(dt, look) {
     // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
-    if (lastRadius != null && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(14, camera.radius));
+    if (lastRadius != null && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
     camera.alpha -= look.x * 2.4 * dt;
     camera.beta = Math.max(camera.lowerBetaLimit, Math.min(camera.upperBetaLimit, camera.beta - look.y * 1.5 * dt));
     const t = camera.target;
     t.x = damp(t.x, s.x, dt, 14);
     t.z = damp(t.z, s.z, dt, 14);
     t.y = damp(t.y, s.y + 1.35, dt, s.grounded ? 10 : 4);
-    let r = wantRadius;
+    const pullWant = s.gliding ? (RIDE.cameraPull || 3.4) : 0;
+    glidePull = damp(glidePull, pullWant, dt, 2.4);
+    let r = wantRadius + glidePull;
     const p = world.physics && world.physics();
     if (p) {
       const dir = new B.Vector3(Math.cos(camera.alpha) * Math.sin(camera.beta), Math.cos(camera.beta), Math.sin(camera.alpha) * Math.sin(camera.beta));
       const from = t.add(dir.scale(0.45)); // outside his own capsule
-      p.plugin.raycast(from, t.add(dir.scale(wantRadius + 0.3)), camRay);
+      p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay);
       if (camRay.hasHit) r = Math.max(1.2, B.Vector3.Distance(t, camRay.hitPoint) - 0.3);
     }
     camera.radius = r < camera.radius ? r : damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
   }
+
+  /* ---------- wind trails + whoosh while he glides ---------- */
+  const trailRoot = new B.TransformNode("glide-trails", world.scene);
+  let trailPs = null;
+  let wasGliding = false;
+  let whooshAt = 0;
+  let trailCount = 0;
+  if (RIDE.trails !== false) {
+    try {
+      const ps = new B.ParticleSystem("glide-wind", 280, world.scene);
+      ps.particleTexture = new B.Texture("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", world.scene, false, false, B.Texture.NEAREST_SAMPLINGMODE);
+      ps.emitter = trailRoot;
+      ps.minEmitBox = new B.Vector3(-0.35, 0.4, -0.2);
+      ps.maxEmitBox = new B.Vector3(0.35, 1.4, 0.2);
+      ps.color1 = new B.Color4(0.72, 0.86, 1, 0.55);
+      ps.color2 = new B.Color4(0.45, 0.7, 1, 0.2);
+      ps.colorDead = new B.Color4(0.3, 0.5, 0.8, 0);
+      ps.minSize = 0.08;
+      ps.maxSize = 0.28;
+      ps.minLifeTime = 0.25;
+      ps.maxLifeTime = 0.55;
+      ps.emitRate = 0;
+      ps.blendMode = B.ParticleSystem.BLENDMODE_ADD;
+      ps.direction1 = new B.Vector3(-1.2, -0.2, -2.5);
+      ps.direction2 = new B.Vector3(1.2, 0.4, -0.8);
+      ps.minEmitPower = 3;
+      ps.maxEmitPower = 7;
+      ps.updateSpeed = 0.02;
+      ps.gravity = new B.Vector3(0, -0.4, 0);
+      ps.billboardMode = B.ParticleSystem.BILLBOARDMODE_STRETCHED;
+      ps.start();
+      trailPs = ps;
+    } catch (err) {
+      trailPs = null;
+    }
+  }
+  function playWhoosh() {
+    const score = day.score;
+    if (score && score.whoosh) return score.whoosh();
+    // fallback: reuse wind amb buffer via score.crack-style unlock path is fine; else silent
+    return false;
+  }
+  function tickGlideFx(dt) {
+    trailRoot.position.set(s.x, s.y, s.z);
+    trailRoot.rotation.y = s.yaw;
+    const on = !!s.gliding;
+    if (trailPs) {
+      trailPs.emitRate = on ? 90 + Math.min(80, s.speed * 6) : 0;
+      trailCount = trailPs.getActiveCount ? trailPs.getActiveCount() : on ? 40 : 0;
+    } else trailCount = on ? 1 : 0;
+    if (on && !wasGliding) {
+      playWhoosh();
+      whooshAt = performance.now();
+      mark("glide", { via: "hold", y: Math.round(s.y * 100) / 100, speed: Math.round(s.speed * 100) / 100 });
+    }
+    if (!on && wasGliding && s.softLand) mark("soft-land", { y: Math.round(s.y * 100) / 100 });
+    wasGliding = on;
+  }
+
+  /* Ambient updraft columns at avenue × cross (stronger in storm / wind). */
+  function weatherLiftScale() {
+    const w = (window.weather && window.weather.now && window.weather.now()) || { state: "clear" };
+    const table = UD.weather || {};
+    if (table[w.state] != null) return table[w.state] * (w.intensity != null ? 0.7 + 0.3 * w.intensity : 1);
+    if (w.state === "storm") return 1;
+    if (w.state === "wind") return 0.92;
+    return 0.12;
+  }
+  function refreshAmbientUpdrafts() {
+    if (UD.ambient === false) return;
+    const city = cfg.city || {};
+    const avenues = city.avenues || (cfg.street ? [cfg.street] : []);
+    const crosses = city.crosses || [];
+    const scale = weatherLiftScale();
+    const base = (UD.lift != null ? UD.lift : 8) * 0.85;
+    const list = [];
+    avenues.forEach((av) => {
+      crosses.forEach((cr) => {
+        if (cr.x < (av.from != null ? av.from : -1e9) || cr.x > (av.to != null ? av.to : 1e9)) return;
+        if (av.z < (cr.from != null ? cr.from : -1e9) || av.z > (cr.to != null ? cr.to : 1e9)) return;
+        list.push({ x: cr.x, z: av.z, r: UD.radius || 4.2, lift: base * scale, kind: "ambient" });
+      });
+    });
+    // Keep player-spawned gust columns.
+    const kept = mover.updrafts().filter((u) => u.kind === "gust");
+    mover.setUpdrafts(list.concat(kept));
+  }
+  let ambientAge = 0;
 
   /* ---------- input ---------- */
   const keys = new Set();
@@ -532,6 +734,9 @@ function install() {
     keys.clear();
     jumps = 0;
     cameraTake();
+    refreshAmbientUpdrafts();
+    ambientAge = 0;
+    wasGliding = false;
     day.note(L.take);
     mark("take", { via, at: `${at.x.toFixed(2)},${at.z.toFixed(2)}`, physics: mover.hasPhysics() });
     syncUi();
@@ -576,7 +781,13 @@ function install() {
     since += dt;
     let text;
     if (mode === "control") {
+      ambientAge += dt;
+      if (ambientAge > 0.45) {
+        ambientAge = 0;
+        refreshAmbientUpdrafts();
+      }
       mover.step(dt, readInput(gp));
+      tickGlideFx(dt);
       text = steeringLines[Math.floor(since / 9) % steeringLines.length];
     } else {
       const target = { x: fr.person.x, z: fr.person.z, room: fr.room, inCar: fr.person.inCar };
@@ -618,13 +829,26 @@ function install() {
     mode: () => mode,
     state: () => ({
       mode, x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: s.anim, grounded: s.grounded, jumps: s.jumps,
-      flights: s.flights, lastFlight: s.lastFlight, floating: s.floating, physics: mover.hasPhysics(), touch: touchMode(),
+      flights: s.flights, lastFlight: s.lastFlight, floating: s.floating, gliding: s.gliding, softLand: s.softLand,
+      lift: s.lift, trails: trailCount, whooshAt, physics: mover.hasPhysics(), touch: touchMode(),
       route: mover.route() ? mover.route().path.length : 0,
+      updrafts: mover.updrafts().length,
+      cameraPull: Math.round(glidePull * 100) / 100,
     }),
     move: mover.move,
+    ride: RIDE,
     log: () => log.slice(),
     take: () => take("console"),
     letGo: () => letGo("console"),
+    spawnUpdraft: (x, z, opt) => {
+      const d = mover.spawnUpdraft(x != null ? x : s.x, z != null ? z : s.z, Object.assign({
+        r: UD.radius, lift: UD.lift, life: UD.life, kind: "gust",
+      }, opt || {}));
+      mark("updraft", { x: d.x, z: d.z, lift: d.lift, kind: d.kind });
+      return d;
+    },
+    updrafts: () => mover.updrafts(),
+    refreshUpdrafts: refreshAmbientUpdrafts,
     touch: (on) => {
       forcedTouch = on !== false;
       syncUi();
