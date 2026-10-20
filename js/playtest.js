@@ -2468,6 +2468,11 @@ async function firstVisit(options, t) {
       if (boxesOverlap(boxes[i].r, boxes[j].r)) t.problem("bug", `#${boxes[i].id} overlaps #${boxes[j].id}`);
     }
   }
+  const side = document.querySelector(".side");
+  if (side && getComputedStyle(side).display !== "none") {
+    const sr = boxOf(side);
+    boxes.forEach((b) => { if (sr && boxesOverlap(sr, b.r)) t.problem("bug", `#${b.id} covers the log panel`); });
+  }
   if (boxes.length === ids.length && !boxes.some((b, i) => boxes.slice(i + 1).some((c) => boxesOverlap(b.r, c.r)))) {
     t.event("touch-reachable", ids.join(" "));
   }
