@@ -14,6 +14,7 @@ import "./main.js";
 import "./analytics.js";
 import "./look.js"; // the city: PBR, neon, skies, quality
 import "./control.js"; // the player can take control of him
+import "./weather.js"; // the day's forecast, and the weather he commands while he's the player's
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 

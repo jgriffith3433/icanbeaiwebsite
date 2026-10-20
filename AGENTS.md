@@ -30,11 +30,12 @@ levels get redone over time. The page is the day playing on its own until someon
   arms while he's the player's. It's the same him all day (no pyjamas or towel colours: `person.outfits` only colours
   the box figure, which shows until the model loads or if it fails).
 - **The city:** a few blocks in `day.config.js` `city` (avenues, crosses, the park, solid blocks). Three of the blocks have a stair up the north face onto the roof (`stair`). His rooms and the office stay the cutaway interiors; the office origin is a few blocks east on the main avenue (`street`). The look is `js/look.js`: PBR asphalt, wet concrete, brick, glass and rooftops (Gen textures in `textures/city/` when `manifest.json` is there; painted stand-ins until then), neon and electric-blue windows after dusk, a sky dome that blends day, dusk and night. Daylight stays bright. **Quality** (`#quality`, also on the public site; `day.look.quality("low"|"high")`, remembered in `icanbe.quality`) drops bloom, MSAA, FXAA and the shadow map and renders at CSS pixels, so a phone stays smooth. A coarse pointer, a window 700 px wide or less, or `navigator.deviceMemory` ≤ 4 starts on low. The weather system blends the sky with `day.look.setSky({ day, dusk, night, fogDensity, fogColor, exposure })` (pass `null` to follow the clock again).
-- **Not yet:** the weather powers (the model has `cast` and `throw` clips for them).
+- **The weather** (`js/weather.js`, the forecast and the lines in `day.config.js` `weather`): clear, clouds, rain, storm, fog, wind and snow. With nobody in control the day follows a forecast seeded by the date. Take control and 1–7, hold Q, or a tap on a phone sets it; it blends over a few seconds on top of the time-of-day sky. Rain and storm wet the road. `weather.now()` and `weather.set(state, intensity)` are what the rest of the page reads.
+- **Not yet:** his storm-caller powers (the model has `cast` and `throw` clips for them). The weather above is the sky, not those.
 
 ### Taking control: how it's built
 
-- `js/control.js` is a real module (imported last by `js/app.js`). `createMover(world, cfg)` is the movement alone:
+- `js/control.js` is a real module (imported by `js/app.js`, then `js/weather.js`). `createMover(world, cfg)` is the movement alone:
   a Havok `PhysicsCharacterController` (capsule 1.7 × 0.28 m, steps up 0.3 m) or, if Havok didn't load, a flat
   mover without colliders; `step(dt, input)` for the player, `walkBack(dt, target)` for the way back (kinematic along
   the route, like the day's own walks, dropping off whatever he stood on but never climbing furniture). `npm test`
@@ -148,7 +149,7 @@ keys, the canvas and `day.watch()`, and it never changes the day.
   plus 100 for each later day. It only grows in a session (kept in sessionStorage `icanbe.progress`). `label` is the
   block title, plus `chapter`, `clock`, and `via` (live, play, or jump; a jump counts after 1.5 s on the block).
 - `feature`, one per interaction: `control` {action: take or let-go, via key/button/touch/gamepad; then back,
-  how: walk or catch-up}, `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
+  how: walk or catch-up}, `weather` {state, via key/wheel/touch, intensity}, `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
   {to, activity} once the day bar settles, `step` {presses, to} for ← →, `camera` {action: turn, zoom, pinch, tap;
   `on` for a tap: person, car, the spot name (`at-<spot>` node), room, nothing}, `sound`, `details`, `quality`
   {value: high or low, via click or api}, `whatsnew`, `privacy`.

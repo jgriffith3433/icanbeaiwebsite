@@ -1724,6 +1724,8 @@
       engine,
       scene,
       update,
+      /* sun, sky light, the look pipeline and the road material: js/weather.js tints them */
+      stage: { sun, hemi, pipeline, road: roadM },
       enablePhysics,
       groundAt,
       physics: () => physics,

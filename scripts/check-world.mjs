@@ -272,6 +272,89 @@ if (modelPath) {
     modelInfo = `model ${(bytes.length / 1048576).toFixed(1)} MB, ${skin.clips.length} clips, ${tall.toFixed(2)} m, his day played ${[...seen].join(' ')}`;
   }
 }
+// Weather (js/weather.js): a seeded forecast, a blend of a few seconds, and a wet road in the rain.
+const { STATES, forecastAt, createWeather, startWeather } = await import(new URL('js/weather.js', root).href);
+ok(STATES.join(',') === 'clear,clouds,rain,storm,fog,wind,snow', `weather states are ${STATES.join(',')}`);
+const wx = cfg.weather || {};
+const castA = forecastAt('2026-10-19', 8 * 60, wx.forecast);
+const castB = forecastAt('2026-10-19', 8 * 60, wx.forecast);
+ok(castA.state === castB.state && castA.intensity === castB.intensity, 'the forecast changed for the same date and minute');
+let forecastDiffers = false;
+for (let d = 1; d <= 27 && !forecastDiffers; d++) {
+  for (let slot = 0; slot < 8; slot++) {
+    const m = slot * 180 + 20;
+    if (forecastAt('2026-10-19', m, wx.forecast).state !== forecastAt(`2026-11-${String(d).padStart(2, '0')}`, m, wx.forecast).state) forecastDiffers = true;
+  }
+}
+ok(forecastDiffers, 'every date drew the same weather');
+const sim = createWeather({ blend: wx.blend || 3.4, forecast: wx.forecast });
+sim.set('clear', 1, 'key');
+sim.step(1, true);
+ok(sim.now().wet < 0.05 && sim.now().blend > 0.99, `clear didn't settle (wet ${sim.now().wet}, blend ${sim.now().blend})`);
+sim.set('rain', 1, 'key');
+sim.step(0.08, false);
+ok(sim.now().state === 'rain' && sim.now().blend < 0.25 && sim.now().wet < 0.35, `rain popped in (blend ${sim.now().blend.toFixed(2)}, wet ${sim.now().wet.toFixed(2)})`);
+sim.step(1.12, false);
+ok(sim.now().blend > 0.4 && sim.now().blend < 0.85, `the blend at 1.2s is ${sim.now().blend.toFixed(2)}, not part-way`);
+sim.step(4, false);
+ok(sim.now().blend > 0.9 && sim.now().wet > 0.85 && sim.now().sound.rain > 0.5, `rain didn't settle wet (blend ${sim.now().blend.toFixed(2)}, wet ${sim.now().wet.toFixed(2)})`);
+sim.set('clear', 1, 'key');
+sim.step(0.08, false);
+ok(sim.now().wet > 0.55, `clear snapped the wet road off (wet ${sim.now().wet.toFixed(2)})`);
+sim.step(5, false);
+ok(sim.now().wet < 0.08 && sim.now().shown === 'clear', `clear didn't dry the road (wet ${sim.now().wet.toFixed(2)}, showing ${sim.now().shown})`);
+const snapWeather = (state) => {
+  sim.set(state, 1, 'key');
+  sim.step(1, true);
+  return sim.now();
+};
+const stormW = snapWeather('storm');
+const fogW = snapWeather('fog');
+const windW = snapWeather('wind');
+const snowW = snapWeather('snow');
+const cloudsW = snapWeather('clouds');
+const clearW = snapWeather('clear');
+const rainW = snapWeather('rain');
+ok(stormW.wet > 0.8 && stormW.lightning > 0.5 && stormW.sound.thunder > 0.5 && stormW.wind > 0.8, 'a storm is not wet, loud and windy');
+ok(fogW.fog > stormW.fog && fogW.wet < 0.25 && fogW.sound.hush > 0.5, 'fog is not the thick muffled one');
+ok(windW.wind > 0.8 && windW.rain === 0 && windW.dust > 0.8 && windW.sound.wind > stormW.sound.wind * 0.9, 'wind is not its own blow');
+ok(snowW.snow > 0.8 && snowW.rain === 0 && snowW.sound.snow > 0.5, 'snow is not its own fall');
+ok(cloudsW.light < 0.7 && cloudsW.wet < 0.1 && cloudsW.light < clearW.light, 'clouds do not dim the day');
+const soundSigs = new Set([stormW, fogW, windW, snowW, cloudsW, clearW, rainW].map((s) => JSON.stringify(s.sound)));
+ok(soundSigs.size === 7, `two states share a sound (${soundSigs.size} distinct)`);
+let backMinute = 0;
+let backCast = forecastAt('2026-10-19', 0, wx.forecast);
+for (let m = 0; m < 1440 && backCast.state === 'snow'; m += 30) {
+  backMinute = m;
+  backCast = forecastAt('2026-10-19', m, wx.forecast);
+}
+sim.set('snow', 1, 'key');
+sim.step(1, true);
+sim.follow('2026-10-19', backMinute, 0.05, false, 'control');
+ok(sim.now().manual && sim.now().state === 'snow', 'taking control handed the weather back to the day');
+sim.follow('2026-10-19', backMinute, 0.05, false, 'schedule');
+ok(!sim.now().manual && sim.now().state === backCast.state, `letting go stayed on ${sim.now().state} instead of the day's ${backCast.state}`);
+if (backCast.state !== 'snow') ok(sim.now().shown === 'snow' && sim.now().blend < 0.35, 'letting go popped straight back to the forecast');
+const weatherLines = wx.lines || {};
+ok(STATES.every((s) => weatherLines[s]), 'day.config.js weather.lines is missing a state');
+ok(!Object.values(weatherLines).some((t) => /\b(they|their|theirs|themselves)\b/i.test(t)), `weather lines that say "they": ${Object.values(weatherLines).join(' | ')}`);
+const mounted = startWeather(world, {
+  now: () => ({ key: '2026-10-19', minutes: 600 }),
+  note() {},
+});
+ok(mounted && mounted.now, "weather didn't attach to the world");
+const frW = E.frame(day, day.dayStart + 60);
+world.update(frW, 0.05, {});
+mounted.set('rain', 1, 'test');
+world.update(frW, 0.05, {});
+ok(mounted.now().state === 'rain' && mounted.now().blend < 0.55, `the world jumped to rain (blend ${mounted.now().blend.toFixed(2)})`);
+world.update(frW, 0.05, { snap: true });
+const wetRoad = mounted.now();
+ok(wetRoad.blend > 0.9 && wetRoad.wet > 0.8 && wetRoad.gloss > 0.35 && wetRoad.puddles > 0, `rain didn't wet the road (wet ${wetRoad.wet.toFixed(2)}, gloss ${wetRoad.gloss == null ? '?' : wetRoad.gloss.toFixed(2)}, puddles ${wetRoad.puddles})`);
+mounted.set('clear', 1, 'test');
+world.update(frW, 0.05, { snap: true });
+ok(mounted.now().wet < 0.12 && mounted.now().gloss < 0.2, `clear left the road wet (gloss ${mounted.now().gloss.toFixed(2)})`);
+
 const lines = (cfg.control && cfg.control.lines) || {};
 const controlTexts = Object.values(lines).flat();
 ok(['take', 'letGo', 'back', 'steering'].every((k) => lines[k]), 'day.config.js control.lines needs take, steering, letGo and back');

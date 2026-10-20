@@ -367,6 +367,8 @@ export function installLook(world) {
     else if (roadName(n)) dress(mesh, mats.asphalt, 2.4);
     else if (walkName(n)) dress(mesh, mats.concrete, 2.2);
   });
+  // Weather (js/weather.js) wets stage.road; point it at the visible PBR asphalt, not the old StandardMaterial.
+  if (world.stage) world.stage.road = mats.asphalt;
   blocks.forEach((b) => {
     const shell = scene.getMeshByName("block-" + b.id);
     const glassTower = b.h >= 10;

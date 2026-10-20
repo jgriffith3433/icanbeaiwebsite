@@ -158,6 +158,32 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     WEATHER — the sky over his day, and what he commands while you have him
+     ------------------------------------------------------------------------
+     With nobody in control, the day follows a forecast seeded by the date
+     (the same idea as `seed: "date"`): each 3-hour block is one state, the
+     same every time you open that date. Take control and 1–7, hold Q, or a
+     tap on a phone sets it; let go and the forecast has it again. The blend
+     is in real seconds. Lines are his, short, for the action log.
+     ------------------------------------------------------------------------ */
+  weather: {
+    blend: 3.4,
+    forecast: {
+      hours: 3,
+      weight: { clear: 26, clouds: 22, rain: 16, storm: 8, fog: 10, wind: 10, snow: 8 },
+    },
+    lines: {
+      clear: "Clear.",
+      clouds: "Clouds.",
+      rain: "Rain.",
+      storm: "A storm.",
+      fog: "Fog.",
+      wind: "Wind.",
+      snow: "Snow.",
+    },
+  },
+
+  /* ------------------------------------------------------------------------
      CHAPTERS — the coloured sections of the day bar
      ------------------------------------------------------------------------ */
   chapters: {

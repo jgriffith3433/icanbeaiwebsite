@@ -295,7 +295,7 @@ function install() {
   btn.className = "control-btn";
   const hint = document.createElement("p");
   hint.className = "control-hint";
-  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold to float) · drag to look · Esc to let go";
+  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold to float) · drag to look · 1–7 or hold Q for the weather · Esc to let go";
   const pad = document.createElement("div");
   pad.className = "touchpad";
   pad.hidden = true;
