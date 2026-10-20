@@ -532,6 +532,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 .version-tag:hover, .version-tag:focus-visible { opacity: 1; }
 html:not(.public):not(.preview-public) .version-tag { display: none; }
+html.touch-ui.in-control .version-tag {
+  right: auto;
+  left: calc(50% + 8px);
+  bottom: auto;
+  top: max(46px, calc(env(safe-area-inset-top) + 40px));
+}
 
 /* ---------- privacy: anonymous viewing statistics (privacy.html), the other corner ---------- */
 .privacy-tag {
@@ -547,6 +553,11 @@ html:not(.public):not(.preview-public) .version-tag { display: none; }
 }
 .privacy-tag:hover, .privacy-tag:focus-visible { opacity: 1; }
 html:not(.public):not(.preview-public) .privacy-tag { display: none; }
+html.touch-ui.in-control .privacy-tag {
+  left: calc(50% - 78px);
+  bottom: auto;
+  top: max(46px, calc(env(safe-area-inset-top) + 40px));
+}
 .foot a { color: inherit; }
 
 /* ---------- taking control (js/control.js): also on the public site ---------- */
@@ -574,7 +585,7 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
 .control-btn[aria-pressed="true"] { background: var(--accent); color: #1a1c22; border-color: transparent; }
 .control-btn:disabled { opacity: 0.45; cursor: default; }
 .public .control-btn,
-.preview-public .control-btn { bottom: 34px; }
+.preview-public .control-btn { bottom: max(16px, env(safe-area-inset-bottom)); }
 
 /* Graphics quality (js/look.js). On the public site too: a phone needs the low setting. */
 .quality-btn {
@@ -601,7 +612,14 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
 .preview-public .quality-btn { bottom: 40px; }
 @media (max-width: 700px) {
   .quality-btn { left: auto; right: max(12px, env(safe-area-inset-right)); bottom: auto; top: max(12px, env(safe-area-inset-top)); }
-  html:not(.public):not(.preview-public) .quality-btn { top: 12px; }
+  html:not(.public):not(.preview-public) .quality-btn { top: max(12px, env(safe-area-inset-top)); }
+}
+html.touch-ui .quality-btn {
+  left: auto;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: auto;
+  top: max(12px, env(safe-area-inset-top));
+  min-height: 44px;
 }
 
 .control-hint {
@@ -629,7 +647,8 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
 .touchpad { position: fixed; inset: auto 0 150px 0; z-index: 4; height: 0; pointer-events: none; }
 .touchpad[hidden] { display: none; }
 .public .touchpad,
-.preview-public .touchpad { bottom: 34px; }
+.preview-public .touchpad { bottom: max(16px, env(safe-area-inset-bottom)); }
+html.touch-ui:not(.public):not(.preview-public) .touchpad { bottom: max(150px, env(safe-area-inset-bottom)); }
 .touchpad .stick,
 .touchpad .jump {
   position: absolute;
@@ -640,7 +659,7 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
   -webkit-user-select: none;
 }
 .touchpad .stick {
-  left: max(22px, env(safe-area-inset-left));
+  left: max(16px, env(safe-area-inset-left));
   width: 132px;
   height: 132px;
   border-radius: 50%;
@@ -662,7 +681,7 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
 }
 .touchpad .stick.held i { background: var(--accent); }
 .touchpad .jump {
-  right: max(22px, env(safe-area-inset-right));
+  right: max(16px, env(safe-area-inset-right));
   bottom: 18px;
   width: 92px;
   height: 92px;
@@ -674,17 +693,35 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
   font-weight: 600;
 }
 .touchpad .jump.held { background: var(--accent); color: #1a1c22; }
-/* on a phone, Let go moves out of the way of the stick and the jump button */
+/* on a phone, Let go sits in the top centre, clear of the stick, jump and powers */
 @media (max-width: 700px) {
-  .in-control .control-btn { bottom: auto; top: 50%; left: auto; right: 12px; transform: none; padding: 8px 14px; font-size: 0.82rem; }
+  .in-control .control-btn {
+    bottom: auto;
+    top: max(10px, env(safe-area-inset-top));
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    font-size: 0.82rem;
+  }
+}
+html.touch-ui.in-control .control-btn {
+  bottom: auto;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  min-height: 44px;
 }
 
 /* ---------- weather (js/weather.js): the state, and the wheel while he's the player's ---------- */
 .weather-btn {
   position: fixed;
   z-index: 4;
-  top: 16px;
-  left: 16px;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
   appearance: none;
   border: 1px solid rgba(240, 194, 122, 0.55);
   background: rgba(14, 16, 22, 0.62);
@@ -699,6 +736,7 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
   -webkit-backdrop-filter: blur(12px);
 }
 .weather-btn[hidden] { display: none; }
+html.touch-ui .weather-btn { min-height: 44px; min-width: 44px; }
 .weather-btn[aria-pressed="true"] { background: var(--accent); color: #1a1c22; border-color: transparent; }
 .weather-wheel {
   position: fixed;
@@ -734,6 +772,20 @@ html:not(.public):not(.preview-public) .privacy-tag { display: none; }
 }
 .weather-wheel button.aim { border-color: var(--accent); }
 .weather-wheel button.on { background: var(--accent); color: #1a1c22; border-color: transparent; }
+@media (max-width: 700px) {
+  .weather-wheel {
+    width: min(240px, 70vw);
+    height: min(240px, 70vw);
+    top: 42%;
+  }
+  .weather-wheel button { width: 64px; height: 64px; min-width: 44px; min-height: 44px; }
+}
+html.touch-ui .weather-wheel {
+  width: min(240px, 70vw);
+  height: min(240px, 70vw);
+  top: 42%;
+}
+html.touch-ui .weather-wheel button { width: 64px; height: 64px; min-width: 44px; min-height: 44px; }
 
 /* catching up with his day: a quick fade */
 #view { transition: opacity 0.35s ease; }

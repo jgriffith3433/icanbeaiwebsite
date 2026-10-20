@@ -178,6 +178,28 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     FIRST VISIT — one minute, then it stays quiet
+     ------------------------------------------------------------------------
+     The first time the page opens, a card walks the player through taking
+     him, walking, a jump, one lightning strike, and letting go. Skip ends
+     it. Done or skipped, it is not shown again (localStorage). Lines are
+     to the player, short, the same plain voice as control.lines. He is
+     "he". An episode offer waits until this card is gone.
+     ------------------------------------------------------------------------ */
+  tutorial: {
+    storageKey: "icanbe.tutorial",
+    skip: "Skip",
+    done: "That's enough. His day is still running.",
+    steps: [
+      { id: "take", do: "Take control.", hint: "Enter, or the button.", touch: "Tap Take control." },
+      { id: "move", do: "Walk him.", hint: "WASD or the arrows. Shift runs.", touch: "Drag the stick. Push it to the edge to run." },
+      { id: "jump", do: "Jump.", hint: "Space. Twice more in the air. Hold it to float down.", touch: "Jump. Twice more in the air. Hold it to float down." },
+      { id: "bolt", do: "Throw one lightning strike.", hint: "E, at the reticle. It spends Pressure.", touch: "Tap Bolt. It spends Pressure." },
+      { id: "letgo", do: "Let go.", hint: "Esc. He walks back to where his day is.", touch: "Tap Let go. He walks back to where his day is." },
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
      WEATHER — the sky over his day, and what he commands while you have him
      ------------------------------------------------------------------------
      With nobody in control, the day follows a forecast seeded by the date

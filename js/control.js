@@ -418,6 +418,7 @@ function install() {
     btn.title = driving ? L.driving : mode === "schedule" ? "Take control (Enter)" : mode === "control" ? "Let go (Esc)" : "";
     btn.setAttribute("aria-pressed", mode === "control" ? "true" : "false");
     document.documentElement.classList.toggle("in-control", mode === "control");
+    document.documentElement.classList.toggle("touch-ui", touchMode());
     pad.hidden = !(mode === "control" && touchMode());
     hint.hidden = !(mode === "control" && !touchMode());
   }
