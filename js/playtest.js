@@ -1141,6 +1141,163 @@ async function city(options, t) {
   t.progress(1);
 }
 
+/* ---------------- weather: every state, blended, and the road goes wet in the rain ---------------- */
+// Real input: the day bar to the door (setup), Enter, WASD out to the avenue, the Sound button,
+// keys 1–7, hold Q and a wedge, then the phone's Weather button. Each state gets a scene once it has settled.
+async function weather(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const W = window.weather;
+  if (!W) {
+    t.problem("bug", "There's no weather (js/weather.js didn't install)");
+    return;
+  }
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control, so the weather wheel can't be used");
+    return;
+  }
+  const day = window.day.today();
+  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  await sleep(500);
+  clickSpeed(1);
+  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}"`);
+  const cast = W.now();
+  t.event("forecast", `${cast.forecast} for ${window.day.now().key} (showing ${cast.shown}, blend ${cast.blend.toFixed(2)}, manual ${cast.manual})`);
+  if (cast.manual) t.problem("bug", "The weather is already overridden before anyone takes control");
+  t.progress(0.04);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+    sound.click();
+    await sleep(250);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+  }
+
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  t.event("control-taken", "Enter, so the weather keys work");
+  const street = window.DAY_CONFIG.street || { z: 12.6 };
+  const at = C.state();
+  const reached = await goTo(at.x, street.z, t, { close: 1.4, ms: 18000, progress: 0.12 });
+  const stood = C.state();
+  t.scene("On the road");
+  await sleep(400);
+  if (reached) t.event("on-the-road", `at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)} (the avenue is z ${street.z})`);
+  else t.problem("bug", `He didn't reach the avenue (at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)}, road z ${street.z})`);
+  t.progress(0.16);
+
+  const order = [
+    ["1", "clear", "Clear"],
+    ["2", "clouds", "Clouds"],
+    ["3", "rain", "Rain"],
+    ["4", "storm", "Storm"],
+    ["5", "fog", "Fog"],
+    ["6", "wind", "Wind"],
+    ["7", "snow", "Snow"],
+  ];
+  const heard = {};
+  let blended = false;
+  let flashesBeforeStorm = W.now().flashes;
+  for (let i = 0; i < order.length; i++) {
+    const [key, state, label] = order[i];
+    const before = W.now();
+    if (state === "storm") flashesBeforeStorm = before.flashes;
+    pressKey(key);
+    await sleep(180);
+    const early = W.now();
+    t.event("weather-set", `${label} via key ${key}; target ${early.state}, blend ${early.blend.toFixed(2)}, sky ${early.sky}`);
+    if (early.state !== state) t.problem("bug", `Key ${key} left the weather on ${early.state}, not ${state}`);
+    if (before.state !== state && early.blend > 0.72) t.problem("bug", `${label} popped in (blend ${early.blend.toFixed(2)} right after the key)`);
+    await sleep(1300);
+    const mid = W.now();
+    if (before.state !== state) {
+      t.event("weather-blend", `${label} at 1.3s: blend ${mid.blend.toFixed(2)}, wet ${mid.wet.toFixed(2)}, fog ${mid.fog.toFixed(3)}, from ${before.state}`);
+      if (!blended) {
+        t.scene("Blending");
+        blended = true;
+        await sleep(350);
+      }
+      if (mid.blend < 0.22 || mid.blend > 0.93) t.problem("bug", `${label} isn't blending (blend ${mid.blend.toFixed(2)} at 1.3s, was ${before.state})`);
+    }
+    await t.until(() => W.now().state === state && W.now().blend > 0.9, 9000, `${label} to settle`);
+    const done = W.now();
+    t.scene(label);
+    await sleep(500);
+    heard[state] = done;
+    const sig = ["air", "rain", "wind", "thunder", "hush", "snow"].map((k) => (done.sound[k] || 0).toFixed(2)).join(",");
+    t.event(`weather-${state}`, `${label}: sky ${done.sky}, wet ${done.wet.toFixed(2)}, gloss ${done.gloss.toFixed(2)}, puddles ${done.puddles}, wind ${done.wind.toFixed(2)}, fog ${done.fog.toFixed(3)}, rain ${done.rain.toFixed(2)}, snow ${done.snow.toFixed(2)}, flashes ${done.flashes}, particles ${done.particles}, sound ${sig}, heard ${done.heard.toFixed(3)}`);
+    t.metric(`wet-${state}`, Math.round(done.wet * 100) / 100);
+    t.metric(`fog-${state}`, Math.round(done.fog * 1000) / 1000);
+    if ((state === "rain" || state === "storm") && (done.wet < 0.65 || done.gloss < 0.35 || done.puddles < 1)) {
+      t.problem("bug", `${label} didn't leave the road wet (wet ${done.wet.toFixed(2)}, gloss ${done.gloss.toFixed(2)}, puddles ${done.puddles})`);
+    }
+    if (state === "clear" && (done.wet > 0.15 || done.gloss > 0.2)) t.problem("bug", `Clear still looks wet (wet ${done.wet.toFixed(2)}, gloss ${done.gloss.toFixed(2)})`);
+    if (state === "rain" && $("log") && !$("log").textContent.includes("Rain.")) t.problem("bug", "Changing the weather isn't in the action log");
+    if (state === "storm") {
+      if (done.flashes <= flashesBeforeStorm) {
+        await t.until(() => W.now().flashes > flashesBeforeStorm, 7000, "a lightning flash").catch(() => {});
+      }
+      if (W.now().flashes <= flashesBeforeStorm) t.problem("bug", "The storm never flashed");
+      else t.event("lightning", `${W.now().flashes} flashes while the storm is up`);
+    }
+    t.progress(0.2 + i * 0.09);
+  }
+  const rain = heard.rain;
+  const storm = heard.storm;
+  const clear = heard.clear;
+  const fog = heard.fog;
+  const wind = heard.wind;
+  const snow = heard.snow;
+  const clouds = heard.clouds;
+  if (rain && clear && rain.sound.rain <= clear.sound.rain) t.problem("bug", "Rain doesn't sound wetter than clear");
+  if (storm && rain && storm.sound.thunder <= 0) t.problem("bug", "The storm has no thunder");
+  if (wind && clear && wind.sound.wind <= clear.sound.wind) t.problem("bug", "Wind doesn't sound windier than clear");
+  if (fog && clear && fog.sound.hush <= clear.sound.hush) t.problem("bug", "Fog doesn't sound muffled next to clear");
+  if (snow && (snow.snow < 0.5 || snow.sound.snow <= 0)) t.problem("bug", "Snow isn't its own fall and sound");
+  if (clouds && clear && Math.abs(clouds.light - clear.light) < 0.15) t.problem("bug", "Clouds don't dim the light");
+  if (fog && storm && fog.fog <= storm.fog) t.problem("bug", "Fog isn't thicker than the storm");
+  const skies = new Set(Object.values(heard).map((s) => s.sky));
+  t.metric("skies", skies.size);
+  if (skies.size < 5) t.problem("bug", `Only ${skies.size} different sky colours across the seven states`);
+  keyDown("q");
+  await sleep(500);
+  t.scene("Weather wheel");
+  await sleep(400);
+  const wheel = $("weather-wheel");
+  if (!wheel || wheel.hidden) t.problem("bug", "Holding Q didn't open the weather wheel");
+  else t.event("wheel-open", "Q held, the radial is up");
+  const wedge = wheel && wheel.querySelector('[data-weather="clouds"]');
+  if (wedge) await tapEl(wedge);
+  keyUp("q");
+  await sleep(250);
+  if (W.now().state !== "clouds") t.problem("bug", `The wheel left the weather on ${W.now().state}, not clouds`);
+  else t.event("weather-wheel", "clouds from the radial");
+  t.progress(0.9);
+
+  C.touch(true);
+  await sleep(300);
+  const phoneBtn = $("weather-btn");
+  if (!phoneBtn || phoneBtn.hidden) t.problem("bug", "There's no Weather button while he's the player's");
+  else {
+    await tapEl(phoneBtn);
+    await sleep(300);
+    t.scene("Weather on a phone");
+    await sleep(400);
+    if (!wheel || wheel.hidden) t.problem("bug", "Tapping Weather didn't open the wheel");
+    const snowWedge = wheel.querySelector('[data-weather="snow"]');
+    if (snowWedge) await tapEl(snowWedge);
+    await sleep(200);
+    if (W.now().state !== "snow") t.problem("bug", `The phone tap left the weather on ${W.now().state}, not snow`);
+    else t.event("weather-touch", "snow from a tap");
+  }
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -1152,6 +1309,7 @@ installPlaytest({
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
+    { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -1162,6 +1320,7 @@ installPlaytest({
       else if (id === "control") await control(options, t);
       else if (id === "model") await model(options, t);
       else if (id === "city") await city(options, t);
+      else if (id === "weather") await weather(options, t);
     } finally {
       releaseHeld();
       stopWatching();
