@@ -1940,11 +1940,19 @@ async function weatherLife(options, t) {
     return;
   }
   const day = window.day.today();
-  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
-  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  // The forecast is seeded by the date in 3-hour slots. Start where it isn't a storm,
+  // so the drift back after the player's storm is a change you can see.
+  const dateKey = window.day.now().key;
+  const calm = (a) => [a.start, a.start + 15].every((m) => W.forecast(dateKey, m).state !== "storm");
+  // Outside at home, in the yard: out the front door in the morning, out of the car in the evening.
+  const outs = day.actions.filter((a) => a.room === "yard" && !a.inCar && !a.path);
+  const out = outs.find(calm) || outs[0] || quietMoment(day);
+  const startAt = out.start + Math.min(0.4, (out.end - out.start) / 2);
+  scrubTo(startAt);
   await sleep(400);
   clickSpeed(1);
-  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}"`);
+  const fc = W.forecast(dateKey, startAt).state;
+  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}" · forecast ${fc}`);
   t.progress(0.05);
 
   pressKey("Enter");
@@ -1999,17 +2007,45 @@ async function weatherLife(options, t) {
   t.scene("Autopilot reacts");
   t.progress(0.78);
 
+  // On a date whose forecast is a storm here too, a storm drifting into a storm shows nothing.
+  // Take him again, clear the sky (1), let go, and watch the storm forecast come back instead.
+  let left = "storm";
+  if (W.now().forecast === "storm") {
+    t.event("forecast-is-storm", "today's forecast here is a storm too: leave him a clear sky instead");
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 5000, "Take control again (Enter)");
+    pressKey("1");
+    await t.until(() => W.now().state === "clear" && W.now().blend > 0.85, 9000, "clear to settle");
+    t.scene("Clear, against the forecast");
+    await sleep(400);
+    pressKey("Escape");
+    await t.until(() => C.mode() === "schedule", 25000, "back on his day again");
+    left = "clear";
+  }
+  t.progress(0.82);
+
   const holdLeft = W.now().hold;
   const holdSec = W.now().holdSec || 22;
-  t.event("hold-wait", `holding ${holdLeft.toFixed(1)}s of ${holdSec}s, then drift to forecast ${W.now().forecast}`);
-  await t.until(() => !W.now().manual, Math.max(8000, (holdLeft + 4) * 1000), "weather hold ends");
-  await sleep(800);
+  t.event("hold-wait", `${left} holding ${holdLeft.toFixed(1)}s of ${holdSec}s, then drift to forecast ${W.now().forecast}`);
+  let drift = null;
+  const onDrift = (e) => (drift = (e && e.detail) || {});
+  window.addEventListener("day:weather-drift", onDrift);
+  try {
+    await t.until(() => !W.now().manual, Math.max(8000, (holdLeft + 4) * 1000), "weather hold ends");
+  } finally {
+    window.removeEventListener("day:weather-drift", onDrift);
+  }
+  const held = W.now();
+  t.event("weather-drift", `hold over: ${(drift && drift.from) || left} → forecast ${(drift && drift.to) || held.forecast}, blend ${held.blend.toFixed(2)}`);
+  // Let the blend finish so the footage shows the sky actually turning.
+  await t.until(() => W.now().blend > 0.9 && W.now().shown === W.now().state, 10000, "the forecast to blend in").catch(() => {});
+  await sleep(600);
   const drifted = W.now();
-  t.scene("Forecast again");
-  t.event("weather-drift", `manual ${drifted.manual}, state ${drifted.state}, forecast ${drifted.forecast}, blend ${drifted.blend.toFixed(2)}`);
+  t.scene(`Forecast again: ${drifted.state}`);
   if (drifted.manual) t.problem("bug", "The weather never drifted back to the day's forecast");
   else if (drifted.state !== drifted.forecast) t.problem("bug", `After the hold, state is ${drifted.state} but forecast is ${drifted.forecast}`);
-  else t.event("forecast-back", `back to ${drifted.forecast}`);
+  else if (drifted.state === left) t.problem("polish", `Drifted back, but the forecast is also ${left}, so nothing visibly changed`);
+  else t.event("forecast-back", `${left} → ${drifted.state} (forecast ${drifted.forecast}), shown ${drifted.shown}, blend ${drifted.blend.toFixed(2)}`);
   t.progress(1);
 }
 
@@ -2172,7 +2208,7 @@ installPlaytest({
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
-    { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 100, tags: ["weather"], description: "Day bar to the front door. Enter, WASD to the avenue, key 3 then 4, Esc. Events: street-rain, autopilot-react, weather-drift." },
+    { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
