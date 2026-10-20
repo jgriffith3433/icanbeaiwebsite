@@ -58,6 +58,11 @@
     const d = e.detail || {};
     if (d.via && d.via !== "forecast") feature("weather", { state: d.state, via: d.via, intensity: d.intensity });
   }));
+  // Storm, lightning, gust, tornado (js/powers.js), and a call the Pressure meter refused.
+  window.addEventListener("day:power", safe((e) => {
+    const d = e.detail || {};
+    feature("power", { action: d.action, via: d.via, power: d.power, pressure: d.pressure });
+  }));
   document.querySelectorAll('a[href="whatsnew.html"]').forEach((a) => a.addEventListener("click", () => feature("whatsnew")));
   document.querySelectorAll('a[href="privacy.html"]').forEach((a) => a.addEventListener("click", () => feature("privacy")));
 

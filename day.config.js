@@ -208,6 +208,45 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     POWERS — what he can call down while you have him
+     ------------------------------------------------------------------------
+     He is a storm caller. Pressure fills while you have him, and faster in a
+     storm. Each call spends some, so they land hard and then he has to wait.
+     Hold F (Y, or the Storm button) and the sky darkens over him, then the
+     storm spreads and the rain starts. E (X, right-click, Bolt) throws
+     lightning where the reticle sits. G (left trigger, Gust) shoves what's
+     in front of him. T (right trigger, Tornado) sends one down the street.
+     Loose bins and people with umbrellas stand near the avenue so a gust
+     has something to take. `dz` is metres from the avenue's centre line.
+     ------------------------------------------------------------------------ */
+  powers: {
+    max: 100,
+    regen: 12, // per second, while you have him
+    stormRegen: 14, // added on top while the weather is a storm
+    hold: 0.7, // seconds the storm takes to answer
+    aim: 3.6, // metres past him the reticle rests, along the camera
+    cone: 52, // gust half-angle, degrees
+    reach: 11, // gust length, metres
+    costs: { storm: 40, bolt: 24, gust: 16, tornado: 48 },
+    keys: { storm: "f", bolt: "e", gust: "g", tornado: "t" },
+    lines: {
+      gather: "The sky draws in over him.",
+      storm: "He calls the storm down.",
+      bolt: "Lightning. Where he aimed.",
+      gust: "A hard gust.",
+      tornado: "He sends a tornado down the street.",
+      dry: "Not enough pressure.",
+    },
+    loose: [
+      { kind: "umbrella", x: -1.6, dz: -2.6 },
+      { kind: "umbrella", x: -2.3, dz: -3.3 },
+      { kind: "bin", x: -2.0, dz: -1.3 },
+      { kind: "bin", x: -8.5, dz: 2.8 },
+      { kind: "umbrella", x: 8.2, dz: 2.8 },
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
      CHAPTERS — the coloured sections of the day bar
      ------------------------------------------------------------------------ */
   chapters: {
