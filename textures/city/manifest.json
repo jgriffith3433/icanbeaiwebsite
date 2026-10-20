@@ -17,5 +17,10 @@
   "sky": {
     "day": "textures/city/sky-day.png",
     "dusk": "textures/city/sky-dusk.png"
+  },
+  "roof": {
+    "albedo": "textures/city/roof-albedo.png",
+    "normal": "textures/city/roof-normal.png",
+    "roughness": "textures/city/roof-roughness.png"
   }
 }

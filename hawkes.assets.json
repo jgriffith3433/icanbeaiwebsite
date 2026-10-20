@@ -90,7 +90,7 @@
     {
      "tool": "image.generate",
      "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Wet concrete sidewalk, cool grey with a navy cast, rain-darkened, soft stains and a fine pitted surface, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
+      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Continuous poured wet concrete sidewalk only: cool grey with a navy cast, rain-darkened, fine aggregate grit, soft stains and hairline cracks, porous pitted surface, even all over. NOT metal, NOT steel plates, NOT diamond plate, NOT rivets, NOT bolts, NOT panel seams, NOT tile grid, NOT manhole. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
       "width": 512,
       "height": 512,
       "seamless": true
@@ -214,7 +214,7 @@
     {
      "tool": "image.generate",
      "params": {
-      "prompt": "Wide stylized night sky panorama, horizon along the lower third, no ground, no buildings, no people. Near-black navy above with a few small stars, a faint electric-blue city glow along the horizon, dark but not a pure black frame, cinematic cartoon like Dose Of Destruction. No text, no watermark.",
+      "prompt": "Full-frame wide stylized night sky only, filled edge to edge with sky. Soft atmospheric electric-blue glow along the lower third as air glow, then deep navy to near-black above with sparse small stars. Absolutely no ground, no earth, no silhouette, no skyline, no buildings, no mountains, no trees, no city lights as objects, no black floor half. Dark but not a pure black frame. Cinematic cartoon like Dose Of Destruction. No text, no watermark.",
       "width": 1024,
       "height": 512
      },
