@@ -487,6 +487,38 @@ async function analytics(options, t) {
     t.scene("Live");
     t.progress(0.2);
 
+    // Take control, set the weather, throw lightning, glide, let go — the player features.
+    t.scene("Player");
+    const quiet = quietMoment(window.day.today());
+    if (quiet) {
+      scrubTo(quiet.start + Math.min(0.4, (quiet.end - quiet.start) / 3));
+      await sleep(500);
+    }
+    pressKey("Enter");
+    await t.until(() => window.day.control && window.day.control.mode() === "control", 4000, "take control").catch(() => {});
+    const offerEl = $("episode-offer");
+    if (offerEl && !offerEl.hidden) {
+      const dec = offerEl.querySelector(".decline");
+      if (dec) dec.click();
+      await sleep(200);
+    }
+    const Cplay = window.day.control;
+    if (!Cplay || Cplay.mode() !== "control") t.problem("bug", "Couldn't take control, so take_control / weather / power never fire");
+    else {
+      pressKey("2");
+      await sleep(350);
+      await t.until(() => window.day.powers && window.day.powers.now().pressure >= 24, 8000, "Pressure for a bolt").catch(() => {});
+      pressKey("e");
+      await sleep(250);
+      keyDown(" ");
+      await sleep(700);
+      keyUp(" ");
+      await sleep(350);
+      pressKey("Escape");
+      await sleep(300);
+    }
+    t.progress(0.22);
+
     // Wait for the batches to go out.
     await t.until(() => ["page_view", "game_ready", "screen", "progress", "feature"].every((n) => sent().some((e) => e.name === n)), 15000, "page_view, progress and feature events to be sent").catch(() => {});
     showSent();
@@ -496,6 +528,8 @@ async function analytics(options, t) {
     const features = new Set(sent().filter((e) => e.name === "feature").map((e) => e.props.name));
     t.metric("featuresSent", [...features].join(","));
     ["camera", "speed", "pause", "scrub", "step", "details", "sound", "live"].forEach((f) => !features.has(f) && t.problem("warning", `No feature event for ${f}`));
+    ["take_control", "let_go", "weather", "power"].forEach((f) => !features.has(f) && t.problem("bug", `No feature event for ${f}`));
+    if (!features.has("glide")) t.problem("warning", "No feature event for glide");
     t.metric("progressSent", sent().filter((e) => e.name === "progress").length);
     if (!sent().some((e) => e.name === "feature" && e.ctx && e.ctx.time && e.ctx.activity)) t.problem("warning", "Events don't carry the time of day and the activity in their context");
 
@@ -2303,6 +2337,185 @@ async function episodes(options, t) {
   t.progress(1);
 }
 
+/* ---------------- first visit: the tutorial, then every phone control, then the player events ---------------- */
+function boxOf(el) {
+  if (!el || el.hidden) return null;
+  const s = getComputedStyle(el);
+  if (s.display === "none" || s.visibility === "hidden") return null;
+  const r = el.getBoundingClientRect();
+  if (r.width < 8 || r.height < 8) return null;
+  return r;
+}
+function boxesOverlap(a, b) {
+  const pad = 2;
+  return a.left < b.right - pad && a.right > b.left + pad && a.top < b.bottom - pad && a.bottom > b.top + pad;
+}
+async function declineEpisode() {
+  const offerEl = $("episode-offer");
+  if (offerEl && !offerEl.hidden) {
+    const dec = offerEl.querySelector(".decline");
+    if (dec) dec.click();
+    await sleep(200);
+  }
+}
+
+async function firstVisit(options, t) {
+  t.scene("Tutorial");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const T = window.day.tutorial;
+  const C = window.day.control;
+  if (!T) {
+    t.problem("bug", "There's no first-visit tutorial");
+    return;
+  }
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const day = window.day.today();
+  const quiet = quietMoment(day);
+  if (quiet) {
+    scrubTo(quiet.start + Math.min(0.4, (quiet.end - quiet.start) / 3));
+    await sleep(400);
+  }
+  T.reset();
+  await t.until(() => T.blocking() && $("tutorial-skip"), 3000, "the tutorial card");
+  const skipBtn = $("tutorial-skip");
+  if (!skipBtn) {
+    t.problem("bug", "The tutorial has no Skip");
+    return;
+  }
+  t.event("tutorial-shown", `step ${T.now().step}`);
+  t.event("tutorial-skip-ready", "Skip is on the card");
+  const t0 = performance.now();
+
+  async function untilStep(id) {
+    const ok = await t.until(() => T.now().step === id || !T.blocking(), 10000, `tutorial step ${id}`).then(() => T.now().step === id || (id === "done" && !T.blocking())).catch(() => false);
+    if (!ok && T.now().step !== id) t.problem("bug", `Tutorial didn't reach ${id} (on ${T.now().step || "hidden"})`);
+    else t.event("tutorial-step", id);
+    return ok || T.now().step === id;
+  }
+
+  if (T.now().step !== "take") t.problem("bug", `Tutorial opened on ${T.now().step}, not take`);
+  pressKey("Enter");
+  await untilStep("move");
+  await holdKeys(["w"], 900);
+  await untilStep("jump");
+  await tapKey(" ", 80);
+  await untilStep("bolt");
+  await t.until(() => window.day.powers && window.day.powers.now().pressure >= 24, 8000, "Pressure for the tutorial bolt").catch(() => {});
+  pressKey("e");
+  await untilStep("letgo");
+  pressKey("Escape");
+  await t.until(() => !T.blocking(), 4000, "the tutorial to finish on let go").catch(() => {});
+  const seconds = (performance.now() - t0) / 1000;
+  t.metric("tutorialSeconds", Math.round(seconds * 10) / 10);
+  if (T.blocking()) t.problem("bug", "The tutorial was still up after let go");
+  else t.event("tutorial-done", `${seconds.toFixed(1)} s`);
+  if (seconds > 60) t.problem("bug", `The tutorial took ${seconds.toFixed(1)} s (it should be under a minute)`);
+  t.progress(0.35);
+
+  await t.until(() => C.mode() === "schedule", 25000, "him to walk back after the tutorial").catch(() => {});
+  t.scene("Skip");
+  T.reset();
+  await t.until(() => T.blocking(), 3000, "the tutorial again, so Skip can be pressed");
+  skipBtn.click();
+  await sleep(200);
+  if (T.blocking()) t.problem("bug", "Skip didn't dismiss the tutorial");
+  else t.event("tutorial-skipped", "Skip hides it, and it stays hidden");
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "take control after skipping").catch(() => {});
+  if (T.blocking()) t.problem("bug", "The tutorial came back after Skip");
+  else t.event("tutorial-stays-hidden", "a later take control doesn't show it");
+  t.progress(0.5);
+
+  t.scene("Phone");
+  await declineEpisode();
+  if (C.mode() !== "control") {
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 4000, "take control for the phone layout").catch(() => {});
+    await declineEpisode();
+  }
+  const native = C.state().touch;
+  if (!native) C.touch(true);
+  await sleep(200);
+  t.event("touch-layout", native ? `phone-sized window ${innerWidth}×${innerHeight}` : `phone controls on a ${innerWidth}×${innerHeight} window (setup shortcut)`);
+  const ids = ["control", "stick", "jump-btn", "power-storm", "power-bolt", "power-gust", "power-tornado", "weather-btn", "quality", "pressure", "episodes"];
+  const boxes = [];
+  ids.forEach((id) => {
+    const r = boxOf($(id));
+    if (!r) {
+      t.problem("bug", `Phone control #${id} isn't on screen`);
+      return;
+    }
+    boxes.push({ id, r });
+    const small = id === "stick" ? 80 : 44;
+    if (r.width < small - 1 || r.height < small - 1) t.problem("bug", `#${id} is ${Math.round(r.width)}×${Math.round(r.height)} (needs a thumb)`);
+    if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) t.problem("bug", `#${id} sits off the screen`);
+    if (r.left < 4 || r.right > innerWidth - 4) t.problem("polish", `#${id} is flush with the screen edge`);
+  });
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      if (boxesOverlap(boxes[i].r, boxes[j].r)) t.problem("bug", `#${boxes[i].id} overlaps #${boxes[j].id}`);
+    }
+  }
+  if (boxes.length === ids.length && !boxes.some((b, i) => boxes.slice(i + 1).some((c) => boxesOverlap(b.r, c.r)))) {
+    t.event("touch-reachable", ids.join(" "));
+  }
+  const look = window.day.look && window.day.look.info();
+  if (look) {
+    t.event("quality-auto", `now ${look.quality} (${look.qualityHow}), auto would pick ${look.auto}`);
+    const phoneSized = innerWidth <= 700 || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+    if (phoneSized && look.qualityHow === "auto" && look.quality !== "low") t.problem("bug", `A phone-sized window auto-picked ${look.quality}`);
+    if (phoneSized && look.quality === "low" && (look.bloom || look.shadows)) t.problem("bug", "Low quality left bloom or shadows on");
+  }
+  const samples = [];
+  const obs = world() && world().scene.onAfterRenderObservable.add(() => samples.push(world().engine.getDeltaTime()));
+  await sleep(1000);
+  if (obs && world()) world().scene.onAfterRenderObservable.remove(obs);
+  const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
+  t.metric("phoneFrameMs", Math.round(avg * 10) / 10);
+  if (!samples.length) t.problem("warning", "No frames to time on the phone layout");
+  else if (avg > 50) t.problem("warning", `Phone layout averaged ${avg.toFixed(1)} ms a frame`);
+  else t.event("phone-smooth", `${avg.toFixed(1)} ms a frame over ${samples.length} frames`);
+  t.progress(0.75);
+
+  t.scene("Weather and bolt");
+  const wbtn = $("weather-btn");
+  if (wbtn) await tapEl(wbtn);
+  await sleep(250);
+  const wheel = $("weather-wheel");
+  const rain = wheel && wheel.querySelector('[data-weather="rain"]');
+  if (!wheel || wheel.hidden || !rain) t.problem("bug", "The weather wheel didn't open from the phone button");
+  else {
+    await tapEl(rain);
+    await sleep(300);
+    const now = window.weather && window.weather.now();
+    if (!now || now.state !== "rain") t.problem("bug", `The wheel tap left the weather on ${now && now.state}`);
+    else t.event("weather-touch", "rain from the wheel");
+  }
+  const bolt = $("power-bolt");
+  if (bolt) {
+    await t.until(() => window.day.powers && window.day.powers.now().pressure >= 24, 8000, "Pressure for the phone bolt").catch(() => {});
+    await tapEl(bolt);
+    await sleep(300);
+  }
+  t.progress(0.9);
+  await t.until(() => {
+    const names = new Set(sent().filter((e) => e.name === "feature").map((e) => (e.props || {}).name));
+    return ["take_control", "weather", "power"].every((n) => names.has(n));
+  }, 12000, "take_control, weather and power to be sent").catch(() => {});
+  const names = new Set(sent().filter((e) => e.name === "feature").map((e) => (e.props || {}).name));
+  t.metric("playerFeatures", [...names].filter((n) => ["take_control", "let_go", "weather", "power", "glide", "episode", "tutorial"].includes(n)).join(","));
+  ["take_control", "weather", "power"].forEach((n) => {
+    if (!names.has(n)) t.problem("bug", `No ${n} feature went out`);
+    else t.event("analytics", `feature ${n}`);
+  });
+  if (names.has("let_go")) t.event("analytics", "feature let_go");
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -2321,6 +2534,7 @@ installPlaytest({
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
+    { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 120, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
@@ -2340,6 +2554,7 @@ installPlaytest({
       else if (id === "powers") await powers(options, t);
       else if (id === "voice") await voice(options, t);
       else if (id === "episodes") await episodes(options, t);
+      else if (id === "first-visit") await firstVisit(options, t);
     } finally {
       releaseHeld();
       stopWatching();

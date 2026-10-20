@@ -247,17 +247,7 @@ function tileBox(mesh, tile) {
   mesh.setVerticesData(B.VertexBuffer.UVKind, uv);
 }
 
-function readQuality() {
-  try {
-    if (typeof location !== "undefined") {
-      const q = new URLSearchParams(location.search).get("quality");
-      if (q === "low" || q === "high") return q;
-    }
-  } catch (e) { /* node, or a locked-down page */ }
-  try {
-    const saved = localStorage.getItem("icanbe.quality");
-    if (saved === "low" || saved === "high") return saved;
-  } catch (e) { /* no storage */ }
+function autoQuality() {
   let narrow = false;
   let coarse = false;
   try { narrow = window.innerWidth <= 700; } catch (e) { /* node */ }
@@ -265,6 +255,27 @@ function readQuality() {
   const mem = typeof navigator !== "undefined" && navigator.deviceMemory;
   if ((mem && mem <= 4) || narrow || coarse) return "low";
   return "high";
+}
+
+/** url, a saved choice, or the phone auto-pick (narrow, coarse pointer, or <= 4 GB). */
+function classifyQuality() {
+  try {
+    if (typeof location !== "undefined") {
+      const q = new URLSearchParams(location.search).get("quality");
+      if (q === "low" || q === "high") return { level: q, how: "url" };
+    }
+  } catch (e) { /* node, or a locked-down page */ }
+  try {
+    const saved = localStorage.getItem("icanbe.quality");
+    if (saved === "low" || saved === "high") return { level: saved, how: "saved" };
+  } catch (e) { /* no storage */ }
+  return { level: autoQuality(), how: "auto" };
+}
+
+let qualityPick = { level: "high", how: "auto" };
+function readQuality() {
+  qualityPick = classifyQuality();
+  return qualityPick.level;
 }
 
 function clockHour() {
@@ -519,6 +530,7 @@ export function installLook(world) {
       btn.setAttribute("aria-pressed", low ? "true" : "false");
       btn.title = low ? "Smooth on a phone. Click for the full picture." : "Full picture. Click for a smoother phone setting.";
     }
+    if (via === "click" || via === "api") qualityPick = { level: quality, how: "saved" };
     if (via && window.dispatchEvent) window.dispatchEvent(new CustomEvent("day:quality", { detail: { value: quality, via } }));
   }
 
@@ -633,6 +645,8 @@ export function installLook(world) {
     info() {
       return {
         quality,
+        qualityHow: qualityPick.how,
+        auto: autoQuality(),
         source,
         pbr: surfaces.length,
         textured: surfaces.filter((m) => !!m.albedoTexture).length,

@@ -48,14 +48,23 @@
   $("live").addEventListener("click", safe(() => feature("live", { via: via() })));
   $("sound").addEventListener("click", safe(() => feature("sound", { value: $("sound").getAttribute("aria-pressed") === "true" ? "on" : "off" })));
   $("details").addEventListener("click", safe(() => feature("details", { value: $("details").getAttribute("aria-pressed") === "true" ? "open" : "closed" })));
-  // Taking control of him (js/control.js): take, let-go, back, glide and updraft.
+  // Taking control of him (js/control.js). take_control, let_go and glide are their own
+  // features; control still carries the same actions for the older list.
   window.addEventListener("day:control", safe((e) => {
     const d = e.detail || {};
+    if (d.action === "take") feature("take_control", { via: d.via });
+    else if (d.action === "let-go") feature("let_go", { via: d.via });
+    else if (d.action === "glide") feature("glide", { via: d.via || "hold", y: d.y, speed: d.speed });
     if (d.action === "glide" || d.action === "soft-land" || d.action === "updraft") {
       feature("control", { action: d.action, via: d.via, y: d.y, speed: d.speed, lift: d.lift, kind: d.kind });
       return;
     }
     feature("control", d.via ? { action: d.action, via: d.via } : { action: d.action, how: d.how });
+  }));
+  // First visit (js/tutorial.js): show, each step, skip or done.
+  window.addEventListener("day:tutorial", safe((e) => {
+    const d = e.detail || {};
+    feature("tutorial", { action: d.action, step: d.step, seconds: d.seconds });
   }));
   // Graphics quality (js/look.js): high or low, from the button.
   window.addEventListener("day:quality", safe((e) => feature("quality", { value: (e.detail || {}).value, via: (e.detail || {}).via || "click" })));

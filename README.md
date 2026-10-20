@@ -1,8 +1,8 @@
 # A day
 
-Small Weather living through today, in real time, one action at a time. Open the site and you see what he's doing right now. Drag the day bar to look around the day, or play it at 10×–1200×.
+I Can Be: a third-person game. Small Weather (he/him, the storm caller from Dose Of Destruction) lives his developer's day on autopilot, in real time. Open the site and you see what he's doing right now; drag the day bar to look around the day, or play it at 10×–1200×. Take control and he's yours: walk the city, run, jump the roofs, set the weather, call a storm, throw lightning, a gust or a tornado, and play the chapter episodes. Let go and he walks back to his day. Babylon.js 9 with Havok physics. More in [AGENTS.md](AGENTS.md#direction).
 
-Where it's going: a third-person game. Small Weather (he/him, the storm caller from Dose Of Destruction) lives his developer's day on autopilot; the player can take control, walk the city and command the weather. Today the day plays on autopilot and you can take control of him (walk, run, jump, then let go and he walks back to his day), on Babylon.js 9 with Havok physics and colliders for the world. More in [AGENTS.md](AGENTS.md#direction).
+**First visit.** The first time the page opens, a card walks the player through it in under a minute: take control, walk, jump, one lightning strike, let go. Skip ends it; done or skipped, it doesn't come back (localStorage `icanbe.tutorial`; `day.tutorial.reset()` in the console shows it again). Lines in `day.config.js` `tutorial`, code in `js/tutorial.js`.
 
 **The whole day is defined in [`day.config.js`](day.config.js).** Change it, save it, and reload the page.
 
@@ -115,10 +115,19 @@ day.today()         // the compiled timeline
 
 `Space` play/pause · `←` `→` 5 minutes (`Shift` for 1) · `1`–`5` speeds · `Esc` back to now · `Enter` take control
 
-While he's yours: `WASD` or arrows move · `Shift` runs · `Space` jumps (twice more in the air; hold to float down) ·
-drag to look, wheel to zoom · `1`–`7` the weather (clear, clouds, rain, storm, fog, wind, snow) or hold `Q` for the
-wheel · `Esc` lets go. A gamepad works too (Start takes and lets go, A jumps, a bumper runs, B lets go), and on a
-phone there's a touch stick (push it to the edge to run), a jump button and a Weather button.
+While he's yours: `WASD` or arrows move · `Shift` runs · `Space` jumps (twice more in the air; hold to float down and
+glide) · drag to look, wheel to zoom · `1`–`7` the weather (clear, clouds, rain, storm, fog, wind, snow) or hold `Q`
+for the wheel · hold `F` for a storm · `E` (or right-click) lightning at the reticle · `G` a gust · `T` a tornado
+(each spends Pressure, the meter) · `Esc` lets go. The Episodes button starts a chapter's mission.
+
+Gamepad: Start takes and lets go, A jumps, a bumper runs, B lets go, Y storm, X lightning, left trigger gust, right
+trigger tornado.
+
+Phone: Take control is a tap. Then a touch stick bottom left (push it to the edge to run), Jump bottom right, Storm,
+Bolt, Gust and Tornado above it, the Weather button top left (a tap opens the wheel), Pressure under it, Quality top
+right, Let go top centre and Episodes bottom centre. Everything clears the notch and the home bar (safe areas).
+Quality picks low by itself on a phone (a narrow window, a coarse pointer or 4 GB or less); the button overrides it,
+and `?quality=low|high` too.
 
 ## Playtests
 
@@ -137,6 +146,7 @@ calls `window.hawkesPlaytest.start()` or the URL has `?playtest=<id>`.
 | `weather-audio` (~100 s) | Sound stays off until a real pointer on Sound; Enter (take-control sting); walk to the avenue; keys through clear, rain, storm, fog and snow. Logs music bed crossfades and rain/wind ambience levels. |
 | `weather-life` (~100 s) | Enter, walk to the avenue, rain (umbrellas + car wipers), storm, Esc; autopilot log reacts while the storm holds, then the sky drifts back to the forecast. |
 | `voice` (~100 s) | Sound on, Enter (episode open line), keys 1–7 each with a weather reaction, a forced power bark and several bolts that skip by chance/cooldown, Esc for the episode close / score-card line. |
+| `first-visit` (~2 min) | A first visit (`day.tutorial.reset()` at a quiet moment): the card walks Enter, W, Space, E and Esc and must finish in under a minute; then Skip hides it and a later take control doesn't bring it back. Then the phone layout (`day.control.touch(true)` on a desktop window): every control on screen, thumb-sized and not overlapping, the auto quality pick and a second of frame times, the Weather button and wheel tapped to rain, Bolt tapped, and `take_control`, `weather` and `power` events going out. |
 | `analytics` (~4 min) | Camera, speed buttons and keys, the day bar, the panels, with every analytics event that goes out on the timeline; then waits for the 3-minute question ("What would you want this to be?") and dismisses it. |
 
 Problems it reports: a block (activity) that never starts, actions never reached, the clock stopping, NaN in the

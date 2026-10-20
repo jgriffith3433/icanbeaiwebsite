@@ -54,7 +54,16 @@ levels get redone over time. The page is the day playing on its own until someon
   Space and Esc keep their day meanings otherwise. `day.control` (console, playtest): `mode()`, `state()`,
   `take()`, `letGo()`, `touch(on)` (show the phone controls on any screen; `?touch=1` too).
 - Touch controls show while he's the player's on a coarse pointer or a window 700 px wide or less. The button is on
-  the public site too (it isn't part of the HUD).
+  the public site too (it isn't part of the HUD). On such a screen `html.touch-ui` is set (`js/control.js`), and the
+  phone layout hangs off it: stick bottom left, Jump bottom right, the power pad above Jump, Weather top left with
+  Pressure under it, Quality top right, Let go top centre, Episodes bottom centre, all 44 px or more and inside the
+  safe areas (`env(safe-area-inset-*)`; `index.html` has `viewport-fit=cover`). The `first-visit` playtest checks
+  that none is off screen or overlapping. Quality picks low by itself on a phone (`js/look.js`; `look.info()` says
+  `qualityHow`: url, saved or auto).
+- **First visit** (`js/tutorial.js`, lines in `day.config.js` `tutorial`): a card the first time the page opens:
+  take control, walk, jump, one lightning strike, let go (keyboard or touch hints). Skip ends it; done or skipped,
+  localStorage `icanbe.tutorial` keeps it away. While it's up, the episode offer waits. A bot's tab (`?playtest=`
+  other than `first-visit`, or `navigator.webdriver`) never shows it; `day.tutorial.reset()` shows it again.
 
 ### His 3D model
 
@@ -153,9 +162,12 @@ keys, the canvas and `day.watch()`, and it never changes the day.
 - `progress` for each block of the day the viewer reaches. `step` is the block's place in today's timeline (1…n),
   plus 100 for each later day. It only grows in a session (kept in sessionStorage `icanbe.progress`). `label` is the
   block title, plus `chapter`, `clock`, and `via` (live, play, or jump; a jump counts after 1.5 s on the block).
-- `feature`, one per interaction: `control` {action: take or let-go, via key/button/touch/gamepad; then back,
-  how: walk or catch-up}, `weather` {state, via key/wheel/touch, intensity}, `power` {action, via, power, pressure},
+- `feature`, one per interaction: `take_control` {via key/button/touch/gamepad}, `let_go` {via}, `glide` {via, y,
+  speed} when he starts floating down, `control` {action: take or let-go, via; then back, how: walk or catch-up; glide,
+  soft-land, updraft: the older list, kept}, `weather` {state, via key/wheel/touch, intensity} (only what the player
+  sets, not the forecast), `power` {action: storm/bolt/gust/tornado or denied, via, power, pressure} for each power,
   `voice` {id, group, via} when a spoken line plays, `episode` {action: offer/start/goal/score/…, id, goal, pct, why},
+  `tutorial` {action: show, step, skip or done, step id, seconds},
   `speed` {value, via key/click}, `pause`, `play`, `live` (back to now), `scrub`
   {to, activity} once the day bar settles, `step` {presses, to} for ← →, `camera` {action: turn, zoom, pinch, tap;
   `on` for a tap: person, car, the spot name (`at-<spot>` node), room, nothing}, `sound`, `details`, `quality`
