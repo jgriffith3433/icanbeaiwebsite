@@ -295,7 +295,7 @@ function install() {
   btn.className = "control-btn";
   const hint = document.createElement("p");
   hint.className = "control-hint";
-  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold to float) · drag to look · 1–7 or hold Q for the weather · Esc to let go";
+  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold to float) · drag to look · hold F for a storm, E lightning, G a gust, T a tornado · 1–7 or hold Q for the weather · Esc to let go";
   const pad = document.createElement("div");
   pad.className = "touchpad";
   pad.hidden = true;
@@ -603,9 +603,11 @@ function install() {
       avatar.show(true);
     }
     avatar.place(s.x, s.y, s.z, s.yaw);
-    avatar.play(s.anim, s.speed, dt);
+    // cast / throw while a power is in his hands (js/powers.js); the walk pose otherwise
+    const posed = day.powers && day.powers.pose ? day.powers.pose() : null;
+    avatar.play(posed || s.anim, posed ? 1 : s.speed, dt);
     cameraFollow(dt, { x: gp.lx, y: gp.ly });
-    return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: s.anim, text };
+    return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: posed || s.anim, text };
   });
 
   syncUi();

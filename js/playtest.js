@@ -1438,6 +1438,181 @@ async function weatherAudio(options, t) {
   t.progress(1);
 }
 
+/* ---------------- powers: storm, lightning, gust, tornado, and the Pressure meter ---------------- */
+// Real input: day bar beside the car (setup), Sound on, Enter, WASD to the avenue near the loose props,
+// hold F for the storm, E bolt, G gust, T tornado; then try one dry so the meter refuses.
+async function powers(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const P = window.powers || (window.day && window.day.powers);
+  if (!P) {
+    t.problem("bug", "There's no powers (js/powers.js didn't install)");
+    return;
+  }
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1)
+    || day.actions.find((a) => /steps out/.test(a.text || ""))
+    || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  t.event("start-at", `${E().fmtClock(outside.start)} "${outside.text || outside.block}"`);
+  t.progress(0.05);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+    sound.click();
+    await sleep(200);
+  }
+
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  t.event("control-taken", "Enter, so his powers work");
+  const meter = $("pressure");
+  if (!meter || meter.hidden) t.problem("bug", "The Pressure meter isn't showing while he's the player's");
+  else t.event("pressure-meter", "Pressure is on screen");
+
+  // Near the loose bins and umbrellas on the avenue (day.config.js powers.loose).
+  const nearLoose = { x: -2.2, z: street.z - 1.8 };
+  const reached = await goTo(nearLoose.x, nearLoose.z, t, { close: 1.6, ms: 20000, sprint: true, progress: 0.12 });
+  const stood = C.state();
+  t.scene("On the avenue");
+  if (reached) t.event("at-props", `at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)} near the loose props`);
+  else t.problem("bug", `He didn't reach the avenue props (at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)})`);
+  t.progress(0.18);
+
+  async function waitPressure(cost, label) {
+    await t.until(() => P.now().pressure + 0.05 >= cost, 12000, `Pressure for ${label} (${cost})`);
+    t.metric(`pressure-before-${label}`, Math.round(P.now().pressure));
+  }
+
+  // 1. Hold F: cloud over him, then the storm and rain.
+  t.scene("Summon storm");
+  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.storm) || 40, "storm");
+  const beforeStorm = window.weather ? window.weather.now() : null;
+  keyDown("f");
+  await t.until(() => P.now().charging || P.now().radius > 1, 2000, "the cloud to gather").catch(() => {});
+  if (P.now().radius > 0.8 || P.now().charging) t.event("storm-gather", `cloud radius ${P.now().radius.toFixed(1)}, charging ${P.now().charging}`);
+  else t.problem("bug", "Holding F didn't darken the sky over him");
+  await sleep(900);
+  keyUp("f");
+  await t.until(() => P.now().called || (window.weather && window.weather.now().state === "storm"), 5000, "the storm he called");
+  const afterStorm = P.now();
+  const wx = window.weather && window.weather.now();
+  if (afterStorm.called || (wx && wx.state === "storm")) {
+    t.event("storm-called", `local rain ${afterStorm.localRain}, weather ${wx && wx.state}, rain ${wx && wx.rain.toFixed(2)}, sky ${wx && wx.sky}`);
+  } else t.problem("bug", "Holding F didn't summon a storm");
+  if (beforeStorm && wx && wx.rain <= beforeStorm.rain && !(afterStorm.localRain || afterStorm.called)) {
+    t.problem("bug", "Summoning a storm didn't start rain");
+  }
+  if ($("log") && !$("log").textContent.includes("storm")) t.problem("polish", "Calling the storm isn't in the action log");
+  t.progress(0.35);
+
+  // 2. E: lightning at the reticle — flash, thunder, a mark on the world.
+  t.scene("Lightning");
+  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.bolt) || 24, "bolt");
+  const props0 = (P.now().props || []).map((p) => ({ ...p }));
+  pressKey("e");
+  await sleep(200);
+  await t.until(() => P.now().strike, 2000, "a lightning strike");
+  const strike = P.now().strike;
+  if (!strike) {
+    t.problem("bug", "E didn't throw lightning");
+  } else {
+    t.event("bolt-struck", `at ${strike.x.toFixed(1)},${strike.z.toFixed(1)} · flash ${P.now().flash.toFixed(2)} · alarm ${strike.alarm} · blackout ${strike.blackout || "none"} · knocked ${strike.knocked}`);
+    if (!(P.now().flash > 0.05 || strike.thunder)) {
+      await t.until(() => P.now().strike && P.now().strike.thunder, 3000, "thunder").catch(() => {});
+    }
+    if (P.now().strike && P.now().strike.thunder) t.event("thunder", `thunder after ${P.now().strike.delay.toFixed(2)} s`);
+    else if (!(P.now().flash > 0)) t.problem("bug", "The strike had no flash or thunder");
+    const moved = (P.now().props || []).some((p, i) => props0[i] && Math.hypot(p.x - props0[i].x, p.z - props0[i].z) > 0.3);
+    const worldHit = !!(strike.alarm || strike.blackout || strike.knocked > 0 || moved || P.now().alarm || P.now().blackout);
+    if (worldHit) t.event("bolt-world", `alarm ${!!(strike.alarm || P.now().alarm)}, lights out ${P.now().blackout || strike.blackout || "none"}, props moved ${moved}, knocked ${strike.knocked}`);
+    else t.problem("bug", "Lightning left no mark on the world (no alarm, lights out or knocked prop)");
+  }
+  t.progress(0.55);
+
+  // 3. G: a gust that pushes what's in front of him.
+  t.scene("Gust");
+  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.gust) || 16, "gust");
+  const beforeGust = (P.now().props || []).map((p) => ({ ...p }));
+  pressKey("g");
+  await sleep(350);
+  const gust = P.now().gust;
+  if (!gust) t.problem("bug", "G didn't cast a gust");
+  else {
+    const pushed = (P.now().props || []).filter((p, i) => beforeGust[i] && Math.hypot(p.x - beforeGust[i].x, p.z - beforeGust[i].z) > 0.25).length;
+    t.event("gust-cast", `pushes ${gust.pushes}, props moved ${pushed}`);
+    if (gust.pushes < 1 && pushed < 1) t.problem("bug", "The gust didn't push anything");
+  }
+  t.progress(0.7);
+
+  // 4. T: a tornado down the street.
+  t.scene("Tornado");
+  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.tornado) || 48, "tornado");
+  pressKey("t");
+  await sleep(200);
+  await t.until(() => P.now().tornado && P.now().tornado.life > 0, 2000, "a tornado");
+  const tw0 = P.now().tornado;
+  if (!tw0) t.problem("bug", "T didn't send a tornado");
+  else {
+    t.event("tornado-start", `on the ${tw0.axis} street at ${tw0.x.toFixed(1)},${tw0.z.toFixed(1)}, life ${tw0.life.toFixed(1)} s`);
+    await sleep(1800);
+    const tw1 = P.now().tornado;
+    const travelled = tw1 ? tw1.travelled : tw0.travelled;
+    if (travelled > 2) t.event("tornado-ran", `travelled ${travelled.toFixed(1)} m down the street`);
+    else t.problem("bug", `The tornado barely moved (${(travelled || 0).toFixed(1)} m)`);
+  }
+  t.progress(0.85);
+
+  // 5. Pressure limits him: spend what's left, then a refused call.
+  t.scene("Pressure");
+  let denied = false;
+  for (let i = 0; i < 8 && !denied; i++) {
+    const before = P.now().pressure;
+    pressKey("t");
+    await sleep(180);
+    const snap = P.now();
+    if (snap.blocked && snap.blocked.power) {
+      denied = true;
+      t.event("pressure-denied", `refused ${snap.blocked.power} at pressure ${snap.blocked.pressure} (had ${before.toFixed(0)})`);
+    }
+  }
+  if (!denied) {
+    // Drain with gusts if tornado never refused (still filling).
+    while (P.now().pressure > 5) {
+      pressKey("g");
+      await sleep(120);
+    }
+    pressKey("t");
+    await sleep(200);
+    if (P.now().blocked) {
+      denied = true;
+      t.event("pressure-denied", `refused ${P.now().blocked.power} at ${P.now().blocked.pressure}`);
+    }
+  }
+  if (!denied) t.problem("bug", "The Pressure meter never refused a power");
+  else t.metric("pressure-floor", P.now().blocked ? P.now().blocked.pressure : Math.round(P.now().pressure));
+
+  C.touch(true);
+  await sleep(250);
+  const pad = $("powerpad");
+  if (!pad || pad.hidden) t.problem("polish", "The power pad isn't showing with touch controls on");
+  else t.event("power-pad", "Storm / Bolt / Gust / Tornado on the phone");
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -1451,6 +1626,7 @@ installPlaytest({
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
+    { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -1463,6 +1639,7 @@ installPlaytest({
       else if (id === "city") await city(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
+      else if (id === "powers") await powers(options, t);
     } finally {
       releaseHeld();
       stopWatching();
