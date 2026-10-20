@@ -63,6 +63,10 @@
     const d = e.detail || {};
     feature("power", { action: d.action, via: d.via, power: d.power, pressure: d.pressure });
   }));
+  window.addEventListener("day:voice", safe((e) => {
+    const d = e.detail || {};
+    if (d.action === "play") feature("voice", { id: d.id, group: d.group, via: d.via });
+  }));
   document.querySelectorAll('a[href="whatsnew.html"]').forEach((a) => a.addEventListener("click", () => feature("whatsnew")));
   document.querySelectorAll('a[href="privacy.html"]').forEach((a) => a.addEventListener("click", () => feature("privacy")));
 

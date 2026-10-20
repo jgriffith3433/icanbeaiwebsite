@@ -1473,6 +1473,138 @@ async function powers(options, t) {
   t.progress(1);
 }
 
+/* ---------------- voice: DoD Eric lines on powers, weather, episode open/close ---------------- */
+// Real input: Sound (pointer), Enter, weather keys 1–7 with gaps for cooldown, bolts for chance/cooldown skips,
+// one forced power bark, Esc for the score-card close. Events: voice-play / voice-skip.
+async function voice(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const V = window.voice || (window.day && window.day.voice);
+  if (!V) {
+    t.problem("bug", "There's no voice (js/voice.js didn't install)");
+    return;
+  }
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const cfg = window.DAY_CONFIG && window.DAY_CONFIG.voice;
+  if (!cfg || !Array.isArray(cfg.lines) || cfg.lines.length < 30) {
+    t.problem("bug", `voice.lines is short (${cfg && cfg.lines ? cfg.lines.length : 0})`);
+  }
+  if (cfg && cfg.voiceId !== "cjVigY5qzO86Huf0OWal") {
+    t.problem("bug", `voiceId is ${cfg && cfg.voiceId}, not DoD Eric (cjVigY5qzO86Huf0OWal)`);
+  }
+  t.event("voice-ready", `${V.now().lines} lines, voice ${V.now().voiceId}`);
+  t.progress(0.05);
+
+  const day = window.day.today();
+  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  clickSpeed(1);
+  await sleep(400);
+  t.event("start-at", `${E().fmtClock(out.start)} "${out.text}"`);
+
+  const plays = [];
+  const skips = [];
+  const onVoice = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "play") plays.push(d);
+    if (d.action === "skip") skips.push(d);
+  };
+  window.addEventListener("day:voice", onVoice);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+    sound.click();
+    await sleep(250);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+  }
+
+  // Episode open
+  t.scene("Episode open");
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  await t.until(() => plays.some((p) => p.group === "episode-open"), 4000, "episode-open line").catch(() => {});
+  const open = plays.find((p) => p.group === "episode-open");
+  if (open) t.event("voice-play", `episode-open ${open.id}: "${open.text}"`);
+  else t.problem("bug", "Taking control didn't play an episode-open line");
+  t.progress(0.15);
+
+  // Weather reactions for every state (wait past cooldown between keys)
+  const order = [
+    ["1", "clear"],
+    ["2", "clouds"],
+    ["3", "rain"],
+    ["4", "storm"],
+    ["5", "fog"],
+    ["6", "wind"],
+    ["7", "snow"],
+  ];
+  for (let i = 0; i < order.length; i++) {
+    const [key, state] = order[i];
+    await sleep(2800);
+    const before = plays.length;
+    pressKey(key);
+    await t.until(() => plays.length > before && plays.some((p) => p.group === `weather-${state}`), 5000, `weather-${state} line`).catch(() => {});
+    const hit = [...plays].reverse().find((p) => p.group === `weather-${state}`);
+    if (hit) t.event(`voice-weather-${state}`, `${hit.id}: "${hit.text}"`);
+    else t.problem("bug", `No voice reaction when weather became ${state}`);
+    t.scene(state.charAt(0).toUpperCase() + state.slice(1));
+    t.progress(0.2 + i * 0.07);
+  }
+
+  // Powers: one forced bark, then several bolts so chance/cooldown skips some
+  t.scene("Power bark");
+  const P = window.powers || (window.day && window.day.powers);
+  if (P) {
+    await t.until(() => P.now().pressure + 0.05 >= 24, 12000, "Pressure for bolt").catch(() => {});
+    const forced = V.say("bolt", { force: true, ignoreCooldown: true, via: "playtest" });
+    if (forced) t.event("voice-play", `forced bolt ${forced.id}: "${forced.text}"`);
+    else t.problem("bug", "Forced bolt line didn't play");
+    await sleep(200);
+    let barked = 0;
+    let quiet = 0;
+    for (let i = 0; i < 6; i++) {
+      await t.until(() => P.now().pressure + 0.05 >= 24, 10000, "Pressure for bolt").catch(() => {});
+      const before = plays.length;
+      const skipBefore = skips.length;
+      pressKey("e");
+      await sleep(350);
+      if (plays.length > before) barked++;
+      else if (skips.length > skipBefore) quiet++;
+      else quiet++;
+    }
+    t.metric("powerVoicePlays", barked);
+    t.metric("powerVoiceSkips", quiet);
+    if (barked < 1 && !forced) t.problem("bug", "No power voice line played");
+    else t.event("voice-power", `${barked} natural barks, ${quiet} skips (chance/cooldown)`);
+    if (quiet < 1) t.problem("polish", "Every power call got a voice line; chance/cooldown should skip some");
+  } else t.problem("bug", "powers missing, can't check power barks");
+  t.progress(0.85);
+
+  // Episode close / score card
+  t.scene("Episode close");
+  await sleep(2800);
+  const beforeClose = plays.length;
+  pressKey("Escape");
+  await t.until(() => C.mode() !== "control", 4000, "Let go (Esc)");
+  await t.until(() => plays.length > beforeClose && plays.some((p) => p.group === "episode-close"), 4000, "episode-close line").catch(() => {});
+  const close = [...plays].reverse().find((p) => p.group === "episode-close");
+  if (close) t.event("voice-play", `episode-close ${close.id}: "${close.text}"`);
+  else t.problem("bug", "Letting go didn't play an episode-close / score-card line");
+
+  window.removeEventListener("day:voice", onVoice);
+  t.metric("voicePlays", plays.length);
+  t.metric("voiceSkips", skips.length);
+  t.event("voice-summary", `${plays.length} plays, ${skips.length} skips, DoD voice ${V.now().voiceId}`);
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -1486,6 +1618,7 @@ installPlaytest({
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
+    { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -1498,6 +1631,7 @@ installPlaytest({
       else if (id === "city") await city(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "powers") await powers(options, t);
+      else if (id === "voice") await voice(options, t);
     } finally {
       releaseHeld();
       stopWatching();
