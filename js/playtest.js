@@ -2013,6 +2013,151 @@ async function weatherLife(options, t) {
   t.progress(1);
 }
 
+/* ---------------- episodes: chapter missions, goals, forecast score card ---------------- */
+// Starts each of the four via the Episodes menu (clock jump + take), completes at least
+// one goal on Morning (clouds then clear), checks the score card and localStorage best.
+// Events: episode-offer / episode-start / episode-goal / episode-score / episode-best.
+async function episodes(options, t) {
+  t.scene("Episodes");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const Ep = window.episodes || (window.day && window.day.episodes);
+  const C = window.day.control;
+  if (!Ep) {
+    t.problem("bug", "There's no episodes API (js/episodes.js didn't install)");
+    return;
+  }
+  if (!C) {
+    t.problem("bug", "There's no Take control");
+    return;
+  }
+  const cfg = window.DAY_CONFIG && window.DAY_CONFIG.episodes;
+  if (!cfg || !Array.isArray(cfg.list) || cfg.list.length < 4) {
+    t.problem("bug", `episodes.list is short (${cfg && cfg.list ? cfg.list.length : 0})`);
+  }
+  t.event("episodes-ready", `${Ep.list().length} episodes, storage ${cfg && cfg.storageKey}`);
+  t.progress(0.05);
+
+  const key = (cfg && cfg.storageKey) || "icanbe.episodes.best";
+  try {
+    localStorage.removeItem(key);
+  } catch (err) {
+    /* ignore */
+  }
+
+  const events = [];
+  const onEp = (e) => events.push((e && e.detail) || {});
+  window.addEventListener("day:episode", onEp);
+
+  const ids = ["morning", "lunch", "commute-home", "night"];
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    const ep = cfg.list.find((e) => e.id === id);
+    t.scene(ep ? ep.title : id);
+    if (C.mode() === "control") {
+      pressKey("Escape");
+      await t.until(() => C.mode() === "schedule" || C.mode() === "returning", 5000, "let go before next").catch(() => {});
+      await t.until(() => C.mode() === "schedule", 25000, "back on day").catch(() => {});
+    }
+    // Dismiss a leftover score card if any.
+    const scoreOk = document.querySelector("#episode-score button.ok");
+    if (scoreOk && !$("episode-score").hidden) scoreOk.click();
+    await sleep(200);
+
+    if (window.day.jump && ep && ep.clock) window.day.jump(ep.clock);
+    else if (ep && ep.clock) {
+      const mins = window.DayEngine.parseClock(ep.clock, window.DAY_CONFIG.dayStart);
+      scrubTo(mins);
+    }
+    clickSpeed(1);
+    await sleep(400);
+    t.event("start-at", `${ep.clock} ${id}`);
+
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 5000, `Take control for ${id}`);
+    await sleep(350);
+    const offer = $("episode-offer");
+    if (!offer || offer.hidden) {
+      // Menu path: start directly if the offer didn't match (clock edge).
+      Ep.start(id, "playtest");
+      t.event("episode-start", `${id} via api (no offer)`);
+    } else {
+      t.event("episode-offer", `${id} offered`);
+      const accept = offer.querySelector("button.accept");
+      if (accept) accept.click();
+      else Ep.start(id, "playtest");
+    }
+    await t.until(() => Ep.now() && Ep.now().id === id, 4000, `${id} running`);
+    const hud = $("episode-hud");
+    if (!hud || hud.hidden) t.problem("bug", `Episode HUD hidden for ${id}`);
+    else t.event("episode-hud", `${id}: ${Ep.now().goals.length} goals`);
+    t.progress(0.15 + i * 0.12);
+
+    if (id === "morning") {
+      // Complete at least one goal: gather clouds, then clear.
+      pressKey("2");
+      await t.until(() => {
+        const n = Ep.now();
+        return n && n.goals.some((g) => g.id === "clouds" && g.done);
+      }, 8000, "clouds goal");
+      t.event("episode-goal", "morning clouds");
+      pressKey("1");
+      await t.until(() => {
+        const n = Ep.now();
+        return n && n.goals.some((g) => g.id === "clear" && g.done);
+      }, 8000, "clear goal");
+      t.event("episode-goal", "morning clear");
+      // End with let-go so the score card shows.
+      pressKey("Escape");
+      await t.until(() => !$("episode-score").hidden || !Ep.now(), 8000, "score card after let-go");
+      const card = $("episode-score");
+      if (card && !card.hidden) {
+        const text = (card.querySelector(".forecast") || {}).textContent || "";
+        t.event("episode-score", text || "score shown");
+        if (!/Today's forecast:/.test(text)) t.problem("bug", `Score card text is "${text}"`);
+        const okBtn = card.querySelector("button.ok");
+        if (okBtn) okBtn.click();
+      } else t.problem("bug", "Morning episode never showed a score card");
+      await t.until(() => C.mode() === "schedule", 30000, "back after morning").catch(() => {});
+      const best = Ep.best();
+      if (!best.morning || !(best.morning.pct >= 0)) t.problem("bug", "Best score for morning wasn't kept");
+      else t.event("episode-best", `morning ${best.morning.pct}% (${best.morning.word})`);
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw || !JSON.parse(raw).morning) t.problem("bug", "localStorage has no morning best");
+        else t.event("episode-storage", "icanbe.episodes.best has morning");
+      } catch (err) {
+        t.problem("bug", `localStorage best unreadable: ${err}`);
+      }
+    } else {
+      // Smoke-start the others: goals visible, then let go for a score.
+      await sleep(600);
+      const n = Ep.now();
+      if (!n || !n.goals.length) t.problem("bug", `${id} has no goals while running`);
+      else t.event("episode-goals", `${id}: ${n.goals.map((g) => g.label).join(" · ")}`);
+      pressKey("Escape");
+      await t.until(() => !$("episode-score").hidden || !Ep.now(), 8000, `score for ${id}`).catch(() => {});
+      const card = $("episode-score");
+      if (card && !card.hidden) {
+        t.event("episode-score", `${id}: ${(card.querySelector(".forecast") || {}).textContent || "shown"}`);
+        const okBtn = card.querySelector("button.ok");
+        if (okBtn) okBtn.click();
+      }
+      await t.until(() => C.mode() === "schedule" || C.mode() === "returning", 5000, "leaving control").catch(() => {});
+      await t.until(() => C.mode() === "schedule", 30000, "schedule again").catch(() => {});
+    }
+  }
+
+  window.removeEventListener("day:episode", onEp);
+  const started = events.filter((e) => e.action === "start").map((e) => e.id);
+  ids.forEach((id) => {
+    if (!started.includes(id) && !events.some((e) => e.action === "score" && e.id === id)) {
+      t.problem("polish", `No start/score event logged for ${id}`);
+    }
+  });
+  t.progress(1);
+}
+
 const E = () => window.DayEngine;
 
 installPlaytest({
@@ -2030,6 +2175,7 @@ installPlaytest({
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 100, tags: ["weather"], description: "Day bar to the front door. Enter, WASD to the avenue, key 3 then 4, Esc. Events: street-rain, autopilot-react, weather-drift." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
+    { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -2046,6 +2192,7 @@ installPlaytest({
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "voice") await voice(options, t);
+      else if (id === "episodes") await episodes(options, t);
     } finally {
       releaseHeld();
       stopWatching();

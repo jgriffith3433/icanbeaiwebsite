@@ -23,6 +23,7 @@ The page needs Vite: opening `index.html` straight from disk no longer works, be
 | `js/main.js` | Clock, playback, the action log, body meters, the things panel |
 | `js/analytics.js` | Hawkes Analytics: what viewers watch and touch (see [AGENTS.md](AGENTS.md#analytics-hawkes-analytics)) |
 | `js/control.js` | Taking control: the player moves him in third person (Havok character controller, keys, gamepad, touch stick, orbit camera), and Let go walks him back to his day |
+| `js/episodes.js` | Chapter episodes (morning / lunch / commute home / night): goals, timers, forecast score cards in localStorage |
 | `js/avatar.js` | How his rigged model (a GLB with idle/walk/run/jump/fall/float/cast clips) replaces the stand-in figure |
 | `simulation-checklist.md` | The original rules the simulation follows |
 

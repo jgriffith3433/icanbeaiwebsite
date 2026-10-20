@@ -71,6 +71,11 @@
     const d = e.detail || {};
     if (d.action === "play") feature("voice", { id: d.id, group: d.group, via: d.via });
   }));
+  // Chapter episodes (js/episodes.js): offer, start, goals, score card.
+  window.addEventListener("day:episode", safe((e) => {
+    const d = e.detail || {};
+    feature("episode", { action: d.action, id: d.id, goal: d.goal, pct: d.pct, why: d.why, via: d.via });
+  }));
   document.querySelectorAll('a[href="whatsnew.html"]').forEach((a) => a.addEventListener("click", () => feature("whatsnew")));
   document.querySelectorAll('a[href="privacy.html"]').forEach((a) => a.addEventListener("click", () => feature("privacy")));
 
