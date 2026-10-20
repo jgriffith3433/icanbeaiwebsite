@@ -341,8 +341,19 @@ sim.step(1, true);
 sim.follow('2026-10-19', backMinute, 0.05, false, 'control');
 ok(sim.now().manual && sim.now().state === 'snow', 'taking control handed the weather back to the day');
 sim.follow('2026-10-19', backMinute, 0.05, false, 'schedule');
-ok(!sim.now().manual && sim.now().state === backCast.state, `letting go stayed on ${sim.now().state} instead of the day's ${backCast.state}`);
-if (backCast.state !== 'snow') ok(sim.now().shown === 'snow' && sim.now().blend < 0.35, 'letting go popped straight back to the forecast');
+ok(sim.now().manual && sim.now().state === 'snow' && sim.now().hold > 0, `letting go dropped the weather immediately (manual ${sim.now().manual}, hold ${sim.now().hold})`);
+ok(sim.now().shown === 'snow', 'the held weather should still show snow right after let-go');
+const holdSec = sim.holdSec || (wx.hold || 24);
+// Almost the full hold: still manual and still looking like snow
+for (let i = 0; i < 20; i++) sim.follow('2026-10-19', backMinute, (holdSec * 0.85) / 20, false, 'schedule');
+ok(sim.now().manual && sim.now().state === 'snow' && sim.now().shown === 'snow', `hold ended early (manual ${sim.now().manual}, shown ${sim.now().shown}, hold ${sim.now().hold.toFixed(1)})`);
+// Finish the hold and let it drift
+for (let i = 0; i < 40 && sim.now().manual; i++) sim.follow('2026-10-19', backMinute, 0.5, false, 'schedule');
+ok(!sim.now().manual && sim.now().state === backCast.state, `after the hold it stayed on ${sim.now().state} instead of the day's ${backCast.state}`);
+if (backCast.state !== 'snow') {
+  const mid = sim.now();
+  ok(mid.shown === 'snow' || mid.blend < 0.85, `drifting back popped straight to the forecast (shown ${mid.shown}, blend ${mid.blend.toFixed(2)})`);
+}
 const weatherLines = wx.lines || {};
 ok(STATES.every((s) => weatherLines[s]), 'day.config.js weather.lines is missing a state');
 ok(!Object.values(weatherLines).some((t) => /\b(they|their|theirs|themselves)\b/i.test(t)), `weather lines that say "they": ${Object.values(weatherLines).join(' | ')}`);

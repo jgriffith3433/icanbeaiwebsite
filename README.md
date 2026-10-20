@@ -75,9 +75,19 @@ Add an entry to one of the `pools`. It gets sprinkled into any step whose `micro
 ```
 
 - `when` limits the entry to certain conditions (things or body stats like `thirst: ">0.5"`).
+  Steps and pools also accept `when: { weather: "rain" }` or `when: { weather: ["rain", "storm"] }`:
+  the day's forecast at that minute (same seed as the sky). Use it so he skips a walk in the rain,
+  watches a storm from the window, or a mind-pool line only fires when it's snowing.
 - `likes` makes it more likely as a stat rises.
 - `set` changes the world. The glass stays empty until a later step fills it.
 - `steps` with `go: "$back"` covers multi-part trips ("walk to the fridge, look, close it, come back").
+
+### Weather the world reacts to
+
+The sky is `day.config.js` `weather` / `js/weather.js`. While he's yours, keys 1–7 set it. After you let go,
+that weather **holds** for `weather.hold` real seconds (default ~22), then drifts back to the day's forecast;
+`weather.react` lines go into the action log while autopilot still has what he left. On the street, people open
+umbrellas in rain, hurry in a storm and huddle in snow; cars run wipers and lights and drive slower when it's wet.
 
 ### Move furniture
 
@@ -123,6 +133,7 @@ calls `window.hawkesPlaytest.start()` or the URL has `?playtest=<id>`.
 | `control` (~100 s) | From a quiet moment at home (the day bar): Enter takes control; WASD walks, Shift sprints, a drag orbits the camera, Space jumps three times in one flight and holds to float; Esc lets go and it checks he walks back (no teleport) to where his day puts him, the log says so and the day carries on. Then the phone's touch stick and jump button (shown with `day.control.touch(true)` on a desktop window), and letting go again by tapping. |
 | `weather` (~110 s) | From the front door (the day bar): Sound on, Enter, walk to the avenue, then keys 1–7 through clear, clouds, rain, storm, fog, wind and snow. Each blends over a few seconds; rain and storm leave the road wet. Hold Q for the wheel, then the phone's Weather button. |
 | `weather-audio` (~100 s) | Sound stays off until a real pointer on Sound; Enter (take-control sting); walk to the avenue; keys through clear, rain, storm, fog and snow. Logs music bed crossfades and rain/wind ambience levels. |
+| `weather-life` (~100 s) | Enter, walk to the avenue, rain (umbrellas + car wipers), storm, Esc; autopilot log reacts while the storm holds, then the sky drifts back to the forecast. |
 | `voice` (~100 s) | Sound on, Enter (episode open line), keys 1–7 each with a weather reaction, a forced power bark and several bolts that skip by chance/cooldown, Esc for the episode close / score-card line. |
 | `analytics` (~4 min) | Camera, speed buttons and keys, the day bar, the panels, with every analytics event that goes out on the timeline; then waits for the 3-minute question ("What would you want this to be?") and dismisses it. |
 
