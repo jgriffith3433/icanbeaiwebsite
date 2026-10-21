@@ -72,7 +72,12 @@ export function makeSkin(B, scene, res, hipsTarget) {
      Also set doNotSyncBoundingInfo = true so Babylon doesn't CPU-skin 22k vertices just to recompute bounding boxes. */
   const glowMeshes = [];
   meshes.forEach((m) => {
-    if (m.skeleton) m.doNotSyncBoundingInfo = true;
+    if (m.skeleton) {
+      m.doNotSyncBoundingInfo = true;
+      /* The stale bind-pose bounds (and the wrap's scale, tilt and clip offsets) can fall outside the camera frustum
+         while he is on screen: skip frustum culling for him, or he vanishes at certain camera angles. */
+      m.alwaysSelectAsActiveMesh = true;
+    }
     const mat = m.material;
     if (!mat) return;
     mat.maxSimultaneousLights = 10;
