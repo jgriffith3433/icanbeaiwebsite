@@ -157,16 +157,20 @@ export function startTutorial() {
   function build() {
     const style = document.createElement("style");
     style.textContent = `
-.tutorial{position:fixed;z-index:8;left:50%;top:max(108px,calc(env(safe-area-inset-top) + 96px));transform:translateX(-50%);width:min(300px,calc(100vw - 168px));padding:14px 14px 12px;border-radius:16px;background:rgba(14,16,22,.88);border:1px solid rgba(240,194,122,.45);color:#f6f1e8;font:500 0.95rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 16px 40px rgba(0,0,0,.4);pointer-events:auto}
+.tutorial{position:fixed;z-index:8;left:50%;bottom:202px;top:auto;transform:translateX(-50%);width:min(300px,calc(100vw - 32px));padding:12px 14px 10px;border-radius:16px;background:rgba(14,16,22,.88);border:1px solid rgba(240,194,122,.45);color:#f6f1e8;font:500 0.95rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 16px 40px rgba(0,0,0,.4);pointer-events:auto}
 .tutorial[hidden]{display:none}
 .tutorial.finished .row{display:none}
 .tutorial p{margin:0}
 .tutorial .do{font:600 1.05rem/1.3 Fraunces,Georgia,serif}
 .tutorial .hint{margin-top:4px;color:rgba(246,241,232,.68);font-size:0.82rem}
-.tutorial .row{display:flex;justify-content:flex-end;margin-top:10px}
+.tutorial .row{display:flex;justify-content:flex-end;margin-top:8px}
 .tutorial button{appearance:none;min-height:44px;padding:8px 16px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.85rem Outfit,system-ui,sans-serif;cursor:pointer}
 .tutorial button:hover{background:rgba(240,194,122,.14)}
-html.touch-ui .tutorial{width:min(260px,calc(100vw - 180px))}
+html.in-control .tutorial{bottom:232px}
+.preview-public .tutorial{bottom:max(72px,calc(env(safe-area-inset-bottom) + 62px))}
+.preview-public.in-control .tutorial{bottom:116px}
+html.touch-ui .tutorial{width:min(280px,calc(100vw - 32px))}
+html.touch-ui.in-control .tutorial{bottom:max(256px,calc(env(safe-area-inset-bottom) + 244px))}
 `;
     document.head.appendChild(style);
     card = document.createElement("div");

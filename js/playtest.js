@@ -183,6 +183,9 @@ async function smoke(options, t) {
   if (!whatBox) t.problem("bug", "The narration HUD (#what) is hidden in Live mode");
   if (!tutBox) t.problem("bug", "The first-time control tutorial prompt (#tutorial) is hidden on a fresh visit");
   if (daybarBox && whatBox && tutBox) {
+    if (boxesOverlap(tutBox, boxOf(document.querySelector(".panel.now")) || whatBox)) {
+      t.problem("bug", "The tutorial card (#tutorial) overlaps the narration header card (.panel.now)");
+    }
     t.event("hud-and-tutorial", `daybar ${Math.round(daybarBox.width)}×${Math.round(daybarBox.height)}, narration "${$("what").textContent}", tutorial "${($("tutorial-text") || {}).textContent || ""}"`);
   }
   t.progress(0.2);
