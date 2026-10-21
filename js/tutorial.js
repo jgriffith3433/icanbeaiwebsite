@@ -166,7 +166,9 @@ export function startTutorial() {
 .tutorial .row{display:flex;justify-content:flex-end;margin-top:10px}
 .tutorial button{appearance:none;min-height:44px;padding:8px 16px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.85rem Outfit,system-ui,sans-serif;cursor:pointer}
 .tutorial button:hover{background:rgba(240,194,122,.14)}
+@media (max-width:700px){html:not(.in-control):not(.preview-public) .tutorial{top:calc(max(12px,env(safe-area-inset-top)) + 206px)}}
 html.touch-ui .tutorial{width:min(260px,calc(100vw - 180px))}
+html.touch-ui:not(.in-control):not(.preview-public) .tutorial{top:calc(max(12px,env(safe-area-inset-top)) + 206px)}
 `;
     document.head.appendChild(style);
     card = document.createElement("div");
