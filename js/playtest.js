@@ -188,6 +188,28 @@ async function smoke(options, t) {
     }
     t.event("hud-and-tutorial", `daybar ${Math.round(daybarBox.width)}×${Math.round(daybarBox.height)}, narration "${$("what").textContent}", tutorial "${($("tutorial-text") || {}).textContent || ""}"`);
   }
+  const topIds = ["sound", "details", "quality", "episodes"];
+  const topBoxes = [];
+  const nowBox = boxOf(document.querySelector(".now"));
+  if (nowBox) topBoxes.push({ id: "now", r: nowBox });
+  topIds.forEach((id) => {
+    const r = boxOf($(id));
+    if (!r) {
+      t.problem("bug", `Top control #${id} isn't on screen in Live mode`);
+      return;
+    }
+    topBoxes.push({ id, r });
+    if (document.documentElement.classList.contains("touch-ui") && (r.width < 43 || r.height < 43)) {
+      t.problem("bug", `#${id} is ${Math.round(r.width)}×${Math.round(r.height)} on touch-ui (needs 44px tap target)`);
+    }
+  });
+  for (let i = 0; i < topBoxes.length; i++) {
+    for (let j = i + 1; j < topBoxes.length; j++) {
+      if (boxesOverlap(topBoxes[i].r, topBoxes[j].r)) {
+        t.problem("bug", `#${topBoxes[i].id} overlaps #${topBoxes[j].id} in Live mode`);
+      }
+    }
+  }
   t.progress(0.2);
 
   // Live for a few seconds: the clock must tick.

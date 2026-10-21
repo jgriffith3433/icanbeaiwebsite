@@ -149,7 +149,9 @@ function install() {
 .ep-btn{position:fixed;z-index:7;left:18px;bottom:118px;appearance:none;border:1px solid rgba(246,241,232,.22);background:rgba(14,16,22,.62);color:#f6f1e8;border-radius:14px;padding:10px 16px;font:600 0.84rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(12px)}
 .ep-btn:hover{background:rgba(240,194,122,.16)}
 .preview-public .ep-btn{bottom:78px}
-html.touch-ui .ep-btn{left:auto;right:max(12px,env(safe-area-inset-right));top:max(56px,calc(env(safe-area-inset-top) + 48px));bottom:auto;transform:none;min-height:44px}
+@media (max-width:700px){.ep-btn{left:auto;right:max(12px,env(safe-area-inset-right));top:calc(max(12px,env(safe-area-inset-top)) + 150px);bottom:auto;transform:none;display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-size:0.78rem;white-space:nowrap}.preview-public .ep-btn{top:calc(max(12px,env(safe-area-inset-top)) + 50px);bottom:auto}.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%)}}
+html.touch-ui .ep-btn{left:auto;right:max(12px,env(safe-area-inset-right));top:calc(max(12px,env(safe-area-inset-top)) + 150px);bottom:auto;transform:none;display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-size:0.78rem;white-space:nowrap}
+html.touch-ui.preview-public .ep-btn{top:calc(max(12px,env(safe-area-inset-top)) + 50px);bottom:auto}
 html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%)}
 .ep-hud{position:fixed;z-index:7;right:18px;top:88px;width:min(280px,calc(100vw - 36px));pointer-events:none;font:600 0.78rem/1.35 Outfit,system-ui,sans-serif;color:#e7eef8}
 .ep-hud[hidden]{display:none}

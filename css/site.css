@@ -465,20 +465,62 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     background: var(--panel-solid);
   }
 }
-@media (max-width: 640px) {
+@media (max-width: 700px) {
   :root { --gutter: 12px; }
   .top { flex-direction: column; gap: 8px; }
-  .now { padding: 12px 14px; }
-  .time { font-size: 2.6rem; }
-  .what { font-size: 1.05rem; }
+  .now {
+    padding: 12px 14px;
+    width: min(460px, calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right)) - 122px));
+  }
+  .mark { padding-right: 0; }
+  .time { font-size: clamp(2rem, 5.8vw, 2.5rem); }
+  .what { font-size: 1.02rem; }
   .next { display: none; }
-  .tools { position: fixed; top: var(--gutter); right: var(--gutter); }
-  .tools button { padding: 6px 10px; font-size: 0.78rem; }
-  .now { width: calc(100vw - 2 * var(--gutter) - 0px); padding-right: 14px; }
-  .mark { padding-right: 150px; }
+  .tools {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .tools button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 14px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
   .count { display: none; }
   .speeds button:nth-child(n + 5) { display: none; }
   .side { bottom: 140px; }
+}
+html.touch-ui .now {
+  width: min(460px, calc(100vw - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right)) - 122px));
+}
+html.touch-ui .mark { padding-right: 0; }
+html.touch-ui .tools {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+html.touch-ui .tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 /* ---------- public site & phone control view ---------- */
@@ -609,15 +651,42 @@ html.touch-ui.in-control .privacy-tag {
 .quality-btn[aria-pressed="true"] { background: rgba(20, 28, 40, 0.85); color: #9eb4c8; }
 .preview-public .quality-btn { bottom: 40px; }
 @media (max-width: 700px) {
-  .quality-btn { left: auto; right: max(12px, env(safe-area-inset-right)); bottom: auto; top: max(12px, env(safe-area-inset-top)); }
-  html:not(.public):not(.preview-public) .quality-btn { top: max(12px, env(safe-area-inset-top)); }
+  .quality-btn {
+    left: auto;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: auto;
+    top: calc(max(12px, env(safe-area-inset-top)) + 100px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 14px;
+    white-space: nowrap;
+  }
+  .in-control .quality-btn,
+  .preview-public .quality-btn {
+    top: max(12px, env(safe-area-inset-top));
+  }
 }
 html.touch-ui .quality-btn {
   left: auto;
   right: max(12px, env(safe-area-inset-right));
   bottom: auto;
-  top: max(12px, env(safe-area-inset-top));
+  top: calc(max(12px, env(safe-area-inset-top)) + 100px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
   min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+html.touch-ui.in-control .quality-btn,
+html.touch-ui.preview-public .quality-btn {
+  top: max(12px, env(safe-area-inset-top));
 }
 
 .control-hint {
