@@ -77,6 +77,14 @@ export function makeSkin(B, scene, res, hipsTarget) {
     if (!mat) return;
     mat.maxSimultaneousLights = 10;
     if ("usePhysicalLightFalloff" in mat) mat.usePhysicalLightFalloff = false;
+    /* The GLB leaves metallicFactor at the glTF default of 1 and the scene has no environment map, so a fully
+       metallic skin has nothing to reflect and draws solid black: make him cloth and skin, lit by the room. */
+    if ("metallic" in mat) {
+      mat.metallic = 0;
+      mat.roughness = Math.max(mat.roughness == null ? 1 : mat.roughness, 0.8);
+      mat.useRoughnessFromMetallicTextureGreen = false;
+      mat.useMetallnessFromMetallicTextureBlue = false;
+    }
     if (mat.ambientColor) mat.ambientColor = new B.Color3(0.22, 0.24, 0.3);
     if (mat.emissiveTexture) {
       mat.emissiveColor = new B.Color3(0.75, 1.15, 1.35);
