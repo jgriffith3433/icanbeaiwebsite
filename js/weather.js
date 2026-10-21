@@ -783,7 +783,7 @@ export function startWeather(world, dayApi) {
     scene.fogColor.copyFrom(scratch.fog);
     scene.fogDensity = L.fog;
     if (sun) sun.intensity *= L.light * (1 + flash * L.lightning * 3.2);
-    if (hemi) hemi.intensity *= L.hemi;
+    if (hemi) hemi.intensity = Math.max(0.16, hemi.intensity * L.hemi);
     const baseExp = pipeline && pipeline.imageProcessing ? pipeline.imageProcessing.exposure : 0.92;
     const targetExp = Math.min(1.08, Math.max(0.76, baseExp * (0.88 + 0.12 * L.exposure) * (1 + flash * 0.85)));
     if (pipeline && pipeline.imageProcessing) pipeline.imageProcessing.exposure = targetExp;

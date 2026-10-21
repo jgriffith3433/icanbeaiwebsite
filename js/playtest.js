@@ -10,6 +10,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const finite = (n) => typeof n === "number" && Number.isFinite(n);
 const $ = (id) => document.getElementById(id);
 
+function boxOf(el) {
+  if (!el || el.hidden) return null;
+  const s = getComputedStyle(el);
+  if (s.display === "none" || s.visibility === "hidden") return null;
+  const r = el.getBoundingClientRect();
+  if (r.width < 8 || r.height < 8) return null;
+  return r;
+}
+
 function world() {
   return window.day && window.day.world();
 }
@@ -136,6 +145,20 @@ async function checkFoundation(t) {
   if (row) t.event("name-in-log", row);
   else t.problem("bug", "The action log doesn't call him Small Weather at the alarm");
   await sleep(1500);
+
+  // Night bedroom: bedside/moonlight fill keeps Small Weather and the bed/desk clearly readable at night.
+  t.scene("Night bedroom");
+  scrubTo(23 * 60 + 40);
+  await sleep(2200);
+  const st = w && w.stage;
+  const fillI = st && st.bedsideFill ? st.bedsideFill.intensity : 0;
+  const bedI = st && st.bedroomLight ? st.bedroomLight.intensity : 0;
+  if (!(fillI > 0.35 && bedI > 0.35)) {
+    t.problem("bug", `Bedroom night fill is too dim at 23:40 (bedsideFill ${fillI.toFixed(2)}, bedroomLight ${bedI.toFixed(2)})`);
+  } else {
+    t.event("bedroom-night-fill", `bedsideFill ${fillI.toFixed(2)}, bedroomLight ${bedI.toFixed(2)}, personOnScreen ${personOnScreen()}`);
+  }
+
   pressKey("Escape");
   await sleep(500);
   t.scene("Live");
@@ -146,12 +169,22 @@ async function smoke(options, t) {
   t.scene("Live");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
+  if (window.day.tutorial && !window.day.tutorial.blocking()) window.day.tutorial.reset();
   const fr0 = window.day.now().frame;
   checkFrame(t, fr0);
   t.note(`${fr0.action.block}: ${fr0.action.text}`);
   t.log(`date ${window.day.now().key}, ${$("time").textContent}${$("ampm").textContent}, ${fr0.action.text}`);
   if (personOnScreen()) t.event("person-visible");
   else t.problem("warning", "The person isn't on screen at load");
+  const daybarBox = boxOf(document.querySelector(".daybar"));
+  const whatBox = boxOf($("what"));
+  const tutBox = boxOf($("tutorial"));
+  if (!daybarBox) t.problem("bug", "The day bar (.daybar) is hidden in Live mode");
+  if (!whatBox) t.problem("bug", "The narration HUD (#what) is hidden in Live mode");
+  if (!tutBox) t.problem("bug", "The first-time control tutorial prompt (#tutorial) is hidden on a fresh visit");
+  if (daybarBox && whatBox && tutBox) {
+    t.event("hud-and-tutorial", `daybar ${Math.round(daybarBox.width)}×${Math.round(daybarBox.height)}, narration "${$("what").textContent}", tutorial "${($("tutorial-text") || {}).textContent || ""}"`);
+  }
   t.progress(0.2);
 
   // Live for a few seconds: the clock must tick.
@@ -173,6 +206,9 @@ async function smoke(options, t) {
   clickSpeed(10);
   await sleep(6000);
   stopWatching();
+  if (!boxOf(document.querySelector(".daybar")) || !boxOf($("what")) || !boxOf($("tutorial"))) {
+    t.problem("bug", "The day bar, narration HUD, or tutorial prompt disappeared during 10× playback");
+  }
   const ran = window.day.now().minutes - m0;
   t.metric("dayMinutesRun", Math.round(ran * 100) / 100);
   t.metric("frames", frames);
@@ -2338,14 +2374,6 @@ async function episodes(options, t) {
 }
 
 /* ---------------- first visit: the tutorial, then every phone control, then the player events ---------------- */
-function boxOf(el) {
-  if (!el || el.hidden) return null;
-  const s = getComputedStyle(el);
-  if (s.display === "none" || s.visibility === "hidden") return null;
-  const r = el.getBoundingClientRect();
-  if (r.width < 8 || r.height < 8) return null;
-  return r;
-}
 function boxesOverlap(a, b) {
   const pad = 2;
   return a.left < b.right - pad && a.right > b.left + pad && a.top < b.bottom - pad && a.bottom > b.top + pad;
@@ -2553,6 +2581,9 @@ installPlaytest({
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
     try {
+      if (id !== "smoke" && id !== "first-visit" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
+        window.day.tutorial.quiet();
+      }
       if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);

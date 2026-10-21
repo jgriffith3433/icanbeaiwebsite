@@ -512,10 +512,15 @@
         L.diffuse = B.Color3.FromHexString("#ffd9a8");
         L.specular = new B.Color3(0.1, 0.08, 0.05);
         L.intensity = 0;
-        L.range = 9;
-        roomLights.push({ light: L, thing: r.light, building: r.building, level: 0 });
+        L.range = 10.5;
+        roomLights.push({ id: r.id, light: L, thing: r.light, building: r.building, level: 0 });
       }
     });
+    const bedsideFill = new B.PointLight("bedside-fill", V3(-5.15, 1.45, -2.35), scene);
+    bedsideFill.diffuse = B.Color3.FromHexString("#ffd296");
+    bedsideFill.specular = new B.Color3(0.08, 0.06, 0.04);
+    bedsideFill.intensity = 0;
+    bedsideFill.range = 8;
     const officeLights = [];
     if (cfg.buildings.office && cfg.buildings.office.bounds) {
       const o = cfg.buildings.office.origin;
@@ -1171,6 +1176,7 @@
     roomLights.forEach((rl) => {
       rl.light.includedOnlyMeshes = (buildingMeshes[rl.building] || []).concat(movers, casters.filter((c) => c.getAbsolutePosition().x < 100));
     });
+    bedsideFill.includedOnlyMeshes = (buildingMeshes.home || []).concat(movers, casters.filter((c) => c.getAbsolutePosition().x < 100));
     officeLights.forEach((L) => {
       L.includedOnlyMeshes = (buildingMeshes.office || []).concat(movers, casters.filter((c) => c.getAbsolutePosition().x > 100));
     });
@@ -1371,6 +1377,7 @@
       });
       /* the room lights only touch what they list: add him */
       roomLights.forEach((rl) => rl.light.includedOnlyMeshes.push(...drawn));
+      bedsideFill.includedOnlyMeshes.push(...drawn);
       officeLights.forEach((L) => L.includedOnlyMeshes.push(...drawn));
     }
 
@@ -1450,10 +1457,14 @@
       hemi.diffuse = B.Color3.Lerp(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2));
       hemi.groundColor = B.Color3.Lerp(C("#12151e"), C("#3a362c"), day);
       pipeline.imageProcessing.exposure = 0.84 + day * 0.1;
-      windows.forEach((w) => {
-        w.material.emissiveColor.set(sky.r * (0.35 + day * 0.4), sky.g * (0.35 + day * 0.4), sky.b * (0.35 + day * 0.45));
-      });
       const night = 1 - Math.min(1, day * 1.6);
+      windows.forEach((w) => {
+        w.material.emissiveColor.set(
+          sky.r * (0.35 + day * 0.4) + night * 0.12,
+          sky.g * (0.35 + day * 0.4) + night * 0.16,
+          sky.b * (0.35 + day * 0.45) + night * 0.25
+        );
+      });
       setEmissive(lampHeadM, "#d7e7ff", 0.12 + night * 1.05);
       setEmissive(winM, "#8fd4ff", 0.06 + night * 1.2);
       winM.diffuseColor = B.Color3.Lerp(C("#1a2433"), C("#8fd4ff"), night * 0.35);
@@ -1462,12 +1473,21 @@
       roomLights.forEach((rl) => {
         const on = things[rl.thing] === "on" ? 1 : 0;
         rl.level = snap ? on : damp(rl.level, on, dt, 10);
-        rl.light.intensity = rl.level * (0.55 + night * 0.65);
+        if (rl.id === "bedroom") {
+          rl.light.diffuse = B.Color3.Lerp(C("#b8cff2"), C("#ffd9a8"), rl.level);
+          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.46;
+        } else if (rl.id === "living") {
+          rl.light.diffuse = B.Color3.Lerp(C("#c4d4f0"), C("#ffd9a8"), rl.level);
+          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.34;
+        } else {
+          rl.light.intensity = rl.level * (0.55 + night * 0.65);
+        }
       });
+      bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.55 : 0.48);
       const officeOn = things.officeLights !== "off" ? 1 : 0;
       officeLights.forEach((L) => (L.intensity = officeOn * (0.12 + night * 0.35)));
-      if (bedLampShade) setEmissive(bedLampShade, "#ffd08a", things.bedroomLamp === "on" ? 1.3 : 0.02);
-      if (props.floorLamp) setEmissive(props.floorLamp, "#ffd08a", things.livingLight === "on" ? 1.1 : 0.02);
+      if (bedLampShade) setEmissive(bedLampShade, "#ffd08a", things.bedroomLamp === "on" ? 1.3 : 0.12 + night * 0.45);
+      if (props.floorLamp) setEmissive(props.floorLamp, "#ffd08a", things.livingLight === "on" ? 1.1 : 0.06 + night * 0.18);
 
       /* screens */
       const flick = 0.85 + Math.sin(t * 2.3) * 0.08 + Math.sin(t * 7.1) * 0.05;
@@ -1841,7 +1861,14 @@
       scene,
       update,
       /* sun, sky light, the look pipeline and the road material: js/weather.js tints them */
-      stage: { sun, hemi, pipeline, road: roadM },
+      stage: {
+        sun,
+        hemi,
+        pipeline,
+        road: roadM,
+        bedsideFill,
+        bedroomLight: (roomLights.find((rl) => rl.id === "bedroom") || {}).light || null,
+      },
       enablePhysics,
       groundAt,
       physics: () => physics,
