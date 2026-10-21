@@ -122,20 +122,23 @@ export function installPlaytest(opts) {
     state() {
       let ready = false;
       try { ready = !!isReady(); } catch {}
-      if (!run) return { ready, status: 'idle', fps: fps.value() };
+      const perf = typeof window !== 'undefined' && window.hawkesPerf?.snapshot ? window.hawkesPerf.snapshot() : undefined;
+      if (!run) return { ready, status: 'idle', fps: fps.value(), ...(perf ? { perf } : {}) };
       if (!run.done && performance.now() - run.moved > stallSeconds * 1000) {
         tracker.problem('bug', `no progress for ${stallSeconds} s (softlock?)`);
         tracker.finish('stuck');
       }
-      return { ...run.state, ready, fps: fps.value(), metrics: { ...run.metrics } };
+      return { ...run.state, ready, fps: fps.value(), metrics: { ...run.metrics }, ...(perf ? { perf } : {}) };
     },
     report() {
       if (!run) return null;
+      const perf = typeof window !== 'undefined' && window.hawkesPerf?.snapshot ? window.hawkesPerf.snapshot() : undefined;
       return {
         scenario: run.id,
         outcome: run.done ? run.state.status : 'stuck',
         seconds: round(run.seconds ?? now()),
         metrics: { ...run.metrics, fpsAverage: fps.average(), fpsWorst: fps.worst() },
+        ...(perf ? { perf } : {}),
         events: run.events.slice(),
         problems: run.problems.slice(),
         log: run.log.slice(),

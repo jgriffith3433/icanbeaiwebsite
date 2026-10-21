@@ -500,7 +500,11 @@ export function installLook(world) {
   const clearVec = new B.Vector3(0.5, 0.62, 0.74);
   const weatherVec = new B.Vector4(0, 0, 0, 0);
   let skyTime = 0;
-  let last = { day: 1, dusk: 0, night: 0, exposure: 0.94, neon: 0.2 };
+  let last = { day: 1, dusk: 0, night: 0, exposure: 0.94, neon: -1 };
+  let lastWet = -1;
+  let lastIbl = -1;
+  let lastLow = null;
+  scene.fogMode = B.Scene.FOGMODE_EXP2;
 
   function weightsNow() {
     const base = skyWeights(clockHour(), clock);
@@ -531,7 +535,8 @@ export function installLook(world) {
     surfaces.forEach((m) => {
       if (m.metadata && m.metadata.wet && m.clearCoat) {
         const wet = (override && override.wet != null) ? override.wet : 0;
-        m.clearCoat.isEnabled = !low && wet > 0.06;
+        const want = !low && wet > 0.06;
+        if (m.clearCoat.isEnabled !== want) m.clearCoat.isEnabled = want;
       }
     });
     const btn = typeof document !== "undefined" && document.getElementById && document.getElementById("quality");
@@ -553,8 +558,16 @@ export function installLook(world) {
     const defaultExp = 0.94 * w.day + 0.85 * w.dusk + 0.78 * w.night;
     const exposure = override && override.exposure != null ? override.exposure : defaultExp;
     const fogDensity = override && override.fogDensity != null ? override.fogDensity : 0.0045 + w.night * 0.0038 + w.dusk * 0.0015;
-    if (pipeline && pipeline.imageProcessing) pipeline.imageProcessing.exposure = exposure;
-    scene.fogMode = B.Scene.FOGMODE_EXP2;
+    if (pipeline && pipeline.imageProcessing) {
+      const safeExp = Math.abs(exposure - 1) < 1e-4 ? 1.0002 : exposure;
+      const ipc = pipeline.imageProcessing.imageProcessingConfiguration;
+      if (ipc && ipc._exposure != null) {
+        ipc._exposure = safeExp;
+        if (scene.imageProcessingConfiguration) scene.imageProcessingConfiguration._exposure = safeExp;
+      } else if (Math.abs(pipeline.imageProcessing.exposure - safeExp) > 0.01) {
+        pipeline.imageProcessing.exposure = safeExp;
+      }
+    }
     scene.fogDensity = fogDensity;
     const horizon = lerpRgb(lerpRgb(rgb(168, 192, 212), rgb(196, 112, 74), w.dusk), rgb(18, 36, 62), w.night);
     const dayHorizon = lerpRgb(horizon, rgb(156, 186, 208), w.day);
@@ -588,24 +601,32 @@ export function installLook(world) {
     const wet = override && override.wet != null ? override.wet : 0;
     const low = quality === "low";
     const ibl = 0.28 + w.day * 0.34;
-    surfaces.forEach((m) => {
-      m.environmentIntensity = ibl;
-      const meta = m.metadata || {};
-      if (meta.wet && m !== mats.asphalt) {
-        const dryRough = meta.dryRough != null ? meta.dryRough : 0.85;
-        m.roughness = Math.max(0.22, dryRough - wet * 0.52);
-        if (m.clearCoat) {
-          m.clearCoat.isEnabled = !low && wet > 0.06;
-          m.clearCoat.intensity = wet * (meta.maxCoat || 0.42);
-          m.clearCoat.roughness = 0.14 + (1 - wet) * 0.16;
+    if (Math.abs(wet - lastWet) > 0.01 || Math.abs(ibl - lastIbl) > 0.01 || low !== lastLow) {
+      lastWet = wet;
+      lastIbl = ibl;
+      lastLow = low;
+      surfaces.forEach((m) => {
+        m.environmentIntensity = ibl;
+        const meta = m.metadata || {};
+        if (meta.wet && m !== mats.asphalt) {
+          const dryRough = meta.dryRough != null ? meta.dryRough : 0.85;
+          m.roughness = Math.max(0.22, dryRough - wet * 0.52);
+          if (m.clearCoat) {
+            const wantCoat = !low && wet > 0.06;
+            if (m.clearCoat.isEnabled !== wantCoat) m.clearCoat.isEnabled = wantCoat;
+            m.clearCoat.intensity = wet * (meta.maxCoat || 0.42);
+            m.clearCoat.roughness = 0.14 + (1 - wet) * 0.16;
+          }
         }
-      }
-    });
-    const neonK = 0.16 + w.dusk * 0.55 + w.night * 1.2 + (override && override.storm ? override.storm * 0.35 : 0);
-    neonMats.forEach((m) => {
-      const base = m.metadata.base;
-      m.emissiveColor.set(base.r * neonK, base.g * neonK, base.b * neonK);
-    });
+      });
+    }
+    const neonK = 0.22 + w.dusk * 0.72 + w.night * 1.38 + (override && override.storm ? override.storm * 0.45 : 0);
+    if (Math.abs(neonK - last.neon) > 0.005) {
+      neonMats.forEach((m) => {
+        const base = m.metadata.base;
+        m.emissiveColor.set(base.r * neonK, base.g * neonK, base.b * neonK);
+      });
+    }
     last = { day: w.day, dusk: w.dusk, night: w.night, exposure, neon: neonK, fogDensity };
   });
 
@@ -624,6 +645,7 @@ export function installLook(world) {
   }
   mountButton();
   applyQuality(quality);
+  if (world.freezeStaticMeshes) world.freezeStaticMeshes();
 
   const api = {
     quality(level) {

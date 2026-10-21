@@ -20,12 +20,15 @@ import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he
 import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
+import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause perf & leak monitor (window.hawkesPerf)
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 
 const control = (window.DAY_CONFIG && window.DAY_CONFIG.control) || {};
 const status = { babylon: window.BABYLON.Engine.Version, physics: "loading", model: control.model ? "loading" : "figure" };
 window.day && (window.day.engineInfo = () => ({ ...status }));
+const perfWorld = window.day && window.day.world && window.day.world();
+if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: "icanbe" });
 
 /* Small Weather's 3D model (day.config.js control.model): kick off fetching the GLB and loader chunk early
    in parallel so the model is ready right after the first frame. */

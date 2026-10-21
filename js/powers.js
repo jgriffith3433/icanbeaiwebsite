@@ -222,7 +222,7 @@ export function startPowers(world, dayApi) {
 
   const boltMat = new B.StandardMaterial("power-bolt", scene);
   boltMat.disableLighting = true;
-  boltMat.emissiveColor = new B.Color3(0.75, 0.9, 1);
+  boltMat.emissiveColor = new B.Color3(1.1, 1.35, 1.65);
   const boltParts = [0, 1, 2, 3].map((i) => {
     const m = B.MeshBuilder.CreateBox("strike-bolt-" + i, { width: 0.14, height: 1, depth: 0.14 }, scene);
     m.material = boltMat;
@@ -243,6 +243,7 @@ export function startPowers(world, dayApi) {
   flashLight.diffuse = new B.Color3(0.75, 0.86, 1);
   flashLight.intensity = 0;
   flashLight.range = 28;
+  flashLight.setEnabled(false);
 
   const gustMat = new B.StandardMaterial("power-gust", scene);
   gustMat.disableLighting = true;
@@ -975,6 +976,8 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     throwFor = Math.max(0, throwFor - dt);
     flash = Math.max(0, flash - dt * 3.1);
     flashLight.intensity = flash * 36;
+    const wantFlash = flashLight.intensity > 0.01;
+    if (flashLight.isEnabled() !== wantFlash) flashLight.setEnabled(wantFlash);
     if (flash < 0.05) {
       boltParts.forEach((m) => m.setEnabled(false));
       impact.setEnabled(false);
@@ -987,7 +990,14 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       c.g += (1 - c.g) * k;
       c.b += (1 - c.b) * k;
       const stage = world.stage || {};
-      if (stage.pipeline && stage.pipeline.imageProcessing) stage.pipeline.imageProcessing.exposure *= 1 + flash * 1.5;
+      if (stage.pipeline && stage.pipeline.imageProcessing) {
+        const ipc = stage.pipeline.imageProcessing.imageProcessingConfiguration;
+        const curExp = ipc ? ipc._exposure : stage.pipeline.imageProcessing.exposure;
+        const nextExp = curExp * (1 + flash * 1.5);
+        const safeExp = Math.abs(nextExp - 1.0) < 1e-4 ? 0.9999 : nextExp;
+        if (ipc) ipc._exposure = safeExp;
+        if (scene.imageProcessingConfiguration) scene.imageProcessingConfiguration._exposure = safeExp;
+      }
     }
 
     if (gustFx && age > gustFx.until) {
