@@ -147,17 +147,20 @@ window.DAY_CONFIG = {
       jumpHeight: 1.5, // the first jump, from the ground
       airJumps: 2, // extra jumps in the air
       airJumpHeight: 1.2,
-      gravity: 6.5, // lower than Earth's 9.8: floaty
-      maxFall: 7, // fastest fall
+      gravity: 14.5, // crisp third-person gravity; hold jump to engage storm-glide
+      jumpSpeed: 6.8,
+      airJumpSpeed: 6.4,
+      maxFall: 9, // fastest fall
       floatFall: 1.6, // kept for older checks; glide uses glideFall
-      glideFall: 0.42, // hold jump in the air: fall this slowly while riding
-      glideSpeed: 10.5, // horizontal speed while gliding
-      airControl: 0.55, // how much he can steer in the air (1 = like on the ground)
+      glideFall: 0.85, // hold jump in the air: glide down at a readable pace
+      glideSpeed: 9.5, // horizontal speed while steering in a glide
+      airControl: 0.65, // how much he can steer in the air (1 = like on the ground)
       glideAirControl: 0.9,
       softLand: 2.4, // horizontal speed after a soft glide landing
+      updraftCeiling: 22, // rooftop ceiling (~22m, above the 16.6m rooftops)
     },
     /* Storm-riding: wind trails, whoosh, camera pull-back, and updraft columns
-       (ambient at avenue crosses; a Gust plants one he can ride). */
+       (ambient at avenue crosses in wind/storm; a Gust plants one he can ride). */
     ride: {
       cameraPull: 3.4,
       whoosh: "audio/sfx/glide-whoosh.mp3",
@@ -166,8 +169,9 @@ window.DAY_CONFIG = {
         radius: 4.2,
         lift: 8, // m/s upward at the centre of a player gust
         life: 7, // seconds a gust updraft lasts
+        ceiling: 22,
         ambient: true,
-        weather: { clear: 0.08, clouds: 0.15, rain: 0.35, storm: 1, fog: 0.1, wind: 0.92, snow: 0.2 },
+        weather: { clear: 0, clouds: 0, rain: 0.25, storm: 1, fog: 0, wind: 0.92, snow: 0 },
       },
     },
     /* Small Weather's 3D model: the rigged GLB from Hawkes Gen (hawkes.assets.json), worn

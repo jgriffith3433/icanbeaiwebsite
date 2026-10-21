@@ -1,18 +1,13 @@
 /* ==========================================================================
    The city look: Small Weather's Dose Of Destruction art on the district.
    Navy and black, electric blue at night, rain-wet surfaces, daylight that
-   stays readable. PBR on the streets and blocks, neon, a sky that blends
-   day / dusk / night (the weather system calls setSky), bloom and a quality
-   toggle for phones.
-
-   Gen textures land in textures/city/ (hawkes.assets.json). Until that
-   manifest exists, the surfaces are painted here so the page isn't flat colour.
+   stays readable. PBR on the streets and blocks, neon, a procedural sky dome
+   that blends day / dusk / night and weather state (weather.js calls setSky),
+   controlled bloom on emissives, and a quality toggle for phones.
    ========================================================================== */
 const B = window.BABYLON;
 
-const TILE = 256;
-const SKY_W = 512;
-const SKY_H = 256;
+const TILE = 64;
 
 function mod(a, m) {
   return ((a % m) + m) % m;
@@ -59,23 +54,23 @@ function paint(scene, name, size, sample, bump) {
   const albedo = new Uint8Array(size * size * 4);
   const normal = new Uint8Array(size * size * 4);
   const H = (u, v) => sample(wrap01(u), wrap01(v)).h;
+  const e = 1 / size;
   for (let y = 0; y < size; y++) {
+    const v = y / size;
     for (let x = 0; x < size; x++) {
       const u = x / size;
-      const v = y / size;
       const c = sample(u, v);
       const i = (y * size + x) * 4;
       albedo[i] = c.r;
       albedo[i + 1] = c.g;
       albedo[i + 2] = c.b;
       albedo[i + 3] = 255;
-      const e = 1 / size;
       const dx = (H(u + e, v) - H(u - e, v)) * bump;
       const dy = (H(u, v + e) - H(u, v - e)) * bump;
-      const len = Math.hypot(dx, dy, 1);
-      normal[i] = (-dx / len) * 127.5 + 127.5;
-      normal[i + 1] = (-dy / len) * 127.5 + 127.5;
-      normal[i + 2] = (1 / len) * 127.5 + 127.5;
+      const invLen = 127.5 / Math.hypot(dx, dy, 1);
+      normal[i] = -dx * invLen + 127.5;
+      normal[i + 1] = -dy * invLen + 127.5;
+      normal[i + 2] = invLen + 127.5;
       normal[i + 3] = 255;
     }
   }
@@ -88,42 +83,19 @@ function paint(scene, name, size, sample, bump) {
   return { albedo: mk(albedo), normal: mk(normal) };
 }
 
-function paintSky(scene, name, sample) {
-  const data = new Uint8Array(SKY_W * SKY_H * 4);
-  for (let y = 0; y < SKY_H; y++) {
-    for (let x = 0; x < SKY_W; x++) {
-      const c = sample(x / SKY_W, y / SKY_H);
-      const i = (y * SKY_W + x) * 4;
-      data[i] = c.r;
-      data[i + 1] = c.g;
-      data[i + 2] = c.b;
-      data[i + 3] = 255;
-    }
-  }
-  const tex = new B.RawTexture(data, SKY_W, SKY_H, B.Engine.TEXTUREFORMAT_RGBA, scene, false, true, B.Texture.BILINEAR_SAMPLINGMODE);
-  tex.wrapU = B.Texture.WRAP_ADDRESSMODE;
-  tex.wrapV = B.Texture.CLAMP_ADDRESSMODE;
-  tex.name = name;
-  return tex;
-}
-
+/* Cohesive dark navy-slate asphalt, concrete, brick, glass, roof, and park turf —
+   no harsh bathroom-tile grid lines or dry neon blotches. */
 function asphalt(u, v) {
   const n = fbm(u, v);
-  const grain = noise(u, v, 32);
-  const crack = noise(u * 3.1 + 0.2, v * 0.4, 6) < 0.28 ? 0.72 : 1;
-  const wet = noise(u, v, 3);
-  const base = lerpRgb(rgb(42, 48, 58), rgb(62, 74, 92), grain);
-  const blue = wet > 0.62 ? lerpRgb(base, rgb(70, 110, 150), (wet - 0.62) * 0.8) : base;
-  const c = lerpRgb(rgb(28, 32, 40), blue, 0.55 + n * 0.45);
-  return { r: c.r * crack, g: c.g * crack, b: c.b * crack, h: n * 0.35 + grain * 0.15 + (crack < 1 ? 0.25 : 0) };
+  const grain = noise(u, v, 16);
+  const c = lerpRgb(rgb(30, 34, 42), rgb(44, 50, 62), n * 0.6 + grain * 0.4);
+  return { r: c.r, g: c.g, b: c.b, h: n * 0.25 + grain * 0.15 };
 }
 function concrete(u, v) {
   const n = fbm(u + 4, v + 2);
-  const pit = noise(u, v, 24);
-  const stain = noise(u, v, 5);
-  const c = lerpRgb(rgb(78, 84, 90), rgb(96, 108, 118), n);
-  const wet = stain > 0.6 ? lerpRgb(c, rgb(62, 78, 96), 0.35) : c;
-  return { r: wet.r * (0.92 + pit * 0.1), g: wet.g * (0.92 + pit * 0.1), b: wet.b * (0.94 + pit * 0.08), h: n * 0.4 + pit * 0.2 };
+  const pit = noise(u, v, 16);
+  const c = lerpRgb(rgb(66, 72, 80), rgb(82, 89, 98), n * 0.65 + pit * 0.35);
+  return { r: c.r, g: c.g, b: c.b, h: n * 0.3 + pit * 0.15 };
 }
 function brick(u, v) {
   const rows = 8;
@@ -133,61 +105,29 @@ function brick(u, v) {
   const fu = wrap01(uu * cols);
   const fv = wrap01(v * rows);
   const mortar = fu < 0.08 || fv < 0.1;
-  const n = noise(u, v, 20);
-  const tone = lerpRgb(rgb(78, 52, 56), rgb(96, 64, 62), n);
-  const c = mortar ? rgb(58, 62, 70) : tone;
-  return { r: c.r, g: c.g, b: c.b, h: mortar ? 0.15 : 0.55 + n * 0.2 };
+  const n = noise(u, v, 16);
+  const tone = lerpRgb(rgb(72, 48, 52), rgb(88, 58, 58), n);
+  const c = mortar ? rgb(50, 54, 62) : tone;
+  return { r: c.r, g: c.g, b: c.b, h: mortar ? 0.18 : 0.52 + n * 0.18 };
 }
 function glass(u, v) {
-  const mullion = wrap01(u * 5) < 0.07 || wrap01(v * 8) < 0.06;
+  const mullion = wrap01(u * 4) < 0.06 || wrap01(v * 6) < 0.05;
   const n = fbm(u, v);
-  const pane = lerpRgb(rgb(28, 40, 58), rgb(46, 78, 112), n);
-  const c = mullion ? rgb(16, 20, 28) : pane;
-  return { r: c.r, g: c.g, b: c.b, h: mullion ? 0.7 : 0.15 + n * 0.1 };
+  const pane = lerpRgb(rgb(22, 32, 48), rgb(36, 56, 82), n);
+  const c = mullion ? rgb(14, 18, 26) : pane;
+  return { r: c.r, g: c.g, b: c.b, h: mullion ? 0.6 : 0.15 + n * 0.08 };
 }
 function roof(u, v) {
   const n = fbm(u + 1, v + 3);
-  const seam = wrap01(u * 4) < 0.04 || wrap01(v * 3) < 0.045;
-  const puddle = noise(u, v, 3) > 0.68;
-  let c = lerpRgb(rgb(32, 36, 44), rgb(48, 54, 64), n);
-  if (puddle) c = lerpRgb(c, rgb(60, 96, 130), 0.45);
-  if (seam) c = lerpRgb(c, rgb(20, 22, 28), 0.6);
-  return { r: c.r, g: c.g, b: c.b, h: (seam ? 0.2 : 0.45) + n * 0.25 + (puddle ? 0.15 : 0) };
+  const grain = noise(u, v, 12);
+  const c = lerpRgb(rgb(28, 32, 40), rgb(40, 46, 56), n * 0.65 + grain * 0.35);
+  return { r: c.r, g: c.g, b: c.b, h: 0.35 + n * 0.2 + grain * 0.1 };
 }
 function park(u, v) {
   const n = fbm(u + 8, v);
-  const blade = noise(u, v, 28);
-  const c = lerpRgb(rgb(32, 58, 44), rgb(48, 78, 52), n * 0.7 + blade * 0.3);
-  return { r: c.r, g: c.g, b: c.b, h: blade * 0.55 + n * 0.2 };
-}
-
-/* v = 0 is the bottom of the panorama, v = 1 the zenith. Horizon sits at 0.42. */
-function skyDay(u, v) {
-  const zenith = rgb(126, 178, 214);
-  const horizon = rgb(214, 228, 236);
-  const below = rgb(40, 52, 62);
-  const cloud = fbm(u, v * 2);
-  let c = v < 0.42 ? lerpRgb(below, horizon, v / 0.42) : lerpRgb(horizon, zenith, (v - 0.42) / 0.58);
-  if (v > 0.48 && v < 0.82 && cloud > 0.55) c = lerpRgb(c, rgb(236, 242, 246), (cloud - 0.55) * 1.4);
-  return c;
-}
-function skyDusk(u, v) {
-  const zenith = rgb(16, 22, 42);
-  const horizon = rgb(214, 122, 78);
-  const blue = rgb(36, 64, 120);
-  const below = rgb(12, 14, 24);
-  const cloud = fbm(u + 0.3, v);
-  let c = v < 0.42 ? lerpRgb(below, horizon, v / 0.42) : lerpRgb(lerpRgb(horizon, blue, Math.min(1, (v - 0.42) * 2.2)), zenith, Math.max(0, (v - 0.55) / 0.45));
-  if (v > 0.4 && v < 0.7 && cloud > 0.5) c = lerpRgb(c, rgb(232, 150, 96), (cloud - 0.5) * 0.7);
-  return c;
-}
-function skyNight(u, v) {
-  const zenith = rgb(6, 8, 16);
-  const horizon = rgb(22, 48, 82);
-  const below = rgb(4, 6, 12);
-  let c = v < 0.42 ? lerpRgb(below, horizon, v / 0.42) : lerpRgb(horizon, zenith, (v - 0.42) / 0.58);
-  if (v > 0.55 && hash(Math.floor(u * 180), Math.floor(v * 90)) > 0.997) c = rgb(220, 230, 245);
-  return c;
+  const blade = noise(u, v, 16);
+  const c = lerpRgb(rgb(30, 52, 40), rgb(44, 70, 48), n * 0.7 + blade * 0.3);
+  return { r: c.r, g: c.g, b: c.b, h: blade * 0.4 + n * 0.2 };
 }
 
 function smoothstep(e0, e1, x) {
@@ -311,25 +251,20 @@ export function installLook(world) {
 
   if (pipeline && pipeline.bloomWeight != null) {
     pipeline.bloomEnabled = true;
-    pipeline.bloomThreshold = 0.52;
-    pipeline.bloomWeight = 0.36;
-    pipeline.bloomKernel = 32;
+    pipeline.bloomThreshold = 0.88;
+    pipeline.bloomWeight = 0.16;
+    pipeline.bloomKernel = 24;
     pipeline.bloomScale = 0.5;
   }
 
   let source = "procedural";
   const maps = {
-    asphalt: paint(scene, "asphalt", TILE, asphalt, 2.2),
-    concrete: paint(scene, "concrete", TILE, concrete, 1.6),
-    brick: paint(scene, "brick", TILE, brick, 2.4),
-    glass: paint(scene, "glass", TILE, glass, 1.1),
-    roof: paint(scene, "roof", TILE, roof, 1.5),
-    ground: paint(scene, "park", TILE, park, 1.4),
-  };
-  const skies = {
-    day: paintSky(scene, "skyDay", skyDay),
-    dusk: paintSky(scene, "skyDusk", skyDusk),
-    night: paintSky(scene, "skyNight", skyNight),
+    asphalt: paint(scene, "asphalt", TILE, asphalt, 1.4),
+    concrete: paint(scene, "concrete", TILE, concrete, 1.1),
+    brick: paint(scene, "brick", TILE, brick, 1.8),
+    glass: paint(scene, "glass", TILE, glass, 0.8),
+    roof: paint(scene, "roof", TILE, roof, 1.0),
+    ground: paint(scene, "park", TILE, park, 1.1),
   };
 
   const surfaces = [];
@@ -337,31 +272,33 @@ export function installLook(world) {
     const m = new B.PBRMaterial(name, scene);
     m.albedoTexture = tex.albedo;
     m.bumpTexture = tex.normal;
-    m.bumpTexture.level = opt.bump == null ? 0.65 : opt.bump;
+    m.bumpTexture.level = opt.bump == null ? 0.45 : opt.bump;
     m.metallic = opt.metallic || 0;
-    m.roughness = opt.roughness == null ? 0.45 : opt.roughness;
+    const dryRough = opt.roughness == null ? 0.84 : opt.roughness;
+    m.roughness = dryRough;
+    m.useRoughnessFromMetallicTextureAlpha = false;
+    m.useRoughnessFromMetallicTextureGreen = true;
+    m.useMetallnessFromMetallicTextureBlue = false;
     m.usePhysicalLightFalloff = false;
     m.maxSimultaneousLights = 4;
-    m.directIntensity = 1.25;
-    m.environmentIntensity = 0.7;
-    m.reflectionTexture = skies.day;
-    if (skies.day) skies.day.coordinatesMode = B.Texture.EQUIRECTANGULAR_MODE;
+    m.directIntensity = 1.0;
+    m.environmentIntensity = 0.45;
     if (opt.wet) {
-      m.clearCoat.isEnabled = true;
-      m.clearCoat.intensity = opt.coat == null ? 0.32 : opt.coat;
-      m.clearCoat.roughness = 0.1;
+      m.clearCoat.isEnabled = false;
+      m.clearCoat.intensity = 0;
+      m.clearCoat.roughness = 0.18;
     }
-    m.metadata = { wet: !!opt.wet };
+    m.metadata = { wet: !!opt.wet, dryRough, maxCoat: opt.coat == null ? 0.45 : opt.coat };
     surfaces.push(m);
     return m;
   }
   const mats = {
-    asphalt: pbr("asphalt", maps.asphalt, { roughness: 0.32, wet: true, coat: 0.42, bump: 0.45 }),
-    concrete: pbr("concrete", maps.concrete, { roughness: 0.4, wet: true, coat: 0.28, bump: 0.4 }),
-    brick: pbr("brick", maps.brick, { roughness: 0.72, bump: 0.85 }),
-    glass: pbr("glass", maps.glass, { metallic: 0.55, roughness: 0.16, wet: true, coat: 0.55, bump: 0.25 }),
-    roof: pbr("roof", maps.roof, { roughness: 0.38, wet: true, coat: 0.36, bump: 0.5 }),
-    ground: pbr("park", maps.ground, { roughness: 0.82, bump: 0.55 }),
+    asphalt: pbr("asphalt", maps.asphalt, { roughness: 0.84, wet: true, coat: 0.55, bump: 0.35 }),
+    concrete: pbr("concrete", maps.concrete, { roughness: 0.86, wet: true, coat: 0.38, bump: 0.32 }),
+    brick: pbr("brick", maps.brick, { roughness: 0.88, bump: 0.65 }),
+    glass: pbr("glass", maps.glass, { metallic: 0.35, roughness: 0.24, wet: true, coat: 0.45, bump: 0.2 }),
+    roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.35 }),
+    ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
 
   function dress(mesh, mat, tile) {
@@ -375,8 +312,8 @@ export function installLook(world) {
   scene.meshes.forEach((mesh) => {
     const n = mesh.name || "";
     if (n === "ground") dress(mesh, mats.ground, 4);
-    else if (roadName(n)) dress(mesh, mats.asphalt, 2.4);
-    else if (walkName(n)) dress(mesh, mats.concrete, 2.2);
+    else if (roadName(n)) dress(mesh, mats.asphalt, 2.8);
+    else if (walkName(n)) dress(mesh, mats.concrete, 2.4);
   });
   // Weather (js/weather.js) wets stage.road; point it at the visible PBR asphalt, not the old StandardMaterial.
   if (world.stage) world.stage.road = mats.asphalt;
@@ -391,10 +328,10 @@ export function installLook(world) {
     }, scene);
     slab.position.set(b.x, b.h - 0.02, b.z);
     slab.isPickable = false;
-    dress(slab, mats.roof, 2.2);
+    dress(slab, mats.roof, 2.8);
     ["ps", "pn", "pn1", "pn2", "pw", "pe"].forEach((suffix) => {
       const lip = scene.getMeshByName(b.id + suffix);
-      if (lip) dress(lip, mats.roof, 1.6);
+      if (lip) dress(lip, mats.roof, 2.0);
     });
   });
 
@@ -437,6 +374,8 @@ export function installLook(world) {
     }
   });
 
+  /* Seamless procedural sky dome: zero equirectangular wrap seam, zero underground white pole,
+     and smooth horizon blend into scene.fogColor. */
   let dome = null;
   let skyMat = null;
   if (engine.getClassName() !== "NullEngine") {
@@ -454,30 +393,94 @@ export function installLook(world) {
         fragmentSource: `
           precision highp float;
           varying vec3 vPos;
-          uniform sampler2D dayTex;
-          uniform sampler2D duskTex;
-          uniform sampler2D nightTex;
           uniform vec3 weights;
+          uniform vec3 horizonColor;
+          uniform vec3 skyTint;
+          uniform vec4 weather;
+
+          float hash2(vec2 p) {
+            vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+            p3 += dot(p3, p3.yzx + 33.33);
+            return fract((p3.x + p3.y) * p3.z);
+          }
+          float noise2(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(hash2(i + vec2(0.0, 0.0)), hash2(i + vec2(1.0, 0.0)), u.x),
+              mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), u.x),
+              u.y
+            );
+          }
+          float fbm2(vec2 p) {
+            float v = 0.0;
+            v += 0.55 * noise2(p);
+            v += 0.30 * noise2(p * 2.13 + vec2(3.7, 1.9));
+            v += 0.15 * noise2(p * 4.27 + vec2(7.1, 5.3));
+            return v;
+          }
+
           void main() {
             vec3 dir = normalize(vPos);
-            float u = atan(dir.x, dir.z) / 6.28318530718 + 0.5;
-            float v = asin(clamp(dir.y, -1.0, 1.0)) / 3.14159265 + 0.5;
-            vec3 c = texture2D(dayTex, vec2(u, v)).rgb * weights.x
-              + texture2D(duskTex, vec2(u, v)).rgb * weights.y
-              + texture2D(nightTex, vec2(u, v)).rgb * weights.z;
-            gl_FragColor = vec4(c, 1.0);
+            float h = clamp(dir.y, -1.0, 1.0);
+            float up = max(0.0, h);
+
+            vec3 dayZen = vec3(0.24, 0.44, 0.68);
+            vec3 dayMid = vec3(0.46, 0.64, 0.80);
+            vec3 duskZen = vec3(0.06, 0.09, 0.20);
+            vec3 duskMid = vec3(0.76, 0.42, 0.28);
+            vec3 nightZen = vec3(0.025, 0.038, 0.08);
+            vec3 nightMid = vec3(0.06, 0.12, 0.22);
+
+            vec3 zen = dayZen * weights.x + duskZen * weights.y + nightZen * weights.z;
+            vec3 mid = dayMid * weights.x + duskMid * weights.y + nightMid * weights.z;
+            vec3 sky = mix(mid, zen, smoothstep(0.04, 0.72, up));
+
+            float cover = clamp(weather.x, 0.0, 1.0);
+            float storm = clamp(weather.y, 0.0, 1.0);
+            float flash = clamp(weather.z, 0.0, 1.0);
+            float t = weather.w;
+
+            sky = mix(sky, skyTint * 0.88, cover * 0.65);
+
+            if (up > 0.01) {
+              vec2 cloudUv = dir.xz / (up + 0.38) * 1.6 + vec2(t * 0.018, t * 0.008);
+              float n = fbm2(cloudUv);
+              float thresh = mix(0.58, 0.25, cover);
+              float cMask = smoothstep(thresh, thresh + 0.28, n) * smoothstep(0.02, 0.22, up);
+              vec3 cLight = mix(vec3(0.78, 0.83, 0.88), vec3(0.84, 0.54, 0.38), weights.y);
+              cLight = mix(cLight, vec3(0.10, 0.15, 0.24), weights.z);
+              vec3 cStorm = mix(vec3(0.26, 0.31, 0.38), vec3(0.11, 0.15, 0.22), storm);
+              vec3 cCol = mix(cLight, cStorm, cover * 0.85);
+              float rim = smoothstep(0.48, 0.72, n) * (storm * 0.35 + flash * 0.75);
+              cCol += vec3(0.35, 0.68, 1.0) * rim;
+              sky = mix(sky, cCol, cMask * (0.35 + cover * 0.55));
+            }
+
+            if (weights.z > 0.25 && up > 0.15 && cover < 0.75) {
+              vec2 starCell = floor(dir.xz / (up + 0.25) * 90.0);
+              float s = hash2(starCell);
+              if (s > 0.9965) {
+                float twinkle = 0.6 + 0.4 * sin(t * 2.5 + s * 400.0);
+                sky += vec3(0.55, 0.68, 0.88) * twinkle * weights.z * (1.0 - cover) * smoothstep(0.15, 0.4, up);
+              }
+            }
+
+            float horBlend = smoothstep(-0.04, 0.22, h);
+            vec3 finalCol = mix(horizonColor, sky, horBlend);
+            gl_FragColor = vec4(finalCol, 1.0);
           }`,
       }, {
         attributes: ["position"],
-        uniforms: ["worldViewProjection", "weights"],
-        samplers: ["dayTex", "duskTex", "nightTex"],
+        uniforms: ["worldViewProjection", "weights", "horizonColor", "skyTint", "weather"],
       });
       skyMat.backFaceCulling = false;
       skyMat.disableDepthWrite = false;
-      skyMat.setTexture("dayTex", skies.day);
-      skyMat.setTexture("duskTex", skies.dusk);
-      skyMat.setTexture("nightTex", skies.night);
       skyMat.setVector3("weights", new B.Vector3(1, 0, 0));
+      skyMat.setVector3("horizonColor", new B.Vector3(0.5, 0.62, 0.74));
+      skyMat.setVector3("skyTint", new B.Vector3(0.5, 0.62, 0.74));
+      skyMat.setVector4("weather", new B.Vector4(0, 0, 0, 0));
       dome = B.MeshBuilder.CreateSphere("skyDome", { diameter: 520, segments: 24 }, scene);
       dome.material = skyMat;
       dome.isPickable = false;
@@ -493,7 +496,11 @@ export function installLook(world) {
   let quality = readQuality();
   let override = null;
   const weightVec = new B.Vector3(1, 0, 0);
-  let last = { day: 1, dusk: 0, night: 0, exposure: 1.16, neon: 0.2 };
+  const fogVec = new B.Vector3(0.5, 0.62, 0.74);
+  const clearVec = new B.Vector3(0.5, 0.62, 0.74);
+  const weatherVec = new B.Vector4(0, 0, 0, 0);
+  let skyTime = 0;
+  let last = { day: 1, dusk: 0, night: 0, exposure: 0.94, neon: 0.2 };
 
   function weightsNow() {
     const base = skyWeights(clockHour(), clock);
@@ -513,16 +520,19 @@ export function installLook(world) {
     engine.setHardwareScalingLevel(low ? 1 : 1 / Math.min(dpr, 1.5));
     if (pipeline) {
       pipeline.bloomEnabled = !low;
-      pipeline.samples = low ? 1 : 4;
+      pipeline.samples = 1;
       pipeline.fxaaEnabled = !low;
     }
     if (sun) sun.shadowEnabled = !low;
     if (glow) {
-      glow.intensity = low ? 0.35 : 0.75;
-      glow.blurKernelSize = low ? 16 : 48;
+      glow.intensity = low ? 0.35 : 0.55;
+      glow.blurKernelSize = 16;
     }
     surfaces.forEach((m) => {
-      if (m.metadata && m.metadata.wet && m.clearCoat) m.clearCoat.isEnabled = !low;
+      if (m.metadata && m.metadata.wet && m.clearCoat) {
+        const wet = (override && override.wet != null) ? override.wet : 0;
+        m.clearCoat.isEnabled = !low && wet > 0.06;
+      }
     });
     const btn = typeof document !== "undefined" && document.getElementById && document.getElementById("quality");
     if (btn) {
@@ -540,29 +550,58 @@ export function installLook(world) {
     w.day /= s;
     w.dusk /= s;
     w.night /= s;
-    const exposure = override && override.exposure != null ? override.exposure : 1.16 * w.day + 1.02 * w.dusk + 0.88 * w.night;
-    const fogDensity = override && override.fogDensity != null ? override.fogDensity : 0.0048 + w.night * 0.0045 + w.dusk * 0.0015;
+    const defaultExp = 0.94 * w.day + 0.85 * w.dusk + 0.78 * w.night;
+    const exposure = override && override.exposure != null ? override.exposure : defaultExp;
+    const fogDensity = override && override.fogDensity != null ? override.fogDensity : 0.0045 + w.night * 0.0038 + w.dusk * 0.0015;
     if (pipeline && pipeline.imageProcessing) pipeline.imageProcessing.exposure = exposure;
     scene.fogMode = B.Scene.FOGMODE_EXP2;
     scene.fogDensity = fogDensity;
-    const horizon = lerpRgb(lerpRgb(rgb(214, 228, 236), rgb(214, 122, 78), w.dusk), rgb(22, 48, 82), w.night);
-    // day weight pulls the noon horizon back toward the bright sky when dusk and night are both low
-    const dayHorizon = lerpRgb(horizon, rgb(186, 214, 232), w.day);
+    const horizon = lerpRgb(lerpRgb(rgb(168, 192, 212), rgb(196, 112, 74), w.dusk), rgb(18, 36, 62), w.night);
+    const dayHorizon = lerpRgb(horizon, rgb(156, 186, 208), w.day);
     if (override && override.fogColor) {
       const col = typeof override.fogColor === "string" ? B.Color3.FromHexString(override.fogColor) : override.fogColor;
       scene.fogColor.copyFrom(col);
     } else {
       scene.fogColor.set(dayHorizon.r / 255, dayHorizon.g / 255, dayHorizon.b / 255);
     }
-    scene.clearColor.set(dayHorizon.r / 255, dayHorizon.g / 255, dayHorizon.b / 255, 1);
+    if (override && override.clearColor) {
+      const cc = override.clearColor;
+      scene.clearColor.set(cc.r, cc.g, cc.b, 1);
+    } else {
+      scene.clearColor.set(dayHorizon.r / 255, dayHorizon.g / 255, dayHorizon.b / 255, 1);
+    }
     if (dome && scene.activeCamera) dome.position.copyFrom(scene.activeCamera.position);
     if (skyMat) {
       weightVec.set(w.day, w.dusk, w.night);
       skyMat.setVector3("weights", weightVec);
+      fogVec.set(scene.fogColor.r, scene.fogColor.g, scene.fogColor.b);
+      skyMat.setVector3("horizonColor", fogVec);
+      clearVec.set(scene.clearColor.r, scene.clearColor.g, scene.clearColor.b);
+      skyMat.setVector3("skyTint", clearVec);
+      const cover = override && override.cover != null ? override.cover : 0;
+      const storm = override && override.storm != null ? override.storm : 0;
+      const flash = override && override.flash != null ? override.flash : 0;
+      skyTime += (engine.getDeltaTime ? engine.getDeltaTime() : 16) * 0.001;
+      weatherVec.set(cover, storm, flash, skyTime);
+      skyMat.setVector4("weather", weatherVec);
     }
-    const ibl = 0.35 + w.day * 0.55;
-    surfaces.forEach((m) => { m.environmentIntensity = ibl; });
-    const neonK = 0.16 + w.dusk * 0.55 + w.night * 1.2;
+    const wet = override && override.wet != null ? override.wet : 0;
+    const low = quality === "low";
+    const ibl = 0.28 + w.day * 0.34;
+    surfaces.forEach((m) => {
+      m.environmentIntensity = ibl;
+      const meta = m.metadata || {};
+      if (meta.wet && m !== mats.asphalt) {
+        const dryRough = meta.dryRough != null ? meta.dryRough : 0.85;
+        m.roughness = Math.max(0.22, dryRough - wet * 0.52);
+        if (m.clearCoat) {
+          m.clearCoat.isEnabled = !low && wet > 0.06;
+          m.clearCoat.intensity = wet * (meta.maxCoat || 0.42);
+          m.clearCoat.roughness = 0.14 + (1 - wet) * 0.16;
+        }
+      }
+    });
+    const neonK = 0.16 + w.dusk * 0.55 + w.night * 1.2 + (override && override.storm ? override.storm * 0.35 : 0);
     neonMats.forEach((m) => {
       const base = m.metadata.base;
       m.emissiveColor.set(base.r * neonK, base.g * neonK, base.b * neonK);
@@ -586,56 +625,13 @@ export function installLook(world) {
   mountButton();
   applyQuality(quality);
 
-  function loadGen() {
-    if (typeof fetch !== "function" || typeof document === "undefined" || !document.baseURI) return;
-    let url;
-    try { url = new URL("textures/city/manifest.json", document.baseURI).href; } catch (e) { return; }
-    fetch(url).then((res) => (res.ok ? res.json() : null)).then((man) => {
-      if (!man) return;
-      const tex = (file) => {
-        const t = new B.Texture(file, scene, false, false, B.Texture.TRILINEAR_SAMPLINGMODE);
-        t.wrapU = B.Texture.WRAP_ADDRESSMODE;
-        t.wrapV = B.Texture.WRAP_ADDRESSMODE;
-        return t;
-      };
-      Object.keys(mats).forEach((key) => {
-        const spec = man[key];
-        if (!spec || !spec.albedo) return;
-        const m = mats[key];
-        m.albedoTexture = tex(spec.albedo);
-        if (spec.normal) {
-          m.bumpTexture = tex(spec.normal);
-          m.bumpTexture.level = m.bumpTexture.level || 0.6;
-        }
-        if (spec.roughness) {
-          m.metallicTexture = tex(spec.roughness);
-          m.useRoughnessFromMetallicTextureGreen = true;
-          m.useMetallnessFromMetallicTextureBlue = false;
-          m.roughness = 1;
-        }
-      });
-      if (man.sky && skyMat) {
-        if (man.sky.day) skyMat.setTexture("dayTex", tex(man.sky.day));
-        if (man.sky.dusk) skyMat.setTexture("duskTex", tex(man.sky.dusk));
-        if (man.sky.night) skyMat.setTexture("nightTex", tex(man.sky.night));
-        if (man.sky.day) {
-          const env = tex(man.sky.day);
-          env.coordinatesMode = B.Texture.EQUIRECTANGULAR_MODE;
-          surfaces.forEach((m) => { m.reflectionTexture = env; });
-        }
-      }
-      source = "gen";
-    }).catch(() => { /* stand-ins stay until the textures are published */ });
-  }
-  loadGen();
-
   const api = {
     quality(level) {
       if (level == null) return quality;
       applyQuality(level, "api");
       return quality;
     },
-    /** Weather blend. Pass a partial ({ day, dusk, night, fogDensity, fogColor, exposure }) or null to follow the clock. */
+    /** Weather blend. Pass a partial ({ day, dusk, night, fogDensity, fogColor, clearColor, exposure, cover, wet, storm, flash }) or null to follow the clock. */
     setSky(partial) {
       override = partial || null;
     },

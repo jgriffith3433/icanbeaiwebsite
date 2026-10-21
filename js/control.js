@@ -28,14 +28,17 @@ export const MOVE_DEFAULTS = {
   jumpHeight: 1.5,
   airJumps: 2,
   airJumpHeight: 1.2,
-  gravity: 6.5,
-  maxFall: 7,
+  gravity: 14.5,
+  jumpSpeed: 6.8,
+  airJumpSpeed: 6.4,
+  maxFall: 9,
   floatFall: 1.6, // legacy slow fall (glide uses glideFall when riding)
-  glideFall: 0.42, // hold jump in the air: ride the wind, fall this slowly
-  glideSpeed: 10.5, // horizontal ride speed while gliding
-  airControl: 0.55,
+  glideFall: 0.85, // hold jump in the air: ride the wind, fall this slowly
+  glideSpeed: 9.5, // horizontal ride speed while gliding and steering
+  airControl: 0.65,
   glideAirControl: 0.9,
   softLand: 2.4, // horizontal speed after a soft glide landing
+  updraftCeiling: 22, // rooftop ceiling (~22m, just above the 16.6m rooftops)
 };
 
 /* ---------------- the movement (no page needed) ---------------- */
@@ -52,11 +55,11 @@ export function createMover(world, cfg) {
   const walkBackSpeed = Math.max(((cfg.person && cfg.person.walkSpeed) || 1.25) * 1.6, 1.6);
   const GRAV = new B.Vector3(0, -M.gravity, 0);
   const DOWN = new B.Vector3(0, -1, 0);
-  const jumpVel = Math.sqrt(2 * M.gravity * M.jumpHeight);
-  const airJumpVel = Math.sqrt(2 * M.gravity * M.airJumpHeight);
+  const jumpVel = M.jumpSpeed || Math.sqrt(2 * M.gravity * M.jumpHeight);
+  const airJumpVel = M.airJumpSpeed || Math.sqrt(2 * M.gravity * M.airJumpHeight);
   const s = {
     x: 0, y: 0, z: 0, yaw: 0, vx: 0, vy: 0, vz: 0,
-    grounded: true, coyote: 0, jumpsLeft: M.airJumps, jumps: 0, takeoffY: 0, peak: 0,
+    grounded: true, coyote: 0, airTime: 0, jumpsLeft: M.airJumps, jumps: 0, takeoffY: 0, peak: 0,
     floating: false, gliding: false, softLand: false, lift: 0, anim: "idle", speed: 0,
     flights: 0, lastFlight: null, // { jumps, height, soft?, glide? } of the last time he was in the air
   };
@@ -140,18 +143,6 @@ export function createMover(world, cfg) {
   }
 
   function sub(h, input, jumpPresses) {
-    const riding = !!input.hold && !s.grounded;
-    const top = riding ? M.glideSpeed : input.sprint ? M.sprint : M.walk;
-    let ix = input.x || 0;
-    let iz = input.z || 0;
-    const steered = Math.hypot(ix, iz) > 0.1;
-    // Hold jump in the air with no stick: keep coasting on the wind in the facing direction.
-    if (riding && !steered) {
-      ix = Math.sin(s.yaw);
-      iz = Math.cos(s.yaw);
-    }
-    const wantX = ix * top;
-    const wantZ = iz * top;
     let support = null;
     let onGround;
     if (cc) {
@@ -180,12 +171,14 @@ export function createMover(world, cfg) {
       }
       s.grounded = true;
       s.coyote = 0.12;
+      s.airTime = 0;
       s.jumpsLeft = M.airJumps;
       s.jumps = 0;
     } else {
       if (s.grounded) s.takeoffY = s.y; // walked off an edge
       s.grounded = false;
       s.coyote = Math.max(0, s.coyote - h);
+      s.airTime += h;
       s.softLand = false;
     }
     for (let j = 0; j < jumpPresses; j++) {
@@ -194,34 +187,49 @@ export function createMover(world, cfg) {
         s.takeoffY = s.y;
         s.peak = s.y;
         s.jumps = 1;
+        s.airTime = 0;
         s.grounded = false;
         s.coyote = 0;
         onGround = false;
       } else if (s.jumpsLeft > 0) {
-        s.vy = Math.max(s.vy, 0) + airJumpVel * (s.vy > 0 ? 0.6 : 1);
+        s.vy = Math.max(s.vy, 0) + airJumpVel * (s.vy > 0 ? 0.65 : 1);
         s.jumpsLeft--;
         s.jumps++;
       }
     }
-    const accel = onGround ? 14 : 14 * (riding ? M.glideAirControl : M.airControl);
+
+    const ceiling = M.updraftCeiling || 22;
+    const rawLift = onGround || !input.hold ? 0 : liftAt(s.x, s.z);
+    const lift = rawLift > 0 && s.y < ceiling ? rawLift * Math.min(1, (ceiling - s.y) / 2.5) : 0;
+    s.lift = lift;
+
+    /* Storm-gliding engages when holding jump after (a) performing a mid-air jump,
+       (b) passing the jump apex / airborne > 0.22s while holding Space, or (c) riding an updraft. */
+    const canGlide = !onGround && !!input.hold && (s.jumpsLeft < M.airJumps || s.vy <= 0.5 || s.airTime > 0.22 || lift > 0.35);
+    const ix = input.x || 0;
+    const iz = input.z || 0;
+    const steered = Math.hypot(ix, iz) > 0.1;
+    // Do NOT auto-propel forward when gliding without directional input; only fly at glideSpeed when steering!
+    const top = canGlide ? (steered ? M.glideSpeed : 0) : input.sprint ? M.sprint : M.walk;
+    const wantX = steered ? ix * top : 0;
+    const wantZ = steered ? iz * top : 0;
+    const accel = onGround ? 14 : canGlide ? (steered ? 14 * M.glideAirControl : 4) : 14 * M.airControl;
     s.vx = damp(s.vx, wantX, h, accel);
     s.vz = damp(s.vz, wantZ, h, accel);
-    const lift = onGround ? 0 : liftAt(s.x, s.z);
-    s.lift = lift;
+
     if (onGround && s.vy <= 0) {
       s.vy = 0;
       s.floating = false;
       s.gliding = false;
     } else {
       if (lift > 0.35) {
-        // lift is m/s upward at the column centre: climb at that rate
+        // lift is m/s upward at the column centre: climb at that rate up to ceiling
         s.vy = Math.max(s.vy, lift);
       } else {
         s.vy -= M.gravity * h;
       }
-      // Hold jump: ride the wind (glide). Rising in an updraft while held still counts as gliding.
-      s.floating = !!input.hold && (s.vy < 0.15 || lift > 0.35);
-      s.gliding = s.floating;
+      s.floating = canGlide && (s.vy <= 0.5 || lift > 0.35);
+      s.gliding = canGlide;
       const fallCap = s.floating ? -M.glideFall : -M.maxFall;
       s.vy = Math.max(s.vy, fallCap);
     }
@@ -544,14 +552,15 @@ function install() {
     wasGliding = on;
   }
 
-  /* Ambient updraft columns at avenue × cross (stronger in storm / wind). */
+  /* Ambient updraft columns at avenue × cross (only active in wind / storm / rain). */
   function weatherLiftScale() {
     const w = (window.weather && window.weather.now && window.weather.now()) || { state: "clear" };
     const table = UD.weather || {};
     if (table[w.state] != null) return table[w.state] * (w.intensity != null ? 0.7 + 0.3 * w.intensity : 1);
     if (w.state === "storm") return 1;
     if (w.state === "wind") return 0.92;
-    return 0.12;
+    if (w.state === "rain") return 0.25;
+    return 0;
   }
   function refreshAmbientUpdrafts() {
     if (UD.ambient === false) return;
@@ -561,13 +570,15 @@ function install() {
     const scale = weatherLiftScale();
     const base = (UD.lift != null ? UD.lift : 8) * 0.85;
     const list = [];
-    avenues.forEach((av) => {
-      crosses.forEach((cr) => {
-        if (cr.x < (av.from != null ? av.from : -1e9) || cr.x > (av.to != null ? av.to : 1e9)) return;
-        if (av.z < (cr.from != null ? cr.from : -1e9) || av.z > (cr.to != null ? cr.to : 1e9)) return;
-        list.push({ x: cr.x, z: av.z, r: UD.radius || 4.2, lift: base * scale, kind: "ambient" });
+    if (scale > 0.01) {
+      avenues.forEach((av) => {
+        crosses.forEach((cr) => {
+          if (cr.x < (av.from != null ? av.from : -1e9) || cr.x > (av.to != null ? av.to : 1e9)) return;
+          if (av.z < (cr.from != null ? cr.from : -1e9) || av.z > (cr.to != null ? cr.to : 1e9)) return;
+          list.push({ x: cr.x, z: av.z, r: UD.radius || 4.2, lift: base * scale, kind: "ambient" });
+        });
       });
-    });
+    }
     // Keep player-spawned gust columns.
     const kept = mover.updrafts().filter((u) => u.kind === "gust");
     mover.setUpdrafts(list.concat(kept));

@@ -334,24 +334,12 @@ export function startWeather(world, dayApi) {
     diff: new B.Color3(),
   };
   const puddles = [];
-  let mirror = null;
   if (roadMat) {
-    try {
-      if (B.MirrorTexture) {
-        mirror = new B.MirrorTexture("puddles", 256, scene, true);
-        mirror.mirrorPlane = new B.Plane(0, -1, 0, 0.06);
-        mirror.level = 1;
-        mirror.refreshRate = 0;
-      }
-    } catch (err) {
-      console.warn("[weather] puddle mirror didn't start:", err);
-      mirror = null;
-    }
     const pmat = new B.StandardMaterial("puddle", scene);
-    pmat.diffuseColor = new B.Color3(0.02, 0.025, 0.03);
-    pmat.specularColor = new B.Color3(0.85, 0.9, 0.95);
-    pmat.specularPower = 80;
-    if (mirror) pmat.reflectionTexture = mirror;
+    pmat.diffuseColor = new B.Color3(0.015, 0.022, 0.032);
+    pmat.emissiveColor = new B.Color3(0.01, 0.018, 0.028);
+    pmat.specularColor = new B.Color3(0.75, 0.84, 0.95);
+    pmat.specularPower = 96;
     pmat.alpha = 0;
     pmat.transparencyMode = B.Material.MATERIAL_ALPHABLEND;
     pmat.backFaceCulling = true;
@@ -366,17 +354,6 @@ export function startWeather(world, dayApi) {
       puddles.push({ mesh, dx: spot[0], dz: spot[1], rz });
     });
   }
-
-  function fillMirror() {
-    if (!mirror) return;
-    const skip = new Set(puddles.map((p) => p.mesh));
-    mirror.renderList = scene.meshes.filter((m) => {
-      if (skip.has(m) || !m.isEnabled() || !m.isVisible) return false;
-      if (roadMat && m.material === roadMat) return false;
-      return !!(m.getTotalVertices && m.getTotalVertices());
-    });
-  }
-  let mirrorMeshes = -1;
 
   /* ---- particles: GPU when the browser has them, the ordinary system otherwise ---- */
   const systems = [];
@@ -529,6 +506,8 @@ export function startWeather(world, dayApi) {
     sway.push({ mesh, base, crown: mesh.name.indexOf("crown") === 0 });
   });
   let windT = 0;
+  let swayAcc = 0;
+  let wasSwayed = false;
   const canSway = !!(scene.getEngine().getCaps && scene.getEngine().getCaps().instancedArrays);
 
   /* ---- ambience, in the page's Sound button ---- */
@@ -803,39 +782,48 @@ export function startWeather(world, dayApi) {
     B.Color3.LerpToRef(scratch.mixed, scratch.fog, fogMix * 0.9, scratch.fog);
     scene.fogColor.copyFrom(scratch.fog);
     scene.fogDensity = L.fog;
-    if (sun) sun.intensity *= L.light * (1 + flash * L.lightning * 4);
+    if (sun) sun.intensity *= L.light * (1 + flash * L.lightning * 3.2);
     if (hemi) hemi.intensity *= L.hemi;
-    if (pipeline && pipeline.imageProcessing) pipeline.imageProcessing.exposure *= L.exposure * (1 + flash * 1.6);
+    const baseExp = pipeline && pipeline.imageProcessing ? pipeline.imageProcessing.exposure : 0.92;
+    const targetExp = Math.min(1.08, Math.max(0.76, baseExp * (0.88 + 0.12 * L.exposure) * (1 + flash * 0.85)));
+    if (pipeline && pipeline.imageProcessing) pipeline.imageProcessing.exposure = targetExp;
+    if (world.look && world.look.setSky) {
+      world.look.setSky({
+        clearColor: scratch.mixed,
+        fogColor: scratch.fog,
+        fogDensity: L.fog,
+        exposure: targetExp,
+        cover: L.cover,
+        wet: L.wet,
+        rain: L.rain,
+        storm: L.lightning,
+        wind: L.wind,
+        flash,
+      });
+    }
     if (roadMat && dryDiffuse) {
       const wet = L.wet;
       const g = 0.04 + wet * 0.66;
       if (roadIsPbr) {
-        dryDiffuse.scaleToRef(1 - wet * 0.55, scratch.diff);
-        scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.06);
+        dryDiffuse.scaleToRef(1 - wet * 0.48, scratch.diff);
+        scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
         if (!roadMat.albedoColor) roadMat.albedoColor = scratch.diff.clone();
         else roadMat.albedoColor.copyFrom(scratch.diff);
-        roadMat.roughness = Math.max(0.08, (dryRough == null ? 0.32 : dryRough) - wet * 0.22);
+        roadMat.roughness = Math.max(0.18, (dryRough == null ? 0.84 : dryRough) - wet * 0.58);
         if (roadMat.clearCoat) {
-          roadMat.clearCoat.isEnabled = true;
-          roadMat.clearCoat.intensity = Math.min(1, (dryCoat == null ? 0.42 : dryCoat) + wet * 0.45);
-          roadMat.clearCoat.roughness = 0.08 + (1 - wet) * 0.06;
+          roadMat.clearCoat.isEnabled = wet > 0.06 && (!world.look || world.look.quality() !== "low");
+          roadMat.clearCoat.intensity = wet * 0.62;
+          roadMat.clearCoat.roughness = 0.12 + (1 - wet) * 0.18;
         }
       } else {
-        dryDiffuse.scaleToRef(1 - wet * 0.62, scratch.diff);
-        scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.05);
+        dryDiffuse.scaleToRef(1 - wet * 0.52, scratch.diff);
+        scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
         roadMat.diffuseColor.copyFrom(scratch.diff);
-        roadMat.ambientColor.copyFrom(scratch.diff).scaleInPlace(0.55);
+        roadMat.ambientColor.copyFrom(scratch.diff).scaleInPlace(0.32);
         roadMat.specularColor.set(g, g * 1.02, g * 1.08);
         roadMat.specularPower = 64 - wet * 40;
       }
       live.gloss = g;
-    }
-    if (mirror) {
-      mirror.refreshRate = L.wet > 0.18 ? 1 : 0;
-      if (scene.meshes.length !== mirrorMeshes && L.wet > 0.18) {
-        mirrorMeshes = scene.meshes.length;
-        fillMirror();
-      }
     }
     const cam = scene.activeCamera;
     const px = cam && cam.target ? cam.target.x : 0;
@@ -844,21 +832,39 @@ export function startWeather(world, dayApi) {
       p.mesh.setEnabled(show);
       p.mesh.position.x = px + p.dx;
       p.mesh.position.z = p.rz + p.dz;
-      p.mesh.material.alpha = show ? Math.min(0.92, 0.25 + L.wet * 0.7) : 0;
+      p.mesh.material.alpha = show ? Math.min(0.78, 0.18 + L.wet * 0.56) : 0;
     });
     live.puddles = puddles.filter((p) => p.mesh.isEnabled()).length;
-    if (canSway) sway.forEach((tree) => {
-      const amp = L.wind * (tree.crown ? 0.22 : 0.05);
-      tree.base.forEach((b, i) => {
-        const phase = b.p.x * 0.17 + b.p.z * 0.11;
-        const lean = Math.sin(windT * 1.7 + phase);
-        const ang = amp * (0.45 + 0.55 * lean);
-        B.Quaternion.FromEulerAnglesToRef(ang * 0.45, 0, ang, swayQ);
-        b.r.multiplyToRef(swayQ, tmpR);
-        B.Matrix.ComposeToRef(b.s, tmpR, b.p, tmpM);
-        tree.mesh.thinInstanceSetMatrixAt(i, tmpM, i === tree.base.length - 1);
-      });
-    });
+    if (canSway) {
+      if (L.wind > 0.18) {
+        swayAcc += dt;
+        if (swayAcc >= 0.055) {
+          swayAcc = 0;
+          wasSwayed = true;
+          sway.forEach((tree) => {
+            const amp = L.wind * (tree.crown ? 0.22 : 0.05);
+            tree.base.forEach((b, i) => {
+              const phase = b.p.x * 0.17 + b.p.z * 0.11;
+              const lean = Math.sin(windT * 1.7 + phase);
+              const ang = amp * (0.45 + 0.55 * lean);
+              B.Quaternion.FromEulerAnglesToRef(ang * 0.45, 0, ang, swayQ);
+              b.r.multiplyToRef(swayQ, tmpR);
+              B.Matrix.ComposeToRef(b.s, tmpR, b.p, tmpM);
+              tree.mesh.thinInstanceSetMatrixAt(i, tmpM, i === tree.base.length - 1);
+            });
+          });
+        }
+      } else if (wasSwayed) {
+        wasSwayed = false;
+        swayAcc = 0;
+        sway.forEach((tree) => {
+          tree.base.forEach((b, i) => {
+            B.Matrix.ComposeToRef(b.s, b.r, b.p, tmpM);
+            tree.mesh.thinInstanceSetMatrixAt(i, tmpM, i === tree.base.length - 1);
+          });
+        });
+      }
+    }
     placeEmitters(L);
     // Adaptive beds + sampled rain/wind/city hum (js/score.js). Procedural noise stays as a
     // fallback when the Gen files aren't there yet, and as a soft under-layer for hush/snow.

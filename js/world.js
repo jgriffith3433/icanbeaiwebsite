@@ -34,7 +34,7 @@
     engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 1.5));
     const scene = new B.Scene(engine);
     scene.clearColor = new B.Color4(0.1, 0.12, 0.17, 1);
-    scene.ambientColor = new B.Color3(0.25, 0.25, 0.28);
+    scene.ambientColor = new B.Color3(0.14, 0.15, 0.18);
     scene.fogMode = B.Scene.FOGMODE_EXP2;
     scene.fogDensity = 0.0065;
     scene.skipPointerMovePicking = true;
@@ -48,7 +48,7 @@
       const m = new B.StandardMaterial("m" + Object.keys(matCache).length + color, scene);
       m.diffuseColor = B.Color3.FromHexString(color);
       m.specularColor = new B.Color3(opt.spec || 0.04, opt.spec || 0.04, opt.spec || 0.04);
-      m.ambientColor = m.diffuseColor.scale(0.6);
+      m.ambientColor = m.diffuseColor.scale(0.32);
       m.maxSimultaneousLights = 10;
       if (opt.alpha != null) m.alpha = opt.alpha;
       if (opt.emissive) m.emissiveColor = B.Color3.FromHexString(opt.emissive);
@@ -129,20 +129,22 @@
     camera.attachControl(canvas, false); // false = the camera takes the wheel/pinch, the page doesn't
 
     const hemi = new B.HemisphericLight("sky", V3(0.1, 1, 0.3), scene);
-    hemi.groundColor = new B.Color3(0.2, 0.18, 0.16);
+    hemi.groundColor = new B.Color3(0.14, 0.13, 0.15);
     const sun = new B.DirectionalLight("sun", V3(-0.4, -1, -0.5), scene);
     sun.position = V3(20, 40, 20);
-    sun.shadowFrustumSize = 30;
-    sun.autoCalcShadowZBounds = true;
-    const shadows = new B.ShadowGenerator(2048, sun);
+    sun.shadowFrustumSize = 32;
+    sun.autoCalcShadowZBounds = false;
+    sun.shadowMinZ = 1;
+    sun.shadowMaxZ = 90;
+    const shadows = new B.ShadowGenerator(1024, sun);
     shadows.usePercentageCloserFiltering = true;
-    shadows.filteringQuality = B.ShadowGenerator.QUALITY_MEDIUM;
-    shadows.bias = 0.0015;
+    shadows.filteringQuality = B.ShadowGenerator.QUALITY_LOW;
+    shadows.bias = 0.0018;
     shadows.normalBias = 0.02;
-    shadows.darkness = 0.25;
+    shadows.darkness = 0.22;
 
-    const glow = new B.GlowLayer("glow", scene, { mainTextureSamples: 2, blurKernelSize: 48 });
-    glow.intensity = 0.75;
+    const glow = new B.GlowLayer("glow", scene, { mainTextureSamples: 1, blurKernelSize: 16 });
+    glow.intensity = 0.55;
     const glowing = (mesh) => {
       glow.addIncludedOnlyMesh(mesh);
       return mesh;
@@ -150,19 +152,19 @@
 
     const pipeline = new B.DefaultRenderingPipeline("look", true, scene, [camera]);
     pipeline.fxaaEnabled = true;
-    pipeline.samples = 4;
+    pipeline.samples = 1;
     pipeline.imageProcessing.toneMappingEnabled = true;
     pipeline.imageProcessing.toneMappingType = B.ImageProcessingConfiguration.TONEMAPPING_ACES;
-    pipeline.imageProcessing.exposure = 1.1;
-    pipeline.imageProcessing.contrast = 1.12;
+    pipeline.imageProcessing.exposure = 0.92;
+    pipeline.imageProcessing.contrast = 1.1;
     pipeline.imageProcessing.vignetteEnabled = true;
-    pipeline.imageProcessing.vignetteWeight = 1.6;
-    pipeline.imageProcessing.vignetteColor = new B.Color4(0.05, 0.05, 0.08, 0);
-    /* Bloom on the bright pixels (neon, windows, lamps). js/look.js turns it off on the low quality setting. */
+    pipeline.imageProcessing.vignetteWeight = 1.5;
+    pipeline.imageProcessing.vignetteColor = new B.Color4(0.04, 0.05, 0.08, 0);
+    /* Bloom on genuine emissives (neon, bolts, blue seams, lamps). js/look.js turns it off on low quality. */
     pipeline.bloomEnabled = true;
-    pipeline.bloomThreshold = 0.52;
-    pipeline.bloomWeight = 0.36;
-    pipeline.bloomKernel = 32;
+    pipeline.bloomThreshold = 0.88;
+    pipeline.bloomWeight = 0.16;
+    pipeline.bloomKernel = 24;
     pipeline.bloomScale = 0.5;
 
     /* ---------------- ground, street ---------------- */
@@ -935,6 +937,7 @@
     }
 
     /* Everything built since "furniture" is furniture: big enough to bump into, and it doesn't move. */
+    const furnitureEnd = scene.meshes.length;
     {
       const moving = [frontDoorNode, fridgeDoor, elevatorDoors && elevatorDoors.l, elevatorDoors && elevatorDoors.r, props.bag].filter(Boolean);
       const moves = (m) => moving.some((n) => m === n || m.isDescendantOf(n));
@@ -1137,8 +1140,15 @@
     headSpot.intensity = 0;
     headSpot.range = 30;
 
-    /* Shadow casters: people, car, furniture near buildings */
+    /* Shadow casters: major silhouettes only (building shells, trees, car hulls, core person shapes).
+       Skip the ~400 tiny indoor furniture sub-parts, window mullions, car hubcaps/wipers, and face bits. */
+    const furnitureSet = new Set(scene.meshes.slice(furnitureFrom, furnitureEnd));
+    const majorFurniture = new Set(["bed", "couch", "desk", "table", "fridge", "counter", "island", "bookshelf", "fdoor", "sign", "eframeL", "eframeR", "eframeT"]);
+    const skipCasterName = /^(wt|wb|wl|wr|wm|pillarF|wheel\d|hub\d|wiper[LR]|nose|eye\d|hand[LR]|foot[LR]|neck|uPole|phone|cup|bag|sighead\d+|sigr\d+|sigg\d+|-crown)/;
     casters.forEach((m) => {
+      const n = m.name || "";
+      if (furnitureSet.has(m) && !majorFurniture.has(n)) return;
+      if (skipCasterName.test(n) || n.includes("-crown") || n.includes("-wallt")) return;
       if (Math.abs(m.getAbsolutePosition().x) < 1e6) shadows.addShadowCaster(m, false);
     });
     scene.meshes.forEach((m) => {
@@ -1434,12 +1444,12 @@
       const ang = ((hour - SR) / (SS - SR)) * PI;
       const elev = Math.sin(Math.max(0, Math.min(PI, ang)));
       sun.direction.set(-Math.cos(ang) * 0.7, -Math.max(0.3, elev), -0.55);
-      sun.intensity = hour > SR - 0.3 && hour < SS + 0.3 ? 0.2 + elev * 0.6 : 0.02;
+      sun.intensity = hour > SR - 0.3 && hour < SS + 0.3 ? 0.18 + elev * 0.54 : 0.02;
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
-      hemi.intensity = 0.17 + day * 0.44;
-      hemi.diffuse = B.Color3.Lerp(C("#6a7fb8"), C("#f7f2e8"), Math.min(1, day * 1.2));
-      hemi.groundColor = B.Color3.Lerp(C("#151820"), C("#4b4436"), day);
-      pipeline.imageProcessing.exposure = 0.95 + (1 - day) * 0.3;
+      hemi.intensity = 0.16 + day * 0.38;
+      hemi.diffuse = B.Color3.Lerp(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2));
+      hemi.groundColor = B.Color3.Lerp(C("#12151e"), C("#3a362c"), day);
+      pipeline.imageProcessing.exposure = 0.84 + day * 0.1;
       windows.forEach((w) => {
         w.material.emissiveColor.set(sky.r * (0.35 + day * 0.4), sky.g * (0.35 + day * 0.4), sky.b * (0.35 + day * 0.45));
       });
