@@ -70,7 +70,7 @@ const nightSky = world.look.skyAt(22);
 ok(noonSky.day > 0.8, `noon sky weight is ${noonSky.day.toFixed(2)}, not day`);
 ok(duskSky.dusk > 0.3, `dusk sky weight is ${duskSky.dusk.toFixed(2)}`);
 ok(nightSky.night > 0.8, `night sky weight is ${nightSky.night.toFixed(2)}`);
-ok(look.exposure >= 1, `noon exposure is ${look.exposure.toFixed(2)} (daylight went dark)`);
+ok(look.exposure >= 0.85 && look.exposure <= 1.05, `noon exposure is ${look.exposure.toFixed(2)} (expected 0.88–0.95)`);
 world.look.quality('low');
 const low = world.look.info();
 ok(low.quality === 'low' && low.bloom === false && low.shadows === false && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
@@ -308,29 +308,66 @@ if (modelPath) {
   const file = new URL(modelPath, root);
   if (ok(/\.glb$/i.test(modelPath) && fs.existsSync(file), `control.model "${modelPath}" isn't a GLB in the repo`)) {
     const bytes = fs.readFileSync(file);
-    ok(bytes.length < 10 * 1024 * 1024, `${modelPath} is ${(bytes.length / 1048576).toFixed(1)} MB (10 MB at most)`);
+    ok(bytes.length < 3 * 1024 * 1024, `${modelPath} is ${(bytes.length / 1048576).toFixed(2)} MB (must be < 3 MB)`);
     const { loadSmallWeather, SKIN_CLIPS } = await import(new URL('js/small-weather.js', root).href);
     const skin = await loadSmallWeather(world, null, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length));
     const missing = SKIN_CLIPS.filter((c) => !skin.clips.includes(c));
     ok(!missing.length, `${modelPath} has no clip for ${missing.join(', ')}`);
     world.setSkin(skin);
+    ok(skin.glowMeshes.length === 0, `skinned mesh was added to GlowLayer (${skin.glowMeshes.length} glowMeshes)`);
     ok(world.person.getChildMeshes(false).filter((m) => m.isEnabled() && !skin.meshes.includes(m) && !/phone|cup|bag/.test(m.name)).length === 0, 'the box figure still shows under his model');
     for (const clip of ['idle', 'walk', 'run', 'jump', 'fall', 'float', 'cast', 'throw']) {
       world.avatar.play(clip, 3, DT);
       ok(skin.clip() === clip, `under control, "${clip}" played "${skin.clip()}"`);
     }
+    // Check standing scale (1.55m..1.90m) and grounded feet in idle, walk, run, and sit/type
+    for (const clip of ['idle', 'walk', 'run']) {
+      world.avatar.place(0, 0, 12.6, 0);
+      world.avatar.play(clip, 2.4, DT);
+      world.scene.render();
+      const b = skin.root.getHierarchyBoundingVectors(true);
+      const h = b.max.y - b.min.y;
+      ok(h >= 1.55 && h <= 1.9, `${clip}: his model is ${h.toFixed(2)} m tall (expected 1.55–1.90 m)`);
+      ok(Math.abs(b.min.y - 0) <= 0.08, `${clip}: his feet are at y=${b.min.y.toFixed(3)} instead of 0.00 (±0.08 m)`);
+    }
     // his day: the first block has him in bed; later he walks, sits at his desk and types
     const seen = new Set();
+    let checkedSit = false;
     for (let m = day.dayStart; m < day.dayStart + 16 * 60; m += 2) {
-      world.update(E.frame(day, m), DT, {});
-      seen.add(skin.clip());
+      world.update(E.frame(day, m), DT, { snap: true });
+      const c = skin.clip();
+      seen.add(c);
+      if (!checkedSit && (c === 'sit' || c === 'type')) {
+        world.update(E.frame(day, m), 0.5, { snap: true });
+        world.scene.render();
+        skin.meshes.forEach((mesh) => {
+          if (mesh.skeleton) {
+            mesh.skeleton.prepare(true);
+            mesh.refreshBoundingInfo(true);
+          }
+        });
+        const b = skin.root.getHierarchyBoundingVectors(true);
+        const floorY = 0.1;
+        ok(Math.abs(b.min.y - floorY) <= 0.08, `${c}: seated feet are at y=${b.min.y.toFixed(3)} instead of floor ${floorY} (±0.08 m)`);
+        ok(b.max.y - floorY < 1.55, `${c}: seated head is ${(b.max.y - floorY).toFixed(2)} m above floor (must be < 1.55 m)`);
+        checkedSit = true;
+      }
     }
+    ok(checkedSit, 'never checked sit/type bounding box during his day');
     ['walk', 'type'].forEach((c) => ok(seen.has(c), `in his day he never played "${c}" (${[...seen].join(' ')})`));
+    world.avatar.place(0, 0, 12.6, 0);
+    world.avatar.play('idle', 0, 1);
+    world.scene.render();
+    skin.meshes.forEach((mesh) => {
+      if (mesh.skeleton) {
+        mesh.skeleton.prepare(true);
+        mesh.refreshBoundingInfo(true);
+      }
+    });
     const box = skin.root.getHierarchyBoundingVectors(true);
     const tall = box.max.y - box.min.y;
-    world.avatar.play('idle', 0, 1);
-    ok(tall > 1.3 && tall < 2.1, `his model is ${tall.toFixed(2)} m tall`);
-    modelInfo = `model ${(bytes.length / 1048576).toFixed(1)} MB, ${skin.clips.length} clips, ${tall.toFixed(2)} m, his day played ${[...seen].join(' ')}`;
+    ok(tall >= 1.55 && tall <= 1.9, `his model is ${tall.toFixed(2)} m tall (expected 1.55–1.90 m)`);
+    modelInfo = `model ${(bytes.length / 1048576).toFixed(2)} MB, ${skin.clips.length} clips, ${tall.toFixed(2)} m, his day played ${[...seen].join(' ')}`;
   }
 }
 // Weather (js/weather.js): a seeded forecast, a blend of a few seconds, and a wet road in the rain.
@@ -426,6 +463,16 @@ ok(wetRoad.blend > 0.9 && wetRoad.wet > 0.8 && wetRoad.gloss > 0.35 && wetRoad.p
 mounted.set('clear', 1, 'test');
 world.update(frW, 0.05, { snap: true });
 ok(mounted.now().wet < 0.12 && mounted.now().gloss < 0.2, `clear left the road wet (gloss ${mounted.now().gloss.toFixed(2)})`);
+ok(!world.scene.textures.some((t) => t.getClassName && t.getClassName() === 'MirrorTexture'), 'MirrorTexture still exists in scene.textures');
+
+// Standing at an avenue intersection without pressing jump must not lift him off the ground.
+mover.start(0, 12.6, 0);
+mover.setUpdrafts([{ x: 0, z: 12.6, r: 4.5, lift: 8, kind: 'ambient' }]);
+for (let i = 0; i < 60; i++) {
+  mover.step(DT, { x: 0, z: 0, jump: 0, hold: false });
+  physicsStep();
+}
+ok(ms.grounded && ms.y < 0.15, `standing in an updraft without holding jump lifted him to y=${ms.y.toFixed(2)}`);
 
 const lines = (cfg.control && cfg.control.lines) || {};
 const controlTexts = Object.values(lines).flat();

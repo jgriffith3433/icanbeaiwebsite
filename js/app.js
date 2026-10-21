@@ -27,13 +27,17 @@ const control = (window.DAY_CONFIG && window.DAY_CONFIG.control) || {};
 const status = { babylon: window.BABYLON.Engine.Version, physics: "loading", model: control.model ? "loading" : "figure" };
 window.day && (window.day.engineInfo = () => ({ ...status }));
 
-/* Small Weather's 3D model (day.config.js control.model): its own chunk, loaded once the page is up, so the
-   day never waits for it. The box figure shows until it's in, and stays if it fails. */
+/* Small Weather's 3D model (day.config.js control.model): kick off fetching the GLB and loader chunk early
+   in parallel so the model is ready right after the first frame. */
 const skinWorld = control.model && window.day && window.day.world();
 if (skinWorld) {
   const w = skinWorld;
-  import("./small-weather.js")
-    .then(({ loadSmallWeather }) => loadSmallWeather(w, control.model))
+  const swModuleP = import("./small-weather.js");
+  const glbBytesP = typeof fetch === "function"
+    ? fetch(control.model).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)
+    : Promise.resolve(null);
+  Promise.all([swModuleP, glbBytesP])
+    .then(([{ loadSmallWeather }, buf]) => loadSmallWeather(w, control.model, buf))
     .then((skin) => {
       w.setSkin(skin);
       Object.assign(status, { model: "small-weather", clips: skin.clips });

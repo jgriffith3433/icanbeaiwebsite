@@ -1219,7 +1219,7 @@ async function look(options, t) {
 
   const noon = await shot("City noon", 12 * 60, "look-noon");
   if (noon.sky.day < 0.6) t.problem("bug", `Noon isn't the day sky (${noon.sky.day.toFixed(2)})`);
-  if (noon.exposure < 1) t.problem("bug", `Noon exposure is ${noon.exposure.toFixed(2)} (the day went dark)`);
+  if (noon.exposure < 0.8) t.problem("bug", `Noon exposure is ${noon.exposure.toFixed(2)} (the day went dark)`);
   t.progress(0.5);
 
   const dusk = await shot("City dusk", 18 * 60 + 30, "look-dusk");

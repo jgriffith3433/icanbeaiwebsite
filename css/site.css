@@ -717,11 +717,13 @@ html.touch-ui.in-control .control-btn {
 }
 
 /* ---------- weather (js/weather.js): the state, and the wheel while he's the player's ---------- */
-.weather-btn {
+.weather-btn,
+#weather-chip {
   position: fixed;
   z-index: 4;
-  top: max(12px, env(safe-area-inset-top));
-  left: max(12px, env(safe-area-inset-left));
+  top: auto;
+  bottom: 206px;
+  left: var(--gutter);
   appearance: none;
   border: 1px solid rgba(240, 194, 122, 0.55);
   background: rgba(14, 16, 22, 0.62);
@@ -735,9 +737,26 @@ html.touch-ui.in-control .control-btn {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-.weather-btn[hidden] { display: none; }
-html.touch-ui .weather-btn { min-height: 44px; min-width: 44px; }
-.weather-btn[aria-pressed="true"] { background: var(--accent); color: #1a1c22; border-color: transparent; }
+.public .weather-btn,
+.preview-public .weather-btn,
+.public #weather-chip,
+.preview-public #weather-chip {
+  bottom: 132px;
+  top: auto;
+}
+.weather-btn[hidden],
+#weather-chip[hidden] { display: none; }
+html.touch-ui .weather-btn,
+html.touch-ui #weather-chip {
+  top: max(12px, env(safe-area-inset-top));
+  bottom: auto;
+  left: max(12px, env(safe-area-inset-left));
+  min-height: 44px;
+  min-width: 44px;
+}
+html.touch-ui.in-control .top .now { display: none; }
+.weather-btn[aria-pressed="true"],
+#weather-chip[aria-pressed="true"] { background: var(--accent); color: #1a1c22; border-color: transparent; }
 .weather-wheel {
   position: fixed;
   z-index: 6;

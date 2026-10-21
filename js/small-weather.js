@@ -30,7 +30,7 @@ export async function loadSmallWeather(world, url, data) {
   return makeSkin(B, scene, res, world.skinHips || 0.91);
 }
 
-/* res: what ImportMeshAsync returned. hipsTarget: his hips' height standing, in world units (the figure's). */
+/* res: what ImportMeshAsync returned. hipsTarget: his hips' height standing, in world units (the figure's, 0.91m). */
 export function makeSkin(B, scene, res, hipsTarget) {
   const glbRoot = res.meshes[0];
   const wrap = new B.TransformNode("small-weather", scene);
@@ -41,44 +41,52 @@ export function makeSkin(B, scene, res, hipsTarget) {
   const groups = res.animationGroups;
   const named = (c) => groups.find((g) => g.name.toLowerCase() === c) || groups.find((g) => new RegExp(`(^|[^a-z])${c}([^a-z]|$)`, "i").test(g.name));
 
-  /* the hips' height in each clip's first frame, from the rig's own Hips key (model space) */
-  const nodes = res.transformNodes || [];
-  const hipsNode = nodes.find((n) => /(^|:)Hips$/.test(n.name));
+  /* Measure the mesh in bind/standing pose: feet sit at y ~ 0 and head at y ~ 1.75 m.
+     Scale by actual standing height (~1.75 m -> scale ~1.0) rather than dividing 0.91 by Hips Y. */
   glbRoot.computeWorldMatrix(true);
-  const rootInv = B.Matrix.Invert(glbRoot.getWorldMatrix());
-  const hipsOf = (g) => {
-    if (!hipsNode || !g) return null;
-    const ta = g.targetedAnimations.find((a) => a.target === hipsNode && a.animation.targetProperty === "position");
-    if (!ta) return null;
-    const v = ta.animation.getKeys()[0].value;
-    const parentM = hipsNode.parent ? hipsNode.parent.computeWorldMatrix(true) : B.Matrix.Identity();
-    return B.Vector3.TransformCoordinates(v, parentM.multiply(rootInv)).y;
-  };
-  const standHips = hipsOf(named("idle")) || hipsOf(groups[0]) || 1;
-  const scale = hipsTarget / standHips;
+  const bindBounds = glbRoot.getHierarchyBoundingVectors(true);
+  const bindHeight = Math.max(1.0, bindBounds.max.y - bindBounds.min.y);
+  const targetHeight = 1.75;
+  const scale = targetHeight / bindHeight;
   wrap.scaling.setAll(scale);
-  const hipsY = {};
-  SKIN_CLIPS.forEach((c) => {
-    const h = hipsOf(named(c));
-    hipsY[c] = (h == null ? standHips : h) * scale;
-  });
+  const footMin = Number.isFinite(bindBounds.min.y) ? bindBounds.min.y * scale : 0;
+
+  /* Anchor wrap.position.y using the standing foot minimum so when me.root.position.y = feetY + 0.91
+     (standing/walking/running/jumping/floating), his boots rest cleanly at feetY without per-clip hip bobbing.
+     For seated/lying poses, account for world.js setting me.root.position.y = spec.y (0.63 for chairs) or tilting me.tilt. */
+  const standAnchor = (hipsTarget || 0.91) + footMin;
+  const seatAnchor = 0.53 + footMin; // spec.y (0.63) - seatAnchor (0.53) = 0.10 m floor height indoors
+  const lieAnchor = 0.62 * scale; // places Hips near spin origin when me.tilt pitches -90 deg on the bed
+  const reclineAnchor = 0.58 * scale;
+  const clipAnchor = (c) => {
+    if (c === "sit" || c === "type") return seatAnchor;
+    if (c === "lie" || c === "side") return lieAnchor;
+    if (c === "recline") return reclineAnchor;
+    return standAnchor;
+  };
 
   const player = clipAvatar(wrap, groups, { clips: SKIN_CLIPS, loops: LOOPS, walkStride: 1.25, runStride: 2.4 });
 
-  /* glow: the texture's bright blue (seams, boot lights) becomes emissive */
+  /* Emissive blue jacket seams & boot lights: use the embedded emissiveTexture in the GLB (or a tiny 128x128 fallback).
+     Do NOT add the 39k-tri skinned mesh to GlowLayer (only lightweight arm bolt tubes go into GlowLayer). */
   const glowMeshes = [];
   meshes.forEach((m) => {
     const mat = m.material;
     if (!mat) return;
-    glowMeshes.push(m);
-    const albedo = mat.albedoTexture || mat.diffuseTexture;
-    if (albedo && albedo.readPixels) emissiveFromBlue(B, scene, mat, albedo);
+    if (mat.emissiveTexture) {
+      mat.emissiveColor = new B.Color3(0.55, 0.85, 1.0);
+    } else {
+      const albedo = mat.albedoTexture || mat.diffuseTexture;
+      if (albedo && albedo.readPixels) emissiveFromBlue(B, scene, mat, albedo);
+    }
   });
 
+  const nodes = res.transformNodes || [];
   const bolts = armLightning(B, scene, nodes);
 
-  let offset = hipsY.idle;
+  let offset = standAnchor;
   let clip = "idle";
+  wrap.position.y = -offset;
   return {
     kind: "small-weather",
     root: wrap,
@@ -89,9 +97,9 @@ export function makeSkin(B, scene, res, hipsTarget) {
     clip: () => clip,
     /* clip, ground speed (m/s), dt; mine: the player has him (the lightning shows) */
     play(c, speed, dt, mine) {
-      clip = hipsY[c] != null ? c : "idle";
+      clip = named(c) ? c : "idle";
       player.play(clip, speed, dt);
-      offset += (hipsY[clip] - offset) * (1 - Math.exp(-10 * dt));
+      offset = clipAnchor(clip);
       wrap.position.y = -offset;
       bolts.update(mine ? BOLTS[clip] || 0.2 : 0, dt);
     },
@@ -101,7 +109,7 @@ export function makeSkin(B, scene, res, hipsTarget) {
   };
 }
 
-/* An emissive mask from the albedo: bright, blue-dominant pixels glow, the rest stay dark. */
+/* Fallback emissive mask if not embedded in GLB: downsampled to 128x128 so zero multi-million-pixel CPU loops run. */
 function emissiveFromBlue(B, scene, mat, albedo) {
   const go = () => {
     const size = albedo.getSize();
@@ -109,23 +117,30 @@ function emissiveFromBlue(B, scene, mat, albedo) {
     if (!p || !size.width) return;
     Promise.resolve(p).then((px) => {
       if (!px) return;
-      const n = size.width * size.height;
-      const out = new Uint8Array(n * 4);
-      for (let i = 0; i < n; i++) {
-        const r = px[i * 4];
-        const g = px[i * 4 + 1];
-        const b = px[i * 4 + 2];
-        const lit = b > 110 && b > r * 1.45 && b >= g * 0.95;
-        const k = lit ? Math.min(1, (b - 90) / 120) : 0;
-        out[i * 4] = r * k;
-        out[i * 4 + 1] = g * k;
-        out[i * 4 + 2] = Math.min(255, b * k * 1.2);
-        out[i * 4 + 3] = 255;
+      const w = Math.min(128, size.width);
+      const h = Math.min(128, size.height);
+      const out = new Uint8Array(w * h * 4);
+      for (let y = 0; y < h; y++) {
+        const sy = Math.floor((y / h) * size.height);
+        for (let x = 0; x < w; x++) {
+          const sx = Math.floor((x / w) * size.width);
+          const si = (sy * size.width + sx) * 4;
+          const di = (y * w + x) * 4;
+          const r = px[si];
+          const g = px[si + 1];
+          const b = px[si + 2];
+          const lit = b > 110 && b > r * 1.45 && b >= g * 0.95;
+          const k = lit ? Math.min(1, (b - 90) / 120) : 0;
+          out[di] = r * k;
+          out[di + 1] = g * k;
+          out[di + 2] = Math.min(255, b * k * 1.2);
+          out[di + 3] = 255;
+        }
       }
-      const tex = new B.RawTexture(out, size.width, size.height, B.Engine.TEXTUREFORMAT_RGBA, scene, false, false, B.Texture.BILINEAR_SAMPLINGMODE);
+      const tex = new B.RawTexture(out, w, h, B.Engine.TEXTUREFORMAT_RGBA, scene, false, false, B.Texture.BILINEAR_SAMPLINGMODE);
       tex.coordinatesIndex = albedo.coordinatesIndex;
       mat.emissiveTexture = tex;
-      mat.emissiveColor = new B.Color3(1.6, 1.6, 1.6);
+      mat.emissiveColor = new B.Color3(0.55, 0.85, 1.0);
     });
   };
   if (albedo.isReady()) go();
