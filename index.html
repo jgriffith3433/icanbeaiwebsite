@@ -122,7 +122,10 @@
           try { localStorage.setItem("previewPublic", on ? "1" : "0"); } catch (e) {}
         }
         var saved = false;
-        try { saved = localStorage.getItem("previewPublic") === "1"; } catch (e) {}
+        try {
+          var q = new URLSearchParams(location.search);
+          if (!navigator.webdriver && !q.get("playtest")) saved = localStorage.getItem("previewPublic") === "1";
+        } catch (e) {}
         set(saved);
         btn.addEventListener("click", function () { set(!root.classList.contains("preview-public")); });
         window.addEventListener("keydown", function (e) {

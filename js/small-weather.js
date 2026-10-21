@@ -73,6 +73,9 @@ export function makeSkin(B, scene, res, hipsTarget) {
   meshes.forEach((m) => {
     const mat = m.material;
     if (!mat) return;
+    mat.maxSimultaneousLights = 10;
+    if ("usePhysicalLightFalloff" in mat) mat.usePhysicalLightFalloff = false;
+    if (mat.ambientColor) mat.ambientColor = new B.Color3(0.22, 0.24, 0.3);
     if (mat.emissiveTexture) {
       mat.emissiveColor = new B.Color3(0.55, 0.85, 1.0);
     } else {
