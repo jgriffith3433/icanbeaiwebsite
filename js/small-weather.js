@@ -85,6 +85,10 @@ export function makeSkin(B, scene, res, hipsTarget) {
       mat.useRoughnessFromMetallicTextureGreen = false;
       mat.useMetallnessFromMetallicTextureBlue = false;
     }
+    /* The occlusion map shares the metallic-roughness image, whose red channel is near 0 over most of the atlas
+       (it reads cyan): it shades away the room's ambient light and leaves a dark jacket drawing black. */
+    if ("ambientTexture" in mat) mat.ambientTexture = null;
+    if (mat.albedoColor) mat.albedoColor = new B.Color3(1.6, 1.6, 1.6); // the navy, black and skin atlas is dark: lift it so it reads in a lamp-lit room
     if (mat.ambientColor) mat.ambientColor = new B.Color3(0.22, 0.24, 0.3);
     if (mat.emissiveTexture) {
       mat.emissiveColor = new B.Color3(0.75, 1.15, 1.35);
