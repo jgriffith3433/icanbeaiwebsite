@@ -1612,8 +1612,11 @@
       if (quiltUp) {
         quiltUp.setEnabled(inBed && things.blanket !== "down");
         quiltDown.setEnabled(!(inBed && things.blanket !== "down"));
-        quiltUp.scaling.z = pp.pose === "recline" ? 0.72 : 1;
-        quiltUp.position.z = pp.pose === "recline" ? 0.55 : 0.36;
+        /* lying: the quilt covers him from the hips down, so his chest, head and the 3D model show above it */
+        const lying = pp.pose === "lie" || pp.pose === "side";
+        quiltUp.scaling.z = pp.pose === "recline" ? 0.72 : lying ? 0.8 : 1;
+        quiltUp.position.z = pp.pose === "recline" ? 0.55 : lying ? 0.58 : 0.36;
+        quiltUp.position.y = lying ? 0.96 : 0.9;
       }
 
       /* car */
