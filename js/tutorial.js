@@ -33,9 +33,9 @@ export function startTutorial() {
   let quietForPlaytest = false;
 
   try {
-    // A bot (any scenario but first-visit) starts with empty storage: keep the card out of its way.
+    // A bot (any scenario but first-visit and smoke) starts with empty storage: keep the card out of its way.
     const id = new URLSearchParams(location.search).get("playtest");
-    if ((id && id !== "first-visit") || (!id && typeof navigator !== "undefined" && navigator.webdriver)) quietForPlaytest = true;
+    if (id && id !== "first-visit" && id !== "smoke") quietForPlaytest = true;
   } catch (e) { /* no location */ }
 
   function seen() {
@@ -206,6 +206,11 @@ html.touch-ui .tutorial{width:min(260px,calc(100vw - 180px))}
       return show();
     },
     skip() { finish("skip"); },
+    quiet() {
+      quietForPlaytest = true;
+      clearTimeout(doneTimer);
+      if (card) card.hidden = true;
+    },
     now() {
       const step = cfg.steps[index];
       return {

@@ -148,10 +148,9 @@ function install() {
   style.textContent = `
 .ep-btn{position:fixed;z-index:7;left:18px;bottom:118px;appearance:none;border:1px solid rgba(246,241,232,.22);background:rgba(14,16,22,.62);color:#f6f1e8;border-radius:14px;padding:10px 16px;font:600 0.84rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(12px)}
 .ep-btn:hover{background:rgba(240,194,122,.16)}
-.public .ep-btn,.preview-public .ep-btn{bottom:78px}
+.preview-public .ep-btn{bottom:78px}
 html.touch-ui .ep-btn{left:auto;right:max(12px,env(safe-area-inset-right));top:max(56px,calc(env(safe-area-inset-top) + 48px));bottom:auto;transform:none;min-height:44px}
 html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%)}
-html.touch-ui.in-control:not(.public):not(.preview-public) .ep-btn{bottom:158px}
 .ep-hud{position:fixed;z-index:7;right:18px;top:88px;width:min(280px,calc(100vw - 36px));pointer-events:none;font:600 0.78rem/1.35 Outfit,system-ui,sans-serif;color:#e7eef8}
 .ep-hud[hidden]{display:none}
 .ep-hud .ep-card{pointer-events:auto;background:rgba(10,14,22,.72);border:1px solid rgba(126,200,255,.35);border-radius:16px;padding:12px 14px;backdrop-filter:blur(14px)}
