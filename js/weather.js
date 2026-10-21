@@ -784,9 +784,8 @@ export function startWeather(world, dayApi) {
     scene.fogDensity = L.fog;
     if (sun) sun.intensity *= L.light * (1 + flash * L.lightning * 3.2);
     if (hemi) hemi.intensity = Math.max(0.16, hemi.intensity * L.hemi);
-    const baseExp = pipeline && pipeline.imageProcessing ? pipeline.imageProcessing.exposure : 0.92;
+    const baseExp = stage.lastSun ? 0.86 + 0.12 * stage.lastSun.day : 0.92;
     const targetExp = Math.min(1.08, Math.max(0.76, baseExp * (0.88 + 0.12 * L.exposure) * (1 + flash * 0.85)));
-    if (pipeline && pipeline.imageProcessing) pipeline.imageProcessing.exposure = targetExp;
     if (world.look && world.look.setSky) {
       world.look.setSky({
         clearColor: scratch.mixed,
@@ -800,28 +799,39 @@ export function startWeather(world, dayApi) {
         wind: L.wind,
         flash,
       });
+    } else if (pipeline && pipeline.imageProcessing) {
+      const safeExp = Math.abs(targetExp - 1.0) < 1e-4 ? 0.9999 : targetExp;
+      const ipc = pipeline.imageProcessing.imageProcessingConfiguration;
+      if (ipc) ipc._exposure = safeExp;
+      if (scene.imageProcessingConfiguration) scene.imageProcessingConfiguration._exposure = safeExp;
     }
     if (roadMat && dryDiffuse) {
       const wet = L.wet;
       const g = 0.04 + wet * 0.66;
-      if (roadIsPbr) {
-        dryDiffuse.scaleToRef(1 - wet * 0.48, scratch.diff);
-        scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
-        if (!roadMat.albedoColor) roadMat.albedoColor = scratch.diff.clone();
-        else roadMat.albedoColor.copyFrom(scratch.diff);
-        roadMat.roughness = Math.max(0.18, (dryRough == null ? 0.84 : dryRough) - wet * 0.58);
-        if (roadMat.clearCoat) {
-          roadMat.clearCoat.isEnabled = wet > 0.06 && (!world.look || world.look.quality() !== "low");
-          roadMat.clearCoat.intensity = wet * 0.62;
-          roadMat.clearCoat.roughness = 0.12 + (1 - wet) * 0.18;
+      const low = !!(world.look && world.look.quality && world.look.quality() === "low");
+      if (Math.abs(wet - (roadMat.__lastWet ?? -1)) > 0.005 || low !== roadMat.__lastLow) {
+        roadMat.__lastWet = wet;
+        roadMat.__lastLow = low;
+        if (roadIsPbr) {
+          dryDiffuse.scaleToRef(1 - wet * 0.48, scratch.diff);
+          scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
+          if (!roadMat.albedoColor) roadMat.albedoColor = scratch.diff.clone();
+          else roadMat.albedoColor.copyFrom(scratch.diff);
+          roadMat.roughness = Math.max(0.18, (dryRough == null ? 0.84 : dryRough) - wet * 0.58);
+          if (roadMat.clearCoat) {
+            const wantCoat = wet > 0.06 && !low;
+            if (roadMat.clearCoat.isEnabled !== wantCoat) roadMat.clearCoat.isEnabled = wantCoat;
+            roadMat.clearCoat.intensity = wet * 0.62;
+            roadMat.clearCoat.roughness = 0.12 + (1 - wet) * 0.18;
+          }
+        } else {
+          dryDiffuse.scaleToRef(1 - wet * 0.52, scratch.diff);
+          scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
+          roadMat.diffuseColor.copyFrom(scratch.diff);
+          roadMat.ambientColor.copyFrom(scratch.diff).scaleInPlace(0.32);
+          roadMat.specularColor.set(g, g * 1.02, g * 1.08);
+          roadMat.specularPower = 64 - wet * 40;
         }
-      } else {
-        dryDiffuse.scaleToRef(1 - wet * 0.52, scratch.diff);
-        scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
-        roadMat.diffuseColor.copyFrom(scratch.diff);
-        roadMat.ambientColor.copyFrom(scratch.diff).scaleInPlace(0.32);
-        roadMat.specularColor.set(g, g * 1.02, g * 1.08);
-        roadMat.specularPower = 64 - wet * 40;
       }
       live.gloss = g;
     }

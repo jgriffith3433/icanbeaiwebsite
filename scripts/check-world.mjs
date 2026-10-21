@@ -484,7 +484,29 @@ const controlTexts = Object.values(lines).flat();
 ok(['take', 'letGo', 'back', 'steering'].every((k) => lines[k]), 'day.config.js control.lines needs take, steering, letGo and back');
 ok(!controlTexts.some((t) => /\b(they|their|theirs|themselves)\b/i.test(t)), `control lines that say "they" for him: ${controlTexts.join(' | ')}`);
 
-const summary = `Babylon ${core.Engine.Version}, Havok: ${p.colliders} colliders in ${p.bodies} bodies; ${day.actions.length} actions; field ${g && g.y.toFixed(2)}, road ${r && r.y.toFixed(2)}, home floor ${inside && inside.y.toFixed(2)}, bed ${onBed && onBed.y.toFixed(2)}, capsule at ${cap.position.y.toFixed(2)}; control: walk ${walked.toFixed(2)} m/s, three jumps ${(peak - y0).toFixed(2)} m, walked back in ${(steps / 60).toFixed(1)} s; ${modelInfo}`;
+// Performance & root-cause monitor checks (hawkesPerf): steady-state frame time, 0 dirty calls/sec, shadow proxy, no GlowLayer, frozen static meshes.
+const { installHawkesPerf } = await import(new URL('js/hawkes-perf.js', root).href);
+const perf = installHawkesPerf(world.scene, { product: 'icanbe' });
+for (let i = 0; i < 4; i++) {
+  world.update(E.frame(day, 9 * 60 + i * 0.01), DT);
+  world.scene.render();
+}
+perf.resetCounters();
+const perfT0 = performance.now();
+for (let i = 0; i < 30; i++) {
+  world.update(E.frame(day, 9 * 60 + 0.05 + i * 0.01), DT);
+  world.scene.render();
+}
+const avgFrameMs = (performance.now() - perfT0) / 30;
+const snap = perf.snapshot();
+ok(snap && snap.geometry && snap.batching && snap.timing, 'hawkesPerf.snapshot() did not return expected sections');
+ok(snap.batching.materialDirtyCallsPerSec === 0, `steady-state materialDirtyCallsPerSec is ${snap.batching.materialDirtyCallsPerSec} (expected 0)`);
+ok(snap.geometry.shadowTris > 0 && snap.geometry.shadowTris < 25000, `shadowTris is ${snap.geometry.shadowTris} (expected < 25000 with shadow proxy)`);
+ok((world.scene.effectLayers || []).length === 0, `scene still has ${(world.scene.effectLayers || []).length} effectLayer(s) (GlowLayer should be removed)`);
+ok(snap.batching.frozenMeshes >= 400, `only ${snap.batching.frozenMeshes} static meshes are frozen`);
+ok(avgFrameMs < 15, `average NullEngine frame time is ${avgFrameMs.toFixed(2)} ms (expected < 15 ms)`);
+
+const summary = `Babylon ${core.Engine.Version}, Havok: ${p.colliders} colliders in ${p.bodies} bodies; ${day.actions.length} actions; field ${g && g.y.toFixed(2)}, road ${r && r.y.toFixed(2)}, home floor ${inside && inside.y.toFixed(2)}, bed ${onBed && onBed.y.toFixed(2)}, capsule at ${cap.position.y.toFixed(2)}; control: walk ${walked.toFixed(2)} m/s, three jumps ${(peak - y0).toFixed(2)} m, walked back in ${(steps / 60).toFixed(1)} s; ${modelInfo}; perf: ${avgFrameMs.toFixed(2)} ms/frame, ${snap.geometry.shadowTris} shadow tris, ${snap.batching.frozenMeshes} frozen meshes`;
 if (problems.length) {
   console.error(`check-world: ${problems.length} problem(s)\n- ${problems.join('\n- ')}\n${summary}`);
   process.exit(1);

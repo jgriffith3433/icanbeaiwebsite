@@ -68,16 +68,18 @@ export function makeSkin(B, scene, res, hipsTarget) {
   const player = clipAvatar(wrap, groups, { clips: SKIN_CLIPS, loops: LOOPS, walkStride: 1.25, runStride: 2.4 });
 
   /* Emissive blue jacket seams & boot lights: use the embedded emissiveTexture in the GLB (or a tiny 128x128 fallback).
-     Do NOT add the 39k-tri skinned mesh to GlowLayer (only lightweight arm bolt tubes go into GlowLayer). */
+     Boost emissiveColor above the pipeline's HDR bloomThreshold (0.88) so seams and boots bloom natively without GlowLayer.
+     Also set doNotSyncBoundingInfo = true so Babylon doesn't CPU-skin 22k vertices just to recompute bounding boxes. */
   const glowMeshes = [];
   meshes.forEach((m) => {
+    if (m.skeleton) m.doNotSyncBoundingInfo = true;
     const mat = m.material;
     if (!mat) return;
     mat.maxSimultaneousLights = 10;
     if ("usePhysicalLightFalloff" in mat) mat.usePhysicalLightFalloff = false;
     if (mat.ambientColor) mat.ambientColor = new B.Color3(0.22, 0.24, 0.3);
     if (mat.emissiveTexture) {
-      mat.emissiveColor = new B.Color3(0.55, 0.85, 1.0);
+      mat.emissiveColor = new B.Color3(0.75, 1.15, 1.35);
     } else {
       const albedo = mat.albedoTexture || mat.diffuseTexture;
       if (albedo && albedo.readPixels) emissiveFromBlue(B, scene, mat, albedo);
@@ -143,7 +145,7 @@ function emissiveFromBlue(B, scene, mat, albedo) {
       const tex = new B.RawTexture(out, w, h, B.Engine.TEXTUREFORMAT_RGBA, scene, false, false, B.Texture.BILINEAR_SAMPLINGMODE);
       tex.coordinatesIndex = albedo.coordinatesIndex;
       mat.emissiveTexture = tex;
-      mat.emissiveColor = new B.Color3(0.55, 0.85, 1.0);
+      mat.emissiveColor = new B.Color3(0.75, 1.15, 1.35);
     });
   };
   if (albedo.isReady()) go();
@@ -158,7 +160,7 @@ function armLightning(B, scene, nodes) {
     .filter((c) => c.every(Boolean));
   const mat = new B.StandardMaterial("bolt", scene);
   mat.disableLighting = true;
-  mat.emissiveColor = new B.Color3(0.55, 0.85, 1.0);
+  mat.emissiveColor = new B.Color3(0.85, 1.2, 1.45);
   const meshes = [];
   const bolts = sides.map((chain, i) => {
     const pts = new Array(9).fill(0).map(() => new B.Vector3());

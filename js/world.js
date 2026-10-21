@@ -94,7 +94,7 @@
       return mesh;
     }
     function capsule(name, h, r, m, parent) {
-      const mesh = B.MeshBuilder.CreateCapsule(name, { height: h, radius: r, tessellation: 12, subdivisions: 2 }, scene);
+      const mesh = B.MeshBuilder.CreateCapsule(name, { height: h, radius: r, tessellation: 8, subdivisions: 1 }, scene);
       mesh.material = m;
       mesh.isPickable = false;
       if (parent) mesh.parent = parent;
@@ -143,12 +143,9 @@
     shadows.normalBias = 0.02;
     shadows.darkness = 0.22;
 
-    const glow = new B.GlowLayer("glow", scene, { mainTextureSamples: 1, blurKernelSize: 16 });
-    glow.intensity = 0.55;
-    const glowing = (mesh) => {
-      glow.addIncludedOnlyMesh(mesh);
-      return mesh;
-    };
+    /* No GlowLayer RTT pass: DefaultRenderingPipeline HDR bloom handles emissives > bloomThreshold (0.88)
+       with zero extra scene render passes. */
+    const glowing = (mesh) => mesh;
 
     const pipeline = new B.DefaultRenderingPipeline("look", true, scene, [camera]);
     pipeline.fxaaEnabled = true;
@@ -513,6 +510,7 @@
         L.specular = new B.Color3(0.1, 0.08, 0.05);
         L.intensity = 0;
         L.range = 10.5;
+        L.setEnabled(false);
         roomLights.push({ id: r.id, light: L, thing: r.light, building: r.building, level: 0 });
       }
     });
@@ -521,6 +519,7 @@
     bedsideFill.specular = new B.Color3(0.08, 0.06, 0.04);
     bedsideFill.intensity = 0;
     bedsideFill.range = 8;
+    bedsideFill.setEnabled(false);
     const officeLights = [];
     if (cfg.buildings.office && cfg.buildings.office.bounds) {
       const o = cfg.buildings.office.origin;
@@ -529,6 +528,7 @@
         L.diffuse = B.Color3.FromHexString("#eef3ff");
         L.intensity = 0;
         L.range = 11;
+        L.setEnabled(false);
         officeLights.push(L);
       });
     }
@@ -1030,10 +1030,10 @@
       const neck = cyl("neck", 0.1, 0.09, 0.1, skin, torso, 10);
       neck.position.y = 0.56;
       const head = pivot("head", torso, 0, 0.6, 0);
-      const skull = sphere("skull", 0.26, skin, head, 14);
+      const skull = sphere("skull", 0.26, skin, head, 8);
       skull.position.y = 0.12;
       skull.scaling.set(0.92, 1.05, 0.98);
-      const hairM = sphere("hair", 0.28, hair, head, 12);
+      const hairM = sphere("hair", 0.28, hair, head, 8);
       hairM.position.set(0, 0.17, -0.02);
       hairM.scaling.set(0.98, 0.72, 1.0);
       const nose = sphere("nose", 0.05, skin, head, 6);
@@ -1144,12 +1144,13 @@
     headSpot.diffuse = B.Color3.FromHexString("#fff1cf");
     headSpot.intensity = 0;
     headSpot.range = 30;
+    headSpot.setEnabled(false);
 
     /* Shadow casters: major silhouettes only (building shells, trees, car hulls, core person shapes).
        Skip the ~400 tiny indoor furniture sub-parts, window mullions, car hubcaps/wipers, and face bits. */
     const furnitureSet = new Set(scene.meshes.slice(furnitureFrom, furnitureEnd));
     const majorFurniture = new Set(["bed", "couch", "desk", "table", "fridge", "counter", "island", "bookshelf", "fdoor", "sign", "eframeL", "eframeR", "eframeT"]);
-    const skipCasterName = /^(wt|wb|wl|wr|wm|pillarF|wheel\d|hub\d|wiper[LR]|nose|eye\d|hand[LR]|foot[LR]|neck|uPole|phone|cup|bag|sighead\d+|sigr\d+|sigg\d+|-crown)/;
+    const skipCasterName = /^(wt|wb|wl|wr|wm|pillarF|wheel\d|hub\d|wiper[LR]|nose|eye\d|hair|ua[LR]|fa[LR]|shin[LR]|hand[LR]|foot[LR]|neck|uPole|phone|cup|bag|sighead\d+|sigr\d+|sigg\d+|-crown)/;
     casters.forEach((m) => {
       const n = m.name || "";
       if (furnitureSet.has(m) && !majorFurniture.has(n)) return;
@@ -1267,11 +1268,20 @@
     function posePerson(p, poseName, hand, dt, moving, snap, t) {
       const spec = POSE[poseName] || POSE.stand;
       const g = gesture(hand, poseName, t);
+      const kk = snap || !p.inited ? 1 : 1 - Math.exp(-5 * dt);
+      p.tilt.rotation.x += (spec.pitch - p.tilt.rotation.x) * kk;
+      p.spin.rotation.y += (spec.roll - p.spin.rotation.y) * kk;
+      if (p.phone) p.phone.setEnabled(!!g.phone);
+      if (p.cup) p.cup.setEnabled(!!g.cup);
+      /* When Small Weather's GLB skin is attached, skip posing his 12 hidden box-figure limb joints
+         unless he is holding a box prop (phone, cup, bag) attached to slotR/slotL. */
+      if (skin && p === me && !g.phone && !g.cup && !(p.bag && p.bag.isEnabled())) {
+        p.inited = true;
+        return spec;
+      }
       const sw = moving ? Math.sin(p.phase) * (spec.swing || 1) : 0;
       const breathe = Math.sin(t * 1.7) * 0.015;
       const target = {
-        pitch: spec.pitch,
-        roll: spec.roll,
         torso: spec.torso + breathe,
         head: (g.head != null ? g.head : 0) + (moving ? 0.05 : Math.sin(t * 0.37) * 0.05),
         headY: moving ? 0 : Math.sin(t * 0.23) * 0.18,
@@ -1287,13 +1297,10 @@
         knR: spec.knee + (moving ? Math.max(0, Math.sin(p.phase - 0.9)) * 0.8 * (spec.swing || 1) : 0),
       };
       const k = snap || !p.inited ? 1 : 1 - Math.exp(-9 * dt);
-      const kk = snap || !p.inited ? 1 : 1 - Math.exp(-5 * dt);
       const J = p.J;
       const L = (o, key, v, kv) => {
         o[key] += (v - o[key]) * (kv || k);
       };
-      L(p.tilt.rotation, "x", target.pitch, kk);
-      L(p.spin.rotation, "y", target.roll, kk);
       L(J.torso.rotation, "x", target.torso);
       L(J.head.rotation, "x", target.head);
       L(J.head.rotation, "y", target.headY);
@@ -1308,10 +1315,6 @@
       L(J.knL.rotation, "x", target.knL);
       L(J.knR.rotation, "x", target.knR);
       p.inited = true;
-      if (p.phone) {
-        p.phone.setEnabled(!!g.phone);
-      }
-      if (p.cup) p.cup.setEnabled(!!g.cup);
       return spec;
     }
 
@@ -1360,25 +1363,58 @@
       return "idle";
     }
     const boxProps = () => [me.phone, me.phone && me.phone.screen, me.cup, me.bag].filter(Boolean);
+    let shadowProxy = null;
     function setSkin(s) {
       if (skin) skin.root.dispose();
       const keep = boxProps();
       me.root.getChildMeshes(false).forEach((m) => {
-        if (!keep.includes(m) && (!s || !s.meshes.includes(m))) m.setEnabled(!s);
+        if (m === shadowProxy) return;
+        if (!keep.includes(m) && (!s || !s.meshes.includes(m))) {
+          m.setEnabled(!s);
+          if (s) shadows.removeShadowCaster(m, false);
+        }
       });
       skin = s;
-      if (!s) return;
+      if (!s) {
+        if (shadowProxy) shadowProxy.setEnabled(false);
+        return;
+      }
       s.root.parent = me.spin;
       s.glowMeshes.concat(s.boltMeshes || []).forEach(glowing);
       const drawn = s.meshes.filter((m) => m.getTotalVertices && m.getTotalVertices() > 0);
       drawn.forEach((m) => {
         m.receiveShadows = true;
-        shadows.addShadowCaster(m, false);
       });
+      /* Lightweight (~144-tri) invisible shadow-caster proxy instead of skinning 38,971 triangles a second time in the shadow map. */
+      if (!shadowProxy) {
+        const proxyMat = new B.StandardMaterial("playerShadowProxyMat", scene);
+        proxyMat.disableLighting = true;
+        proxyMat.disableColorWrite = true;
+        proxyMat.disableDepthWrite = true;
+        shadowProxy = B.MeshBuilder.CreateCapsule("playerShadowProxy", { height: 1.62, radius: 0.22, tessellation: 8, subdivisions: 1 }, scene);
+        shadowProxy.material = proxyMat;
+        shadowProxy.parent = me.spin;
+        shadowProxy.position.y = -0.08;
+        shadowProxy.isPickable = false;
+        shadowProxy.receiveShadows = false;
+        shadows.addShadowCaster(shadowProxy, false);
+      }
+      shadowProxy.setEnabled(true);
+      if (!s.meshes.includes(shadowProxy)) s.meshes.push(shadowProxy);
       /* the room lights only touch what they list: add him */
-      roomLights.forEach((rl) => rl.light.includedOnlyMeshes.push(...drawn));
-      bedsideFill.includedOnlyMeshes.push(...drawn);
-      officeLights.forEach((L) => L.includedOnlyMeshes.push(...drawn));
+      roomLights.forEach((rl) => {
+        drawn.forEach((m) => {
+          if (!rl.light.includedOnlyMeshes.includes(m)) rl.light.includedOnlyMeshes.push(m);
+        });
+      });
+      drawn.forEach((m) => {
+        if (!bedsideFill.includedOnlyMeshes.includes(m)) bedsideFill.includedOnlyMeshes.push(m);
+      });
+      officeLights.forEach((L) => {
+        drawn.forEach((m) => {
+          if (!L.includedOnlyMeshes.includes(m)) L.includedOnlyMeshes.push(m);
+        });
+      });
     }
 
     /* ---------------- sky ---------------- */
@@ -1391,7 +1427,8 @@
       const mid = (SR + SS) / 2;
       return 0.7 + 0.3 * (1 - Math.abs(h - mid) / (mid - SR));
     }
-    const C = (h) => B.Color3.FromHexString(h);
+    const colorCache = {};
+    const C = (h) => colorCache[h] || (colorCache[h] = B.Color3.FromHexString(h));
     /* Fallback grade when the sky dome in js/look.js isn't up. Noon stays light; night is navy, not black.
        look.js blends day, dusk and night over this and the weather system calls day.look.setSky. */
     const SKY = [
@@ -1406,11 +1443,13 @@
       [SS + 1.5, C("#10182a")],
       [24, C("#070b14")],
     ];
+    const skyScratch = new B.Color3();
     function skyAt(h) {
       for (let i = 0; i < SKY.length - 1; i++) {
         if (h >= SKY[i][0] && h <= SKY[i + 1][0]) {
           const t = (h - SKY[i][0]) / Math.max(1e-6, SKY[i + 1][0] - SKY[i][0]);
-          return B.Color3.Lerp(SKY[i][1], SKY[i + 1][1], t);
+          B.Color3.LerpToRef(SKY[i][1], SKY[i + 1][1], t, skyScratch);
+          return skyScratch;
         }
       }
       return SKY[0][1];
@@ -1425,13 +1464,14 @@
     canvas.addEventListener("wheel", markUser, { passive: true });
     canvas.addEventListener("touchstart", markUser, { passive: true });
 
-    const state = { carYaw: null, lastX: null, lastZ: null };
+    const state = { carYaw: null, lastX: null, lastZ: null, lastOutfit: null };
     const things0 = {};
     let elapsed = 0;
 
     function setEmissive(m, hex, k) {
-      const c = B.Color3.FromHexString(hex);
-      m.emissiveColor.set(c.r * k, c.g * k, c.b * k);
+      const c = C(hex);
+      const boost = k > 0.4 ? k * 1.15 : k;
+      m.emissiveColor.set(c.r * boost, c.g * boost, c.b * boost);
     }
 
     function update(fr, dt, opts) {
@@ -1447,16 +1487,19 @@
       /* sky & sun */
       const sky = skyAt(hour);
       scene.clearColor.set(sky.r, sky.g, sky.b, 1);
-      scene.fogColor = sky;
+      scene.fogColor.copyFrom(sky);
       const ang = ((hour - SR) / (SS - SR)) * PI;
       const elev = Math.sin(Math.max(0, Math.min(PI, ang)));
       sun.direction.set(-Math.cos(ang) * 0.7, -Math.max(0.3, elev), -0.55);
       sun.intensity = hour > SR - 0.3 && hour < SS + 0.3 ? 0.18 + elev * 0.54 : 0.02;
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
       hemi.intensity = 0.16 + day * 0.38;
-      hemi.diffuse = B.Color3.Lerp(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2));
-      hemi.groundColor = B.Color3.Lerp(C("#12151e"), C("#3a362c"), day);
-      pipeline.imageProcessing.exposure = 0.84 + day * 0.1;
+      B.Color3.LerpToRef(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
+      B.Color3.LerpToRef(C("#12151e"), C("#3a362c"), day, hemi.groundColor);
+      if (!scene.metadata || !scene.metadata.dayLook) {
+        const ipc = pipeline.imageProcessing && pipeline.imageProcessing.imageProcessingConfiguration;
+        if (ipc) ipc._exposure = 0.84 + day * 0.1;
+      }
       const night = 1 - Math.min(1, day * 1.6);
       windows.forEach((w) => {
         w.material.emissiveColor.set(
@@ -1467,25 +1510,35 @@
       });
       setEmissive(lampHeadM, "#d7e7ff", 0.12 + night * 1.05);
       setEmissive(winM, "#8fd4ff", 0.06 + night * 1.2);
-      winM.diffuseColor = B.Color3.Lerp(C("#1a2433"), C("#8fd4ff"), night * 0.35);
+      B.Color3.LerpToRef(C("#1a2433"), C("#8fd4ff"), night * 0.35, winM.diffuseColor);
 
-      /* room lights */
+      /* room lights: disable 0-intensity or distant building lights so shaders bind only active lights */
+      const px = opts.player ? opts.player.x : fr.person.x;
       roomLights.forEach((rl) => {
         const on = things[rl.thing] === "on" ? 1 : 0;
         rl.level = snap ? on : damp(rl.level, on, dt, 10);
         if (rl.id === "bedroom") {
-          rl.light.diffuse = B.Color3.Lerp(C("#b8cff2"), C("#ffd9a8"), rl.level);
+          B.Color3.LerpToRef(C("#b8cff2"), C("#ffd9a8"), rl.level, rl.light.diffuse);
           rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.46;
         } else if (rl.id === "living") {
-          rl.light.diffuse = B.Color3.Lerp(C("#c4d4f0"), C("#ffd9a8"), rl.level);
+          B.Color3.LerpToRef(C("#c4d4f0"), C("#ffd9a8"), rl.level, rl.light.diffuse);
           rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.34;
         } else {
           rl.light.intensity = rl.level * (0.55 + night * 0.65);
         }
+        const want = rl.light.intensity > 0.01 && Math.abs(px - rl.light.position.x) < 75;
+        if (rl.light.isEnabled() !== want) rl.light.setEnabled(want);
       });
       bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.55 : 0.48);
+      const wantBedside = bedsideFill.intensity > 0.01 && Math.abs(px - bedsideFill.position.x) < 75;
+      if (bedsideFill.isEnabled() !== wantBedside) bedsideFill.setEnabled(wantBedside);
       const officeOn = things.officeLights !== "off" ? 1 : 0;
-      officeLights.forEach((L) => (L.intensity = officeOn * (0.12 + night * 0.35)));
+      const nearOffice = px > 65 || (cam.inited && cam.x > 65);
+      officeLights.forEach((L) => {
+        L.intensity = officeOn && nearOffice ? 0.12 + night * 0.35 : 0;
+        const want = L.intensity > 0.01;
+        if (L.isEnabled() !== want) L.setEnabled(want);
+      });
       if (bedLampShade) setEmissive(bedLampShade, "#ffd08a", things.bedroomLamp === "on" ? 1.3 : 0.12 + night * 0.45);
       if (props.floorLamp) setEmissive(props.floorLamp, "#ffd08a", things.livingLight === "on" ? 1.1 : 0.06 + night * 0.18);
 
@@ -1592,6 +1645,8 @@
       setEmissive(myCar.hl, "#fff3d0", lights ? 1.6 : 0.05);
       setEmissive(myCar.tl, "#ff2a2a", things.engine === "on" ? (car.moving ? 0.7 : 1.4) : 0.05);
       headSpot.intensity = lights ? 1.6 * Math.max(night, raining || foggy ? 0.55 : 0) : 0;
+      const wantHead = headSpot.intensity > 0.01;
+      if (headSpot.isEnabled() !== wantHead) headSpot.setEnabled(wantHead);
 
       /* traffic */
       const tSec = minutes * 60;
@@ -1645,10 +1700,13 @@
       });
 
       /* person */
-      const outfit = outfits[things.outfit] || outfits.work || { top: "#c46b52", bottom: "#3a3e46" };
-      me.top.diffuseColor = C(outfit.top);
-      me.bottom.diffuseColor = C(outfit.bottom);
-      me.shoes.diffuseColor = C(outfit.feet || P.shoes || "#241f1c");
+      if (!skin && state.lastOutfit !== things.outfit) {
+        state.lastOutfit = things.outfit;
+        const outfit = outfits[things.outfit] || outfits.work || { top: "#c46b52", bottom: "#3a3e46" };
+        me.top.diffuseColor.copyFrom(C(outfit.top));
+        me.bottom.diffuseColor.copyFrom(C(outfit.bottom));
+        me.shoes.diffuseColor.copyFrom(C(outfit.feet || P.shoes || "#241f1c"));
+      }
       if (player) {
         // placed and posed by the player's controller
       } else if (pp.inCar) {
@@ -1856,10 +1914,60 @@
       };
     }
 
+    /** Freeze world matrices on all static building, street, roof, neon, parked-car, and furniture meshes. */
+    function freezeStaticMeshes() {
+      const dynamicRoots = new Set(
+        [
+          me.root,
+          myCar.root,
+          ...traffic.map((tr) => tr.car.root),
+          ...streetFolk.map((f) => f.person.root),
+          ...npcs.map((n) => n.person.root),
+          frontDoorNode,
+          fridgeDoor,
+          hourHand,
+          minuteHand,
+        ].filter(Boolean)
+      );
+      const dynamicMeshes = new Set(
+        [
+          quiltUp,
+          quiltDown,
+          sinkMug,
+          shelfMug,
+          deskGlass,
+          deskPhone,
+          nightPhone,
+          props.bag,
+          elevatorDoors && elevatorDoors.l,
+          elevatorDoors && elevatorDoors.r,
+          trunk,
+          ...crowns,
+        ].filter(Boolean)
+      );
+      const dynamicName = /^(skyDome|puddle\d*|loose-|power-|strike-|funnel-|debris-|ep-|bolt\d*|scorch)/;
+      (scene.transformNodes || []).forEach((n) => n.computeWorldMatrix(true));
+      let count = 0;
+      (scene.meshes || []).forEach((m) => {
+        if (!m || m.isWorldMatrixFrozen || !m.getTotalVertices || m.getTotalVertices() === 0) return;
+        if (m.skeleton || dynamicMeshes.has(m) || dynamicName.test(m.name || "")) return;
+        let p = m.parent;
+        while (p) {
+          if (dynamicRoots.has(p)) return;
+          p = p.parent;
+        }
+        m.computeWorldMatrix(true);
+        m.freezeWorldMatrix();
+        count++;
+      });
+      return count;
+    }
+
     return {
       engine,
       scene,
       update,
+      freezeStaticMeshes,
       /* sun, sky light, the look pipeline and the road material: js/weather.js tints them */
       stage: {
         sun,
