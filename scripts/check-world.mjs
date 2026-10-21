@@ -37,6 +37,12 @@ const sandbox = globalThis;
 const cfg = sandbox.DAY_CONFIG;
 ok(/^9\./.test(core.Engine.Version), `Babylon is ${core.Engine.Version}, not 9`);
 ok(cfg.person && cfg.person.name === 'Small Weather', `day.config.js person.name is "${cfg.person && cfg.person.name}", not Small Weather`);
+try {
+  const assetsManifest = JSON.parse(fs.readFileSync(new URL('hawkes.assets.json', root), 'utf8'));
+  ok(assetsManifest && assetsManifest.project === 'icanbe' && Array.isArray(assetsManifest.assets) && assetsManifest.assets.length >= 60, `hawkes.assets.json is missing expected assets (${assetsManifest && assetsManifest.assets && assetsManifest.assets.length})`);
+} catch (err) {
+  ok(false, `hawkes.assets.json is invalid JSON: ${err.message}`);
+}
 
 const day = sandbox.DayEngine.build(cfg, '2026-10-19');
 ok(!day.errors.length, `day.config.js errors: ${day.errors.join('; ')}`);
