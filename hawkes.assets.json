@@ -1,3 +1,964 @@
+{
+ "project": "icanbe",
+ "_about": "Generated assets as data (Hawkes Studio, docs/projects/AGENTS.md): each recipe made through Hawkes Gen and where its output lives.",
+ "assets": [
+  {
+   "id": "small-weather",
+   "note": "Small Weather, the player character (canon m_9743a1dfe970, the same storm caller as Dose Of Destruction): a clean A-pose front sheet from DoD's art (AllTheCharacters/SmallWeather/anims/_reference.png, library a_02d916892b5b8a2d), a textured mesh (best of 3, picked against the reference from mesh.rig's turntables: the chain can't judge meshes), then Gen's auto-rig with 14 Mixamo-skeleton clips. The clips are scripts/small-weather-clips.mjs's output (art/small-weather/clips, from PH Origins' ch33 hero's Mixamo rig: Idle, Walk, Run, Jump, Sitting Idle, plus posed fall, float, cast, throw and the day's poses), uploaded to the entity icanbe/small-weather (slots clip-src/*). The glow on the seams and boots and the arm lightning are added in the page (js/small-weather.js). Entity: icanbe/small-weather.",
+   "steps": [
+    {
+     "tool": "image.edit",
+     "inputs": {
+      "images": [
+       "$input:0"
+      ]
+     },
+     "params": {
+      "prompt": "Clean 3D character model reference sheet of this exact young man, front view, facing the camera: standing straight in an A-pose, both arms held straight and angled down and away from the body at about 40 degrees so there is clear space between the arms and the torso, hands open with fingers together, feet apart at shoulder width, full body from the top of his hair to the soles of his boots, centered. Keep his face, black messy hair, black glasses, dark navy tech jacket with glowing blue seams down the chest, shoulder straps, grey tee, fingerless gloves, black cargo pants with pockets, black knee armor, black boots with glowing blue lights. Stylized 3D game character render with clean shapes and saturated colors. Plain flat light grey background, no lightning, no clouds, no rain, no smoke, no effects around him, no shadow, even soft studio lighting.",
+      "width": 832,
+      "height": 1216
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "mesh.textured",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "faces": 40000,
+      "texture": 1024
+     },
+     "save": "mesh"
+    },
+    {
+     "tool": "mesh.rig",
+     "inputs": {
+      "mesh": "$prev",
+      "clips": [
+       "$input:1",
+       "$input:2",
+       "$input:3",
+       "$input:4",
+       "$input:5",
+       "$input:6",
+       "$input:7",
+       "$input:8",
+       "$input:9",
+       "$input:10",
+       "$input:11",
+       "$input:12",
+       "$input:13",
+       "$input:14"
+      ]
+     },
+     "params": {
+      "names": [
+       "idle",
+       "walk",
+       "run",
+       "jump",
+       "fall",
+       "float",
+       "cast",
+       "throw",
+       "sit",
+       "type",
+       "phone",
+       "lie",
+       "side",
+       "recline"
+      ],
+      "height": 1.75
+     },
+     "save": "rigged"
+    }
+   ],
+   "inputs": {
+    "files": [
+     "asset:a_02d916892b5b8a2d",
+     "art/small-weather/clips/idle.glb",
+     "art/small-weather/clips/walk.glb",
+     "art/small-weather/clips/run.glb",
+     "art/small-weather/clips/jump.glb",
+     "art/small-weather/clips/fall.glb",
+     "art/small-weather/clips/float.glb",
+     "art/small-weather/clips/cast.glb",
+     "art/small-weather/clips/throw.glb",
+     "art/small-weather/clips/sit.glb",
+     "art/small-weather/clips/type.glb",
+     "art/small-weather/clips/phone.glb",
+     "art/small-weather/clips/lie.glb",
+     "art/small-weather/clips/side.glb",
+     "art/small-weather/clips/recline.glb"
+    ]
+   },
+   "pickAt": 1,
+   "candidates": 4,
+   "pick": "on-model with the reference: black messy hair, black glasses, dark navy tech jacket with glowing blue seams, grey tee, black cargo pants, knee armor, glowing boots; a clean A-pose with the arms clear of the body, the whole body in frame, no effects",
+   "refs": [
+    0
+   ],
+   "files": {
+    "rigged": "models/small-weather.glb"
+   }
+  },
+  {
+   "id": "voice-bolt-1",
+   "note": "Small Weather spoken line (bolt): \"Point and flash.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Point and flash.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/bolt-1.mp3"
+   }
+  },
+  {
+   "id": "voice-bolt-2",
+   "note": "Small Weather spoken line (bolt): \"That one felt personal.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "That one felt personal.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/bolt-2.mp3"
+   }
+  },
+  {
+   "id": "voice-bolt-3",
+   "note": "Small Weather spoken line (bolt): \"Keep the count. I'll keep the bolts.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Keep the count. I'll keep the bolts.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/bolt-3.mp3"
+   }
+  },
+  {
+   "id": "voice-gust-1",
+   "note": "Small Weather spoken line (gust): \"Move.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Move.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/gust-1.mp3"
+   }
+  },
+  {
+   "id": "voice-gust-2",
+   "note": "Small Weather spoken line (gust): \"Wind's on my side.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Wind's on my side.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/gust-2.mp3"
+   }
+  },
+  {
+   "id": "voice-gust-3",
+   "note": "Small Weather spoken line (gust): \"Bins don't get a vote.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Bins don't get a vote.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/gust-3.mp3"
+   }
+  },
+  {
+   "id": "voice-storm-1",
+   "note": "Small Weather spoken line (storm): \"I brought the weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "I brought the weather.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/storm-1.mp3"
+   }
+  },
+  {
+   "id": "voice-storm-2",
+   "note": "Small Weather spoken line (storm): \"Pressure's rising. Good.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Pressure's rising. Good.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/storm-2.mp3"
+   }
+  },
+  {
+   "id": "voice-storm-3",
+   "note": "Small Weather spoken line (storm): \"Sky's mine for a minute.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Sky's mine for a minute.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/storm-3.mp3"
+   }
+  },
+  {
+   "id": "voice-tornado-1",
+   "note": "Small Weather spoken line (tornado): \"Watch the street.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Watch the street.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/tornado-1.mp3"
+   }
+  },
+  {
+   "id": "voice-tornado-2",
+   "note": "Small Weather spoken line (tornado): \"Funnel's going.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Funnel's going.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/tornado-2.mp3"
+   }
+  },
+  {
+   "id": "voice-tornado-3",
+   "note": "Small Weather spoken line (tornado): \"Drama, delivered.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Drama, delivered.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/tornado-3.mp3"
+   }
+  },
+  {
+   "id": "voice-glide-1",
+   "note": "Small Weather spoken line (glide): \"Easy.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Easy.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/glide-1.mp3"
+   }
+  },
+  {
+   "id": "voice-glide-2",
+   "note": "Small Weather spoken line (glide): \"I don't fall. I float.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "I don't fall. I float.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/glide-2.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-clear",
+   "note": "Small Weather spoken line (weather-clear): \"Clear skies. Boring, but fine.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Clear skies. Boring, but fine.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-clear.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-clear-2",
+   "note": "Small Weather spoken line (weather-clear): \"Sun's out. I'm not.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Sun's out. I'm not.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-clear-2.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-clouds",
+   "note": "Small Weather spoken line (weather-clouds): \"Clouds. Warming up.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Clouds. Warming up.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-clouds.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-rain",
+   "note": "Small Weather spoken line (weather-rain): \"Rain. Finally something useful.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Rain. Finally something useful.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-rain.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-rain-2",
+   "note": "Small Weather spoken line (weather-rain): \"Wet road. Good.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Wet road. Good.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-rain-2.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-storm",
+   "note": "Small Weather spoken line (weather-storm): \"There it is.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "There it is.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-storm.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-storm-2",
+   "note": "Small Weather spoken line (weather-storm): \"This is more like it.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "This is more like it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-storm-2.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-fog",
+   "note": "Small Weather spoken line (weather-fog): \"Fog. Soft edges.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Fog. Soft edges.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-fog.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-wind",
+   "note": "Small Weather spoken line (weather-wind): \"Wind's restless.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Wind's restless.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-wind.mp3"
+   }
+  },
+  {
+   "id": "voice-wx-snow",
+   "note": "Small Weather spoken line (weather-snow): \"Snow. Quiet drama.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Snow. Quiet drama.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/wx-snow.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-open-1",
+   "note": "Small Weather spoken line (episode-open): \"Alright. My turn.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Alright. My turn.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-open-1.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-open-2",
+   "note": "Small Weather spoken line (episode-open): \"The day's on autopilot. I'm not.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "The day's on autopilot. I'm not.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-open-2.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-open-3",
+   "note": "Small Weather spoken line (episode-open): \"The Orchestrator asked for drama, so I brought the weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "The Orchestrator asked for drama, so I brought the weather.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-open-3.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-close-1",
+   "note": "Small Weather spoken line (episode-close): \"Back to the day. It kept going without me.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Back to the day. It kept going without me.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-close-1.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-close-2",
+   "note": "Small Weather spoken line (episode-close): \"Not bad for a lunch break.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Not bad for a lunch break.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-close-2.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-close-3",
+   "note": "Small Weather spoken line (episode-close): \"Pressure spent. Worth it.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Pressure spent. Worth it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-close-3.mp3"
+   }
+  },
+  {
+   "id": "voice-ep-close-4",
+   "note": "Small Weather spoken line (episode-close): \"Clock's still running. So am I.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Clock's still running. So am I.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/ep-close-4.mp3"
+   }
+  },
+  {
+   "id": "voice-day-1",
+   "note": "Small Weather spoken line (day): \"Another commit. Another cloud somewhere.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Another commit. Another cloud somewhere.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-1.mp3"
+   }
+  },
+  {
+   "id": "voice-day-2",
+   "note": "Small Weather spoken line (day): \"Code compiles. Sky doesn't.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Code compiles. Sky doesn't.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-2.mp3"
+   }
+  },
+  {
+   "id": "voice-day-3",
+   "note": "Small Weather spoken line (day): \"Standing desk. Sitting storm.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Standing desk. Sitting storm.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-3.mp3"
+   }
+  },
+  {
+   "id": "voice-day-4",
+   "note": "Small Weather spoken line (day): \"Coffee's cold. Forecast isn't.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Coffee's cold. Forecast isn't.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-4.mp3"
+   }
+  },
+  {
+   "id": "voice-day-5",
+   "note": "Small Weather spoken line (day): \"Traffic's nothing. Weather's everything.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Traffic's nothing. Weather's everything.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-5.mp3"
+   }
+  },
+  {
+   "id": "voice-day-6",
+   "note": "Small Weather spoken line (day): \"Alarm set. Atmosphere optional.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Alarm set. Atmosphere optional.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-6.mp3"
+   }
+  },
+  {
+   "id": "voice-day-7",
+   "note": "Small Weather spoken line (day): \"Pull request. Push weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Pull request. Push weather.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-7.mp3"
+   }
+  },
+  {
+   "id": "voice-day-8",
+   "note": "Small Weather spoken line (day): \"Meeting at ten. Storm whenever.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Meeting at ten. Storm whenever.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-8.mp3"
+   }
+  },
+  {
+   "id": "voice-day-9",
+   "note": "Small Weather spoken line (day): \"I type. The sky waits.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "I type. The sky waits.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/voice/day-9.mp3"
+   }
+  },
+  {
+   "id": "music-clear",
+   "note": "Calm city bed for clear weather (js/score.js, day.config.js score.music.clear).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Calm cinematic city ambient bed, soft warm pads, quiet distant traffic pulse, electric-blue night city mood like Dose Of Destruction, gentle and spacious, seamless loop, instrumental, 72 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 72,
+      "key": "A minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/clear.mp3"
+   }
+  },
+  {
+   "id": "music-clouds",
+   "note": "Building cloudy bed (score.music.clouds).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Building cloudy city ambient, darker pads than clear, soft muted drums entering, tension rising under an overcast sky, cinematic cartoon mood, seamless loop, instrumental, 80 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 80,
+      "key": "A minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/clouds.mp3"
+   }
+  },
+  {
+   "id": "music-rain",
+   "note": "Rainy city bed (score.music.rain).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Rainy city score, soft piano droplets, wet asphalt mood, mid tempo pulse, melancholic but calm, navy and electric blue night, seamless loop, instrumental, 84 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 84,
+      "key": "D minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/rain.mp3"
+   }
+  },
+  {
+   "id": "music-storm",
+   "note": "Intense storm track (score.music.storm).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Intense cinematic storm track, deep drums, thunderous bass, electric synth stabs, dramatic weather power, storm caller energy, seamless loop, instrumental, 100 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 100,
+      "key": "E minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/storm.mp3"
+   }
+  },
+  {
+   "id": "music-fog",
+   "note": "Eerie fog bed (score.music.fog).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Eerie fog ambient, hollow pads, distant unresolved tones, muffled city hush, mysterious and still, seamless loop, instrumental, 60 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 60,
+      "key": "C minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/fog.mp3"
+   }
+  },
+  {
+   "id": "music-snow",
+   "note": "Soft snow bed (score.music.snow).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Soft snow ambient, delicate bells, soft choir pads, quiet winter city, gentle and cold, seamless loop, instrumental, 66 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 66,
+      "key": "F major"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/snow.mp3"
+   }
+  },
+  {
+   "id": "music-take-control",
+   "note": "Heroic sting when the player takes control (score.sting).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Heroic short sting, rising synth brass and electric crackle, storm caller taking control of the weather, one triumphant hit then a short tail, instrumental",
+      "lyrics": "[Instrumental]",
+      "seconds": 10,
+      "bpm": 120,
+      "key": "E minor"
+     },
+     "save": "music"
+    }
+   ],
    "files": {
     "music": "audio/music/take-control.mp3"
    }
@@ -113,6 +1074,220 @@
    ],
    "files": {
     "sfx": "audio/sfx/city-hum.mp3"
+   }
+  },
+  {
+   "id": "city-asphalt",
+   "note": "Wet asphalt for the avenues (js/look.js). Dark navy, rain-wet, stylized like Dose Of Destruction. texture.maps makes the normal and roughness from the albedo.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark wet asphalt, nearly black with deep navy, rain-wet sheen, faint electric-blue reflections in the damp, fine grain and a few soft cracks, even all over, no focal point. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, not a photograph. Flat even lighting, no cast shadows, no text, no watermark.",
+      "width": 512,
+      "height": 512,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "files": {
+    "take": "textures/city/asphalt-take.png",
+    "maps.albedo": "textures/city/asphalt-albedo.png",
+    "maps.normal": "textures/city/asphalt-normal.png",
+    "maps.roughness": "textures/city/asphalt-roughness.png"
+   }
+  },
+  {
+   "id": "city-concrete",
+   "note": "Wet concrete for sidewalks, the driveway and the ramps.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Continuous poured wet concrete sidewalk only: cool grey with a navy cast, rain-darkened, fine aggregate grit, soft stains and hairline cracks, porous pitted surface, even all over. NOT metal, NOT steel plates, NOT diamond plate, NOT rivets, NOT bolts, NOT panel seams, NOT tile grid, NOT manhole. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
+      "width": 512,
+      "height": 512,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "files": {
+    "take": "textures/city/concrete-take.png",
+    "maps.albedo": "textures/city/concrete-albedo.png",
+    "maps.normal": "textures/city/concrete-normal.png",
+    "maps.roughness": "textures/city/concrete-roughness.png"
+   }
+  },
+  {
+   "id": "city-brick",
+   "note": "Dark wet brick for the shorter blocks.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark brick wall in running bond, bricks a deep navy-brown, mortar a cooler grey, surfaces rain-wet. Even all over, no single featured brick. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
+      "width": 512,
+      "height": 512,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "files": {
+    "take": "textures/city/brick-take.png",
+    "maps.albedo": "textures/city/brick-albedo.png",
+    "maps.normal": "textures/city/brick-normal.png",
+    "maps.roughness": "textures/city/brick-roughness.png"
+   }
+  },
+  {
+   "id": "city-glass",
+   "note": "Dark glass curtain wall for the tall blocks.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark glass curtain wall, navy-black reflective panes divided by thin darker mullions, a faint electric-blue reflection, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 512,
+      "height": 512,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.2
+     },
+     "save": "maps"
+    }
+   ],
+   "files": {
+    "take": "textures/city/glass-take.png",
+    "maps.albedo": "textures/city/glass-albedo.png",
+    "maps.normal": "textures/city/glass-normal.png",
+    "maps.roughness": "textures/city/glass-roughness.png"
+   }
+  },
+  {
+   "id": "city-roof",
+   "note": "Wet tar rooftops.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Flat rooftop, dark wet tar, navy-black, soft seams and a few shallow puddles reflecting a dull blue, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
+      "width": 512,
+      "height": 512,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "files": {
+    "take": "textures/city/roof-take.png",
+    "maps.albedo": "textures/city/roof-albedo.png",
+    "maps.normal": "textures/city/roof-normal.png",
+    "maps.roughness": "textures/city/roof-roughness.png"
+   }
+  },
+  {
+   "id": "city-sky-day",
+   "note": "Day sky for the dome in js/look.js. Bright enough that noon stays readable. The weather system blends it with dusk and night.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Wide stylized sky panorama, horizon along the lower third, no ground, no buildings, no people. Bright readable daylight, soft blue sky, pale scattered clouds, clear and not dark, cinematic cartoon like Dose Of Destruction. No text, no watermark, no sun flare covering the frame.",
+      "width": 1024,
+      "height": 512
+     },
+     "save": "sky"
+    }
+   ],
+   "files": {
+    "sky": "textures/city/sky-day.png"
+   }
+  },
+  {
+   "id": "city-sky-dusk",
+   "note": "Dusk sky. Deep navy above, amber and electric blue at the horizon.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Wide stylized dusk sky panorama, horizon along the lower third, no ground, no buildings, no people. Deep navy above, amber and electric blue at the horizon, a few dramatic clouds, cinematic cartoon like Dose Of Destruction. No text, no watermark.",
+      "width": 1024,
+      "height": 512
+     },
+     "save": "sky"
+    }
+   ],
+   "files": {
+    "sky": "textures/city/sky-dusk.png"
+   }
+  },
+  {
+   "id": "city-sky-night",
+   "note": "Night sky. Near-black navy, a few stars, electric-blue glow on the horizon. Not a pure black frame.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Full-frame wide stylized night sky only, filled edge to edge with sky. Soft atmospheric electric-blue glow along the lower third as air glow, then deep navy to near-black above with sparse small stars. Absolutely no ground, no earth, no silhouette, no skyline, no buildings, no mountains, no trees, no city lights as objects, no black floor half. Dark but not a pure black frame. Cinematic cartoon like Dose Of Destruction. No text, no watermark.",
+      "width": 1024,
+      "height": 512
+     },
+     "save": "sky"
+    }
+   ],
+   "files": {
+    "sky": "textures/city/sky-night.png"
    }
   }
  ]
