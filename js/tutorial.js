@@ -217,7 +217,7 @@ html.touch-ui.in-control .tutorial{bottom:max(256px,calc(env(safe-area-inset-bot
       if (btn && !btn.disabled) btn.click();
       else if (day && day.control) day.control.take();
     });
-    const skip = card.querySelector("button");
+    const skip = card.querySelector("#tutorial-skip");
     skip.textContent = cfg.skip || "Skip";
     skip.addEventListener("click", () => finish("skip"));
     document.body.appendChild(card);
