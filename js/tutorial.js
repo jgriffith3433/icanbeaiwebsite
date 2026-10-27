@@ -9,6 +9,13 @@ const DEFAULTS = {
   storageKey: "icanbe.tutorial",
   skip: "Skip",
   done: "That's enough. His day is still running.",
+  // The first step also says what this is, for someone who has never seen the page.
+  intro: {
+    title: "This is Small Weather's day, live.",
+    line: "He lives it on his own, in real time. Take him over: walk the city, jump the roofs, call down the storm.",
+    take: "Take control",
+    hint: "Or press Enter.",
+  },
   steps: [
     { id: "take", do: "Take control.", hint: "Enter, or the button.", touch: "Tap Take control." },
     { id: "move", do: "Walk him.", hint: "WASD or the arrows. Shift runs.", touch: "Drag the stick. Push it to the edge to run." },
@@ -59,6 +66,8 @@ export function startTutorial() {
   let card = null;
   let titleEl = null;
   let hintEl = null;
+  let introEl = null;
+  let takeBtn = null;
   let doneTimer = 0;
   function blocking() {
     return !!(card && !card.hidden && index < cfg.steps.length);
@@ -66,13 +75,24 @@ export function startTutorial() {
   function paint() {
     if (!card) return;
     const step = cfg.steps[index];
+    const intro = step && step.id === "take" && cfg.intro;
+    card.classList.toggle("intro", !!intro);
+    introEl.hidden = takeBtn.hidden = !intro;
     if (!step) {
       titleEl.textContent = cfg.done;
       hintEl.textContent = "";
       return;
     }
-    titleEl.textContent = step.do;
-    hintEl.textContent = (touchy() && step.touch) || step.hint || "";
+    if (intro) {
+      introEl.querySelector(".title").textContent = intro.title;
+      introEl.querySelector(".line").textContent = intro.line;
+      takeBtn.textContent = intro.take || step.do;
+      titleEl.textContent = "";
+      hintEl.textContent = touchy() ? "" : intro.hint || "";
+    } else {
+      titleEl.textContent = step.do;
+      hintEl.textContent = (touchy() && step.touch) || step.hint || "";
+    }
     card.setAttribute("data-step", step.id);
   }
   function armStep() {
@@ -171,6 +191,13 @@ html.in-control .tutorial{bottom:232px}
 .preview-public.in-control .tutorial{bottom:116px}
 html.touch-ui .tutorial{width:min(280px,calc(100vw - 32px))}
 html.touch-ui.in-control .tutorial{bottom:max(256px,calc(env(safe-area-inset-bottom) + 244px))}
+.tutorial.intro{width:min(360px,calc(100vw - 32px));padding:16px 18px 12px}
+.tutorial .intro-copy .title{font:600 1.3rem/1.25 Fraunces,Georgia,serif}
+.tutorial .intro-copy .line{margin-top:6px;color:rgba(246,241,232,.82)}
+.tutorial .do:empty{display:none}
+.tutorial .row{gap:8px}
+.tutorial button.take{background:#f0c27a;border-color:#f0c27a;color:#141210}
+.tutorial button.take:hover{background:#f6d39b}
 `;
     document.head.appendChild(style);
     card = document.createElement("div");
@@ -179,9 +206,17 @@ html.touch-ui.in-control .tutorial{bottom:max(256px,calc(env(safe-area-inset-bot
     card.hidden = true;
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-label", "First visit");
-    card.innerHTML = `<p class="do"></p><p class="hint"></p><div class="row"><button type="button" id="tutorial-skip"></button></div>`;
+    card.innerHTML = `<div class="intro-copy" hidden><p class="title"></p><p class="line"></p></div><p class="do"></p><p class="hint"></p><div class="row"><button type="button" class="take" id="tutorial-take" hidden></button><button type="button" id="tutorial-skip"></button></div>`;
     titleEl = card.querySelector(".do");
     hintEl = card.querySelector(".hint");
+    introEl = card.querySelector(".intro-copy");
+    takeBtn = card.querySelector(".take");
+    takeBtn.addEventListener("click", () => {
+      // The page's own Take control button, so it counts as a button press; the API if it isn't there.
+      const btn = document.getElementById("control");
+      if (btn && !btn.disabled) btn.click();
+      else if (day && day.control) day.control.take();
+    });
     const skip = card.querySelector("button");
     skip.textContent = cfg.skip || "Skip";
     skip.addEventListener("click", () => finish("skip"));

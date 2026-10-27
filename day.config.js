@@ -194,6 +194,13 @@ window.DAY_CONFIG = {
     storageKey: "icanbe.tutorial",
     skip: "Skip",
     done: "That's enough. His day is still running.",
+    // The first card also says what the page is (J, 2026-10-27: catch a new visitor in the first seconds).
+    intro: {
+      title: "This is Small Weather's day, live.",
+      line: "He lives it on his own, in real time. Take him over: walk the city, jump the roofs, call down the storm.",
+      take: "Take control",
+      hint: "Or press Enter.",
+    },
     steps: [
       { id: "take", do: "Take control.", hint: "Enter, or the button.", touch: "Tap Take control." },
       { id: "move", do: "Walk him.", hint: "WASD or the arrows. Shift runs.", touch: "Drag the stick. Push it to the edge to run." },
