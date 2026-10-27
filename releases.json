@@ -1,8 +1,19 @@
 {
   "product": "icanbe",
   "name": "I Can Be",
-  "current": "1.4.7",
+  "current": "1.5.0",
   "releases": [
+    {
+      "version": "1.5.0",
+      "date": "2026-10-27",
+      "build": "e5f698c",
+      "title": "Tutorial and first-visit changes",
+      "notes": [
+        "The tutorial card's Skip button now has a label, so it's clear what it does.",
+        "Skip now closes the tutorial for good instead of bringing it back.",
+        "On your first visit, a card explains what this page is and offers a Take control button."
+      ]
+    },
     {
       "version": "1.4.7",
       "date": "2026-10-27",
