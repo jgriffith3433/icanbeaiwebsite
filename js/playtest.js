@@ -475,7 +475,7 @@ async function analytics(options, t) {
   checkBasics(t);
   const A = window.hawkesAnalytics;
   if (!A) {
-    t.problem("bug", "Hawkes Analytics didn't load (js/hawkes-analytics.js)");
+    t.problem("bug", "Hawkes Analytics didn't load (gen.hawkesgen.com/sdk/analytics@1.js)");
     return;
   }
   await t.until(() => window.day.now().frame, 15000, "the first frame");

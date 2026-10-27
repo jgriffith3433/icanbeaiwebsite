@@ -4,10 +4,10 @@ import { defineConfig } from 'vite';
 
 // index.html's module scripts (js/app.js: Babylon 9, Havok, the day; js/playtest.js) are bundled into dist/assets.
 // The rest of the site is static and goes into dist as it is: the other pages, the classic scripts they load
-// (js/hawkes-analytics.js and js/hawkes-release.js, copies of shared files), releases.json, the CNAME and models/
+// (js/hawkes-release.js, a copy of a shared file; the analytics SDK comes from Gen), releases.json, the CNAME and models/
 // (Small Weather's GLB, loaded by URL from day.config.js control.model).
 // dist/ is the whole site: .github/workflows/pages.yml publishes it.
-const STATIC = ['whatsnew.html', 'privacy.html', 'releases.json', 'CNAME', 'css', 'models', 'audio', 'textures', 'js/hawkes-analytics.js', 'js/hawkes-release.js', 'js/hawkes-perf.js'];
+const STATIC = ['whatsnew.html', 'privacy.html', 'releases.json', 'CNAME', 'css', 'models', 'audio', 'textures', 'js/hawkes-release.js', 'js/hawkes-perf.js'];
 
 function copyStatic() {
   let outDir = 'dist';
