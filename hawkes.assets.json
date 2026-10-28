@@ -74,25 +74,23 @@
      "save": "rigged"
     }
    ],
-   "inputs": {
-    "files": [
-     "asset:a_02d916892b5b8a2d",
-     "art/small-weather/clips/idle.glb",
-     "art/small-weather/clips/walk.glb",
-     "art/small-weather/clips/run.glb",
-     "art/small-weather/clips/jump.glb",
-     "art/small-weather/clips/fall.glb",
-     "art/small-weather/clips/float.glb",
-     "art/small-weather/clips/cast.glb",
-     "art/small-weather/clips/throw.glb",
-     "art/small-weather/clips/sit.glb",
-     "art/small-weather/clips/type.glb",
-     "art/small-weather/clips/phone.glb",
-     "art/small-weather/clips/lie.glb",
-     "art/small-weather/clips/side.glb",
-     "art/small-weather/clips/recline.glb"
-    ]
-   },
+   "inputs": [
+    "asset:a_02d916892b5b8a2d",
+    "art/small-weather/clips/idle.glb",
+    "art/small-weather/clips/walk.glb",
+    "art/small-weather/clips/run.glb",
+    "art/small-weather/clips/jump.glb",
+    "art/small-weather/clips/fall.glb",
+    "art/small-weather/clips/float.glb",
+    "art/small-weather/clips/cast.glb",
+    "art/small-weather/clips/throw.glb",
+    "art/small-weather/clips/sit.glb",
+    "art/small-weather/clips/type.glb",
+    "art/small-weather/clips/phone.glb",
+    "art/small-weather/clips/lie.glb",
+    "art/small-weather/clips/side.glb",
+    "art/small-weather/clips/recline.glb"
+   ],
    "pickAt": 1,
    "candidates": 4,
    "pick": "on-model with the reference: black messy hair, black glasses, dark navy tech jacket with glowing blue seams, grey tee, black cargo pants, knee armor, glowing boots; a clean A-pose with the arms clear of the body, the whole body in frame, no effects",
