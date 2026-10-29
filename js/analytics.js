@@ -1,6 +1,6 @@
 /* ==========================================================================
    Hawkes Analytics: what viewers watch and touch (the SDK is Hawkes Gen's,
-   https://gen.hawkesgen.com/sdk/analytics@1.js, never a copy here; the contract is
+   https://gen.hawkesgen.ai/sdk/analytics@1.js, never a copy here; the contract is
    hawkesgen/docs/analytics.md; how it's wired here is in AGENTS.md "Analytics").
    It only listens: the page's controls, the day bar, the keys and the camera
    gestures, plus one frame callback through day.watch(). Nothing per frame is

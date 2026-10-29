@@ -139,7 +139,7 @@ day/dusk/night skies and the quality toggle are js/look.js." Negative: `text, wa
 Hawkes Analytics is the only analytics here (J, 2026-10-18): never add another tracker. The contract is
 `hawkesgen/docs/analytics.md`. The product id is `icanbe` (`hawkesgen/analytics/products.json`, beta `icanbe`).
 
-**Where it's loaded.** The SDK is Hawkes Gen's, `https://gen.hawkesgen.com/sdk/analytics@1.js`: never a copy here
+**Where it's loaded.** The SDK is Hawkes Gen's, `https://gen.hawkesgen.ai/sdk/analytics@1.js`: never a copy here
 (J, 2026-10-27), so a Gen deploy updates every site at once. It's loaded with `data-product="icanbe"` on every page people see: `index.html`
 (a classic script in `<head>`, then `loadStart()` straight after it, so `game_ready.ms` includes the bundle's download),
 `whatsnew.html` and `privacy.html`. A new public page needs the same two lines (`HAWKES_BUILD` and the script tag).
