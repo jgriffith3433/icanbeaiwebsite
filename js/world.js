@@ -1364,6 +1364,14 @@
     }
     const boxProps = () => [me.phone, me.phone && me.phone.screen, me.cup, me.bag].filter(Boolean);
     let shadowProxy = null;
+    /* Small Weather is the only model he ever has: while his GLB is on its way the box figure stays hidden (it is
+       only the frame that places and seats him), so nothing shows and then swaps. setSkin(null), after a failed
+       load, is the one way the figure comes back. */
+    if (cfg.control && cfg.control.model) {
+      me.root.getChildMeshes(false).forEach((m) => {
+        if (!boxProps().includes(m)) m.setEnabled(false);
+      });
+    }
     function setSkin(s) {
       if (skin) skin.root.dispose();
       const keep = boxProps();

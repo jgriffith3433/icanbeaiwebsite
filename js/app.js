@@ -47,6 +47,7 @@ if (skinWorld) {
       console.info(`[world] Small Weather's model: ${skin.clips.length} clips (${skin.clips.join(" ")})`);
     })
     .catch((err) => {
+      w.setSkin(null); // the figure is hidden until the model is on; only a failed load brings it back
       Object.assign(status, { model: "figure", modelError: String((err && err.message) || err) });
       console.error("[world] Small Weather's model didn't load:", err);
     })
