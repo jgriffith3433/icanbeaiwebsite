@@ -932,10 +932,22 @@ async function model(options, t) {
   t.scene("Loading his model");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
+  /* Small Weather or nothing: the box figure (the stand-in) must never be drawn, not even while his GLB loads */
+  let standInSeen = false;
+  const watchStandIn = () => {
+    const w = window.day.world && window.day.world();
+    const sk = skinNow();
+    if (w && w.person && w.person.getChildMeshes(false).some((m) => m.isEnabled() && m.isVisible && !(sk && sk.meshes.includes(m)) && !/phone|cup|bag|shadowproxy|bolt/i.test(m.name))) standInSeen = true;
+  };
+  const standInTimer = setInterval(watchStandIn, 16);
+  watchStandIn();
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  watchStandIn();
+  clearInterval(standInTimer);
+  if (standInSeen) t.problem("blocker", "The box stand-in showed for Small Weather (it must be Small Weather or nothing)");
   const info = window.day.engineInfo ? window.day.engineInfo() : {};
   if (info.model !== "small-weather" || !skinNow()) {
-    t.problem("blocker", `Small Weather's model didn't load (${info.model}${info.modelError ? ": " + info.modelError : ""}): the box figure shows`);
+    t.problem("blocker", `Small Weather's model didn't load (${info.model}${info.modelError ? ": " + info.modelError : ""}): he isn't shown`);
     return;
   }
   const skin = skinNow();

@@ -31,24 +31,40 @@ const perfWorld = window.day && window.day.world && window.day.world();
 if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: "icanbe" });
 
 /* Small Weather's 3D model (day.config.js control.model): kick off fetching the GLB and loader chunk early
-   in parallel so the model is ready right after the first frame. */
+   in parallel so the model is ready right after the first frame. He is drawn only once it is on (js/world.js
+   keeps the box figure hidden): a failed load tries twice more, then he stays hidden, never a stand-in. */
 const skinWorld = control.model && window.day && window.day.world();
 if (skinWorld) {
   const w = skinWorld;
-  const swModuleP = import("./small-weather.js");
-  const glbBytesP = typeof fetch === "function"
-    ? fetch(control.model).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)
-    : Promise.resolve(null);
-  Promise.all([swModuleP, glbBytesP])
-    .then(([{ loadSmallWeather }, buf]) => loadSmallWeather(w, control.model, buf))
+  const fetchBytes = () => (typeof fetch === "function"
+    ? fetch(control.model, { cache: "no-cache" }).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)
+    : Promise.resolve(null));
+  const firstBytesP = fetchBytes();
+  const firstModuleP = import("./small-weather.js");
+  const RETRY_MS = [0, 2000, 6000];
+  const wear = async () => {
+    let lastErr = null;
+    for (let i = 0; i < RETRY_MS.length; i++) {
+      if (RETRY_MS[i]) await new Promise((r) => setTimeout(r, RETRY_MS[i]));
+      try {
+        const [{ loadSmallWeather }, buf] = await Promise.all([i ? import("./small-weather.js") : firstModuleP, i ? fetchBytes() : firstBytesP]);
+        return await loadSmallWeather(w, control.model, buf);
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[world] Small Weather's model, try ${i + 1} of ${RETRY_MS.length}, didn't load:`, err);
+      }
+    }
+    throw lastErr;
+  };
+  wear()
     .then((skin) => {
       w.setSkin(skin);
       Object.assign(status, { model: "small-weather", clips: skin.clips });
       console.info(`[world] Small Weather's model: ${skin.clips.length} clips (${skin.clips.join(" ")})`);
     })
     .catch((err) => {
-      w.setSkin(null); // the figure is hidden until the model is on; only a failed load brings it back
-      Object.assign(status, { model: "figure", modelError: String((err && err.message) || err) });
+      w.setSkin(null); // he stays hidden: Small Weather or nothing, never the box figure
+      Object.assign(status, { model: "none", modelError: String((err && err.message) || err) });
       console.error("[world] Small Weather's model didn't load:", err);
     })
     .finally(() => window.dispatchEvent(new CustomEvent("day:model", { detail: { ...status } })));

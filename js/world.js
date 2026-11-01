@@ -1364,22 +1364,27 @@
     }
     const boxProps = () => [me.phone, me.phone && me.phone.screen, me.cup, me.bag].filter(Boolean);
     let shadowProxy = null;
-    /* Small Weather is the only model he ever has: while his GLB is on its way the box figure stays hidden (it is
-       only the frame that places and seats him), so nothing shows and then swaps. setSkin(null), after a failed
-       load, is the one way the figure comes back. */
-    if (cfg.control && cfg.control.model) {
-      me.root.getChildMeshes(false).forEach((m) => {
-        if (!boxProps().includes(m)) m.setEnabled(false);
+    /* Small Weather is the only model he ever has. The box figure is never drawn: it is only the frame that places,
+       tilts and seats him. While his GLB is on its way nothing shows; if it never loads, nothing shows either
+       (setSkin(null) keeps him hidden). Only a config with no model (control.model null) draws the boxes. */
+    const figureDrawn = !(cfg.control && cfg.control.model);
+    const figureMeshes = () => {
+      const keep = boxProps();
+      return me.root.getChildMeshes(false).filter((m) => m !== shadowProxy && !keep.includes(m) && !(skin && skin.meshes.includes(m)));
+    };
+    if (!figureDrawn) {
+      figureMeshes().forEach((m) => {
+        m.setEnabled(false);
+        shadows.removeShadowCaster(m, false);
       });
     }
     function setSkin(s) {
       if (skin) skin.root.dispose();
-      const keep = boxProps();
-      me.root.getChildMeshes(false).forEach((m) => {
-        if (m === shadowProxy) return;
-        if (!keep.includes(m) && (!s || !s.meshes.includes(m))) {
-          m.setEnabled(!s);
-          if (s) shadows.removeShadowCaster(m, false);
+      skin = null;
+      figureMeshes().forEach((m) => {
+        if (!s || !s.meshes.includes(m)) {
+          m.setEnabled(!s && figureDrawn);
+          if (s || !figureDrawn) shadows.removeShadowCaster(m, false);
         }
       });
       skin = s;
@@ -1388,6 +1393,7 @@
         return;
       }
       s.root.parent = me.spin;
+      if (s.attach) s.attach(); // into the scene only now, placed under his frame
       s.glowMeshes.concat(s.boltMeshes || []).forEach(glowing);
       const drawn = s.meshes.filter((m) => m.getTotalVertices && m.getTotalVertices() > 0);
       drawn.forEach((m) => {
