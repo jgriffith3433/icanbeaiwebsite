@@ -9,7 +9,7 @@ Agents' fixes land on `beta` (pull requests Studio merges); `sync.bat` brings th
 | | Address |
 |---|---|
 | Local | [http://localhost:8092/](http://localhost:8092/) |
-| Beta | [https://icanbe.hawkesgen.ai/](https://icanbe.hawkesgen.ai/) |
+| Beta | [https://sites.hawkesgen.ai/o/j-studio-4f12/i-can-be-ai/](https://sites.hawkesgen.ai/o/j-studio-4f12/i-can-be-ai/) |
 | Live | [https://icanbe.ai/](https://icanbe.ai/) |
 | Deploys (GitHub Actions) | [github.com/jgriffith3433/icanbeaiwebsite/actions](https://github.com/jgriffith3433/icanbeaiwebsite/actions) |
 
