@@ -22,18 +22,28 @@ const LOOPS = ["idle", "walk", "run", "fall", "float", "sit", "type", "phone", "
 /* How much lightning each clip has while he's the player's (0 on his day) */
 const BOLTS = { cast: 1, throw: 1, float: 0.7, fall: 0.5, jump: 0.5, idle: 0.3, walk: 0.25, run: 0.35 };
 
-/* Load the GLB into the world's scene and make the skin. data: an ArrayBuffer instead of fetching url (tests). */
+/* Load the GLB and make the skin. data: an ArrayBuffer instead of fetching url (tests).
+   It loads into an asset container, not the scene, so nothing of his is drawn while it streams in (no bare,
+   untextured or bind-posed body at the origin): world.setSkin() puts him on, and only then is he in the scene. */
 export async function loadSmallWeather(world, url, data) {
   const B = window.BABYLON;
   const scene = world.scene;
-  const res = await B.ImportMeshAsync(data ? new Uint8Array(data) : url, scene, { pluginExtension: ".glb" });
-  return makeSkin(B, scene, res, world.skinHips || 0.91);
+  const container = await B.LoadAssetContainerAsync(data ? new Uint8Array(data) : url, scene, { pluginExtension: ".glb" });
+  try {
+    return makeSkin(B, scene, container, world.skinHips || 0.91, container);
+  } catch (err) {
+    container.dispose();
+    throw err;
+  }
 }
 
-/* res: what ImportMeshAsync returned. hipsTarget: his hips' height standing, in world units (the figure's, 0.91m). */
-export function makeSkin(B, scene, res, hipsTarget) {
+/* res: the loaded meshes, animationGroups and transformNodes (an AssetContainer or what ImportMeshAsync returned).
+   hipsTarget: his hips' height standing, in world units (the figure's, 0.91m). container: when given, his parts join
+   the scene only when the skin is put on (attach()). Until then the skin is hidden. */
+export function makeSkin(B, scene, res, hipsTarget, container) {
   const glbRoot = res.meshes[0];
   const wrap = new B.TransformNode("small-weather", scene);
+  wrap.setEnabled(false);
   glbRoot.parent = wrap;
   const meshes = res.meshes.filter((m) => m.getTotalVertices && m.getTotalVertices() > 0);
   /* __root__ has no vertices but parents the mesh; it stays enabled, so it counts as his */
@@ -127,6 +137,14 @@ export function makeSkin(B, scene, res, hipsTarget) {
     },
     show(on) {
       wrap.setEnabled(on);
+    },
+    /* world.setSkin(): into the scene, then shown, once he is parented and placed */
+    attach() {
+      if (container) {
+        container.addAllToScene();
+        container = null;
+      }
+      wrap.setEnabled(true);
     },
   };
 }

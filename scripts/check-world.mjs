@@ -56,6 +56,14 @@ ok(!theyLines.length, `lines that still say "they": ${theyLines.slice(0, 5).join
 
 const world = sandbox.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 ok(world && world.person, 'the world has no person');
+// Small Weather or nothing: with a model configured, the box figure is never drawn, not before his model is on and
+// not after a failed load (setSkin(null)).
+const figureShowing = () => world.person.getChildMeshes(false).filter((m) => m.isEnabled() && !/phone|cup|bag|shadowproxy/i.test(m.name));
+if (cfg.control && cfg.control.model) {
+  ok(figureShowing().length === 0, `the box stand-in shows before his model loads: ${figureShowing().slice(0, 4).map((m) => m.name).join(', ')}`);
+  world.setSkin(null);
+  ok(figureShowing().length === 0, 'the box stand-in comes back after a failed model load');
+}
 const { installLook } = await import(new URL('js/look.js', root).href);
 installLook(world);
 world.update(sandbox.DayEngine.frame(day, 12 * 60), 0.016, { snap: true });
@@ -322,9 +330,11 @@ if (modelPath) {
     ok(bytes.length < 3 * 1024 * 1024, `${modelPath} is ${(bytes.length / 1048576).toFixed(2)} MB (must be < 3 MB)`);
     const { loadSmallWeather, SKIN_CLIPS } = await import(new URL('js/small-weather.js', root).href);
     const skin = await loadSmallWeather(world, null, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length));
+    ok(skin.meshes.every((m) => !world.scene.meshes.includes(m)), 'his model is in the scene before it is put on (it would show at the origin while loading)');
     const missing = SKIN_CLIPS.filter((c) => !skin.clips.includes(c));
     ok(!missing.length, `${modelPath} has no clip for ${missing.join(', ')}`);
     world.setSkin(skin);
+    ok(skin.meshes.every((m) => world.scene.meshes.includes(m)) && skin.root.isEnabled(), 'his model is not in the scene, or hidden, once put on');
     ok(skin.glowMeshes.length === 0, `skinned mesh was added to GlowLayer (${skin.glowMeshes.length} glowMeshes)`);
     ok(world.person.getChildMeshes(false).filter((m) => m.isEnabled() && !skin.meshes.includes(m) && !/phone|cup|bag/.test(m.name)).length === 0, 'the box figure still shows under his model');
     for (const clip of ['idle', 'walk', 'run', 'jump', 'fall', 'float', 'cast', 'throw']) {
