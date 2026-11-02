@@ -169,6 +169,11 @@ async function smoke(options, t) {
   t.scene("Live");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
+  // Small Weather or nothing: wait for his model (never the box stand-in) before judging the page.
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const mInfo = window.day.engineInfo ? window.day.engineInfo() : {};
+  if (mInfo.model === "small-weather") t.event("small-weather-visible", "his model is on the figure");
+  else t.problem("blocker", `Small Weather didn't appear (model ${mInfo.model}${mInfo.modelError ? ": " + mInfo.modelError : ""})`);
   if (window.day.tutorial && !window.day.tutorial.blocking()) window.day.tutorial.reset();
   const fr0 = window.day.now().frame;
   checkFrame(t, fr0);
@@ -256,10 +261,60 @@ async function smoke(options, t) {
   if (window.day.now().mode !== "live") t.problem("bug", "Esc didn't go back to live");
   t.scene("Live");
   t.event("back-to-live");
-  t.progress(0.9);
+  t.progress(0.6);
 
   await checkFoundation(t);
+  t.progress(0.7);
+  await roofBolt(t);
   t.progress(1);
+}
+
+/** Smoke's last step: take control outside, climb the first rooftop with a stair, throw one bolt (E). */
+async function roofBolt(t) {
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const cfg = window.DAY_CONFIG;
+  if (!C || !P) {
+    t.problem("bug", "There's no Take control or powers to test lightning");
+    return;
+  }
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const day = window.day.today();
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1)
+    || day.actions.find((a) => /steps out/.test(a.text || ""))
+    || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  t.event("start-at", `${E().fmtClock(outside.start)} outside, to climb a roof`);
+  t.scene("Take control");
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  t.event("control-taken", "Enter");
+  const b = ((cfg.city && cfg.city.blocks) || []).find((x) => x.stair);
+  if (!b) {
+    t.problem("bug", "The district has no roof with a stair");
+    return;
+  }
+  const s = b.stair;
+  t.scene(`Roof ${b.id}`);
+  const ok = (await goTo(s.x0 - 0.9, s.z, t, { sprint: true, progress: 0.75, ms: 30000 }))
+    && (await goTo(s.x1 - 0.25, s.z, t, { close: 0.35, progress: 0.8, ms: 20000 }));
+  await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 12000 });
+  const st = C.state();
+  const onRoof = ok && st.y > b.h - 0.4;
+  if (onRoof) t.event("on-rooftop", `on the ${b.id} roof at y ${st.y.toFixed(2)}`);
+  else t.problem("bug", `He isn't on the ${b.id} roof (y ${st.y.toFixed(2)} at ${st.x.toFixed(1)},${st.z.toFixed(1)})`);
+  const cost = (cfg.powers && cfg.powers.costs && cfg.powers.costs.bolt) || 24;
+  await t.until(() => P.now().pressure + 0.05 >= cost, 15000, "Pressure for the bolt").catch(() => {});
+  pressKey("e");
+  await t.until(() => P.now().strike, 3000, "a lightning strike").catch(() => {});
+  const strike = P.now().strike;
+  if (strike) t.event("bolt-struck", `from the roof, at ${strike.x.toFixed(1)},${strike.z.toFixed(1)}`);
+  else t.problem("bug", "E didn't throw lightning from the rooftop");
+  await sleep(600);
+  pressKey("Escape");
+  t.event(strike && onRoof ? "smoke-pass" : "smoke-fail", "city loaded, Small Weather shown, rooftop, one bolt");
 }
 
 /* ---------------- day: the whole day at high speed; every block must happen ---------------- */
@@ -2599,7 +2654,7 @@ const E = () => window.DayEngine;
 installPlaytest({
   product: "icanbe",
   scenarios: [
-    { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live; Babylon 9, physics, his name in the panel and log", seconds: 30, tags: ["smoke"] },
+    { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
