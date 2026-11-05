@@ -426,6 +426,15 @@ window.DAY_CONFIG = {
       timeUp: "Time's up.",
       letGo: "Episode paused — score stands.",
     },
+    /* Strain (the beat sheet's overuse rule, per story episode): every weather call adds to a meter
+       by kind; the same call again inside `stackSec` adds double. Over an episode's `strain.budget`
+       the part is scarred: kick-backs happen in the world and the card says so. */
+    strain: {
+      costs: { rain: 1, gale: 1, sunbreak: 1, fog: 1, bolt: 2, gust: 1, tornado: 2, storm: 2 },
+      stackSec: 60,
+      scarPenalty: 25,
+      lines: { clean: "Clean", scarred: "Scarred", meter: "Sky", of: "of" },
+    },
     /* Bands for the score card copy: "N% chance of <word>". */
     bands: [
       { min: 90, word: "awesome" },
@@ -475,6 +484,63 @@ window.DAY_CONFIG = {
           done: "Clear skies for the commute. He did that.",
         },
       },
+      /* Story arc, Part 1 (docs/story-arc-beat-sheet.md): the park is dry, the market is losing its
+         stock. Rain belongs on the park and nowhere near the market; the market wants sun. Lunch
+         is when Birdie is on the bench and Dex is in the plaza, so one run needs no clock jump. */
+      {
+        id: "dry-park",
+        part: 1,
+        title: "Part 1: Dry",
+        tagline: "Rain on the park, not the market. Then dry the market out.",
+        chapters: ["work", "lunch"],
+        after: "11:40",
+        before: "12:15",
+        clock: "11:50",
+        timer: 300,
+        zones: {
+          park: { rect: [-34, 20, 30, 68], pad: 6, name: "the park" },
+          market: { rect: [106, 16.8, 130, 36], pad: 8, name: "the market" },
+        },
+        market: { open: false },
+        strain: { budget: 4 },
+        goals: [
+          { id: "rain-park", kind: "ability-in", power: "rain", zone: "park", label: "Rain on the park (R, near Birdie)" },
+          { id: "sun-market", kind: "ability-in", power: "sunbreak", zone: "market", after: "rain-park", label: "Sun break over the market (X)" },
+          { id: "stalls", kind: "stay", zone: "market", seconds: 20, after: "sun-market", label: "Stay while the stalls fill" },
+        ],
+        lines: {
+          start: "The park is straw. The market is soft. Two asks.",
+          done: "The park drank. The market opened.",
+          scarred: "The park drank. The market opened. It cost.",
+        },
+        say: {
+          start: [
+            ["Birdie", "There you are. My tomatoes are sulking. The whole lawn is."],
+            ["Birdie", "A little rain. Not a lot. A little."],
+            ["He", "Rain's the park's. Not the market's."],
+          ],
+          "goal:rain-park": [
+            ["Birdie", "Look at them drink. Bless you."],
+            ["Dex", "Parcels, produce, everything's gone soft. You can't sell soft."],
+            ["Dex", "Sun break. Two minutes. Dry the plaza out, then I'll carry the rest."],
+          ],
+          "goal:sun-market": [["He", "Sun's here."]],
+          "edgy": [["Birdie", "Enough now?"]],
+          "kick:flood": [["Birdie", "That's plenty. That's — plenty."]],
+          "kick:soak": [["Dex", "That's rain. On the produce. On the produce, Small Weather."]],
+          "kick:scorch": [["Dex", "It's brown behind you. The grass. It's brown."]],
+          "end:clean": [
+            ["Board", "Reservoir level: low. Two days. Maybe three."],
+            ["He", "Two days."],
+          ],
+          "end:scarred": [
+            ["Board", "Reservoir level: low. And the sky's been busy."],
+            ["He", "It cost."],
+          ],
+        },
+        toasts: { "goal:rain-park": "The park drank.", "goal:stalls": "The market is open." },
+        scars: { flood: "the pond ran over the path", soak: "the stock got rained on", scorch: "a brown patch on the lawn", shut: "one stall stays shut" },
+      },
       {
         id: "lunch",
         title: "Rooftop storm",
@@ -492,6 +558,62 @@ window.DAY_CONFIG = {
           start: "Lunch break. The roofs are waiting.",
           done: "Three rods. One sky. His.",
         },
+      },
+      /* Story arc, Part 2: the wind turbines on the annex roof have been still all week. A steady
+         gale turns them; too much wind (or wind in the plaza) costs the market its stalls. */
+      {
+        id: "still-blades",
+        part: 2,
+        title: "Part 2: Still",
+        tagline: "Wind for the turbines, not for the market stalls.",
+        chapters: ["work"],
+        after: "16:20",
+        before: "17:45",
+        clock: "16:40",
+        timer: 240,
+        zones: {
+          roofs: { rect: [149, -5.5, 165, 6.5], pad: 10, name: "the annex roof" },
+          market: { rect: [106, 16.8, 130, 36], pad: 8, name: "the market" },
+        },
+        turbines: { x: [152, 157, 162], z: 0.5, y: 5.72 },
+        market: { open: true },
+        strain: { budget: 7 },
+        goals: [
+          { id: "ines", kind: "reach", x: 154, z: 9.8, r: 8, label: "Find Ines at the annex" },
+          { id: "turn", kind: "wind-time", zone: "roofs", seconds: 10, after: "ines", label: "Keep a gale on the roof (V)" },
+          { id: "stalls-stand", kind: "intact", after: "turn", label: "Leave every stall standing" },
+        ],
+        lines: {
+          start: "The elevator crawls. The lights are low. Roofs are quiet.",
+          done: "The roofs have power.",
+          scarred: "The blades turn. Not everything stayed up.",
+        },
+        say: {
+          start: [
+            ["He", "Pull request. Push weather."],
+            ["Ines", "Seventeen blades on this roof. Not one has turned since Tuesday."],
+          ],
+          "goal:ines": [
+            ["Ines", "A gale. Steady, not a tantrum. They only turn if the wind is kind."],
+            ["He", "Steady."],
+          ],
+          "goal:turn": [["Ines", "They're turning. Do you see how they turn?"]],
+          "edgy": [["Ines", "Enough now?"]],
+          "kick:topple": [["Dex", "The stalls! Mind the stalls!"]],
+          "kick:overspeed": [["Ines", "Too fast. They've shut themselves. Start again, and kinder."]],
+          "end:clean": [
+            ["Ines", "The charts moved. The reservoir isn't just low. Something has been pulling the sky toward it."],
+            ["He", "Pulling."],
+            ["Ines", "Something wants the water gone. Or the weather very much on."],
+            ["Board", "Reservoir level: critical."],
+          ],
+          "end:scarred": [
+            ["Ines", "They turned. Some things in the plaza didn't stay up."],
+            ["Board", "Reservoir level: critical."],
+          ],
+        },
+        toasts: { "goal:turn": "The roofs have power." },
+        scars: { topple: "stalls down in the plaza", overspeed: "the blades overspeed and shut" },
       },
       {
         id: "commute-home",
