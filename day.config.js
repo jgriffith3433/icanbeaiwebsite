@@ -733,10 +733,16 @@ window.DAY_CONFIG = {
         toasts: { "goal:turn": "The roofs have power." },
         scars: { topple: "stalls down in the plaza", overspeed: "the blades overspeed and shut" },
       },
+      /* The hurricane drive, rebuilt as a rescue (same engine as the lunch storm, `pieces` + `help` goals, rank S..C).
+         A wind he is partly responsible for is on the avenue, and the way home (west along it, the office lot to the
+         apartment) has four things in it. Each set piece lists the abilities that help (`powers`) and the ones that
+         hurt (`hurts`: points off, a shorter full-points window, the scenery gets worse), so the same key is right at
+         one and wrong at the next: a Gale clears the road and tips the bus stop; Rain floods the underpass and a Sun
+         break dries it. He is on foot (Take control is locked in the car); driving the car himself is not built. */
       {
         id: "commute-home",
         title: "Hurricane drive",
-        tagline: "Get home through the storm you made, with wind and debris.",
+        tagline: "The way home is shut in four places. Wind clears, sun dries, rain floods. Pick the right weather at each.",
         /* Offer as he leaves the office / walks the lot (still "work"), and
            during the drive-home chapter if he isn't in the car. */
         chapters: ["work", "commute"],
@@ -745,16 +751,142 @@ window.DAY_CONFIG = {
         /* 17:53: still on foot in the office (elevator). 17:55+ he's in the car
            and Take control is locked — the episode is a walk/glide home. */
         clock: "17:53",
-        timer: 300,
-        debris: true,
+        timer: 360,
+        sky: { state: "wind", intensity: 0.9 },
+        twistSky: { state: "storm", intensity: 0.9 },
+        zones: {
+          debris: { rect: [106, 6, 128, 19], pad: 6, name: "the road by the plaza" },
+          underpass: { rect: [88, 6, 106, 19], pad: 6, name: "the underpass" },
+          bus: { rect: [58, 6, 74, 19], pad: 6, name: "the bus stop" },
+          bridge: { rect: [8, 6, 30, 19], pad: 6, name: "the bridge" },
+        },
+        rank: {
+          help: 100,
+          late: 60,
+          precision: 0,
+          hurt: 40,
+          time: 150,
+          max: 950,
+          bands: [
+            { min: 90, rank: "S" },
+            { min: 70, rank: "A" },
+            { min: 45, rank: "B" },
+            { min: 0, rank: "C" },
+          ],
+        },
+        pieces: [
+          {
+            id: "debris",
+            goal: "debris",
+            powers: ["gale", "gust", "tornado"],
+            hurts: ["rain", "storm"],
+            hurtText: { rain: "rain soaked the junk and pinned it down", storm: "the storm piled more on" },
+            range: 14,
+            limit: 65,
+            debris: { x0: 108, x1: 128, n: 8 },
+            people: [
+              { id: "marlo", name: "Marlo", x: 121, z: 10, color: "#d9604a", thanks: "Marlo: A shop sign. It came down like a plate." },
+              { id: "cass", name: "Cass", x: 112, z: 15.4, color: "#4a7fc0", thanks: "Cass: I was going to push it. I was not going to push it." },
+            ],
+          },
+          {
+            id: "underpass",
+            goal: "underpass",
+            powers: ["sunbreak"],
+            hurts: ["rain", "storm"],
+            hurtText: { rain: "the water came up another hand", storm: "the water came up another hand" },
+            range: 11,
+            limit: 65,
+            prop: { kind: "water", x: 97, z: 12.6, w: 13, d: 7 },
+            people: [
+              { id: "tamsin", name: "Tamsin", x: 97, z: 10, color: "#a65bb5", thanks: "Tamsin: It was up to the doors. Now it's a puddle with opinions." },
+              { id: "wren", name: "Wren", x: 102, z: 15.4, color: "#e0a53c", thanks: "Wren: I'd have waded. Mum says never wade." },
+            ],
+          },
+          {
+            id: "bus",
+            goal: "bus",
+            powers: ["bolt"],
+            hurts: ["gale", "tornado"],
+            hurtText: { gale: "the gale tore the shelter's roof", tornado: "the funnel rocked the bus" },
+            range: 16,
+            limit: 65,
+            twist: true,
+            prop: { kind: "bus", x: 66, z: 12.6 },
+            people: [
+              { id: "hale", name: "Hale", x: 63, z: 10, color: "#4f9a5b", thanks: "Hale: Battery was flat. Thirty years, that's a first." },
+              { id: "odette", name: "Odette", x: 70, z: 15.4, color: "#d9a05a", thanks: "Odette: Everybody on! Everybody on, it's moving!" },
+            ],
+          },
+          {
+            id: "bridge",
+            goal: "bridge",
+            powers: ["fog"],
+            hurts: ["gale", "tornado", "storm"],
+            hurtText: { gale: "the gust tripped the wind sensor", tornado: "the funnel tripped the wind sensor", storm: "the storm tripped the wind sensor" },
+            range: 14,
+            limit: 65,
+            prop: { kind: "gate", x: 10, z: 12.6 },
+            people: [
+              { id: "sorrel", name: "Sorrel", x: 24, z: 10, color: "#d9604a", thanks: "Sorrel: Over. Over and across. I'll buy you a coffee." },
+              { id: "pike", name: "Pike", x: 17, z: 15.4, color: "#4a7fc0", thanks: "Pike: The barrier stood up for me. I'll say that for it." },
+            ],
+          },
+        ],
         goals: [
-          { id: "blow", kind: "weather-any", states: ["storm", "wind"], label: "Whip up storm or wind" },
-          { id: "debris", kind: "debris", count: 2, label: "Shove the debris (gust or tornado)" },
-          { id: "home", kind: "reach", spot: "parkHome", r: 8, label: "Get home" },
+          { id: "debris", kind: "help", piece: "debris", count: 2, label: "Clear the road: Gale or Gust near each (V / G)" },
+          { id: "underpass", kind: "help", piece: "underpass", count: 2, after: "debris", label: "Drain the underpass: Sun break near each (X)" },
+          { id: "bus", kind: "help", piece: "bus", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it (E)" },
+          { id: "bridge", kind: "help", piece: "bridge", count: 2, after: "bus", label: "Hold the bridge open: Fog near each (C)" },
+          { id: "home", kind: "reach", spot: "parkHome", r: 8, after: "bridge", label: "Get home" },
         ],
         lines: {
-          start: "The lot. Home is through what he makes.",
-          done: "Home. The storm came with him.",
+          start: "The lot. The way home is the avenue, and the avenue is shut.",
+          done: "Home. The storm came with him, and most of them got through.",
+          timeUp: "The light went. The storm stayed.",
+          late: "{name} has waited too long.",
+        },
+        say: {
+          start: [
+            ["Board", "Wind advisory. The avenue is closed in several places. Please remain indoors."],
+            ["He", "Home is west along it. Four closures."],
+            ["He", "Wind first. Clear the road."],
+          ],
+          "piece:debris": [["He", "Gale. It'll lift it."]],
+          "hurt:debris": [["Marlo", "Rain? It's heavier now. It's heavier!"]],
+          "late:debris": [["Marlo", "There's a whole sign on my bonnet. Anyone?"]],
+          "piece:underpass": [
+            ["Tamsin", "The underpass took the car to the doors. The water won't go."],
+            ["He", "Sun. Dry it, don't add to it."],
+          ],
+          "hurt:underpass": [["Tamsin", "It's higher! Don't rain on it, please!"]],
+          "late:underpass": [["Wren", "It's at the mirrors. The mirrors."]],
+          "piece:bus": [
+            ["Hale", "Bus is dead in the road. Flat battery, twelve people on it. Anything with a spark?"],
+            ["He", "Lightning. Close, and kind."],
+          ],
+          "hurt:bus": [["Odette", "The shelter's roof! Wind, no! Wind's the problem here!"]],
+          "late:bus": [["Odette", "We can see the lightning, we're just not in it."]],
+          "twist": [
+            ["Board", "Wind advisory upgraded. Storm cell on the avenue. The bridge will close on high wind."],
+            ["He", "It followed him. Or he followed it."],
+          ],
+          "piece:bridge": [
+            ["Sorrel", "The bridge shuts when the wind sensor trips. Still air. We need still air."],
+            ["He", "Fog. Heavy, quiet."],
+          ],
+          "hurt:bridge": [["Sorrel", "It tripped! The arm's coming down again!"]],
+          "late:bridge": [["Pike", "It's coming down. The arm's coming down."]],
+          "end:S": [["Board", "The avenue is open. No further closures."], ["He", "Home."]],
+          "end:A": [["Board", "The avenue is open."], ["He", "Mostly dry."]],
+          "end:B": [["Board", "The avenue is open. Some delays."], ["He", "Some."]],
+          "end:C": [["Board", "The avenue is open. Please do not do that again."], ["He", "He heard."]],
+        },
+        toasts: {
+          "goal:debris": "The road is clear.",
+          "goal:underpass": "The underpass is draining.",
+          "goal:bus": "The bus is rolling. The cell is on the avenue.",
+          "goal:bridge": "The bridge is open.",
         },
       },
       /* Story arc, Part 3: the reservoir. The Storm Tank is low. Charge the mast with lightning, then bring

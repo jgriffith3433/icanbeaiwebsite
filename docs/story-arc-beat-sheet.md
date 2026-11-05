@@ -198,6 +198,20 @@ sign of the pull on the sky that Ines names at the end of Part 2: the cell is dr
   but for less ("late"). Rank is points out of the maximum: help (100 each, 60 late), the rod precision (25), time
   left (up to 150): S 90%, A 70%, B 45%, C below.
 
+## The hurricane drive (rebuilt Part 2.3)
+
+Evening, 17:53. The wind he stirred up in the afternoon has the avenue shut in four places between the office and
+home, and the Board is reading advisories. The car is no use, so the way home is on foot along the drive. Each set
+piece has an ability that helps and one or two that hurt, and the same key is right at one and wrong at the next.
+
+- **Opening.** The Board: wind advisory, avenue closed, stay indoors. He: "Home is west along it. Four closures."
+- **1. Clear the road (the fallen sign).** Marlo and Cass are blocked. Gale or Gust lifts it. Rain soaks the junk and pins it down (hurts).
+- **2. Drain the underpass.** Tamsin and Wren, water to the doors. Sun break dries it. Rain or a storm raises it (hurts).
+- **3. Start the stranded bus.** Hale and Odette; a flat battery. A Lightning call near it jump-starts it. A gale or a funnel tears the shelter roof (hurts). **The twist:** when it moves, the wind turns to a storm cell on the avenue.
+- **4. Hold the bridge open.** Sorrel and Pike; the bridge arm drops when the wind sensor trips. Fog gives still air and holds it. Gale, funnel or storm trips it (hurts).
+- **Ending line.** By rank S to C the Board closes the advisory (S: "No further closures." C: "Please do not do that again."), and He answers in one line. Get home to finish.
+- **Points.** Help 100 (60 late, 65 s per piece), wrong call -40 and 15 s off the window, time left up to 150; max 950; S 90%, A 70%, B 45%.
+
 ## Three endings
 
 Chosen at the day's end (the day key rolls over). All three are the same sky, different weather; none of them is the
@@ -216,7 +230,7 @@ Endings are reachable in one day of play for A and B; C needs deliberate overuse
 - **Morning (Clear the sky)** is Part 1.1's staging; its weather goals (gather clouds, clear, reach the car) are the
   episode's own and are untouched. The Birdie ask is placed so the rain call comes before the clear-sky call.
 - **Lunch (Rooftop storm)** is Part 1.3, rebuilt as a rescue (next section): three rods became three set pieces.
-- **Commute home (Hurricane drive)** is Part 2.3, unchanged: storm or wind, shove debris, get home.
+- **Commute home (Hurricane drive)** is Part 2.3, rebuilt as a drive home through four closures (next section).
 - **Night (Light show)** is Part 3.1 as the Tank's mast timing; its cue and window numbers are reused.
 - The **tutorial** still teaches the five abilities first; the arc never asks for an ability the player hasn't unlocked.
 - Existing neighbor beats (ask, thanks, surprise) stay as they are. New lines here are *additions* to what those three

@@ -397,7 +397,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   offerDecline.textContent = L.decline;
 
   /* ---- rods / debris meshes (episode-local; not world.js) ---- */
-  const props = { rods: [], debris: [], people: [], mats: null };
+  const props = { rods: [], debris: [], people: [], set: [], mats: null };
   function ensureMats() {
     if (!B || !world || !world.scene || props.mats) return props.mats;
     const rod = new B.StandardMaterial("ep-rod", world.scene);
@@ -568,6 +568,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     props.debris.forEach((m) => m.dispose && m.dispose());
     props.people.forEach((q) => q.root && q.root.dispose(false, true));
     props.people = [];
+    props.set.forEach((q) => q.root && q.root.dispose(false, true));
+    props.set = [];
     props.rods = [];
     props.debris = [];
   }
@@ -588,13 +590,16 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       props.rods.push({ id: b.id, x: b.x, y: b.h + 1.7, z: b.z, mesh: pole, ball, hit: false });
     });
   }
-  function spawnDebris() {
+  function spawnDebris(area) {
     if (!B || !world || !world.scene) return;
     const mats = ensureMats();
     const street = cfgRoot.street || { z: 12.6, from: -48, to: 210 };
     const zs = street.z || 12.6;
-    for (let i = 0; i < 8; i++) {
-      const x = 20 + i * 14 + (i % 2) * 3;
+    // `area` = { x0, x1, n } puts the junk where a set piece needs it; without it, along the whole avenue.
+    const n = area && area.n ? area.n : 8;
+    const step = area ? (area.x1 - area.x0) / Math.max(1, n - 1) : 14;
+    for (let i = 0; i < n; i++) {
+      const x = area ? area.x0 + i * step : 20 + i * 14 + (i % 2) * 3;
       const z = zs + (i % 2 === 0 ? -2.4 : 2.6);
       const box = B.MeshBuilder.CreateBox("ep-debris-" + i, { width: 0.7, height: 0.55, depth: 0.55 }, world.scene);
       box.position.set(x, 0.28, z);
@@ -977,6 +982,61 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     beam.material.alpha = 0.35;
     return { root, ring, beam, warn, ok: smat("ok", "#6be0a0", 0.9) };
   }
+  /* The scenery of a set piece (def.prop): flood water, a dead bus, a bridge gate. Plain shapes; the art pass is later. */
+  function buildSet(def) {
+    if (!B || !world || !world.scene || !def.prop) return null;
+    const P = def.prop;
+    const root = new B.TransformNode("ep-set-" + def.id, world.scene);
+    root.position.set(P.x, 0, P.z);
+    const add = (m, x, y, z, mat) => { m.parent = root; m.position.set(x, y, z); m.material = mat; m.isPickable = false; return m; };
+    const out = { root, kind: P.kind, def, level: 0, hurts: 0 };
+    if (P.kind === "water") {
+      const mat = smat("flood", "#2f6f9a", 0.35);
+      mat.alpha = 0.6;
+      out.water = add(B.MeshBuilder.CreateBox("ep-set-water", { width: P.w || 12, height: 1, depth: P.d || 7 }, world.scene), 0, 0.05, 0, mat);
+      out.water.scaling.y = 0.2;
+    } else if (P.kind === "bus") {
+      out.body = add(B.MeshBuilder.CreateBox("ep-set-bus", { width: 9, height: 2.7, depth: 2.5 }, world.scene), 0, 1.65, 0, smat("bus", "#c9a227", 0.05));
+      out.glass = add(B.MeshBuilder.CreateBox("ep-set-bus-glass", { width: 8.2, height: 0.9, depth: 2.56 }, world.scene), 0, 2.15, 0, smat("busglass", "#33414f", 0.05));
+      [-3, 3].forEach((wx, i) => add(B.MeshBuilder.CreateCylinder("ep-set-bus-wheel" + i, { diameter: 1.1, height: 2.7, tessellation: 12 }, world.scene), wx, 0.55, 0, smat("tyre", "#1b1c20", 0.02)).rotation.x = Math.PI / 2);
+      out.lit = smat("buslit", "#ffe9a0", 0.9);
+    } else if (P.kind === "gate") {
+      add(B.MeshBuilder.CreateBox("ep-set-post-a", { width: 0.4, height: 2.2, depth: 0.4 }, world.scene), 0, 1.1, -4.5, smat("post", "#5a5a60"));
+      add(B.MeshBuilder.CreateBox("ep-set-post-b", { width: 0.4, height: 2.2, depth: 0.4 }, world.scene), 0, 1.1, 4.5, smat("post", "#5a5a60"));
+      const pivot = new B.TransformNode("ep-set-pivot", world.scene);
+      pivot.parent = root;
+      pivot.position.set(0, 2, -4.5);
+      const bar = B.MeshBuilder.CreateBox("ep-set-bar", { width: 0.25, height: 0.25, depth: 9 }, world.scene);
+      bar.parent = pivot;
+      bar.position.z = 4.5;
+      bar.material = smat("bar", "#e0503c", 0.5);
+      bar.isPickable = false;
+      out.pivot = pivot;
+      out.angle = 1.2;
+    }
+    props.set.push(out);
+    return out;
+  }
+  /* A call that hurts the piece: points off, the full-points window shorter, the scenery worse. */
+  function hurtPiece(power) {
+    const R = active.rescue;
+    const def = R.def;
+    const rk = active.ep.rank || {};
+    const pen = rk.hurt != null ? rk.hurt : 40;
+    R.score = Math.max(0, R.score - pen);
+    R.hurt += 1;
+    R.at -= def.hurtSecs != null ? def.hurtSecs : 15;
+    const set = props.set.find((q) => q.def === def);
+    if (set) set.hurts += 1;
+    props.people.forEach((p) => {
+      if (p.m && !p.helped && R.people.indexOf(p) >= 0) p.m.ring.scaling.setAll(1.5);
+    });
+    mark("hurt", { id: active.ep.id, piece: def.id, power, points: -pen, score: R.score, hurts: R.hurt });
+    storyEvent("hurt", { id: active.ep.id, piece: def.id, power, points: -pen, score: R.score });
+    sayKey("hurt:" + def.id);
+    showToast(`-${pen} ${(def.hurtText && def.hurtText[power]) || "that made it worse"}`);
+    paintHud();
+  }
   function pieceGoal(R) {
     return active.goals.find((g) => g.kind === "help" && R.def && g.piece === R.def.id);
   }
@@ -994,7 +1054,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       if (m) props.people.push(person);
       return person;
     });
-    if (def.debris) spawnDebris();
+    if (def.debris) spawnDebris(def.debris === true ? null : def.debris);
+    buildSet(def);
     sayKey("piece:" + def.id);
     mark("piece", { id: active.ep.id, piece: def.id, index: i, people: def.people.length });
     paintHud();
@@ -1004,11 +1065,12 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     const R = active.rescue;
     if (R.twisted) return;
     R.twisted = true;
-    R.sky = { state: "fog", intensity: 1 };
+    const ts = active.ep.twistSky || { state: "fog", intensity: 1 };
+    R.sky = { state: ts.state, intensity: ts.intensity };
     const W = window.weather || day.weather;
-    if (W && W.set) W.set("fog", 1, "story");
+    if (W && W.set) W.set(ts.state, ts.intensity, "story");
     sayKey("twist");
-    mark("twist", { id: active.ep.id, sky: "fog" });
+    mark("twist", { id: active.ep.id, sky: ts.state });
     storyEvent("twist", { id: active.ep.id });
   }
   function afterPiece() {
@@ -1064,9 +1126,16 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   function onPieceCall(power) {
     const R = active.rescue;
     const def = R && R.def;
-    if (!def || def.powers.indexOf(power) < 0) return;
+    if (!def) return;
+    const isHurt = def.hurts && def.hurts.indexOf(power) >= 0;
+    if (!isHurt && def.powers.indexOf(power) < 0) return;
     const pos = playerPos();
     if (!pos) return;
+    if (isHurt) {
+      // Only a call made near the stranded hurts them.
+      if (R.people.some((p) => !p.helped && Math.hypot(pos.x - p.x, pos.z - p.z) <= def.range + 6)) hurtPiece(power);
+      return;
+    }
     let best = null;
     let bd = 1e9;
     R.people.forEach((p) => {
@@ -1094,6 +1163,18 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         mark("late", { id: A.ep.id, piece: R.def.id });
       }
     }
+    props.set.forEach((q) => {
+      const calm = q.def !== R.def || R.people.every((p) => p.helped);
+      if (q.kind === "water" && q.water) {
+        const want = calm ? 0.02 : 0.2 + 0.35 * q.hurts;
+        q.water.scaling.y += (want - q.water.scaling.y) * Math.min(1, dt * 1.5);
+      } else if (q.kind === "gate" && q.pivot) {
+        const el = A.age - R.at;
+        const want = calm ? 1.2 : Math.min(0, 1.2 - 1.2 * Math.max(0, el / (q.def.limit || 60)) - 0.3 * q.hurts);
+        q.angle += (want - q.angle) * Math.min(1, dt * 2);
+        q.pivot.rotation.x = q.angle;
+      } else if (q.kind === "bus" && q.glass && calm && q.glass.material !== q.lit) q.glass.material = q.lit;
+    });
     props.people.forEach((p) => {
       if (!p.m) return;
       if (!p.helped) {
@@ -1169,7 +1250,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (ep.rods && ep.rods.length) spawnRods(ep.rods);
     else clearProps();
     if (ep.pieces) {
-      active.rescue = { idx: -1, def: null, at: 0, score: 0, helped: 0, late: 0, total: ep.pieces.reduce((n, q) => n + q.people.length, 0), precision: false, lastHelpAt: -9, sky: ep.sky ? Object.assign({}, ep.sky) : null, bonus: 0, people: [], twisted: false, lateSaid: false };
+      active.rescue = { idx: -1, def: null, at: 0, score: 0, helped: 0, late: 0, total: ep.pieces.reduce((n, q) => n + q.people.length, 0), hurt: 0, precision: false, lastHelpAt: -9, sky: ep.sky ? Object.assign({}, ep.sky) : null, bonus: 0, people: [], twisted: false, lateSaid: false };
     }
     if (ep.debris) spawnDebris();
     if (ep.market) spawnStalls(!!ep.market.open);
@@ -1277,7 +1358,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       scoreRank.textContent = card.rank;
       scoreRank.className = "rank r-" + card.rank;
       scoreRankDetail.hidden = false;
-      scoreRankDetail.textContent = `Rank ${card.rank} · ${card.points} of ${run.ep.rank.max} points · ${R.helped} of ${R.total} stranded helped` + (R.late ? ` (${R.late} late)` : "") + ` · help ${R.score - (R.precision ? run.ep.rank.precision : 0)}` + (R.precision ? ` · rod ${run.ep.rank.precision}` : "") + ` · time ${R.bonus}`;
+      scoreRankDetail.textContent = `Rank ${card.rank} · ${card.points} of ${run.ep.rank.max} points · ${R.helped} of ${R.total} stranded helped` + (R.late ? ` (${R.late} late)` : "") + ` · help ${R.score - (R.precision ? run.ep.rank.precision : 0)}` + (R.hurt ? ` (${R.hurt} wrong call${R.hurt > 1 ? "s" : ""}, -${R.hurt * (run.ep.rank.hurt != null ? run.ep.rank.hurt : 40)})` : "") + (R.precision ? ` · rod ${run.ep.rank.precision}` : "") + ` · time ${R.bonus}`;
     } else {
       scoreRank.hidden = true;
       scoreRankDetail.hidden = true;
@@ -1646,7 +1727,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
             cue: active.cueOn,
             unlocked: (active.unlocked || []).slice(),
             rescue: active.rescue
-              ? { score: active.rescue.score, helped: active.rescue.helped, total: active.rescue.total, piece: active.rescue.def ? active.rescue.def.id : null, twisted: active.rescue.twisted, late: active.rescue.late, precision: active.rescue.precision, rank: rankFor(active.rescue.score, active.ep.rank).rank, people: active.rescue.people.map((p) => ({ id: p.id, x: p.x, z: p.z, helped: p.helped })) }
+              ? { score: active.rescue.score, helped: active.rescue.helped, total: active.rescue.total, piece: active.rescue.def ? active.rescue.def.id : null, twisted: active.rescue.twisted, late: active.rescue.late, hurt: active.rescue.hurt, precision: active.rescue.precision, rank: rankFor(active.rescue.score, active.ep.rank).rank, people: active.rescue.people.map((p) => ({ id: p.id, x: p.x, z: p.z, helped: p.helped })) }
               : null,
             prompt: active.ep.tutorial && currentTutorialGoal(active) ? currentTutorialGoal(active).prompt : null,
           }

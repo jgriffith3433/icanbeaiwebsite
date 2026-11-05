@@ -3398,6 +3398,143 @@ async function lunchRescue(options, t) {
   t.progress(1);
 }
 
+/* ---------------- hurricane drive: the rebuilt commute home (opening, four set pieces, helping and hurting abilities, the twist, rank S-C) ---------------- */
+// Setup shortcuts: the day bar to a moment outdoors, the Pressure meter topped up between calls, and the episode started
+// by its API. Everything else is real keys: Enter, WASD with Shift, V / R at the fallen sign, X / R at the underpass,
+// E at the bus, C / V at the bridge, Esc. Two runs. Run 1 uses the wrong weather first (rain on the debris: points off,
+// "hurt"), helps one person with the right one and lets go (low rank). Run 2 plays the right ability at each of the four
+// set pieces, through the twist, and gets home (high rank). Events: drive-* with the lines, each help and hurt with its
+// points, the twist and the two rank cards side by side.
+async function hurricaneDrive(options, t) {
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  const cfg = window.DAY_CONFIG;
+  const ep = ((cfg.episodes && cfg.episodes.list) || []).find((e) => e.id === "commute-home");
+  if (!ep || !ep.pieces || ep.pieces.length < 3) return t.problem("bug", "The hurricane drive has no set pieces");
+  const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
+  const heard = [];
+  const onStory = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "say") { heard.push(d); t.event("drive-say", `${d.who}: ${d.text}`); }
+    if (d.action === "help") t.event("drive-help", `${d.person} (${d.piece}): +${d.points}${d.late ? " late" : ""}, score ${d.score}`);
+    if (d.action === "hurt") t.event("drive-hurt", `${d.power} at ${d.piece}: ${d.points}, score ${d.score}`);
+    if (d.action === "twist") t.event("drive-twist", "the wind turns to a storm cell");
+  };
+  window.addEventListener("day:story", onStory);
+  const onEp = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.id !== "commute-home") return;
+    if (d.action === "piece") t.event("drive-piece", `set piece ${d.index + 1} of ${ep.pieces.length}: ${d.piece}, ${d.people} stranded`);
+  };
+  window.addEventListener("day:episode", onEp);
+  try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
+
+  const day = window.day.today();
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+
+  const refill = () => { if (P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  async function walkTo(x, z, progress) {
+    await goTo(C.state().x, sideZ, t, { sprint: true, progress, ms: 12000, close: 1.2 });
+    for (let k = 0; k < 16; k++) {
+      const s = C.state();
+      if (Math.abs(s.x - x) < 1.6) break;
+      const nx = s.x + Math.max(-22, Math.min(22, x - s.x));
+      if (!(await goTo(nx, sideZ, t, { sprint: true, progress, ms: 14000, close: 1.2 }))) break;
+    }
+    return goTo(x, z, t, { progress, ms: 8000, close: 1.4 });
+  }
+  const goalDone = (id) => { const n = Ep.now(); return !!(n && n.goals.some((g) => g.id === id && g.done)); };
+  const lastSay = () => ($("episode-say") || {}).textContent || "";
+  async function card(label) {
+    await t.until(() => !$("episode-score").hidden, 8000, `${label}: the score card`);
+    const el = $("episode-score");
+    const rank = (el.querySelector(".rank") || {}).textContent || "";
+    const detail = (el.querySelector(".rankdetail") || {}).textContent || "";
+    const text = (el.querySelector(".forecast") || {}).textContent || "";
+    t.event("drive-card", `${label}: rank ${rank} | ${text} | ${detail}`);
+    await sleep(1800);
+    el.querySelector("button.ok").click();
+    return { rank, text, detail };
+  }
+  async function press(key, wait) { pressKey(key); await sleep(wait || 600); }
+  // One set piece: walk to each stranded person and call the ability (the right one for the piece).
+  async function playPiece(q, key, progress) {
+    for (let i = 0; i < q.people.length; i++) {
+      const p = q.people[i];
+      if (!(await walkTo(p.x, p.z - 0.8, progress + i * 0.02))) t.problem("bug", `He didn't reach ${p.name} (${q.id})`);
+      refill();
+      await press(key, 1300);
+    }
+    await t.until(() => goalDone(q.goal), 5000, `set piece ${q.id} done`);
+    t.event("drive-goal", `set piece ${q.id} done`);
+  }
+
+  /* ---- run 1: the wrong weather first, one person helped, then let go ---- */
+  t.scene("Hurricane drive: the wrong weather");
+  Ep.start("commute-home", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "commute-home", 3000, "the drive running");
+  if (!$("episode-hud") || $("episode-hud").hidden) t.problem("bug", "The episode HUD isn't up for the drive");
+  await sleep(3000);
+  t.event("drive-opening", `"${lastSay()}" · HUD: ${($("episode-hud").textContent || "").replace(/\s+/g, " ").slice(0, 170)}`);
+  const first = ep.pieces[0];
+  if (!(await walkTo(first.people[0].x, first.people[0].z - 0.8, 0.1))) t.problem("bug", "He didn't reach the fallen sign");
+  refill();
+  await press("r", 1300);
+  await t.until(() => Ep.now() && Ep.now().rescue && Ep.now().rescue.hurt >= 1, 4000, "rain on the debris hurting the set piece");
+  const hurtScore = Ep.now().rescue.score;
+  refill();
+  await press("v", 1300);
+  await t.until(() => Ep.now() && Ep.now().rescue && Ep.now().rescue.helped >= 1, 4000, "a gale helping Marlo");
+  const mid = Ep.now().rescue;
+  t.event("drive-score", `rain hurt (score ${hurtScore}), a gale helped: score ${mid.score}, rank ${mid.rank}`);
+  await sleep(2000);
+  Ep.end("let-go");
+  const low = await card("wrong then right, one helped");
+
+  /* ---- run 2: the right ability at each set piece ---- */
+  t.scene("Hurricane drive: the road");
+  Ep.start("commute-home", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "commute-home", 3000, "the drive again");
+  await sleep(2500);
+  await playPiece(ep.pieces[0], "v", 0.2);
+  t.scene("Hurricane drive: the underpass");
+  await playPiece(ep.pieces[1], "x", 0.3);
+  t.scene("Hurricane drive: the stranded bus");
+  await playPiece(ep.pieces[2], "e", 0.45);
+  await t.until(() => Ep.now() && Ep.now().rescue && Ep.now().rescue.twisted, 3000, "the twist");
+  await sleep(4500); // the twist lines
+  t.event("drive-sky", `after the twist the sky is ${(window.weather || window.day.weather).now().state}`);
+  t.scene("Hurricane drive: the bridge");
+  await playPiece(ep.pieces[3], "c", 0.6);
+  t.scene("Hurricane drive: home");
+  if (!(await walkTo(-1.5, 7.6, 0.85))) t.problem("bug", "He didn't get home");
+  await t.until(() => !$("episode-score").hidden, 8000, "the score card at home").catch(() => {});
+  const high = await card("the right ability each time");
+  if (!low.rank || !high.rank) t.problem("bug", `The score card shows no rank (${low.rank || "-"} / ${high.rank || "-"})`);
+  else if (low.rank === high.rank) t.problem("bug", `Playing it right left the rank at ${high.rank}, the same as the wrong weather`);
+  else t.event("drive-rank", `wrong weather, one helped: ${low.rank}; right ability each time: ${high.rank}`);
+  await sleep(4500); // the ending line
+  if (!heard.some((h) => /^end:/.test(h.key || ""))) t.problem("bug", "The ending line didn't play");
+  window.removeEventListener("day:story", onStory);
+  window.removeEventListener("day:episode", onEp);
+  t.event("drive-lines", `${heard.length} lines spoken`);
+  t.progress(1);
+}
+
 /* ---------------- story ending: Part 1, 2 and 3 in a row, then Part 3 again to reach each of the three endings ---------------- */
 // Setup shortcuts: the day bar to a moment outdoors (and to 22:30 before Part 3), the Pressure meter topped up, and each
 // part started by its API. Everything else is real keys: Enter, WASD with Shift, R, X, V, E. Events: ending-* with the
@@ -3872,6 +4009,7 @@ installPlaytest({
     { id: "story-ending", title: "Part 3 (the reservoir) after Part 2, and the ending card: three Part 3 runs reach three different endings (Fair Weather, Heavy Weather, Overcast) and the card says how the park, turbines, market and reservoir fared", seconds: 840, tags: ["episodes", "story"], description: "Day bar to a moment outdoors and to 22:30 (setup), Enter, each part started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza, the annex and the Storm Tank, R, X, V and E. Events part3-offered / ending-say / ending-gauge / ending-kick / ending-card / ending-reached / ending-fared / three-endings." },
     { id: "story-parts", title: "Story Parts 1 and 2 as episodes: rain on the park (not the market), sun break and the stalls; overusing rain floods the park and scars the card; Part 2 wind for the turbines, a gale in the plaza topples a stall; neighbor dialogue from the beat sheet", seconds: 420, tags: ["episodes", "story"], description: "Day bar to a moment outdoors (setup), Enter, the parts started by their API (setup) and Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza and the annex, R, X and V. Events story-list / story-menu / story-say / story-goal / story-strain / story-kick / story-wind / story-card (clean vs scarred)." },
     { id: "lunch-rescue", title: "Rooftop storm (lunch): a surprise storm strands people in the plaza, on the shop roof and in the avenue; helping them with Sun break, Lightning and Gale changes the score and the S-C rank; the twist turns the rain to fog; an ending line per rank", seconds: 300, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the plaza cafe, the shop and the avenue, X, E, V, Esc. Run 1 helps one person and lets go (low rank); run 2 plays all three set pieces. Events lunch-opening / lunch-piece / lunch-help / lunch-score / lunch-twist / lunch-sky / lunch-goal / lunch-card / lunch-rank / lunch-say." },
+    { id: "hurricane-drive", title: "Hurricane drive (commute home): four closures on the way home (fallen sign, flooded underpass, dead bus, closing bridge); the right ability at each helps, the wrong one hurts (rain on the debris, gale at the bus); a storm twist; an ending line and an S-C rank on the score card", seconds: 360, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift along the avenue, R then V at the fallen sign, V, X, E and C at the four set pieces, Esc. Run 1 uses rain on the debris (hurt) then a gale and lets go (low rank); run 2 plays all four set pieces right and gets home. Events drive-opening / drive-piece / drive-hurt / drive-help / drive-twist / drive-sky / drive-goal / drive-card / drive-rank / drive-say." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
@@ -3903,6 +4041,7 @@ installPlaytest({
       else if (id === "story-parts") await storyParts(options, t);
       else if (id === "story-ending") await storyEnding(options, t);
       else if (id === "lunch-rescue") await lunchRescue(options, t);
+      else if (id === "hurricane-drive") await hurricaneDrive(options, t);
       else if (id === "first-visit") await firstVisit(options, t);
       else if (id === "tutorial-episode") await tutorialEpisode(options, t);
     } finally {
