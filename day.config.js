@@ -306,12 +306,12 @@ window.DAY_CONFIG = {
     aim: 3.6, // metres past him the reticle rests, along the camera
     cone: 52, // gust half-angle, degrees
     reach: 11, // gust length, metres
-    costs: { storm: 40, bolt: 24, gust: 16, tornado: 48 },
-    keys: { storm: "f", bolt: "e", gust: "g", tornado: "t" },
+    costs: { storm: 40, bolt: 24, gust: 16, tornado: 48, rain: 18, gale: 20, fog: 16, sunbreak: 22 },
+    keys: { storm: "f", bolt: "e", gust: "g", tornado: "t", rain: "r", gale: "v", fog: "c", sunbreak: "x" },
     // js/abilities.js: the bar's cooldown sweep. Seconds before the next call, and how long it lasts.
-    cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8 },
-    durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4 },
-    names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado" },
+    cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8, rain: 4, gale: 5, fog: 4, sunbreak: 6 },
+    durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4, rain: 3, gale: 3, fog: 3, sunbreak: 3 },
+    names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado", rain: "Rain", gale: "Gale", fog: "Fog", sunbreak: "Sun break" },
     lines: {
       cooling: "Not ready yet.",
       gather: "The sky draws in over him.",
@@ -319,6 +319,10 @@ window.DAY_CONFIG = {
       bolt: "Lightning. Where he aimed.",
       gust: "A hard gust. The air lifts under him.",
       tornado: "He sends a tornado down the street.",
+      rain: "Rain, just here, just for a moment.",
+      gale: "A gale tears down the street.",
+      fog: "Fog rolls in off the street.",
+      sunbreak: "The clouds split. Warm light.",
       dry: "Not enough pressure.",
     },
     loose: [

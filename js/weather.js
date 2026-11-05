@@ -142,6 +142,8 @@ export function createWeather(opt) {
   let holdLeft = 0;
   let powerLeft = 0; // an ability's own weather: lasts ABILITY_HOLD_SEC from its last call, in control or not
   let lastForecast = { state: "clear", intensity: 1, slot: 0 };
+  let sunFlag = false; // a Sun break is the ability's weather right now (clear sky, warm light)
+  let sun = 0; // 0..1, how much of that warm light is showing; eases in and out with the ability
 
   function step(dt, snap) {
     const fading = target === "clear" && !manual;
@@ -151,6 +153,9 @@ export function createWeather(opt) {
       weights[s] += (g - weights[s]) * k;
     }
     level += (targetIntensity - level) * k;
+    const sk = snap ? 1 : 1 - Math.exp(-Math.max(0, dt) / (sunFlag && manual ? 0.5 : ABILITY_FADE_SEC / 3));
+    sun += ((sunFlag && manual ? 1 : 0) - sun) * sk;
+    if (sun < 0.002) sun = 0;
   }
 
   function shown() {
@@ -194,6 +199,7 @@ export function createWeather(opt) {
       cover: L.cover,
       sound: Object.assign({}, L.sound),
       manual,
+      sun,
       hold: Math.max(holdLeft, powerLeft),
       holdSec,
       forecast: lastForecast.state,
@@ -205,6 +211,7 @@ export function createWeather(opt) {
     if (!STATES.includes(state)) return false;
     target = state;
     targetIntensity = intensity == null || !Number.isFinite(intensity) ? 1 : Math.max(0, Math.min(1, intensity));
+    sunFlag = false;
     if (via !== "forecast") {
       manual = true;
       holdLeft = 0;
@@ -246,7 +253,14 @@ export function createWeather(opt) {
     step(dt, snap);
   }
 
-  return { set, step, follow, now, look, blendSec, holdSec };
+  /** Sun break: the sky clears and the light turns warm, for as long as an ability's weather lasts. */
+  function sunbreak() {
+    if (!set("clear", 1, "power")) return false;
+    sunFlag = true;
+    return true;
+  }
+
+  return { set, sunbreak, step, follow, now, look, blendSec, holdSec };
 }
 
 /* ---------------- the page: sky, particles, wet roads, wind, sound, the wheel ---------------- */
@@ -395,7 +409,7 @@ export function startWeather(world, dayApi) {
       }
     }
     ps.emitter = new B.Vector3(0, 8, 0);
-    ps.particleTexture = tex(name === "snow" || name === "splash" ? "dot" : "streak");
+    ps.particleTexture = tex(name === "snow" || name === "splash" || name === "mist" || name === "motes" ? "dot" : "streak");
     if (!ps.particleTexture) {
       ps.dispose();
       return null;
@@ -455,6 +469,8 @@ export function startWeather(world, dayApi) {
   const splashPs = makeSystem("splash", 2200, 500);
   const snowPs = makeSystem("snow", 5000, 900);
   const dustPs = makeSystem("dust", 1200, 350);
+  const mistPs = makeSystem("mist", 600, 160); // fog: big soft banks drifting at street height
+  const motesPs = makeSystem("motes", 700, 200); // sun break: gold motes lifting through the light
   if (rainPs) {
     rainPs.billboardMode = B.ParticleSystem.BILLBOARDMODE_STRETCHED;
     rainPs.minEmitBox.set(-18, 0, -18);
@@ -496,6 +512,27 @@ export function startWeather(world, dayApi) {
     dustPs.maxSize = 0.2;
     dustPs.color1.set(0.72, 0.7, 0.62, 0.35);
     dustPs.color2.set(0.8, 0.78, 0.7, 0.15);
+  }
+  if (mistPs) {
+    mistPs.minEmitBox.set(-16, 0, -16);
+    mistPs.maxEmitBox.set(16, 1.2, 16);
+    mistPs.minLifeTime = 3;
+    mistPs.maxLifeTime = 5;
+    mistPs.minSize = 3;
+    mistPs.maxSize = 6.5;
+    mistPs.color1.set(0.86, 0.88, 0.9, 0.16);
+    mistPs.color2.set(0.78, 0.8, 0.84, 0.09);
+  }
+  if (motesPs) {
+    motesPs.blendMode = B.ParticleSystem.BLENDMODE_ADD;
+    motesPs.minEmitBox.set(-14, 0, -14);
+    motesPs.maxEmitBox.set(14, 3, 14);
+    motesPs.minLifeTime = 1.6;
+    motesPs.maxLifeTime = 3;
+    motesPs.minSize = 0.07;
+    motesPs.maxSize = 0.2;
+    motesPs.color1.set(1, 0.86, 0.5, 0.8);
+    motesPs.color2.set(1, 0.7, 0.35, 0.45);
   }
   systems.forEach((ps) => {
     try {
@@ -774,6 +811,23 @@ export function startWeather(world, dayApi) {
       dustPs.minEmitPower = 6 + look.wind * 4;
       dustPs.maxEmitPower = 12 + look.wind * 6;
     }
+    if (mistPs && !mistPs.__dead) {
+      mistPs.emitter.set(x, 0.3, z);
+      mistPs.emitRate = cap(mistPs, Math.max(0, Math.min(1, (look.fog - 0.03) / 0.06)) * 70);
+      mistPs.direction1.set(0.3, 0.02, -0.15);
+      mistPs.direction2.set(0.6, 0.08, 0.15);
+      mistPs.minEmitPower = 0.3;
+      mistPs.maxEmitPower = 0.8;
+    }
+    if (motesPs && !motesPs.__dead) {
+      motesPs.emitter.set(x, 0.2, z);
+      motesPs.emitRate = cap(motesPs, (weather.now().sun || 0) * 110);
+      motesPs.direction1.set(-0.2, 0.7, -0.2);
+      motesPs.direction2.set(0.2, 1.2, 0.2);
+      motesPs.gravity.set(0, 0.1, 0);
+      motesPs.minEmitPower = 0.4;
+      motesPs.maxEmitPower = 1.1;
+    }
   }
 
   /* Reflections (clear coat on the road and the wet surfaces, the mirror puddles) show only while the weather
@@ -804,14 +858,27 @@ export function startWeather(world, dayApi) {
     } else nextFlash = Math.min(nextFlash, 2);
     flash = Math.max(0, flash - dt * (flash > 0.4 ? 5 : 8));
     if (flash > 0) B.Color3.LerpToRef(scratch.mixed, scratch.white, flash * 0.82, scratch.mixed);
+    // Sun break: the sky goes warm gold, scaled by how bright the hour already is (no gold at midnight).
+    const sunK = (weather.now().sun || 0) * Math.min(1, (scratch.tod.r + scratch.tod.g + scratch.tod.b) / 1.4);
+    if (sunK > 0.001) {
+      scratch.toward.set(1, 0.82, 0.5);
+      B.Color3.LerpToRef(scratch.mixed, scratch.toward, sunK * 0.34, scratch.mixed);
+    }
     scene.clearColor.set(scratch.mixed.r, scratch.mixed.g, scratch.mixed.b, 1);
     const fogMix = Math.min(1, L.fog / 0.045);
     scratch.fog.set(L.fogC[0], L.fogC[1], L.fogC[2]);
     B.Color3.LerpToRef(scratch.mixed, scratch.fog, fogMix * 0.9, scratch.fog);
     scene.fogColor.copyFrom(scratch.fog);
     scene.fogDensity = L.fog;
-    if (sun) sun.intensity *= L.light * (1 + flash * L.lightning * 3.2);
-    if (hemi) hemi.intensity = Math.max(0.16, hemi.intensity * L.hemi);
+    if (sun) {
+      sun.intensity *= L.light * (1 + flash * L.lightning * 3.2) * (1 + sunK * 0.7);
+      if (sunK > 0.001 && sun.diffuse) {
+        sun.diffuse.r = Math.min(1, sun.diffuse.r + (1 - sun.diffuse.r) * sunK);
+        sun.diffuse.g += (0.84 - sun.diffuse.g) * sunK * 0.6;
+        sun.diffuse.b += (0.55 - sun.diffuse.b) * sunK * 0.6;
+      }
+    }
+    if (hemi) hemi.intensity = Math.max(0.16, hemi.intensity * L.hemi * (1 + sunK * 0.2));
     const baseExp = stage.lastSun ? 0.86 + 0.12 * stage.lastSun.day : 0.92;
     const targetExp = Math.min(1.08, Math.max(0.76, baseExp * (0.88 + 0.12 * L.exposure) * (1 + flash * 0.85)));
     if (world.look && world.look.setSky) {
@@ -979,6 +1046,7 @@ export function startWeather(world, dayApi) {
     STATES,
     now: apiNow,
     set: (state, intensity, via) => weather.set(state, intensity, via),
+    sunbreak: () => weather.sunbreak(),
     forecast: (dateKey, minutes) => forecastAt(dateKey, minutes, cfg.forecast),
     /** The wheel, for a phone tap the playtest sends as a pointer. */
     open: (on) => openWheel(on !== false),

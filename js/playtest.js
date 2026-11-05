@@ -361,6 +361,89 @@ async function roofBolt(t) {
   t.event(strike && onRoof ? "smoke-pass" : "smoke-fail", "city loaded, Small Weather shown, rooftop, one bolt");
 }
 
+/* ---------------- weather-abilities: rain, gale, fog, sun break and lightning, one call each ---------------- */
+async function weatherAbilities(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const P = window.powers || (window.day && window.day.powers);
+  const W = window.weather || (window.day && window.day.weather);
+  const C = window.day.control;
+  if (!P || !W || !C) {
+    t.problem("bug", "powers, weather or Take control isn't installed");
+    return;
+  }
+  const day = window.day.today();
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1)
+    || day.actions.find((a) => /steps out/.test(a.text || ""))
+    || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+    sound.click();
+    await sleep(200);
+  }
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  t.event("control-taken", "Enter, so his abilities work");
+  const ids = ["rain", "gale", "fog", "sunbreak", "bolt"];
+  const bar = P.now().abilities;
+  const keys = ids.map((id) => {
+    const a = bar.find((x) => x.id === id);
+    return a ? `${a.key.toUpperCase()} ${a.name}` : `${id} MISSING`;
+  });
+  if (ids.every((id) => bar.some((x) => x.id === id) && document.getElementById("ability-" + id))) t.event("five-abilities", keys.join(", "));
+  else t.problem("bug", `The ability bar doesn't have all five: ${keys.join(", ")}`);
+  const calm = () => {
+    const n = W.now();
+    return n.state === "clear" && n.rain < 0.05 && n.fog < 0.015 && n.wind < 0.2 && n.sun < 0.05;
+  };
+  await t.until(calm, 6000, "a calm sky to start").catch(() => {});
+  const looks = {};
+  const probes = {
+    rain: { key: "r", ok: (n) => n.state === "rain" && n.rain > 0.3, show: (n) => `rain ${n.rain.toFixed(2)}, wet ${n.wet.toFixed(2)}` },
+    gale: { key: "v", ok: (n) => n.state === "wind" && n.wind > 0.5, show: (n) => `wind ${n.wind.toFixed(2)}, dust ${n.dust.toFixed(2)}` },
+    fog: { key: "c", ok: (n) => n.state === "fog" && n.fog > 0.04, show: (n) => `fog density ${n.fog.toFixed(3)}` },
+    sunbreak: { key: "x", ok: (n) => n.sun > 0.5, show: (n) => `warm light ${n.sun.toFixed(2)}, sky ${n.sky}` },
+    bolt: { key: "e", ok: (n) => n.state === "storm", show: (n) => `storm, flashes ${n.flashes}` },
+  };
+  let n = 0;
+  for (const id of ids) {
+    n++;
+    const pr = probes[id];
+    t.scene(`Ability: ${id}`);
+    t.progress(0.1 + 0.17 * n);
+    const cost = (P.now().abilities.find((x) => x.id === id) || {}).cost || 20;
+    await t.until(() => P.now().energy + 0.05 >= cost, 15000, `Energy for ${id}`).catch(() => {});
+    const e0 = P.now().energy;
+    pressKey(pr.key);
+    const hit = await t.until(() => (id === "bolt" ? P.now().strike : true) && pr.ok(W.now()), 4000, `${id} to show in the sky`).then(() => true).catch(() => false);
+    await sleep(900);
+    const seen = W.now();
+    looks[id] = { sky: seen.sky, fog: seen.fog, rain: seen.rain, wind: seen.wind, sun: seen.sun };
+    const slot = document.getElementById("ability-" + id);
+    if (hit && pr.ok(seen)) t.event(`ability-${id}`, `${pr.show(seen)}; spent ${Math.round(e0 - P.now().energy)} energy`);
+    else t.problem("bug", `${pr.key.toUpperCase()} (${id}) didn't change the sky as it should (state ${seen.state})`);
+    if (!slot || !(slot.classList.contains("cooling") || slot.classList.contains("active"))) t.problem("bug", `The ${id} slot didn't show it was used`);
+    const heard = (W.now().heard || 0);
+    t.metric(`heard-${id}`, Number(heard.toFixed(3)));
+    const t0 = Date.now();
+    const gone = await t.until(calm, 14000, `${id} to ease out`).then(() => true).catch(() => false);
+    const secs = (Date.now() - t0) / 1000 + 0.9;
+    if (gone && secs < 10) t.event(`fade-${id}`, `back to a calm sky ${secs.toFixed(1)} s after the call`);
+    else t.problem("bug", `${id} didn't fade out within seconds`);
+  }
+  const skies = ids.map((id) => looks[id].sky);
+  if (new Set(skies).size === ids.length) t.event("all-distinct", `five different skies: ${skies.join(" ")}`);
+  else t.problem("bug", `Two abilities looked the same: ${skies.join(" ")}`);
+  pressKey("Escape");
+  t.event("weather-abilities-pass", "each of the five used once");
+}
+
 /* ---------------- day: the whole day at high speed; every block must happen ---------------- */
 async function wholeDay(options, t) {
   t.scene("Start of day");
@@ -2888,6 +2971,7 @@ installPlaytest({
   product: "icanbe",
   scenarios: [
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
+    { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
@@ -2922,6 +3006,7 @@ installPlaytest({
       else if (id === "photos") await photos(options, t);
       else if (id === "fill-out") await fillOut(options, t);
       else if (id === "weather") await weather(options, t);
+      else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);

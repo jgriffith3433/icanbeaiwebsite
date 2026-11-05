@@ -12,7 +12,7 @@
 
 import { createAbilities, startAbilityBar } from "./abilities.js";
 
-export const POWER_NAMES = ["storm", "bolt", "gust", "tornado"];
+export const POWER_NAMES = ["storm", "bolt", "gust", "tornado", "rain", "gale", "fog", "sunbreak"];
 
 const DEFAULTS = {
   max: 100,
@@ -22,18 +22,22 @@ const DEFAULTS = {
   aim: 3.6,
   cone: 52,
   reach: 11,
-  costs: { storm: 40, bolt: 24, gust: 16, tornado: 48 },
-  keys: { storm: "f", bolt: "e", gust: "g", tornado: "t" },
+  costs: { storm: 40, bolt: 24, gust: 16, tornado: 48, rain: 18, gale: 20, fog: 16, sunbreak: 22 },
+  keys: { storm: "f", bolt: "e", gust: "g", tornado: "t", rain: "r", gale: "v", fog: "c", sunbreak: "x" },
   // seconds before it can be called again, and how long it lasts (the bar's sweep and glow)
-  cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8 },
-  durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4 },
-  names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado" },
+  cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8, rain: 4, gale: 5, fog: 4, sunbreak: 6 },
+  durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4, rain: 3, gale: 3, fog: 3, sunbreak: 3 },
+  names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado", rain: "Rain", gale: "Gale", fog: "Fog", sunbreak: "Sun break" },
   lines: {
     gather: "The sky draws in over him.",
     storm: "He calls the storm down.",
     bolt: "Lightning. Where he aimed.",
     gust: "A hard gust.",
     tornado: "He sends a tornado down the street.",
+    rain: "Rain, just here, just for a moment.",
+    gale: "A gale tears down the street.",
+    fog: "Fog rolls in off the street.",
+    sunbreak: "The clouds split. Warm light.",
     dry: "Not enough pressure.",
     cooling: "Not ready yet.",
   },
@@ -589,7 +593,47 @@ export function startPowers(world, dayApi) {
     return true;
   }
 
+  /* ---- the four weather abilities: each sets the sky for a few seconds (js/weather.js eases it out) ---- */
+  const callFx = { until: 0, id: "", pulse: 0 }; // gale: the street-wide push, fading
+  function weatherCall(id, via) {
+    if (mode() !== "control") return false;
+    if (!gauge.spend(id)) return refuse(id, via);
+    const w = wx();
+    if (id === "rain") {
+      if (w && w.set) w.set("rain", 1, "power");
+      noiseWash(5200, 2.4, 0.2, "highpass");
+      noiseWash(1700, 2.0, 0.1, "bandpass");
+    } else if (id === "gale") {
+      if (w && w.set) w.set("wind", 1, "power");
+      const p = who();
+      const f = forward();
+      props.forEach((prop) => {
+        const dx = prop.mesh.position.x - p.x;
+        const dz = prop.mesh.position.z - p.z;
+        if (Math.hypot(dx, dz) > 16) return;
+        shove(prop, f.x * 52, 12, f.z * 52);
+      });
+      callFx.dirX = f.x;
+      callFx.dirZ = f.z;
+      callFx.until = age + 3;
+      shake = Math.max(shake, 0.01);
+      sweep(260, 1500, 2.6, 0.32);
+    } else if (id === "fog") {
+      if (w && w.set) w.set("fog", 1, "power");
+      pad2([110, 165, 220], 3.4, 0.07);
+    } else if (id === "sunbreak") {
+      if (w && w.sunbreak) w.sunbreak();
+      else if (w && w.set) w.set("clear", 1, "power");
+      chime([523.25, 659.25, 783.99, 1046.5], 0.12);
+    }
+    callFx.id = id;
+    callFx.at = age;
+    note(line(id));
+    say(id, via, id);
+    return true;
+  }
   const commands = { storm: summon, bolt, gust, tornado: sendTornado };
+  ["rain", "gale", "fog", "sunbreak"].forEach((id) => (commands[id] = (via) => weatherCall(id, via)));
   function command(name, via) {
     const fn = commands[name];
     if (!fn || mode() !== "control") return false;
@@ -737,6 +781,92 @@ export function startPowers(world, dayApi) {
     g.connect(a.master);
     src.start(t);
     src.stop(t + dur + 0.03);
+  }
+  /* Each weather call has its own procedural sound (no file): rain a hiss, gale a rising sweep, fog a low pad, sun a chime. */
+  function noiseWash(freq, dur, vol, type) {
+    const a = ensureAudio();
+    if (!a || !soundOn()) return;
+    if (a.ctx.state === "suspended") a.ctx.resume();
+    const t = a.ctx.currentTime;
+    const src = a.ctx.createBufferSource();
+    src.buffer = a.buf;
+    src.loop = true;
+    const f = a.ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    const g = a.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.35);
+    g.gain.setValueAtTime(vol, t + Math.max(0.4, dur - 1.1));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f);
+    f.connect(g);
+    g.connect(a.master);
+    src.start(t);
+    src.stop(t + dur + 0.05);
+  }
+  function sweep(from, to, dur, vol) {
+    const a = ensureAudio();
+    if (!a || !soundOn()) return;
+    if (a.ctx.state === "suspended") a.ctx.resume();
+    const t = a.ctx.currentTime;
+    const src = a.ctx.createBufferSource();
+    src.buffer = a.buf;
+    src.loop = true;
+    const f = a.ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.Q.value = 1.4;
+    f.frequency.setValueAtTime(from, t);
+    f.frequency.exponentialRampToValueAtTime(to, t + dur * 0.55);
+    f.frequency.exponentialRampToValueAtTime(from * 0.8, t + dur);
+    const g = a.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f);
+    f.connect(g);
+    g.connect(a.master);
+    src.start(t);
+    src.stop(t + dur + 0.05);
+  }
+  function pad2(freqs, dur, vol) {
+    const a = ensureAudio();
+    if (!a || !soundOn()) return;
+    if (a.ctx.state === "suspended") a.ctx.resume();
+    const t = a.ctx.currentTime;
+    freqs.forEach((hz, i) => {
+      const o = a.ctx.createOscillator();
+      const g = a.ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = hz * (1 + i * 0.002);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 1.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g);
+      g.connect(a.master);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    });
+  }
+  function chime(freqs, vol) {
+    const a = ensureAudio();
+    if (!a || !soundOn()) return;
+    if (a.ctx.state === "suspended") a.ctx.resume();
+    const t = a.ctx.currentTime;
+    freqs.forEach((hz, i) => {
+      const o = a.ctx.createOscillator();
+      const g = a.ctx.createGain();
+      o.type = "triangle";
+      o.frequency.value = hz;
+      const at = t + i * 0.11;
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(vol, at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 1.5);
+      o.connect(g);
+      g.connect(a.master);
+      o.start(at);
+      o.stop(at + 1.55);
+    });
   }
   function beepAlarm() {
     const a = ensureAudio();
@@ -1026,6 +1156,12 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       }
     }
 
+    if (callFx.until > age) {
+      // Gale: a steady shove down the street, fading, and a little shake
+      const k = (callFx.until - age) / 3;
+      props.forEach((prop) => shove(prop, callFx.dirX * 5 * k, 0.4, callFx.dirZ * 5 * k));
+      shake = Math.max(shake, 0.004 * k);
+    }
     if (gustFx && age > gustFx.until) {
       gustMesh.setEnabled(false);
       gustFx = gustFx.pushes != null ? Object.assign(gustFx, { alive: false }) : gustFx;

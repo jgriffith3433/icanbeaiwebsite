@@ -19,7 +19,7 @@ const ok = (cond, msg) => {
   return cond;
 };
 
-ok(POWER_NAMES.join(",") === "storm,bolt,gust,tornado", `power names are ${POWER_NAMES.join(",")}`);
+ok(POWER_NAMES.join(",") === "storm,bolt,gust,tornado,rain,gale,fog,sunbreak", `power names are ${POWER_NAMES.join(",")}`);
 
 const g = createGauge({ max: 100, regen: 10, stormRegen: 20, costs: { storm: 40, bolt: 24, gust: 16, tornado: 48 }, start: 0 });
 ok(g.now().value === 0, "gauge starts empty");
