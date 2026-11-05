@@ -5,6 +5,9 @@
 import { createRequire } from "node:module";
 import {
   clockMinutes,
+  gradeCall,
+  matchShowCue,
+  showTally,
   matchEpisode,
   scoreCard,
   loadBest,
@@ -244,6 +247,33 @@ ok(episodeDone(loadBest("k", m3), chain[0].id) && episodeLock(E.list, loadBest("
 ok(episodeLock(E.list, loadBest("k", m3), chain[2].id) !== null, "the one after that stays locked");
 ok(nextEpisode(E.list, chain[0].id).id === chain[1].id && nextEpisode(E.list, chain[chain.length - 1].id) === null, "nextEpisode follows the list and stops at the end");
 ok(episodeLock(E.list, {}, "tutorial") === null, "unknown or tutorial ids are never locked");
+
+
+// The finale: the Light show's cues, timing and score
+const nt = E.list.find((e) => e.id === "night");
+const F = nt && nt.finale;
+ok(F && F.cues.length >= 12 && F.closing && F.closing.neighbors.length === 3, "the finale has a show of 12+ cues and a closing card with the three neighbors");
+const kinds = new Set(F.cues.map((c) => c.power));
+ok(["bolt", "rain", "fog", "gale", "sunbreak"].every((k) => kinds.has(k)) && nt.variety === 5, "the show uses all five effects and asks for five");
+ok(F.cues.every((c, i) => i === 0 || c.at > F.cues[i - 1].at), "cues are in time order");
+const cd = (cfg.powers && cfg.powers.cooldowns) || {};
+ok(F.cues.every((c, i) => F.cues.slice(0, i).filter((p) => p.power === c.power).every((p) => c.at - p.at >= (cd[c.power] || 0) + 0.1)), "no ability is cued again before its cooldown is up");
+ok(gradeCall(0.2, F) === "perfect" && gradeCall(-0.8, F) === "good" && gradeCall(1.5, F) === null, "timing: perfect, good, then nothing");
+const cues = F.cues.map((c) => Object.assign({ state: "wait" }, c));
+ok(matchShowCue(cues, "rain", 8, F) === null, "the wrong ability on a cue is not a hit");
+ok(matchShowCue(cues, "bolt", 8.3, F).grade === "perfect" && matchShowCue(cues, "bolt", 9.8, F).index === 1, "the right ability on the beat is a hit on the nearest cue");
+const showAll = { cues: F.cues.map((c) => Object.assign({ grade: "perfect" }, c)), best: F.cues.length, off: 0, used: new Set(["bolt", "rain", "fog", "gale", "sunbreak"]) };
+const perfectShow = showTally(showAll, F, nt.variety);
+ok(perfectShow.people === 1 && perfectShow.time === 1 && perfectShow.damage === 1 && perfectShow.variety === 1, "a perfect show scores everything");
+const sloppyShow = showTally({ cues: showAll.cues.map((c, i) => Object.assign({}, c, { grade: i % 2 ? "good" : null })), best: 2, off: 3, used: new Set(["bolt"]) }, F, nt.variety);
+ok(sloppyShow.people < 0.35 && sloppyShow.time < 0.2 && sloppyShow.damage < 0.7 && sloppyShow.variety === 0.2, `a sloppyShow one-note show scores low: ${JSON.stringify(sloppyShow)}`);
+const same = (grade) => scoreBreakdown(showTally({ cues: showAll.cues.map((c) => Object.assign({}, c, { grade })), best: 18, off: 0, used: showAll.used }, F, 5), E.scoring).points;
+ok(same("perfect") > same("good") && same("good") > same(null), "score drops with timing");
+const vp = (names) => scoreBreakdown(showTally({ cues: showAll.cues, best: 18, off: 0, used: new Set(names) }, F, 5), E.scoring).points;
+ok(vp(["bolt", "rain", "fog", "gale", "sunbreak"]) > vp(["bolt"]), "score drops with variety");
+["start", "gather", "end:S", "end:A", "end:B", "end:C"].forEach((k) => ok(Array.isArray(nt.say[k]) && nt.say[k].length, `night: dialogue for ${k}`));
+["S", "A", "B", "C"].forEach((k) => ok(F.closing.last[k] && F.closing.last[k].length === 2, `closing: last line for rank ${k}`));
+["A", "B", "C", "none"].forEach((k) => ok(F.closing.intro[k], `closing: intro for ending ${k}`));
 
 ok(clockMinutes("7:55") === 7 * 60 + 55, "clockMinutes 7:55");
 ok(clockMinutes("18:00") === 18 * 60, "clockMinutes 18:00");

@@ -5,6 +5,41 @@
    debris and timed bolts; a forecast-style score card lands in localStorage.
    ========================================================================== */
 
+import { createFinale } from "./finale.js";
+
+/* ---- the finale's show (Light show) ----
+   `cues` = [{ at, power }]: seconds from the show's start and the ability to call. A call is a hit when it is the cue's
+   ability and lands inside `f.good` seconds of `at` (perfect inside `f.perfect`). */
+export function gradeCall(dt, f) {
+  const d = Math.abs(dt);
+  if (d <= (f.perfect != null ? f.perfect : 0.45)) return "perfect";
+  if (d <= (f.good != null ? f.good : 1.1)) return "good";
+  return null;
+}
+/** The unresolved cue of this ability nearest to now (`t`), if it is close enough: { index, grade, dt }, else null. */
+export function matchShowCue(cues, power, t, f) {
+  let best = null;
+  (cues || []).forEach((c, i) => {
+    if (c.state !== "wait" || c.power !== power) return;
+    const g = gradeCall(t - c.at, f);
+    if (!g) return;
+    const d = Math.abs(t - c.at);
+    if (!best || d < best.d) best = { index: i, grade: g, dt: t - c.at, d };
+  });
+  return best ? { index: best.index, grade: best.grade, dt: best.dt } : null;
+}
+/** The four score fractions (0..1) of a show: Timing, Chain, Clean calls and Variety. */
+export function showTally(show, f, varietyTarget) {
+  const n = Math.max(1, (show.cues || []).length);
+  const pts = (show.cues || []).reduce((a, c) => a + (c.grade === "perfect" ? 1 : c.grade === "good" ? 0.6 : 0), 0);
+  return {
+    people: pts / n,
+    time: Math.min(1, (show.best | 0) / n),
+    damage: Math.max(0, 1 - (show.off | 0) * 0.12),
+    variety: Math.min(1, (show.used ? show.used.size : 0) / Math.max(1, varietyTarget || 5)),
+  };
+}
+
 /** Parse "HH:MM" to minutes past midnight (same idea as DayEngine.parseClock). */
 export function clockMinutes(clock) {
   if (typeof clock === "number") return clock;
@@ -338,6 +373,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-hud li i{flex:0 0 14px;font-style:normal}
 .ep-hud .timer{margin-top:8px;font-variant-numeric:tabular-nums;color:#9fd4ff}
 .ep-hud .cue{margin-top:6px;color:#f0c27a}
+.ep-hud .cue .cn{display:block}
+.ep-hud .cue .bar{display:block;height:6px;margin:5px 0;border-radius:3px;background:rgba(240,194,122,.18);overflow:hidden}
+.ep-hud .cue .bar b{display:block;height:100%;width:0;background:#f0c27a;border-radius:3px}
+.ep-hud .cue .cj{display:block;color:#9fd4ff;font-variant-numeric:tabular-nums}
+.ep-hud .cue .cj.perfect{color:#ffe08a}.ep-hud .cue .cj.miss,.ep-hud .cue .cj.off{color:#e58a7a}
 .ep-hud .prompt{margin:8px 0 0;color:#f0c27a}
 .ep-hud .skip{margin-top:8px;appearance:none;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.8rem Outfit,system-ui,sans-serif;cursor:pointer}
 .ep-hud .skip:hover{background:rgba(240,194,122,.14)}
@@ -430,6 +470,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   endEl.hidden = true;
   endEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><p class="kicker"></p><h2></h2><p class="scene"></p><ul class="fared"></ul><p class="lastline"></p><p class="tally"></p><div class="actions"><button type="button" class="primary again"></button></div></div>`;
 
+  /* The closing card after the finale: the day's three stories and the neighbors, from the arc the parts left. */
+  const closeEl = document.createElement("div");
+  closeEl.id = "closing-card";
+  closeEl.className = "ep-ending";
+  closeEl.hidden = true;
+  closeEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><p class="kicker"></p><h2></h2><p class="scene"></p><ul class="fared"></ul><ul class="neighbors"></ul><p class="lastline"></p><p class="tally"></p><div class="actions"><button type="button" class="primary again"></button></div></div>`;
+
   const menu = document.createElement("div");
   menu.id = "episode-menu";
   menu.className = "ep-menu";
@@ -448,13 +495,17 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   say.setAttribute("role", "status");
   say.setAttribute("aria-live", "polite");
 
-  document.body.append(menuBtn, hud, offer, scoreEl, endEl, menu, toast, say);
+  document.body.append(menuBtn, hud, offer, scoreEl, endEl, closeEl, menu, toast, say);
 
   const hudTitle = hud.querySelector("h3");
   const hudTag = hud.querySelector(".tag");
   const hudList = hud.querySelector("ul");
   const hudTimer = hud.querySelector(".timer");
   const hudCue = hud.querySelector(".cue");
+  hudCue.innerHTML = `<b class="cn"></b><i class="bar"><b></b></i><span class="cj"></span>`;
+  const cueName = hudCue.querySelector(".cn");
+  const cueBar = hudCue.querySelector(".bar b");
+  const cueJudge = hudCue.querySelector(".cj");
   const hudStrain = hud.querySelector(".strain");
   const hudRank = hud.querySelector(".rankline");
   const hudPiece = hud.querySelector(".pieceline");
@@ -744,9 +795,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (ep.strain) damage -= Math.min(1, run.strain / (2 * ep.strain.budget)) * 0.6 + Math.min(0.4, run.kicks.length * 0.2);
     const target = ep.variety || scoring.variety || 3;
     const variety = run.used ? Math.min(1, run.used.size / target) : 0;
-    const b = scoreBreakdown({ people, time, damage: Math.max(0, damage), variety }, scoring);
+    let m = { people, time, damage: Math.max(0, damage), variety };
+    if (run.show) m = showTally(run.show, ep.finale, ep.variety); // the finale scores the show, not goals
+    const b = scoreBreakdown(m, scoring);
     b.rank = rankOf(b.pct, scoreBands);
-    b.used = run.used ? [...run.used] : [];
+    b.used = run.show ? [...run.show.used] : run.used ? [...run.used] : [];
     b.target = target;
     return b;
   }
@@ -850,7 +903,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       markEl.textContent = g.done ? "✓" : g.failed ? "✗" : "·";
       const label = document.createElement("span");
       let text = g.label || g.id;
-      if ((g.kind === "ability-in" && g.count > 1) || g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris" || g.kind === "help") {
+      if ((g.kind === "ability-in" && g.count > 1) || g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris" || g.kind === "help" || g.kind === "show-hits" || g.kind === "show-variety") {
         const need = g.count | 0;
         const have = Math.min(need, g.progress | 0);
         text += ` (${have}/${need})`;
@@ -861,7 +914,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       li.append(markEl, label);
       hudList.appendChild(li);
     });
-    if (active.ep.timer) {
+    if (active.ep.timer && !active.show) {
       hudTimer.hidden = false;
       const sec = Math.max(0, Math.ceil(active.left));
       hudTimer.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
@@ -894,9 +947,12 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     hudPrompt.hidden = !cur;
     hudPrompt.textContent = cur ? cur.prompt || "" : "";
     hudSkip.hidden = !active.ep.tutorial;
-    if (active.ep.cue) {
+    if (active.show) paintCue();
+    else if (active.ep.cue) {
       hudCue.hidden = false;
-      hudCue.textContent = active.cueOn ? "Now — strike!" : "Wait for the cue…";
+      cueName.textContent = active.cueOn ? "Now — strike!" : "Wait for the cue…";
+      cueBar.style.width = "0%";
+      cueJudge.textContent = "";
     } else hudCue.hidden = true;
   }
   function completeGoal(g, via) {
@@ -1327,6 +1383,140 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     offer.hidden = true;
     offerEp = null;
   }
+  /* ---- the finale: the show's cues, judged on timing; the stage is js/finale.js ---- */
+  let stage = null; // the plaza stage (spectators, beams, fireworks, aurora), alive from the start to the closing card
+  let stageHold = false; // keep the stage up after the show for the score and closing cards
+  let pendingClosing = null;
+  let closeAuto = 0;
+  function stopStage() {
+    if (stage) stage.stop();
+    stage = null;
+    stageHold = false;
+  }
+  function startShow(ep) {
+    const F = ep.finale;
+    active.show = {
+      started: false, t: 0, over: false, endAt: 0, hits: 0, perfect: 0, off: 0, chain: 0, best: 0, act: -1, judge: "", judgeKind: "",
+      used: new Set(), cues: F.cues.map((c) => Object.assign({ state: "wait", grade: null, dt: null }, c)),
+    };
+    stage = createFinale(world, B, F);
+    if (stage) stage.start(F.spectators);
+    mark("show-stage", { id: ep.id, spectators: F.spectators, cues: F.cues.length });
+  }
+  const inPlaza = () => {
+    const pos = playerPos();
+    const z = active && active.ep.zones && active.ep.zones.plaza;
+    return !!(pos && z && inZone(z, pos.x, pos.z));
+  };
+  const powerName = (id) => { const a = abil(); const v = a && a.get && a.get(id); return v ? `${v.name} (${String(v.key || "").toUpperCase()})` : id; };
+  /* One weather call during the show: a hit on a cue, or off the beat. */
+  function onShowCall(power) {
+    const A = active;
+    const S = A.show;
+    const F = A.ep.finale;
+    if (!S.started || S.over) return;
+    const m = inPlaza() ? matchShowCue(S.cues, power, S.t, F) : null;
+    if (!m) {
+      S.off += 1;
+      S.chain = 0;
+      S.judge = F.lines.off;
+      S.judgeKind = "off";
+      mark("show-off", { id: A.ep.id, power, t: +S.t.toFixed(2), off: S.off });
+      paintHud();
+      return;
+    }
+    const c = S.cues[m.index];
+    c.state = "hit";
+    c.grade = m.grade;
+    c.dt = m.dt;
+    S.hits += 1;
+    if (m.grade === "perfect") S.perfect += 1;
+    S.chain += 1;
+    S.best = Math.max(S.best, S.chain);
+    S.used.add(power);
+    S.judge = `${F.lines[m.grade]}${m.dt >= 0 ? " +" : " "}${m.dt.toFixed(2)} s · ×${S.chain}`;
+    S.judgeKind = m.grade;
+    if (stage) stage.cue(power, m.grade);
+    mark("show-cue", { id: A.ep.id, cue: m.index, power, grade: m.grade, dt: +m.dt.toFixed(2), chain: S.chain, hits: S.hits });
+    A.goals.forEach((g) => {
+      if (g.kind === "show-hits") { g.progress = S.hits; if (S.hits >= (g.count | 0)) completeGoal(g, "show"); }
+      if (g.kind === "show-variety") { g.progress = S.used.size; if (S.used.size >= (g.count | 0)) completeGoal(g, "show"); }
+    });
+    if (active) paintHud();
+  }
+  function showTick(dt) {
+    const A = active;
+    const S = A.show;
+    const F = A.ep.finale;
+    if (!S.started) {
+      if (inPlaza()) {
+        S.started = true;
+        const a = abil();
+        if (a && a.reset) a.reset(100);
+        sayKey("gather");
+        mark("show-begin", { id: A.ep.id, gathered: stage ? stage.info().gathered : 0 });
+        paintHud();
+      }
+      return;
+    }
+    S.t += dt;
+    F.acts.forEach((a, i) => {
+      if (i > S.act && S.t >= a.at) {
+        S.act = i;
+        if (day.note) day.note((F.lines.act && F.lines.act[a.name]) || a.name);
+        sayKey("act:" + a.name);
+        mark("show-act", { id: A.ep.id, act: a.name });
+      }
+    });
+    S.cues.forEach((c, i) => {
+      if (c.state === "wait" && S.t > c.at + F.good) {
+        c.state = "miss";
+        S.chain = 0;
+        S.judge = F.lines.miss;
+        S.judgeKind = "miss";
+        if (stage) stage.cue(c.power, "miss");
+        mark("show-miss", { id: A.ep.id, cue: i, power: c.power });
+      }
+    });
+    if (!S.over && S.cues.every((c) => c.state !== "wait")) {
+      S.over = true;
+      S.endAt = S.t + (F.afterSec != null ? F.afterSec : 5);
+      const k = S.hits / S.cues.length;
+      if (stage) stage.grand(k);
+      if (day.note) day.note(F.lines.done);
+      mark("show-over", { id: A.ep.id, hits: S.hits, perfect: S.perfect, best: S.best, off: S.off, of: S.cues.length });
+    }
+    if (S.over && S.t >= S.endAt) {
+      stageHold = true;
+      const g = A.goals.find((x) => x.kind === "show-end");
+      if (g) completeGoal(g, "show");
+      if (active === A) finish("time"); // not every goal done: the show is still over
+    }
+  }
+  function paintCue() {
+    const A = active;
+    const S = A.show;
+    const F = A.ep.finale;
+    hudCue.hidden = false;
+    if (!S.started) {
+      cueName.textContent = "Walk to the plaza. The show starts when he gets there.";
+      cueBar.style.width = "0%";
+      cueJudge.textContent = stage ? `${stage.info().gathered} of ${stage.info().spectators} are in place` : "";
+      cueJudge.className = "cj";
+      return;
+    }
+    const nx = S.cues.find((c) => c.state === "wait");
+    if (nx) {
+      const inSec = nx.at - S.t;
+      cueName.textContent = `Next: ${powerName(nx.power)} in ${Math.max(0, inSec).toFixed(1)} s`;
+      cueBar.style.width = Math.round(100 * Math.max(0, Math.min(1, 1 - inSec / 3))) + "%";
+    } else {
+      cueName.textContent = S.over ? F.lines.done : "";
+      cueBar.style.width = "100%";
+    }
+    cueJudge.textContent = S.judge || "";
+    cueJudge.className = "cj " + (S.judgeKind || "");
+  }
   function start(ep, via, opts) {
     if (!ep) return false;
     if (opts && opts.challenge && !ep.tutorial) ep = challengeEp(ep, cfg.challenge);
@@ -1382,6 +1572,10 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (ep.market) spawnStalls(!!ep.market.open);
     if (ep.turbines) spawnTurbines(ep.turbines);
     if (ep.gauge) spawnGauge(ep.gauge);
+    stopStage();
+    pendingClosing = null;
+    closeAuto = 0;
+    if (ep.finale) startShow(ep);
     sayQueue = [];
     sayLeft = 0;
     sayKey("start", ep);
@@ -1396,6 +1590,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     return true;
   }
   function endQuiet() {
+    if (active && active.show && !stageHold) stopStage();
     if (active && active.ep.tutorial) openAllAbilities();
     if (active && active.rescue) active.rescue.sky = null;
     active = null;
@@ -1485,7 +1680,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     {
       const R = run.rescue;
       scoreRankDetail.textContent = `Rank ${card.rank} · ${card.points} of ${sb.max} points` + (run.ep.challengeOn ? " · Challenge" : "") + (R ? ` · ${R.helped} of ${R.total} stranded helped` + (R.late ? ` (${R.late} late)` : "") + (R.hurt ? ` · ${R.hurt} wrong call${R.hurt > 1 ? "s" : ""}` : "") : "");
-      const names = Object.assign({ people: R ? "People helped" : "Goals done", time: "Time left", damage: "Damage avoided", variety: "Ability variety" }, scoring.names || {});
+      const names = Object.assign({ people: R ? "People helped" : "Goals done", time: "Time left", damage: "Damage avoided", variety: "Ability variety" }, scoring.names || {}, (run.ep.finale && run.ep.finale.rowNames) || {});
+      if (run.show) scoreRankDetail.textContent += ` · ${run.show.hits} of ${run.show.cues.length} cues on the beat (${run.show.perfect} perfect)` + (run.show.off ? ` · ${run.show.off} off the beat` : "");
       scoreBreak.innerHTML = "";
       sb.rows.forEach((r) => {
         const li = document.createElement("li");
@@ -1516,7 +1712,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     scoreUnlock.textContent = unlocked ? (scoring.unlockLine || "Challenge unlocked. Find it in the Episodes menu.") : "";
     paintScoreButtons(why);
     scoreEl.hidden = false;
-    mark("score", { id: run.ep.id, challenge: !!run.ep.challengeOn, cleared: card.cleared, unlocked, best: b ? b.rank : null, parts: sb.rows.map((r) => r.id + ":" + r.points).join(","), variety: sb.used.join(","), rank: card.rank || null, points: card.points == null ? null : card.points, helped: run.rescue ? run.rescue.helped : null, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved, scarred: card.scarred, strain: run.strain, kicks: run.kicks.slice(), scars });
+    if (run.ep.finale && run.ep.finale.closing && run.show && run.show.started && (why === "clear" || why === "time")) {
+      pendingClosing = { rank: card.rank, points: card.points, hits: run.show.hits, of: run.show.cues.length, perfect: run.show.perfect, best: run.show.best, max: sb.max, closing: run.ep.finale.closing };
+      closeAuto = run.ep.finale.closeAfter != null ? run.ep.finale.closeAfter : 9;
+    } else if (run.show) stageHold = false;
+    mark("score", { id: run.ep.id, challenge: !!run.ep.challengeOn, cleared: card.cleared, unlocked, best: b ? b.rank : null, parts: sb.rows.map((r) => r.id + ":" + r.points).join(","), variety: sb.used.join(","), rank: card.rank || null, points: card.points == null ? null : card.points, helped: run.rescue ? run.rescue.helped : null, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved, scarred: card.scarred, strain: run.strain, kicks: run.kicks.slice(), scars, show: run.show ? { hits: run.show.hits, perfect: run.show.perfect, off: run.show.off, best: run.show.best, of: run.show.cues.length, used: [...run.show.used].join(",") } : undefined });
     endQuiet();
     return card;
   }
@@ -1581,12 +1781,65 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   }
   function hideScore() {
     scoreEl.hidden = true;
+    closeAuto = 0;
     if (pendingEnding) {
       const id = pendingEnding;
       pendingEnding = null;
       showEnding(id);
-    }
+    } else if (pendingClosing) {
+      const c = pendingClosing;
+      pendingClosing = null;
+      showClosing(c);
+    } else if (!active) stopStage();
   }
+  /* The closing card: how the day's stories ended (from the arc the three parts left), the neighbors in the crowd, his last line. */
+  function showClosing(c) {
+    const K = c.closing;
+    const arc = loadArc();
+    const fared = cityFared(arc, END.fared);
+    const endingId = arc.ending && arc.ending.id;
+    closeEl.querySelector(".kicker").textContent = K.kicker || "Closing night";
+    closeEl.querySelector("h2").textContent = K.title || "The district, tonight";
+    closeEl.querySelector(".scene").textContent = (K.intro && (K.intro[endingId] || K.intro.none)) || "";
+    const ul = closeEl.querySelector(".fared");
+    ul.innerHTML = "";
+    fared.forEach((f) => {
+      const li = document.createElement("li");
+      li.className = f.state;
+      li.dataset.need = f.need;
+      const b = document.createElement("b");
+      b.textContent = (END.needs && END.needs[f.need]) || f.need;
+      li.append(b, document.createTextNode(f.text));
+      ul.appendChild(li);
+    });
+    const nb = closeEl.querySelector(".neighbors");
+    nb.innerHTML = "";
+    (K.neighbors || []).forEach(([who, text]) => {
+      const li = document.createElement("li");
+      li.dataset.neighbor = who;
+      const b = document.createElement("b");
+      b.textContent = who;
+      li.append(b, document.createTextNode(text));
+      nb.appendChild(li);
+    });
+    const last = (K.last && (K.last[c.rank] || K.last.C)) || ["He", ""];
+    const ll = closeEl.querySelector(".lastline");
+    ll.innerHTML = "";
+    const who = document.createElement("i");
+    who.textContent = last[0];
+    ll.append(who, document.createTextNode(last[1]));
+    closeEl.querySelector(".tally").textContent = `${K.tally || "The show"}: rank ${c.rank} · ${c.points} of ${c.max} points · ${c.hits} of ${c.of} cues on the beat (${c.perfect} perfect) · best chain ${c.best}`;
+    closeEl.querySelector(".again").textContent = K.button || "Walk the city";
+    closeEl.dataset.ending = endingId || "none";
+    closeEl.dataset.rank = c.rank;
+    closeEl.hidden = false;
+    if (day.note) day.note(`${K.title || "Closing night"}. ${last[0]}: ${last[1]}`);
+    mark("closing", { id: "night", rank: c.rank, ending: endingId || "none", fared: fared.map((f) => f.need + ":" + f.state).join(","), neighbors: (K.neighbors || []).length });
+  }
+  closeEl.querySelector(".again").addEventListener("click", () => {
+    closeEl.hidden = true;
+    stopStage();
+  });
 
   function hideMenu() {
     menu.hidden = true;
@@ -1673,6 +1926,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     const base = lastRun && list.find((e) => e.id === lastRun.id);
     if (!base || pendingEnding) return;
     scoreEl.hidden = true;
+    pendingClosing = null;
+    closeAuto = 0;
     mark("replay", { id: base.id, challenge: lastRun.challenge });
     launch(base, lastRun.challenge ? { challenge: true } : undefined);
   });
@@ -1681,6 +1936,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     const nxt = base && nextEpisode(list, base.id);
     if (!nxt || pendingEnding || episodeLock(list, loadBest(storageKey), nxt.id)) return;
     scoreEl.hidden = true;
+    pendingClosing = null;
+    closeAuto = 0;
     mark("next", { id: nxt.id, from: base.id });
     launch(nxt);
   });
@@ -1738,6 +1995,10 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     }
     if (d.action === d.power && d.action !== "denied" && active.used) active.used.add(d.power);
     if (active.rescue && d.action === d.power && d.action !== "denied") onPieceCall(d.power);
+    if (active.show && d.action === d.power && d.action !== "denied") {
+      onShowCall(d.power);
+      if (!active) return;
+    }
     if (active.ep.strain && d.action === d.power && d.action !== "denied") {
       onStoryCall(d.power);
       const pos = playerPos();
@@ -1867,11 +2128,22 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       if (sayLeft <= 0) nextSay();
     }
     animateStory(dt);
+    if (closeAuto > 0) {
+      closeAuto -= dt;
+      if (closeAuto <= 0 && !scoreEl.hidden && pendingClosing) hideScore();
+    }
+    if (stage) {
+      const W = window.weather || day.weather;
+      const fg = W && W.now ? W.now().fog : 0;
+      stage.update(dt, Math.max(0, Math.min(1, (fg - 0.01) / 0.03)));
+    }
     if (!active) return;
     active.age += dt;
+    if (active.show) showTick(dt);
+    if (!active) return;
     if (active.ep.strain) storyTick(dt);
     if (active.rescue) rescueTick(dt);
-    if (active.ep.timer) {
+    if (active.ep.timer && !active.show) {
       active.left -= dt;
       if (active.left <= 0) {
         active.left = 0;
@@ -1938,6 +2210,14 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
             prompt: active.ep.tutorial && currentTutorialGoal(active) ? currentTutorialGoal(active).prompt : null,
           }
         : null,
+    show: () => {
+      if (!active || !active.show) return null;
+      const S = active.show;
+      const nx = S.cues.find((c) => c.state === "wait");
+      return { started: S.started, t: S.t, over: S.over, hits: S.hits, perfect: S.perfect, off: S.off, chain: S.chain, best: S.best, used: [...S.used], next: nx ? { power: nx.power, at: nx.at, in: nx.at - S.t } : null, cues: S.cues.map((c) => ({ at: c.at, power: c.power, state: c.state, grade: c.grade })), judge: S.judge, stage: stage ? stage.info() : null };
+    },
+    stage: () => (stage ? stage.info() : null),
+    closing: () => ({ shown: !closeEl.hidden, rank: closeEl.dataset.rank || null, ending: closeEl.dataset.ending || null, pending: !!pendingClosing, fared: [...closeEl.querySelectorAll(".fared li")].map((li) => li.dataset.need + ":" + li.className), neighbors: [...closeEl.querySelectorAll(".neighbors li")].map((li) => li.dataset.neighbor) }),
     offer: () => (offerEp ? { id: offerEp.id, title: offerEp.title } : null),
     best: () => loadBest(storageKey),
     lock: (id) => episodeLock(list, loadBest(storageKey), id),
