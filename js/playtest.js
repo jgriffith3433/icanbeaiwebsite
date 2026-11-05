@@ -334,7 +334,10 @@ async function roofBolt(t) {
     const others = [".daybar", ".bottom", "#control-btn", ".control-btn"].map((q) => document.querySelector(q)).filter((e) => e && e.offsetParent);
     const bad = others.filter((e) => hit(bar, e.getBoundingClientRect()));
     if (bad.length) t.problem("bug", `The ability bar and Energy label cover ${bad.map((e) => e.className || e.id).join(", ")}`);
-    else t.event("ability-bar-clear", `bar at y ${Math.round(bar.top)}-${Math.round(bar.bottom)} clear of the day timeline and Let go`);
+    const sp = [...document.querySelectorAll("#speeds button")].filter((e) => hit(bar, e.getBoundingClientRect()));
+    if (sp.length) t.problem("bug", `The ability bar covers the speed buttons ${sp.map((e) => e.textContent.trim()).join(", ")}`);
+    else t.event("speed-buttons-clear", "every speed button (incl. 300x, 1200x) is clear of the ability bar");
+    if (!bad.length) t.event("ability-bar-clear", `bar at y ${Math.round(bar.top)}-${Math.round(bar.bottom)} clear of the day timeline and Let go`);
   }
   const e0 = P.now().energy;
   const WXB = window.weather || window.day.weather;
