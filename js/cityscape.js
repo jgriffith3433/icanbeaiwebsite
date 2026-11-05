@@ -19,6 +19,7 @@
    Quality low drops the outer fill and the skyline's far half.
    ========================================================================== */
 const B = window.BABYLON;
+import { installProps, reserved } from "./props.js";
 let world = null;
 
 function makeRng(seed) {
@@ -284,12 +285,16 @@ export function installCityscape(w) {
   if (city.park) fixed.push([city.park.x0 - 3, city.park.z0 - 3, city.park.x1 + 3, city.park.z1 + 3]);
   fixed.push([-16, -6.5, 43, 7.5]); // the roof-to-roof glide corridor (apt to shop)
   fixed.push([street.from + 30 - 5, street.z + 40 - 5, street.from + 30 + 5, street.z + 40 + 5]); // the check's open grass
+  reserved(cfg).rects.forEach((r) => fixed.push(r)); // the plaza and the landmarks (js/props.js)
   const solids = world.solids || [];
   function blocked(x0, z0, x1, z1, pad) {
     for (let i = 0; i < fixed.length; i++) {
       const f = fixed[i];
       if (x1 > f[0] && x0 < f[2] && z1 > f[1] && z0 < f[3]) return true;
     }
+    return hitsSolid(x0, z0, x1, z1, pad);
+  }
+  function hitsSolid(x0, z0, x1, z1, pad) {
     for (let i = 0; i < solids.length; i++) {
       const s = solids[i];
       const p = s.roll ? 3.6 : pad;
@@ -318,6 +323,7 @@ export function installCityscape(w) {
     return chunks[key];
   }
   const newSolids = [];
+  const fillerList = []; // the lots built on, for the rooftops and shop signs (js/props.js)
   const stats = { fillers: 0, tall: 0, blocks: 0 };
   function addBuilding(x, z, w, d, h, styleIdx, shop, collide) {
     const c = chunkFor(x, z);
@@ -334,6 +340,7 @@ export function installCityscape(w) {
       c.facade[styleIdx].box(x + (rng() - 0.5) * w * 0.4, z + (rng() - 0.5) * d * 0.4, bw, bd, h, h + 1 + rng() * 1.4, "facade", 0, 0, roofTint);
     }
     if (h > 22) c.facade[styleIdx].box(x + (rng() - 0.5) * w * 0.3, z + (rng() - 0.5) * d * 0.3, 0.4, 0.4, h, h + 5 + rng() * 6, "facade", 0, 0, roofTint);
+    fillerList.push({ x, z, w, d, h, near: !!collide });
     stats.fillers++;
     if (h > 20) stats.tall++;
     if (collide) newSolids.push({ x, y: h / 2, z, w, h, d });
@@ -591,6 +598,33 @@ export function installCityscape(w) {
   poleMesh.thinInstanceRefreshBoundingInfo(true);
   [zebraX, zebraZ, stopX, stopZ, dashX, dashZ, edgeX, edgeZ].forEach((m) => m.thinInstanceRefreshBoundingInfo(true));
 
+  /* ---------------- props, signs, park, plaza, landmarks, rooftops (js/props.js) ---------------- */
+  const props = installProps({
+    world,
+    blocked,
+    hitsSolid,
+    fillers: fillerList,
+    roads,
+    crossXs,
+    avZs,
+    lampSpots,
+    canvasTexture,
+    T,
+    poolTexture: (color) => {
+      const t = canvasTexture("cs-spill-" + color, 128, 128, (g, W, H) => {
+        const grd = g.createRadialGradient(W / 2, H / 2, 2, W / 2, H / 2, W / 2);
+        grd.addColorStop(0, color + "e0");
+        grd.addColorStop(0.5, color + "50");
+        grd.addColorStop(1, color + "00");
+        g.clearRect(0, 0, W, H);
+        g.fillStyle = grd;
+        g.fillRect(0, 0, W, H);
+      });
+      t.hasAlpha = true;
+      return t;
+    },
+  });
+
   /* ---------------- night ---------------- */
   const fogV = new B.Color3();
   let lit = { windows: 0, lamps: 0, shops: 0 };
@@ -612,6 +646,7 @@ export function installCityscape(w) {
     const lamps = Math.min(1, w.dusk * 0.8 + w.night * 1.1);
     const shops = Math.min(1, w.dusk * 0.7 + w.night * 1.0);
     lit = { windows, lamps, shops };
+    props.update(w, lit);
     facadeMats.forEach((m) => m.emissiveColor.set(windows * 1.15, windows * 1.15, windows * 1.15));
     shopMat.emissiveColor.set(shops * 1.1, shops * 1.1, shops * 1.1);
     skyMat.emissiveColor.set(windows * 1.3, windows * 1.3, windows * 1.3);
@@ -639,6 +674,7 @@ export function installCityscape(w) {
         crossings,
         lamps: lampSpots.length,
         lit: { ...lit },
+        props: props.info(),
         colliders: newSolids.length + lampSolids.length,
       };
     },

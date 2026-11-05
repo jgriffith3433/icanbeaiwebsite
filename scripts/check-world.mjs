@@ -487,6 +487,7 @@ world.update(frW, 0.05, {});
 ok(mounted.now().state === 'rain' && mounted.now().blend < 0.55, `the world jumped to rain (blend ${mounted.now().blend.toFixed(2)})`);
 world.update(frW, 0.05, { snap: true });
 const wetRoad = mounted.now();
+ok(wetRoad.reflect > 0.8, `the player's rain doesn't reflect (reflect ${wetRoad.reflect})`);
 ok(wetRoad.blend > 0.9 && wetRoad.wet > 0.8 && wetRoad.gloss > 0.35 && wetRoad.puddles > 0, `rain didn't wet the road (wet ${wetRoad.wet.toFixed(2)}, gloss ${wetRoad.gloss == null ? '?' : wetRoad.gloss.toFixed(2)}, puddles ${wetRoad.puddles})`);
 mounted.set('clear', 1, 'test');
 world.update(frW, 0.05, { snap: true });
