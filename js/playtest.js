@@ -3265,6 +3265,168 @@ async function storyParts(options, t) {
   t.progress(1);
 }
 
+/* ---------------- story ending: Part 1, 2 and 3 in a row, then Part 3 again to reach each of the three endings ---------------- */
+// Setup shortcuts: the day bar to a moment outdoors (and to 22:30 before Part 3), the Pressure meter topped up, and each
+// part started by its API. Everything else is real keys: Enter, WASD with Shift, R, X, V, E. Events: ending-* with the
+// Part 3 dialogue, the gauge, the Strain at the Tank, and the ending card (name, how each need fared, his last line).
+async function storyEnding(options, t) {
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  const cfg = window.DAY_CONFIG;
+  const list = (cfg.episodes && cfg.episodes.list) || [];
+  if (!list.find((e) => e.id === "low-tank")) return t.problem("bug", "Part 3 isn't in the episode list");
+  const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
+  const heard = [];
+  const onStory = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "say") { heard.push(d); t.event("ending-say", `${d.who}: ${d.text}`); }
+    if (d.action === "kick") t.event("ending-kick", `${d.kick} at strain ${d.strain}`);
+  };
+  window.addEventListener("day:story", onStory);
+  try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
+  Ep.resetArc();
+
+  const day = window.day.today();
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+
+  const refill = () => { if (P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  async function walkTo(x, z, progress) {
+    await goTo(C.state().x, sideZ, t, { sprint: true, progress, ms: 12000, close: 1.2 });
+    for (let k = 0; k < 16; k++) {
+      const s = C.state();
+      if (Math.abs(s.x - x) < 1.6) break;
+      const nx = s.x + Math.max(-22, Math.min(22, x - s.x));
+      if (!(await goTo(nx, sideZ, t, { sprint: true, progress, ms: 14000, close: 1.2 }))) break;
+    }
+    return goTo(x, z, t, { progress, ms: 9000, close: 1.4 });
+  }
+  const goalDone = (id) => { const n = Ep.now(); return !!(n && n.goals.some((g) => g.id === id && g.done)); };
+  const lastSay = () => ($("episode-say") || {}).textContent || "";
+  async function card(label) {
+    await t.until(() => !$("episode-score").hidden, 8000, `${label}: the score card`);
+    const el = $("episode-score");
+    const text = (el.querySelector(".forecast") || {}).textContent || "";
+    const strain = (el.querySelector(".strainline") || {}).textContent || "";
+    t.event("ending-card", `${label}: ${text} | ${strain}`);
+    await sleep(1500);
+    el.querySelector("button.ok").click();
+    return { text, strain, scarred: /scarred/.test(text) };
+  }
+  async function press(key, wait) { pressKey(key); await sleep(wait || 600); }
+
+  /* ---- Part 1, played clean ---- */
+  t.scene("Part 1: the park and the market");
+  Ep.start("dry-park", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "dry-park", 3000, "Part 1 running");
+  if (!(await walkTo(-6, 24.5, 0.08))) t.problem("bug", "He didn't reach the park bench");
+  refill();
+  await press("r", 900);
+  await t.until(() => goalDone("rain-park"), 5000, "rain on the park");
+  await sleep(2500);
+  if (!(await walkTo(117, 27.5, 0.25))) t.problem("bug", "He didn't reach the plaza");
+  refill();
+  await press("x", 900);
+  await t.until(() => goalDone("sun-market"), 5000, "sun break over the market");
+  await t.until(() => goalDone("stalls"), 40000, "the stalls to fill");
+  const c1 = await card("Part 1");
+  if (c1.scarred) t.problem("bug", `A clean Part 1 came out ${c1.text}`);
+
+  /* ---- Part 2, played clean: four steady gales on the annex roof ---- */
+  t.scene("Part 2: the annex roof");
+  Ep.start("still-blades", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "still-blades", 3000, "Part 2 running");
+  if (!(await walkTo(154, 9.8, 0.4))) t.problem("bug", "He didn't reach Ines");
+  await t.until(() => goalDone("ines"), 4000, "finding Ines");
+  await sleep(2400);
+  for (let i = 0; i < 5 && !goalDone("turn") && Ep.now(); i++) {
+    refill();
+    await press("v", 3000);
+    await sleep(2300);
+  }
+  await t.until(() => !$("episode-score").hidden, 6000, "Part 2's card");
+  const c2 = await card("Part 2");
+  if (c2.scarred) t.problem("bug", `A clean Part 2 came out ${c2.text}`);
+  await sleep(3500);
+
+  /* ---- Part 3 is offered at night, once Part 2 has been played ---- */
+  t.scene("Part 3: night, the Storm Tank");
+  const night = 22 * 60 + 30;
+  scrubTo(night);
+  await sleep(900);
+  const matched = Ep.match("bedtime", night, { arc: Ep.arc() });
+  if (matched && matched.id === "low-tank") t.event("part3-offered", "Part 3: Low is offered at 22:30 once Part 2 has been played");
+  else t.problem("bug", `Part 3 isn't offered at night after Part 2 (got ${matched && matched.id})`);
+  if (Ep.match("bedtime", night, { arc: { parts: {} } }) && Ep.match("bedtime", night, { arc: { parts: {} } }).id === "low-tank") t.problem("bug", "Part 3 was offered without Part 2 played");
+  await walkTo(190, 31, 0.6);
+
+  /* One run at the Tank: `bolts` lightning calls (E) in the zone, then rain (R) until the gauge is full. */
+  async function tankRun(label, bolts) {
+    t.scene(`Part 3: ${label}`);
+    scrubTo(night);
+    await sleep(500);
+    Ep.start("low-tank", "playtest");
+    await t.until(() => Ep.now() && Ep.now().id === "low-tank", 3000, "Part 3 running");
+    if (!$("episode-hud") || $("episode-hud").hidden) t.problem("bug", "The episode HUD isn't up for Part 3");
+    await sleep(3200);
+    t.event("ending-dialogue", `Part 3 opens: "${lastSay()}"`);
+    const zoneOk = Math.hypot(C.state().x - 190, C.state().z - 44) < 18;
+    if (!zoneOk) await walkTo(190, 31, 0.6);
+    for (let i = 0; i < bolts; i++) {
+      refill();
+      await press("e", 1700);
+      const st = Ep.story();
+      if (st) t.event("ending-gauge", `bolt ${i + 1}: gauge ${(st.gauge * 100).toFixed(0)}%, Sky ${st.strain} of ${st.budget}`);
+    }
+    await t.until(() => goalDone("charge"), 6000, "the mast to be charged");
+    for (let i = 0; i < 8 && !goalDone("fill") && Ep.now(); i++) {
+      refill();
+      await press("r", 4400);
+      const st = Ep.story();
+      if (st) t.event("ending-gauge", `rain ${i + 1}: gauge ${(st.gauge * 100).toFixed(0)}%, Sky ${st.strain} of ${st.budget}`);
+    }
+    await t.until(() => !$("episode-score").hidden, 8000, "Part 3's card");
+    const c3 = await card(label);
+    await t.until(() => !$("ending-card").hidden, 5000, "the ending card");
+    const el = $("ending-card");
+    const name = (el.querySelector("h2") || {}).textContent || "";
+    const fared = [...el.querySelectorAll("li")].map((li) => li.textContent).join(" | ");
+    const last = (el.querySelector(".lastline") || {}).textContent || "";
+    const tally = (el.querySelector(".tally") || {}).textContent || "";
+    t.event("ending-reached", `${name} (${el.dataset.ending}) · ${tally} · ${last}`);
+    t.event("ending-fared", fared);
+    await sleep(2600); // a beat on the card for the footage
+    el.querySelector("button.again").click();
+    return { name, id: el.dataset.ending, fared, c3 };
+  }
+
+  const a = await tankRun("a calm Tank (two bolts, a little rain)", 2);
+  if (a.id !== "A") t.problem("bug", `A clean arc with a calm Tank ended ${a.name}, not Fair Weather`);
+  const b = await tankRun("a busy Tank (extra bolts)", 6);
+  if (b.id !== "B") t.problem("bug", `A flooded avenue ended ${b.name}, not Heavy Weather`);
+  const c = await tankRun("an overworked Tank (ten bolts)", 10);
+  if (c.id !== "C") t.problem("bug", `Strain 10 at the Tank ended ${c.name}, not Overcast`);
+  const ids = [a.id, b.id, c.id];
+  if (new Set(ids).size === 3) t.event("three-endings", `Three different endings from three Part 3 runs: ${[a.name, b.name, c.name].join(", ")}`);
+  else t.problem("bug", `The endings weren't three different ones: ${ids.join(",")}`);
+  if (!heard.some((h) => /Reservoir level: critical\. Please/.test(h.text)) || !heard.some((h) => /Weather Warning/.test(h.text))) t.problem("bug", "Part 3's Board lines didn't play");
+  window.removeEventListener("day:story", onStory);
+  t.progress(1);
+}
+
 /* ---------------- tutorial episode: five abilities, one at a time, a toast each, skippable ---------------- */
 // Needs ?playtest=tutorial-episode (the offer is only made by itself for a player or this scenario).
 async function tutorialEpisode(options, t) {
@@ -3574,6 +3736,7 @@ installPlaytest({
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
+    { id: "story-ending", title: "Part 3 (the reservoir) after Part 2, and the ending card: three Part 3 runs reach three different endings (Fair Weather, Heavy Weather, Overcast) and the card says how the park, turbines, market and reservoir fared", seconds: 840, tags: ["episodes", "story"], description: "Day bar to a moment outdoors and to 22:30 (setup), Enter, each part started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza, the annex and the Storm Tank, R, X, V and E. Events part3-offered / ending-say / ending-gauge / ending-kick / ending-card / ending-reached / ending-fared / three-endings." },
     { id: "story-parts", title: "Story Parts 1 and 2 as episodes: rain on the park (not the market), sun break and the stalls; overusing rain floods the park and scars the card; Part 2 wind for the turbines, a gale in the plaza topples a stall; neighbor dialogue from the beat sheet", seconds: 420, tags: ["episodes", "story"], description: "Day bar to a moment outdoors (setup), Enter, the parts started by their API (setup) and Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza and the annex, R, X and V. Events story-list / story-menu / story-say / story-goal / story-strain / story-kick / story-wind / story-card (clean vs scarred)." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
@@ -3604,6 +3767,7 @@ installPlaytest({
       else if (id === "voice") await voice(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);
+      else if (id === "story-ending") await storyEnding(options, t);
       else if (id === "first-visit") await firstVisit(options, t);
       else if (id === "tutorial-episode") await tutorialEpisode(options, t);
     } finally {

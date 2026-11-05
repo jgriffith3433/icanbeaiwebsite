@@ -27,6 +27,8 @@ export function matchEpisode(list, chapter, minutes, opt) {
     if (after != null && minutes < after) continue;
     if (before != null && minutes > before) continue;
     if (ep.needOut && inCar) continue;
+    // A later part is offered by itself only once the part before it has been played.
+    if (ep.afterPart && !(opt && opt.arc && opt.arc.parts && opt.arc.parts[ep.afterPart])) continue;
     if (inCar && (ep.id === "commute-home" || ep.debris)) continue;
     return ep;
   }
@@ -44,8 +46,56 @@ export function inZone(zone, x, z) {
 /** What one weather call adds to the Strain meter: its cost, doubled if the same call came inside stackSec. */
 export function strainCost(cfg, power, lastAt, now) {
   const base = (cfg && cfg.costs && cfg.costs[power]) != null ? cfg.costs[power] : 1;
-  const stack = (cfg && cfg.stackSec) || 60;
+  const stack = cfg && cfg.stackSec != null ? cfg.stackSec : 60;
   return lastAt != null && now - lastAt <= stack ? base * 2 : base;
+}
+
+/* ---- the arc across the three parts (Part 3 and the endings) ----
+   `arc` = { parts: { 1: { scarred, strain, kicks, goals, at }, 2: …, 3: … }, ending }, kept in localStorage.
+   `at` is the sim minute the part ended at; Strain falls by 1 each sim hour, so it is what's left at `nowMin`. */
+export function carryStrain(arc, nowMin, upto, perHour) {
+  const parts = (arc && arc.parts) || {};
+  const per = perHour != null ? perHour : 1;
+  let sum = 0;
+  Object.keys(parts).forEach((k) => {
+    const p = parts[k];
+    if (!p || (upto != null && Number(k) >= upto)) return;
+    const hours = Math.max(0, (nowMin - (p.at || 0)) / 60);
+    sum += Math.max(0, Math.round((p.strain | 0) - hours * per));
+  });
+  return sum;
+}
+
+/* Which ending the arc earned: C when the sky is overworked (Strain at the Tank at the overcast line, or every part
+   scarred), A when all three parts were played clean and the Tank stayed at or under the calm line, else B. */
+export function pickEnding(arc, tankStrain, rules) {
+  const r = Object.assign({ calm: 6, overcast: 10 }, rules || {});
+  const parts = (arc && arc.parts) || {};
+  const played = [1, 2, 3].filter((n) => parts[n]);
+  const scarred = played.filter((n) => parts[n].scarred).length;
+  if (tankStrain >= r.overcast || (played.length === 3 && scarred === 3)) return "C";
+  if (played.length === 3 && scarred === 0 && tankStrain <= r.calm) return "A";
+  return "B";
+}
+
+/* The four needs, one line each, from what the parts left behind: state is ok, scar or open (never answered). */
+export function cityFared(arc, lines) {
+  const parts = (arc && arc.parts) || {};
+  const L = lines || {};
+  const has = (n, k) => !!(parts[n] && (parts[n].kicks || []).indexOf(k) >= 0);
+  const goal = (n, id) => !!(parts[n] && (parts[n].goals || []).indexOf(id) >= 0);
+  const pick = (key, state) => (L[key] && L[key][state]) || `${key}: ${state}`;
+  const out = [];
+  let st = !parts[1] || !goal(1, "rain-park") ? "open" : has(1, "flood") || has(1, "scorch") ? "scar" : "ok";
+  out.push({ need: "park", state: st, text: pick("park", st) });
+  st = !parts[2] || !goal(2, "turn") ? "open" : has(2, "overspeed") || has(2, "topple") || (parts[2].toppled | 0) > 0 ? "scar" : "ok";
+  out.push({ need: "turbines", state: st, text: pick("turbines", st) });
+  st = !parts[1] || !goal(1, "stalls") ? "open" : has(1, "soak") || parts[1].scarred || has(2, "topple") ? "scar" : "ok";
+  out.push({ need: "market", state: st, text: pick("market", st) });
+  const p3 = parts[3];
+  st = !p3 || !goal(3, "fill") ? "open" : has(3, "overcast") || has(3, "flood") ? "scar" : "ok";
+  out.push({ need: "reservoir", state: st, text: pick("reservoir", st) });
+  return out;
 }
 
 function wordFor(pct, bands) {
@@ -143,6 +193,13 @@ function install() {
     cfg.lines || {}
   );
   const bands = cfg.bands || [];
+  const arcKey = cfg.arcKey || "icanbe.story.arc";
+  const END = cfg.endings || {};
+  const loadArc = () => {
+    const a = loadBest(arcKey);
+    if (!a.parts || typeof a.parts !== "object") a.parts = {};
+    return a;
+  };
   const storageKey = cfg.storageKey || "icanbe.episodes.best";
   const B = window.BABYLON;
   const world = day.world && day.world();
@@ -204,8 +261,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-score.scarred .forecast,.ep-score.scarred .strainline{color:#e58a7a}
 .ep-toast{position:fixed;z-index:9;left:50%;top:max(64px,calc(env(safe-area-inset-top) + 56px));transform:translate(-50%,-8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(14,16,22,.9);border:1px solid #f0c27a;color:#f6f1e8;font:600 0.95rem Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap;max-width:calc(100vw - 24px)}
 .ep-toast.on{opacity:1;transform:translate(-50%,0)}
-.ep-offer,.ep-score,.ep-menu{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
-.ep-offer[hidden],.ep-score[hidden],.ep-menu[hidden]{display:none}
+.ep-offer,.ep-score,.ep-menu,.ep-ending{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
+.ep-offer[hidden],.ep-score[hidden],.ep-menu[hidden],.ep-ending[hidden]{display:none}
 .ep-panel{width:min(420px,100%);background:rgba(14,16,22,.92);border:1px solid rgba(246,241,232,.18);border-radius:20px;padding:22px 22px 18px;color:#f6f1e8;font:500 0.95rem/1.4 Outfit,system-ui,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.45)}
 .ep-panel h2{margin:0 0 6px;font-size:1.25rem}
 .ep-panel p{margin:0 0 14px;color:rgba(246,241,232,.72)}
@@ -214,6 +271,16 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-panel button.primary{background:#f0c27a;color:#1a1c22;border-color:transparent}
 .ep-panel .forecast{font-size:1.15rem;font-weight:700;color:#9fd4ff;margin:8px 0 4px}
 .ep-panel .bestline{font-size:0.82rem;color:rgba(246,241,232,.55)}
+.ep-ending .ep-panel{width:min(520px,100%)}
+.ep-ending .kicker{margin:0 0 2px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#9fd4ff}
+.ep-ending ul{margin:0 0 12px;padding:0;list-style:none}
+.ep-ending li{margin:5px 0;color:rgba(246,241,232,.86)}
+.ep-ending li b{display:inline-block;min-width:92px;color:#f0c27a;font-weight:600}
+.ep-ending li.scar b,.ep-ending li.scar{color:#e58a7a}
+.ep-ending li.open b,.ep-ending li.open{color:rgba(246,241,232,.5)}
+.ep-ending .lastline{font-size:1.05rem;color:#f6f1e8;margin:10px 0 4px}
+.ep-ending .lastline i{display:block;font-style:normal;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#7ec8ff}
+.ep-ending .tally{font-size:.85rem;color:#9fd4ff;margin:0 0 6px}
 .ep-menu .ep-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 .ep-menu .ep-row{display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:100%;gap:2px}
 .ep-menu .ep-row small{font-weight:500;color:rgba(246,241,232,.55)}
@@ -244,6 +311,12 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   scoreEl.hidden = true;
   scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><div class="actions"><button type="button" class="primary ok">OK</button></div></div>`;
 
+  const endEl = document.createElement("div");
+  endEl.id = "ending-card";
+  endEl.className = "ep-ending";
+  endEl.hidden = true;
+  endEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><p class="kicker"></p><h2></h2><p class="scene"></p><ul class="fared"></ul><p class="lastline"></p><p class="tally"></p><div class="actions"><button type="button" class="primary again"></button></div></div>`;
+
   const menu = document.createElement("div");
   menu.id = "episode-menu";
   menu.className = "ep-menu";
@@ -262,7 +335,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   say.setAttribute("role", "status");
   say.setAttribute("aria-live", "polite");
 
-  document.body.append(menuBtn, hud, offer, scoreEl, menu, toast, say);
+  document.body.append(menuBtn, hud, offer, scoreEl, endEl, menu, toast, say);
 
   const hudTitle = hud.querySelector("h3");
   const hudTag = hud.querySelector(".tag");
@@ -284,6 +357,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   const scoreStrain = scoreEl.querySelector(".strainline");
   const scoreOk = scoreEl.querySelector(".ok");
   const menuList = menu.querySelector(".ep-list");
+  const endKicker = endEl.querySelector(".kicker");
+  const endTitle = endEl.querySelector("h2");
+  const endScene = endEl.querySelector(".scene");
+  const endFared = endEl.querySelector(".fared");
+  const endLast = endEl.querySelector(".lastline");
+  const endTally = endEl.querySelector(".tally");
+  const endAgain = endEl.querySelector(".again");
   const menuClose = menu.querySelector(".close");
 
   offerAccept.textContent = L.accept;
@@ -308,7 +388,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     return props.mats;
   }
   /* ---- story props (Parts 1 and 2): market stalls, roof turbines, scorch and flood patches ---- */
-  const story = { stalls: [], turbines: [], patches: [], spin: 0, turned: false };
+  const story = { stalls: [], turbines: [], patches: [], spin: 0, turned: false, gauge: null };
   const STALL_AT = [[109, 20.4], [114, 20.4], [123, 20.4], [127.5, 20.4], [118, 33.4]];
   const STALL_COLORS = ["#d9604a", "#e0a53c", "#4f9a5b", "#4a7fc0", "#a65bb5"];
   function smat(name, hex, emissive) {
@@ -396,6 +476,41 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       story.turbines.push({ root, rotor, hub, w: 0, still: true, lit: false, matHub: hub.material });
     });
   }
+  /* Part 3: the Storm Tank's gauge, a glass tube on the avenue side of the tank that fills as the mast is charged
+     and the rain comes down. `level` is 0..1; the fill grows from the bottom. */
+  function spawnGauge(cfgG) {
+    if (!B || !world || !world.scene || !cfgG) return;
+    const root = new B.TransformNode("ep-gauge", world.scene);
+    root.position.set(cfgG.x, 0, cfgG.z);
+    const H = cfgG.h || 10;
+    const tube = B.MeshBuilder.CreateBox("ep-gauge-tube", { width: 1.1, height: H, depth: 1.1 }, world.scene);
+    tube.parent = root;
+    tube.position.y = H / 2;
+    const tm = smat("gauge-glass", "#27323f", 0.08);
+    tm.alpha = 0.7;
+    tube.material = tm;
+    tube.isPickable = false;
+    const fill = B.MeshBuilder.CreateBox("ep-gauge-fill", { width: 0.8, height: H, depth: 0.8 }, world.scene);
+    fill.parent = root;
+    fill.material = smat("gauge-water", "#3ecbff", 0.9);
+    fill.isPickable = false;
+    story.gauge = { root, fill, H, level: 0, to: 0, glow: fill.material };
+    setGauge(0, true);
+  }
+  function setGauge(v, snap) {
+    const g = story.gauge;
+    if (!g) return;
+    g.to = Math.max(0, Math.min(1, v));
+    if (snap) g.level = g.to;
+    applyGauge();
+  }
+  function applyGauge() {
+    const g = story.gauge;
+    if (!g) return;
+    const k = Math.max(0.02, g.level);
+    g.fill.scaling.y = k;
+    g.fill.position.y = (g.H * k) / 2;
+  }
   function patch(kind, x, z, r, hex, alpha) {
     if (!B || !world || !world.scene) return;
     const d = B.MeshBuilder.CreateCylinder("ep-patch-" + kind, { diameter: r * 2, height: 0.05, tessellation: 20 }, world.scene);
@@ -410,6 +525,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     story.stalls.forEach((s) => s.node.dispose(false, false));
     story.turbines.forEach((t) => t.root.dispose(false, false));
     story.patches.forEach((d) => d.dispose());
+    if (story.gauge) story.gauge.root.dispose(false, true);
+    story.gauge = null;
     story.turned = false;
     story.stalls = [];
     story.turbines = [];
@@ -577,7 +694,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       markEl.textContent = g.done ? "✓" : g.failed ? "✗" : "·";
       const label = document.createElement("span");
       let text = g.label || g.id;
-      if (g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris") {
+      if ((g.kind === "ability-in" && g.count > 1) || g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris") {
         const need = g.count | 0;
         const have = Math.min(need, g.progress | 0);
         text += ` (${have}/${need})`;
@@ -750,7 +867,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     const sc = cfg.strain || {};
     const budget = A.ep.strain.budget;
     const nowS = performance.now() / 1000;
-    const add = strainCost(sc, power, A.lastCall[power], nowS);
+    const add = strainCost(Object.assign({}, sc, A.ep.strain), power, A.lastCall[power], nowS);
     A.lastCall[power] = nowS;
     A.strain += add;
     A.calls[power] = (A.calls[power] | 0) + 1;
@@ -773,6 +890,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       if (power === "rain" && at("park") && A.over && kick("flood")) patch("flood", 15, 60, 9, "#2c6f98", 0.55);
       if (power === "sunbreak" && at("market")) A.marketWet = false;
       if (power === "sunbreak" && A.over && pos && kick("scorch")) patch("scorch", pos.x - 1.5, pos.z + 3, 3.2, "#6b4a22", 1);
+    } else if (A.ep.id === "low-tank") {
+      const lim = (cfg.endings && cfg.endings.rules) || { calm: 6, overcast: 10 };
+      if (A.strain > lim.calm && A.strain < lim.overcast && kick("flood")) patch("flood", 190, 24, 9, "#2c6f98", 0.55);
+      if (A.strain >= lim.overcast && kick("overcast")) {
+        const W = window.weather || day.weather;
+        if (W && W.set) W.set("storm", 1, "power");
+      }
     } else if (A.ep.id === "still-blades") {
       if (power === "gale" && at("market")) {
         toppleStall(1);
@@ -836,6 +960,15 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     };
     active.unlocked = [];
     Object.assign(active, { strain: 0, over: false, edgy: false, lastCall: {}, calls: {}, kicks: [], marketWet: false, toppled: 0, windSec: 0, stay: 0, shutUntil: 0, age: 0 });
+    if (ep.id === "dry-park") saveBest(arcKey, { parts: {} }); // Part 1 starts the arc over
+    active.carry = 0;
+    if (ep.part === 3) {
+      // Strain the district still carries from the earlier parts, less one for each sim hour since.
+      const nowMin = (day.now && day.now().minutes) || 0;
+      active.carry = carryStrain(loadArc(), nowMin, 3, cfg.strain && cfg.strain.perHour);
+      active.strain = active.carry;
+      active.over = active.strain > ep.strain.budget;
+    }
     if (ep.tutorial) {
       const A = abil();
       if (A) A.lock();
@@ -847,6 +980,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (ep.debris) spawnDebris();
     if (ep.market) spawnStalls(!!ep.market.open);
     if (ep.turbines) spawnTurbines(ep.turbines);
+    if (ep.gauge) spawnGauge(ep.gauge);
     sayQueue = [];
     sayLeft = 0;
     sayKey("start", ep);
@@ -894,6 +1028,24 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         scars.push((run.ep.scars && run.ep.scars.shut) || "a stall stays shut");
       }
     }
+    if (run.ep.part && (why === "clear" || why === "scarred" || why === "time")) {
+      const arc = loadArc();
+      arc.parts[run.ep.part] = {
+        scarred: !!card.scarred,
+        strain: run.strain,
+        kicks: run.kicks.slice(),
+        goals: run.goals.filter((g) => g.done).map((g) => g.id),
+        toppled: run.toppled,
+        at: (day.now && day.now().minutes) || 0,
+      };
+      if (run.ep.part === 3) {
+        const id = pickEnding(arc, run.strain, END.rules);
+        arc.ending = { id, tank: run.strain };
+        pendingEnding = id;
+      }
+      saveBest(arcKey, arc);
+      mark("arc", { id: run.ep.id, part: run.ep.part, scarred: !!card.scarred, strain: run.strain });
+    }
     if (card.scarred && run.strain > run.ep.strain.budget) scars.push(`strain ${run.strain} over ${run.ep.strain.budget}`);
     if (run.ep.strain && (why === "clear" || why === "scarred")) sayKey(card.scarred ? "end:scarred" : "end:clean", run.ep);
     if (day.note) {
@@ -910,7 +1062,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (storyMeta) {
       const sl = (cfg.strain && cfg.strain.lines) || {};
       scoreStrain.hidden = false;
-      scoreStrain.textContent = `${sl.meter || "Sky"} ${run.strain} ${sl.of || "of"} ${run.ep.strain.budget} · ${card.scarred ? sl.scarred || "Scarred" : sl.clean || "Clean"}` + (scars.length ? `: ${scars.join("; ")}` : "");
+      scoreStrain.textContent = `${sl.meter || "Sky"} ${run.strain} ${sl.of || "of"} ${run.ep.strain.budget}` + (run.carry ? ` (${run.carry} carried from earlier)` : "") + ` · ${card.scarred ? sl.scarred || "Scarred" : sl.clean || "Clean"}` + (scars.length ? `: ${scars.join("; ")}` : "");
     } else scoreStrain.hidden = true;
     const b = rec.best[run.ep.id];
     scoreBest.textContent = b ? `${L.best}: ${b.pct}% chance of ${b.word}` : "";
@@ -919,8 +1071,48 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     endQuiet();
     return card;
   }
+  let pendingEnding = null;
+  /* The ending card: which of the three endings, how each need came out, his last line, the Sky total. */
+  function showEnding(id) {
+    const e = END[id];
+    if (!e) return null;
+    const arc = loadArc();
+    const fared = cityFared(arc, END.fared);
+    const L2 = END.lines || {};
+    endKicker.textContent = L2.kicker || "How the district fared";
+    endTitle.textContent = e.name;
+    endScene.textContent = e.scene;
+    endFared.innerHTML = "";
+    fared.forEach((f) => {
+      const li = document.createElement("li");
+      li.className = f.state;
+      const b = document.createElement("b");
+      b.textContent = (END.needs && END.needs[f.need]) || f.need;
+      li.append(b, document.createTextNode(f.text));
+      li.dataset.need = f.need;
+      endFared.appendChild(li);
+    });
+    endLast.innerHTML = "";
+    const who = document.createElement("i");
+    who.textContent = e.last[0];
+    endLast.append(who, document.createTextNode(e.last[1]));
+    const tank = (arc.ending && arc.ending.tank) || 0;
+    endTally.textContent = `${L2.tally || "Sky at the Tank"}: ${tank}`;
+    endAgain.textContent = L2.again || "Walk the city";
+    endEl.dataset.ending = id;
+    endEl.hidden = false;
+    if (day.note) day.note(`${e.name}. ${e.last[0]}: ${e.last[1]}`);
+    mark("ending", { id: "ending", ending: id, name: e.name, tank, fared: fared.map((f) => f.need + ":" + f.state).join(",") });
+    storyEvent("ending", { ending: id, name: e.name, tank, fared: fared.map((f) => ({ need: f.need, state: f.state })) });
+    return { id, name: e.name, fared };
+  }
   function hideScore() {
     scoreEl.hidden = true;
+    if (pendingEnding) {
+      const id = pendingEnding;
+      pendingEnding = null;
+      showEnding(id);
+    }
   }
 
   function hideMenu() {
@@ -978,6 +1170,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       mark("decline", { id });
     }
   });
+  endAgain.addEventListener("click", () => { endEl.hidden = true; });
   hudSkip.addEventListener("click", () => {
     if (active && active.ep.tutorial) finish("skip");
   });
@@ -1006,7 +1199,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         showOffer(tut);
         return;
       }
-      const ep = matchEpisode(list, chapter, minutes, { inCar });
+      const ep = matchEpisode(list, chapter, minutes, { inCar, arc: loadArc() });
       if (ep) showOffer(ep);
     } else if (action === "let-go") {
       lastControl = "returning";
@@ -1039,7 +1232,9 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       const pos = playerPos();
       active.goals.forEach((g) => {
         if (g.kind !== "ability-in" || g.done || !afterMet(g, active) || g.power !== d.power) return;
-        if (pos && inZone((active.ep.zones || {})[g.zone], pos.x, pos.z)) completeGoal(g, d.via || "key");
+        if (!(pos && inZone((active.ep.zones || {})[g.zone], pos.x, pos.z))) return;
+        if (g.count > 1) bumpProgress(g, 1, d.via || "key");
+        else completeGoal(g, d.via || "key");
       });
       if (!active) return;
     }
@@ -1088,6 +1283,10 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         A.stay = g.progress;
         if (g.progress >= g.seconds) completeGoal(g, "stay");
       }
+      if (g.kind === "weather-time" && pos && inZone(zones[g.zone], pos.x, pos.z) && wx && (g.states || [g.state]).indexOf(wx.state) >= 0) {
+        g.progress = Math.min(g.seconds, (g.progress || 0) + dt);
+        if (g.progress >= g.seconds) completeGoal(g, "weather");
+      }
       if (g.kind === "wind-time" && pos && inZone(zones[g.zone], pos.x, pos.z) && wx && wx.state === "wind" && A.age >= A.shutUntil) {
         g.progress = Math.min(g.seconds, (g.progress || 0) + dt);
         A.windSec = g.progress;
@@ -1112,6 +1311,16 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         st.node.position.y = Math.abs(Math.sin(st.tilt)) * 0.4;
       }
     });
+    // Part 3: the gauge follows the goals (a third per charge, the rest from the rain) and eases to it.
+    if (story.gauge) {
+      const g = story.gauge;
+      if (A && A.goals) {
+        const frac = (id) => { const x = A.goals.find((q) => q.id === id); return x ? (x.done ? 1 : Math.min(1, (x.progress || 0) / (x.count || x.seconds || 1))) : 0; };
+        g.to = 0.35 * frac("charge") + 0.65 * frac("fill");
+      }
+      g.level += (g.to - g.level) * Math.min(1, dt * 3);
+      applyGauge();
+    }
     // Part 2: blades turn with the wind on the roof; a shut turbine stands dead; a won one turns for good.
     if (story.turbines.length) {
       const W = window.weather || day.weather;
@@ -1231,9 +1440,18 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
             marketWet: active.marketWet,
             stalls: story.stalls.map((x) => (x.down ? "down" : x.open ? "open" : x.shut ? "shut" : "closed")),
             turbine: story.spin,
+            carry: active.carry,
+            gauge: story.gauge ? story.gauge.level : null,
           }
         : null,
     menu: showMenu,
+    arc: () => loadArc(),
+    ending: () => {
+      const a = loadArc();
+      return a.ending ? { id: a.ending.id, name: (END[a.ending.id] || {}).name, tank: a.ending.tank, shown: !endEl.hidden, fared: cityFared(a, END.fared) } : null;
+    },
+    showEnding: (id) => showEnding(id || (loadArc().ending || {}).id),
+    resetArc: () => saveBest(arcKey, { parts: {} }),
   };
   day.episodes = api;
   window.episodes = api;
