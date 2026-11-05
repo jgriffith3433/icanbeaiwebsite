@@ -19,7 +19,7 @@ export function matchEpisode(list, chapter, minutes, opt) {
   const items = Array.isArray(list) ? list : [];
   for (let i = 0; i < items.length; i++) {
     const ep = items[i];
-    if (!ep || !ep.id) continue;
+    if (!ep || !ep.id || ep.tutorial) continue;
     const ch = ep.chapters || [];
     if (ch.length && chapter && ch.indexOf(chapter) < 0) continue;
     const after = clockMinutes(ep.after);
@@ -164,6 +164,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-hud li i{flex:0 0 14px;font-style:normal}
 .ep-hud .timer{margin-top:8px;font-variant-numeric:tabular-nums;color:#9fd4ff}
 .ep-hud .cue{margin-top:6px;color:#f0c27a}
+.ep-hud .prompt{margin:8px 0 0;color:#f0c27a}
+.ep-hud .skip{margin-top:8px;appearance:none;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.8rem Outfit,system-ui,sans-serif;cursor:pointer}
+.ep-hud .skip:hover{background:rgba(240,194,122,.14)}
+.ep-toast{position:fixed;z-index:9;left:50%;top:max(64px,calc(env(safe-area-inset-top) + 56px));transform:translate(-50%,-8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(14,16,22,.9);border:1px solid #f0c27a;color:#f6f1e8;font:600 0.95rem Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap;max-width:calc(100vw - 24px)}
+.ep-toast.on{opacity:1;transform:translate(-50%,0)}
 .ep-offer,.ep-score,.ep-menu{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
 .ep-offer[hidden],.ep-score[hidden],.ep-menu[hidden]{display:none}
 .ep-panel{width:min(420px,100%);background:rgba(14,16,22,.92);border:1px solid rgba(246,241,232,.18);border-radius:20px;padding:22px 22px 18px;color:#f6f1e8;font:500 0.95rem/1.4 Outfit,system-ui,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.45)}
@@ -190,7 +195,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   hud.id = "episode-hud";
   hud.className = "ep-hud";
   hud.hidden = true;
-  hud.innerHTML = `<div class="ep-card"><h3></h3><p class="tag"></p><ul></ul><div class="timer" hidden></div><div class="cue" hidden></div></div>`;
+  hud.innerHTML = `<div class="ep-card"><h3></h3><p class="tag"></p><ul></ul><div class="timer" hidden></div><div class="cue" hidden></div><p class="prompt" hidden></p><button type="button" class="skip" hidden>Skip</button></div>`;
 
   const offer = document.createElement("div");
   offer.id = "episode-offer";
@@ -210,13 +215,21 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   menu.hidden = true;
   menu.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2>${L.menu}</h2><p>Jump the clock to a chapter and play that episode.</p><div class="ep-list"></div><div class="actions"><button type="button" class="close">Close</button></div></div>`;
 
-  document.body.append(menuBtn, hud, offer, scoreEl, menu);
+  const toast = document.createElement("div");
+  toast.id = "ability-toast";
+  toast.className = "ep-toast";
+  toast.setAttribute("role", "status");
+  toast.setAttribute("aria-live", "polite");
+
+  document.body.append(menuBtn, hud, offer, scoreEl, menu, toast);
 
   const hudTitle = hud.querySelector("h3");
   const hudTag = hud.querySelector(".tag");
   const hudList = hud.querySelector("ul");
   const hudTimer = hud.querySelector(".timer");
   const hudCue = hud.querySelector(".cue");
+  const hudPrompt = hud.querySelector(".prompt");
+  const hudSkip = hud.querySelector(".skip");
   const offerTitle = offer.querySelector("h2");
   const offerTag = offer.querySelector(".tagline");
   const offerHint = offer.querySelector(".hint");
@@ -333,6 +346,60 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     const d = day.today && day.today();
     return d && d.spots && d.spots[name] ? d.spots[name] : null;
   }
+  /* ---- the tutorial episode: abilities locked, unlocked one at a time, a toast each ---- */
+  const tutKey = cfg.tutorialKey || "icanbe.episodes.tutorial";
+  let toastTimer = 0;
+  let botQuiet = false;
+  try {
+    // Only a real player, or the tutorial-episode scenario, is offered it by itself: other scenarios
+    // start with empty storage and must not meet the offer.
+    const pid = new URLSearchParams(location.search).get("playtest");
+    if (pid && pid !== "tutorial-episode") botQuiet = true;
+  } catch (e) { /* no location */ }
+  function tutorialDone() {
+    try { return !!localStorage.getItem(tutKey); } catch (e) { return false; }
+  }
+  function rememberTutorial(how) {
+    try { localStorage.setItem(tutKey, how); } catch (e) { /* private mode */ }
+  }
+  function abil() {
+    const P = window.powers || day.powers;
+    return P && P.abilities ? P.abilities : null;
+  }
+  function showToast(text) {
+    toast.textContent = text;
+    toast.classList.add("on");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("on"), 4200);
+  }
+  function unlockAbility(id, run) {
+    const A = abil();
+    if (!A || !id) return;
+    A.unlock(id);
+    const info = A.get(id) || { name: id, key: "" };
+    const text = String((run.ep.lines && run.ep.lines.unlock) || "New ability: {name}. Key {key}.")
+      .replace("{name}", info.name)
+      .replace("{key}", String(info.key).toUpperCase());
+    showToast(text);
+    if (day.note) day.note(text);
+    const slot = document.getElementById("ability-" + id);
+    if (slot) {
+      slot.classList.add("unlocked-now");
+      setTimeout(() => slot.classList.remove("unlocked-now"), 4200);
+    }
+    // Pressure is topped up so a new ability can be tried straight away.
+    if (A.reset) A.reset(100);
+    run.unlocked.push(id);
+    mark("unlock", { id: run.ep.id, power: id, name: info.name, key: info.key });
+  }
+  function openAllAbilities() {
+    const A = abil();
+    if (A) A.unlock();
+  }
+  function currentTutorialGoal(run) {
+    return run.goals.find((g) => !g.done) || null;
+  }
+
   function paintHud() {
     if (!active) {
       hud.hidden = true;
@@ -363,6 +430,10 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       const sec = Math.max(0, Math.ceil(active.left));
       hudTimer.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     } else hudTimer.hidden = true;
+    const cur = active.ep.tutorial ? currentTutorialGoal(active) : null;
+    hudPrompt.hidden = !cur;
+    hudPrompt.textContent = cur ? cur.prompt || "" : "";
+    hudSkip.hidden = !active.ep.tutorial;
     if (active.ep.cue) {
       hudCue.hidden = false;
       hudCue.textContent = active.cueOn ? "Now — strike!" : "Wait for the cue…";
@@ -374,6 +445,10 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     g.progress = Math.max(g.progress | 0, g.count | 0);
     if (day.note) day.note((g.label || g.id) + ".");
     mark("goal", { id: active.ep.id, goal: g.id, via: via || "play" });
+    if (active.ep.tutorial) {
+      const next = currentTutorialGoal(active);
+      if (next) unlockAbility(next.power, active);
+    }
     paintHud();
     if (allDone(active)) finish("clear");
     return true;
@@ -440,7 +515,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     offerEp = ep;
     offerTitle.textContent = ep.title;
     offerTag.textContent = ep.tagline || "";
-    offerHint.textContent = L.offer;
+    offerHint.textContent = ep.tutorial ? "New here? Learn the five weather abilities, one at a time." : L.offer;
     offer.hidden = false;
     mark("offer", { id: ep.id });
   }
@@ -475,6 +550,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       cueAge: 0,
       via: via || "play",
     };
+    active.unlocked = [];
+    if (ep.tutorial) {
+      const A = abil();
+      if (A) A.lock();
+      const first = currentTutorialGoal(active);
+      if (first) unlockAbility(first.power, active);
+    }
     if (ep.rods && ep.rods.length) spawnRods(ep.rods);
     else clearProps();
     if (ep.debris) spawnDebris();
@@ -484,6 +566,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     return true;
   }
   function endQuiet() {
+    if (active && active.ep.tutorial) openAllAbilities();
     active = null;
     clearProps();
     hud.hidden = true;
@@ -491,6 +574,21 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   function finish(why) {
     if (!active) return null;
     const run = active;
+    if (run.ep.tutorial) {
+      // Done and Skip are remembered; letting go (or a restart) only pauses it: it's offered again.
+      const how = why === "clear" ? "done" : why === "skip" ? "skip" : "pause";
+      if (how !== "pause") rememberTutorial(how);
+      const L2 = run.ep.lines || {};
+      const text = how === "done" ? L2.done : how === "skip" ? L2.skip : "";
+      if (text) {
+        if (day.note) day.note(text);
+        showToast(text);
+      }
+      mark("tutorial-" + how, { id: run.ep.id, why, goals: goalsDone(run), unlocked: run.unlocked.length });
+      mark("score", { id: run.ep.id, why, tutorial: true, goals: goalsDone(run) });
+      endQuiet();
+      return null;
+    }
     const card = scoreCard(goalsDone(run), run.goals.length, run.left, run.ep.timer || 0, bands);
     const rec = recordBest(storageKey, run.ep.id, card);
     if (day.note) {
@@ -555,6 +653,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   offerDecline.addEventListener("click", () => {
     declinedTake = true;
     const id = offerEp && offerEp.id;
+    if (offerEp && offerEp.tutorial) rememberTutorial("skip");
     hideOffer();
     mark("decline", { id });
   });
@@ -562,9 +661,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (e.target === offer) {
       declinedTake = true;
       const id = offerEp && offerEp.id;
+      if (offerEp && offerEp.tutorial) rememberTutorial("skip");
       hideOffer();
       mark("decline", { id });
     }
+  });
+  hudSkip.addEventListener("click", () => {
+    if (active && active.ep.tutorial) finish("skip");
   });
   scoreOk.addEventListener("click", hideScore);
   scoreEl.addEventListener("click", (e) => {
@@ -586,6 +689,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       const chapter = (fr && (fr.chapter || (fr.action && fr.action.chapter))) || "";
       const minutes = (day.now && day.now().minutes) || 0;
       const inCar = !!(fr && fr.person && fr.person.inCar);
+      const tut = list.find((e) => e.tutorial);
+      if (tut && !botQuiet && !tutorialDone()) {
+        showOffer(tut);
+        return;
+      }
       const ep = matchEpisode(list, chapter, minutes, { inCar });
       if (ep) showOffer(ep);
     } else if (action === "let-go") {
@@ -607,6 +715,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (!active) return;
     const d = (e && e.detail) || {};
     const power = d.power || d.action;
+    if (active.ep.tutorial) {
+      // A used ability ("denied" and the world's thunder echo don't count).
+      if (d.action !== power || d.action === "denied") return;
+      const cur = currentTutorialGoal(active);
+      if (cur && cur.power === power) completeGoal(cur, d.via || "key");
+      return;
+    }
     if (power === "storm") tryGoalsFromSnap("storm");
     if (power === "gust" || power === "tornado") {
       active.debris += 1;
@@ -704,10 +819,14 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
             timed: active.timed,
             debris: active.debris,
             cue: active.cueOn,
+            unlocked: (active.unlocked || []).slice(),
+            prompt: active.ep.tutorial && currentTutorialGoal(active) ? currentTutorialGoal(active).prompt : null,
           }
         : null,
     offer: () => (offerEp ? { id: offerEp.id, title: offerEp.title } : null),
     best: () => loadBest(storageKey),
+    tutorial: () => ({ done: tutorialDone(), key: tutKey }),
+    skip: () => (active && active.ep.tutorial ? finish("skip") : null),
     start: (id, via) => {
       const ep = list.find((e) => e.id === id);
       return ep ? start(ep, via || "api") : false;

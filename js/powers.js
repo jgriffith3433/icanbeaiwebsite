@@ -39,6 +39,7 @@ const DEFAULTS = {
     fog: "Fog rolls in off the street.",
     sunbreak: "The clouds split. Warm light.",
     dry: "Not enough pressure.",
+    locked: "Not unlocked yet.",
     cooling: "Not ready yet.",
   },
 };
@@ -459,7 +460,7 @@ export function startPowers(world, dayApi) {
   /* ---- calls ---- */
   function refuse(power, via) {
     blocked = { power, pressure: Math.round(gauge.now().value), at: age, reason: lastWhy };
-    note(line(lastWhy === "cooldown" ? "cooling" : "dry"));
+    note(line(lastWhy === "cooldown" ? "cooling" : lastWhy === "locked" ? "locked" : "dry"));
     say("denied", via, power);
     return false;
   }

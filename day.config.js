@@ -324,6 +324,7 @@ window.DAY_CONFIG = {
       fog: "Fog rolls in off the street.",
       sunbreak: "The clouds split. Warm light.",
       dry: "Not enough pressure.",
+      locked: "Not unlocked yet.",
     },
     loose: [
       { kind: "umbrella", x: -1.6, dz: -2.6 },
@@ -433,6 +434,30 @@ window.DAY_CONFIG = {
       { min: 0, word: "drizzle" },
     ],
     list: [
+      /* The tutorial episode (first in the menu; offered once, on a new player's first take
+         control after the first-visit card). It teaches the five weather abilities one at a
+         time: every ability is locked, the next one unlocks (a toast says so) when the one
+         before it has been used, and when the last is used, or on Skip, everything is open.
+         Not tied to a chapter or the clock: it plays wherever he stands. */
+      {
+        id: "tutorial",
+        tutorial: true,
+        title: "Learn the weather",
+        tagline: "Five abilities, one at a time. Skip any time.",
+        goals: [
+          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Press E to throw Lightning where the reticle is." },
+          { id: "rain", kind: "ability", power: "rain", label: "Call Rain", prompt: "Press R. Rain, just here, just for a moment.", after: "bolt" },
+          { id: "gale", kind: "ability", power: "gale", label: "Call a Gale", prompt: "Press V. A gale shoves bins and umbrellas down the street.", after: "rain" },
+          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Press C. Fog rolls in off the street.", after: "gale" },
+          { id: "sunbreak", kind: "ability", power: "sunbreak", label: "Break the Sun through", prompt: "Press X. The clouds split.", after: "fog" },
+        ],
+        lines: {
+          start: "Five abilities. He learns them one at a time.",
+          done: "That's all five. The sky is his.",
+          skip: "Skipped. Every ability is open.",
+          unlock: "New ability: {name}. Key {key}.",
+        },
+      },
       {
         id: "morning",
         title: "Clear the sky",
