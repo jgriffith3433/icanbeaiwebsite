@@ -73,6 +73,15 @@ ab.step(0, 0);
 ok(ab.use("bolt").ok && !ab.use("nope").ok, "unknown ability refused");
 ab.step(2.1, 0);
 ok(ab.use("bolt").reason === "energy", "refused for energy when too poor");
+ab.step(10, 100);
+ab.lock();
+const e0 = ab.now().energy;
+ok(ab.use("bolt").reason === "locked" && ab.get("bolt").locked && ab.now().energy === e0, "a locked ability is refused and free");
+ab.unlock("bolt");
+ok(ab.use("bolt").ok, "an unlocked ability works");
+ab.lock();
+ab.unlock();
+ok(!ab.isLocked("bolt"), "unlock() with no id opens everything");
 ab.step(100, 100);
 ok(ab.now().energy === 100, "energy regenerates up to max");
 
