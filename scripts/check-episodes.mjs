@@ -51,7 +51,7 @@ E.list.filter((e) => !e.tutorial).forEach((ep) => {
   ok(ep.title && ep.tagline, `${ep.id}: needs title and tagline`);
   ok(Array.isArray(ep.chapters) && ep.chapters.length, `${ep.id}: needs chapters`);
   ok(ep.clock, `${ep.id}: needs a clock jump`);
-  ok(Array.isArray(ep.goals) && ep.goals.length >= 2 && ep.goals.length <= 3, `${ep.id}: wants 2–3 goals, has ${ep.goals && ep.goals.length}`);
+  ok(Array.isArray(ep.goals) && ep.goals.length >= 2 && ep.goals.length <= (ep.pieces ? 5 : 3), `${ep.id}: wants 2–3 goals (5 with set pieces), has ${ep.goals && ep.goals.length}`);
   ep.goals.forEach((g) => ok(g.id && g.kind && g.label, `${ep.id}/${g && g.id}: goal needs id, kind, label`));
 });
 
@@ -117,6 +117,30 @@ ok(rk(6 * lunch.rank.help + lunch.rank.precision + 90) === "S", "everyone, the r
 ok(rk(6 * lunch.rank.help) === "A" && rk(3 * lunch.rank.help) === "C" && rk(5 * lunch.rank.help) === "B", "more people helped is a higher rank");
 ok(rk(6 * lunch.rank.late) < rk(6 * lunch.rank.help) || rankFor(6 * lunch.rank.late, lunch.rank).pct < rankFor(6 * lunch.rank.help, lunch.rank).pct, "late help is worth less");
 ok(inZone(lunch.zones.plaza, 118, 30) && lunch.pieces[0].people.every((p) => inZone(lunch.zones.plaza, p.x, p.z)), "the shelter people stand in the plaza");
+
+// The hurricane drive (commute-home): a rescue with four set pieces, a twist, helping and hurting abilities, an ending per rank
+const dr = E.list.find((e) => e.id === "commute-home");
+ok(dr && dr.pieces && dr.pieces.length >= 3, "the drive has at least three set pieces");
+ok(dr.pieces.length === 4 && dr.pieces.map((q) => q.id).join() === "debris,underpass,bus,bridge", "the drive's pieces are debris, underpass, bus, bridge");
+ok(dr.goals.filter((g) => g.kind === "help").every((g, i, a) => dr.pieces.some((q) => q.id === g.piece && q.people.length === g.count) && (i === 0 ? !g.after : g.after === a[i - 1].id)), "each drive goal is a set piece with its people counted, chained in order");
+ok(dr.goals[dr.goals.length - 1].kind === "reach" && dr.goals[dr.goals.length - 1].after === "bridge", "the drive ends with Get home after the last piece");
+["start", "twist", "end:S", "end:A", "end:B", "end:C"].forEach((k) => ok(Array.isArray(dr.say[k]) && dr.say[k].length, `drive: dialogue for ${k}`));
+dr.pieces.forEach((q) => {
+  ok(q.powers.length && q.hurts && q.hurts.length && q.range > 0 && q.limit > 0, `drive/${q.id}: helping and hurting powers, range and limit`);
+  ok(!q.powers.some((p) => q.hurts.indexOf(p) >= 0), `drive/${q.id}: no ability both helps and hurts`);
+  ok(dr.say["piece:" + q.id] && dr.say["late:" + q.id] && dr.say["hurt:" + q.id], `drive/${q.id}: opening, late and hurt lines`);
+  q.people.forEach((p) => ok(p.id && p.name && p.thanks, `drive/${q.id}/${p.id}: a person with a thanks line`));
+});
+const helpers = dr.pieces.map((q) => q.powers.join("/"));
+ok(new Set(dr.pieces.map((q) => q.powers.join())).size === dr.pieces.length, `no two drive pieces want the same ability (${helpers.join(" | ")})`);
+ok(dr.pieces.some((a) => dr.pieces.some((b) => a !== b && a.powers.some((p) => b.hurts.indexOf(p) >= 0))), "an ability that helps one drive piece hurts another");
+const dpts = dr.pieces.reduce((n, q) => n + q.people.length, 0) * dr.rank.help + dr.rank.precision + dr.rank.time;
+ok(dpts === dr.rank.max, `drive rank.max (${dr.rank.max}) is every help + the time bonus (${dpts})`);
+const dk = (n) => rankFor(n, dr.rank).rank;
+ok(dk(dr.rank.max) === "S" && dk(0) === "C", "the drive: full points is S, nothing is C");
+ok(dk(8 * dr.rank.help) === "A" && dk(8 * dr.rank.help - 2 * dr.rank.hurt) !== "S", "hurting costs rank");
+ok(dr.pieces.every((q) => inZone(dr.zones[q.id], q.people[0].x, q.people[0].z)), "the drive's stranded stand in their zones");
+ok(matchEpisode(E.list, "work", clockMinutes("17:53")).id === "commute-home", "the drive is still offered at 17:53");
 
 // Story arc, Part 3 and the three endings
 const p3 = E.list.find((e) => e.id === "low-tank");
