@@ -151,6 +151,42 @@ export function rankFor(points, rank) {
   return { pct, rank: letter };
 }
 
+/** The unified score. `m` = { people, time, damage, variety }, each 0..1; `scoring.weights` sets what each is worth
+    (they add to the max). Returns the rows for the card, the points and the percent of the max. */
+export function scoreBreakdown(m, scoring) {
+  const sc = scoring || {};
+  const w = Object.assign({ people: 400, time: 200, damage: 250, variety: 150 }, sc.weights || {});
+  const rows = ["people", "time", "damage", "variety"].map((id) => {
+    const v = Math.max(0, Math.min(1, Number(m && m[id]) || 0));
+    return { id, value: v, max: w[id], points: Math.round(w[id] * v) };
+  });
+  const max = rows.reduce((n, r) => n + r.max, 0);
+  const points = rows.reduce((n, r) => n + r.points, 0);
+  return { rows, points, max, pct: max > 0 ? Math.round((100 * points) / max) : 0 };
+}
+
+/** S to C from a percent, by the first band it reaches. */
+export function rankOf(pct, bands) {
+  const list = Array.isArray(bands) && bands.length ? bands : [{ min: 0, rank: "C" }];
+  for (let i = 0; i < list.length; i++) if (pct >= (list[i].min | 0)) return list[i].rank;
+  return list[list.length - 1].rank;
+}
+
+/** The challenge version of an episode: a tighter timer, a smaller strain budget, more people in the set pieces.
+    Returns a copy; `ep` is untouched. `ep.challenge` = { timer: 0.7, budget: -1, extra: { pieceId: [people…] } }. */
+export function challengeEp(ep, base) {
+  const ch = Object.assign({ timer: 0.7, budget: -1 }, base || {}, ep.challenge || {});
+  const o = Object.assign({}, ep, { challengeOn: true, title: ep.title + " (Challenge)" });
+  if (ep.timer) o.timer = Math.max(30, Math.round(ep.timer * ch.timer));
+  if (ep.strain) o.strain = Object.assign({}, ep.strain, { budget: Math.max(2, ep.strain.budget + (ch.budget | 0)) });
+  if (ep.pieces) {
+    const extra = ch.extra || {};
+    o.pieces = ep.pieces.map((q) => Object.assign({}, q, { people: q.people.concat(extra[q.id] || []) }));
+    o.goals = ep.goals.map((g) => (g.kind === "help" && extra[g.piece] ? Object.assign({}, g, { count: g.count + extra[g.piece].length }) : g));
+  }
+  return o;
+}
+
 export function loadBest(key, store) {
   const s = store || (typeof localStorage !== "undefined" ? localStorage : null);
   if (!s || !key) return {};
@@ -175,16 +211,27 @@ export function saveBest(key, best, store) {
   }
 }
 
-/** Record a run if it beats the stored best for that episode id. */
+/** Record a run if it beats the stored best for that episode id. `card.cleared` (every goal done) is kept for good:
+    it is what unlocks the Challenge. A challenge run is stored under `<id>#challenge`. */
 export function recordBest(key, id, card, store) {
   const best = loadBest(key, store);
   const prev = best[id];
+  const cleared = !!(card.cleared || (prev && prev.cleared));
   if (!prev || (card.pct | 0) > (prev.pct | 0)) {
-    best[id] = { pct: card.pct, word: card.word, text: card.text, scarred: !!card.scarred, rank: card.rank || null, when: Date.now() };
+    best[id] = { pct: card.pct, word: card.word, text: card.text, scarred: !!card.scarred, rank: card.rank || null, points: card.points == null ? null : card.points, cleared, when: Date.now() };
     saveBest(key, best, store);
     return { best, improved: true };
   }
+  if (cleared && !prev.cleared) {
+    prev.cleared = true;
+    saveBest(key, best, store);
+  }
   return { best, improved: false };
+}
+
+/** The Challenge is open once the episode has been cleared (every goal done) in the normal mode. */
+export function challengeOpen(best, id) {
+  return !!(best && best[id] && best[id].cleared);
 }
 
 function install() {
@@ -293,6 +340,14 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-panel button{appearance:none;border:1px solid rgba(246,241,232,.22);background:rgba(246,241,232,.08);color:#f6f1e8;border-radius:12px;padding:10px 16px;font:600 0.88rem Outfit,system-ui,sans-serif;cursor:pointer}
 .ep-panel button.primary{background:#f0c27a;color:#1a1c22;border-color:transparent}
 .ep-panel .forecast{font-size:1.15rem;font-weight:700;color:#9fd4ff;margin:8px 0 4px}
+.ep-panel .breakdown{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:4px}
+.ep-panel .breakdown li{display:grid;grid-template-columns:1fr 80px 64px;gap:8px;align-items:center;font-size:.82rem;color:rgba(246,241,232,.85)}
+.ep-panel .breakdown i{display:block;height:6px;border-radius:3px;background:rgba(246,241,232,.14);overflow:hidden}
+.ep-panel .breakdown i b{display:block;height:100%;background:#f0c27a}
+.ep-panel .breakdown em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums}
+.ep-panel .unlockline{margin:6px 0 0;font-size:.9rem;color:#9fd4ff;font-weight:700}
+.ep-menu .ep-row.chal{padding-left:24px;border-style:dashed}
+.ep-menu .ep-row.chal[disabled]{opacity:.45;cursor:default}
 .ep-panel .bestline{font-size:0.82rem;color:rgba(246,241,232,.55)}
 .ep-ending .ep-panel{width:min(520px,100%)}
 .ep-ending .kicker{margin:0 0 2px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#9fd4ff}
@@ -332,7 +387,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   scoreEl.id = "episode-score";
   scoreEl.className = "ep-score";
   scoreEl.hidden = true;
-  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="rank" hidden></p><p class="rankdetail" hidden></p><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><div class="actions"><button type="button" class="primary ok">OK</button></div></div>`;
+  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="rank" hidden></p><p class="rankdetail" hidden></p><ul class="breakdown" hidden></ul><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><p class="unlockline" hidden></p><div class="actions"><button type="button" class="primary ok">OK</button></div></div>`;
 
   const endEl = document.createElement("div");
   endEl.id = "ending-card";
@@ -382,6 +437,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   const scoreStrain = scoreEl.querySelector(".strainline");
   const scoreRank = scoreEl.querySelector(".rank");
   const scoreRankDetail = scoreEl.querySelector(".rankdetail");
+  const scoreBreak = scoreEl.querySelector(".breakdown");
+  const scoreUnlock = scoreEl.querySelector(".unlockline");
   const scoreOk = scoreEl.querySelector(".ok");
   const menuList = menu.querySelector(".ep-list");
   const endKicker = endEl.querySelector(".kicker");
@@ -628,6 +685,32 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       return o;
     });
   }
+  /* The unified score, the same for every episode: people helped (or goals done), time left, damage avoided
+     (wrong calls, Strain, kick-backs) and ability variety. `scoring` in day.config.js sets the weights and bands. */
+  const scoring = cfg.scoring || {};
+  const scoreBands = scoring.bands || [{ min: 90, rank: "S" }, { min: 70, rank: "A" }, { min: 45, rank: "B" }, { min: 0, rank: "C" }];
+  function liveScore(run) {
+    const ep = run.ep;
+    const R = run.rescue;
+    const done = allDone(run);
+    let people;
+    if (R && R.total) {
+      const rk = ep.rank || {};
+      const late = rk.help > 0 ? (rk.late || 0) / rk.help : 0.6;
+      people = (R.helped - R.late * (1 - late)) / R.total;
+    } else people = run.goals.length ? goalsDone(run) / run.goals.length : 0;
+    const time = done ? (ep.timer > 0 ? Math.max(0, run.left) / ep.timer : 1) : 0;
+    let damage = 1;
+    if (R) damage -= Math.min(1, R.hurt * 0.25);
+    if (ep.strain) damage -= Math.min(1, run.strain / (2 * ep.strain.budget)) * 0.6 + Math.min(0.4, run.kicks.length * 0.2);
+    const target = ep.variety || scoring.variety || 3;
+    const variety = run.used ? Math.min(1, run.used.size / target) : 0;
+    const b = scoreBreakdown({ people, time, damage: Math.max(0, damage), variety }, scoring);
+    b.rank = rankOf(b.pct, scoreBands);
+    b.used = run.used ? [...run.used] : [];
+    b.target = target;
+    return b;
+  }
   function goalsDone(run) {
     return run.goals.filter((g) => g.done).length;
   }
@@ -752,10 +835,12 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       hudStrain.innerHTML = `${sc.meter || "Sky"}: ${active.strain} ${sc.of || "of"} ${b}<i><b style="width:${Math.min(100, Math.round((100 * active.strain) / b))}%"></b></i>`;
     } else hudStrain.hidden = true;
     const RS = active.rescue;
-    if (RS && active.ep.rank) {
-      const rk = rankFor(RS.score, active.ep.rank);
+    if (!active.ep.tutorial) {
+      const ls = liveScore(active);
       hudRank.hidden = false;
-      hudRank.innerHTML = `Score <b>${RS.score}</b> · ${RS.helped}/${RS.total} helped · Rank <b>${rk.rank}</b>`;
+      hudRank.innerHTML = (RS ? `Score <b>${RS.score}</b> · ${RS.helped}/${RS.total} helped · ` : "") + `${ls.points} points · Rank <b>${ls.rank}</b>`;
+    }
+    if (RS && active.ep.rank) {
       hudPiece.hidden = !RS.def;
       if (RS.def) {
         const left = Math.max(0, Math.ceil(RS.def.limit - (active.age - RS.at)));
@@ -763,9 +848,9 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         hudPiece.textContent = `Set piece ${RS.idx + 1} of ${active.ep.pieces.length}: ` + (left > 0 ? `${left} s for full points` : "late, worth less");
       }
     } else {
-      hudRank.hidden = true;
       hudPiece.hidden = true;
     }
+    if (active.ep.tutorial) hudRank.hidden = true;
     const cur = active.ep.tutorial ? currentTutorialGoal(active) : null;
     hudPrompt.hidden = !cur;
     hudPrompt.textContent = cur ? cur.prompt || "" : "";
@@ -1203,8 +1288,9 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     offer.hidden = true;
     offerEp = null;
   }
-  function start(ep, via) {
+  function start(ep, via, opts) {
     if (!ep) return false;
+    if (opts && opts.challenge && !ep.tutorial) ep = challengeEp(ep, cfg.challenge);
     hideOffer();
     hideMenu();
     if (active) endQuiet();
@@ -1229,10 +1315,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       cueOn: false,
       cueAge: 0,
       via: via || "play",
+      used: new Set(),
     };
     active.unlocked = [];
     Object.assign(active, { strain: 0, over: false, edgy: false, lastCall: {}, calls: {}, kicks: [], marketWet: false, toppled: 0, windSec: 0, stay: 0, shutUntil: 0, age: 0 });
-    if (ep.id === "dry-park") saveBest(arcKey, { parts: {} }); // Part 1 starts the arc over
+    if (ep.id === "dry-park" && !ep.challengeOn) saveBest(arcKey, { parts: {} }); // Part 1 starts the arc over
     active.carry = 0;
     if (ep.part === 3) {
       // Strain the district still carries from the earlier parts, less one for each sim hour since.
@@ -1266,7 +1353,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     }
     if (ep.lines && ep.lines.start && day.note) day.note(ep.lines.start);
     paintHud();
-    mark("start", { id: ep.id, via: via || "play", title: ep.title });
+    mark("start", { id: ep.id, via: via || "play", title: ep.title, challenge: !!ep.challengeOn, timer: ep.timer || 0 });
     return true;
   }
   function endQuiet() {
@@ -1298,19 +1385,17 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       ? { value: run.strain, budget: run.ep.strain.budget, kicks: run.kicks.length, penalty: (cfg.strain && cfg.strain.scarPenalty) || 25 }
       : null;
     const card = scoreCard(goalsDone(run), run.goals.length, run.left, run.ep.timer || 0, bands, storyMeta);
-    if (run.ep.rank && run.rescue) {
-      const R = run.rescue;
-      const rk0 = run.ep.rank;
-      R.bonus = allDone(run) && run.ep.timer > 0 ? Math.round((rk0.time || 0) * (run.left / run.ep.timer)) : 0;
-      const points = R.score + R.bonus;
-      const rk = rankFor(points, rk0);
-      card.pct = rk.pct;
-      card.word = wordFor(rk.pct, bands);
-      card.text = `Today's forecast: ${card.pct}% chance of ${card.word}`;
-      card.rank = rk.rank;
-      card.points = points;
-    }
-    const rec = recordBest(storageKey, run.ep.id, card);
+    const sb = liveScore(run);
+    if (run.rescue) run.rescue.bonus = Math.round(sb.rows[1].points);
+    card.pct = sb.pct;
+    card.word = wordFor(sb.pct, bands);
+    card.text = `Today's forecast: ${card.pct}% chance of ${card.word}` + (storyMeta ? (card.scarred ? " · scarred" : " · clean") : "");
+    card.rank = sb.rank;
+    card.points = sb.points;
+    card.cleared = why === "clear" || (why !== "time" && why !== "let-go" && allDone(run));
+    const bestId = run.ep.challengeOn ? run.ep.id + "#challenge" : run.ep.id;
+    const prevBest = loadBest(storageKey)[bestId];
+    const rec = recordBest(storageKey, bestId, card);
     // The scars the card lists: each kick-back, a shut stall in Part 1, a goal that failed.
     const scars = run.kicks.map((k) => (run.ep.scars && run.ep.scars[k]) || k);
     if (run.ep.id === "dry-park" && story.stalls.length) {
@@ -1321,7 +1406,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         scars.push((run.ep.scars && run.ep.scars.shut) || "a stall stays shut");
       }
     }
-    if (run.ep.part && (why === "clear" || why === "scarred" || why === "time")) {
+    if (run.ep.part && !run.ep.challengeOn && (why === "clear" || why === "scarred" || why === "time")) {
       const arc = loadArc();
       arc.parts[run.ep.part] = {
         scarred: !!card.scarred,
@@ -1352,16 +1437,30 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     scoreTitle.textContent = L.scoreTitle;
     scoreForecast.textContent = card.text;
     scoreDetail.textContent = `${card.done} of ${card.total} goals` + (why === "time" ? " · time up" : why === "let-go" ? " · let go" : "");
-    if (card.rank) {
+    scoreRank.hidden = false;
+    scoreRank.textContent = card.rank;
+    scoreRank.className = "rank r-" + card.rank;
+    scoreRankDetail.hidden = false;
+    {
       const R = run.rescue;
-      scoreRank.hidden = false;
-      scoreRank.textContent = card.rank;
-      scoreRank.className = "rank r-" + card.rank;
-      scoreRankDetail.hidden = false;
-      scoreRankDetail.textContent = `Rank ${card.rank} · ${card.points} of ${run.ep.rank.max} points · ${R.helped} of ${R.total} stranded helped` + (R.late ? ` (${R.late} late)` : "") + ` · help ${R.score - (R.precision ? run.ep.rank.precision : 0)}` + (R.hurt ? ` (${R.hurt} wrong call${R.hurt > 1 ? "s" : ""}, -${R.hurt * (run.ep.rank.hurt != null ? run.ep.rank.hurt : 40)})` : "") + (R.precision ? ` · rod ${run.ep.rank.precision}` : "") + ` · time ${R.bonus}`;
-    } else {
-      scoreRank.hidden = true;
-      scoreRankDetail.hidden = true;
+      scoreRankDetail.textContent = `Rank ${card.rank} · ${card.points} of ${sb.max} points` + (run.ep.challengeOn ? " · Challenge" : "") + (R ? ` · ${R.helped} of ${R.total} stranded helped` + (R.late ? ` (${R.late} late)` : "") + (R.hurt ? ` · ${R.hurt} wrong call${R.hurt > 1 ? "s" : ""}` : "") : "");
+      const names = Object.assign({ people: R ? "People helped" : "Goals done", time: "Time left", damage: "Damage avoided", variety: "Ability variety" }, scoring.names || {});
+      scoreBreak.innerHTML = "";
+      sb.rows.forEach((r) => {
+        const li = document.createElement("li");
+        li.dataset.part = r.id;
+        const nm = document.createElement("span");
+        nm.textContent = names[r.id] + (r.id === "variety" ? ` (${sb.used.length} of ${sb.target})` : "");
+        const bar = document.createElement("i");
+        const fill = document.createElement("b");
+        fill.style.width = Math.round(r.value * 100) + "%";
+        bar.appendChild(fill);
+        const pt = document.createElement("em");
+        pt.textContent = `${r.points}/${r.max}`;
+        li.append(nm, bar, pt);
+        scoreBreak.appendChild(li);
+      });
+      scoreBreak.hidden = false;
     }
     scoreEl.classList.toggle("scarred", !!card.scarred);
     if (storyMeta) {
@@ -1369,10 +1468,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       scoreStrain.hidden = false;
       scoreStrain.textContent = `${sl.meter || "Sky"} ${run.strain} ${sl.of || "of"} ${run.ep.strain.budget}` + (run.carry ? ` (${run.carry} carried from earlier)` : "") + ` · ${card.scarred ? sl.scarred || "Scarred" : sl.clean || "Clean"}` + (scars.length ? `: ${scars.join("; ")}` : "");
     } else scoreStrain.hidden = true;
-    const b = rec.best[run.ep.id];
-    scoreBest.textContent = b ? `${L.best}: ${b.pct}% chance of ${b.word}` : "";
+    const b = rec.best[bestId];
+    scoreBest.textContent = b ? `${L.best}: rank ${b.rank || "-"} · ${b.pct}% chance of ${b.word}` + (rec.improved && prevBest ? " (new best)" : "") : "";
+    const unlocked = !run.ep.challengeOn && card.cleared && !(prevBest && prevBest.cleared) && run.ep.id !== "tutorial";
+    scoreUnlock.hidden = !unlocked;
+    scoreUnlock.textContent = unlocked ? (scoring.unlockLine || "Challenge unlocked. Find it in the Episodes menu.") : "";
     scoreEl.hidden = false;
-    mark("score", { id: run.ep.id, rank: card.rank || null, points: card.points == null ? null : card.points, helped: run.rescue ? run.rescue.helped : null, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved, scarred: card.scarred, strain: run.strain, kicks: run.kicks.slice(), scars });
+    mark("score", { id: run.ep.id, challenge: !!run.ep.challengeOn, cleared: card.cleared, unlocked, best: b ? b.rank : null, parts: sb.rows.map((r) => r.id + ":" + r.points).join(","), variety: sb.used.join(","), rank: card.rank || null, points: card.points == null ? null : card.points, helped: run.rescue ? run.rescue.helped : null, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved, scarred: card.scarred, strain: run.strain, kicks: run.kicks.slice(), scars });
     endQuiet();
     return card;
   }
@@ -1431,7 +1533,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       btn.type = "button";
       btn.className = "ep-row";
       const b = best[ep.id];
-      btn.innerHTML = `<strong>${ep.title}</strong><small>${ep.tagline || ""}${b ? ` · ${L.best} ${b.pct}%` : ""}</small>`;
+      btn.innerHTML = `<strong>${ep.title}</strong><small>${ep.tagline || ""}${b ? ` · ${L.best} ${b.rank ? "rank " + b.rank + " · " : ""}${b.pct}%` : ""}</small>`;
       btn.addEventListener("click", () => {
         hideMenu();
         if (day.jump && ep.clock) day.jump(ep.clock);
@@ -1443,6 +1545,28 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         setTimeout(go, 120);
       });
       menuList.appendChild(btn);
+      if (ep.tutorial) return;
+      const ch = challengeEp(ep, cfg.challenge);
+      const open = challengeOpen(best, ep.id);
+      const cb = document.createElement("button");
+      cb.type = "button";
+      cb.className = "ep-row chal";
+      cb.id = "ep-challenge-" + ep.id;
+      cb.dataset.locked = open ? "0" : "1";
+      const cbest = best[ep.id + "#challenge"];
+      const extra = ch.pieces ? ch.pieces.reduce((n, q) => n + q.people.length, 0) - ep.pieces.reduce((n, q) => n + q.people.length, 0) : 0;
+      cb.innerHTML = `<strong>Challenge</strong><small>${open ? `${ch.timer ? Math.floor(ch.timer / 60) + ":" + String(ch.timer % 60).padStart(2, "0") + " timer" : "tighter"}${extra ? `, ${extra} more to help` : ""}${ch.strain ? `, Sky budget ${ch.strain.budget}` : ""}${cbest ? ` · ${L.best} ${cbest.rank || "-"}` : ""}` : "Clear it once to unlock"}</small>`;
+      if (!open) cb.disabled = true;
+      cb.addEventListener("click", () => {
+        hideMenu();
+        if (day.jump && ep.clock) day.jump(ep.clock);
+        const C = day.control;
+        setTimeout(() => {
+          if (C && C.mode && C.mode() === "schedule") C.take();
+          start(ep, "menu", { challenge: true });
+        }, 120);
+      });
+      menuList.appendChild(cb);
     });
     menu.hidden = false;
     mark("menu", {});
@@ -1532,6 +1656,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       if (cur && cur.power === power) completeGoal(cur, d.via || "key");
       return;
     }
+    if (d.action === d.power && d.action !== "denied" && active.used) active.used.add(d.power);
     if (active.rescue && d.action === d.power && d.action !== "denied") onPieceCall(d.power);
     if (active.ep.strain && d.action === d.power && d.action !== "denied") {
       onStoryCall(d.power);
@@ -1718,6 +1843,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         ? {
             id: active.ep.id,
             title: active.ep.title,
+            challenge: !!active.ep.challengeOn,
             left: active.left,
             goals: active.goals.map((g) => ({ id: g.id, done: g.done, progress: g.progress, label: g.label })),
             rods: [...active.rodsHit],
@@ -1727,18 +1853,21 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
             cue: active.cueOn,
             unlocked: (active.unlocked || []).slice(),
             rescue: active.rescue
-              ? { score: active.rescue.score, helped: active.rescue.helped, total: active.rescue.total, piece: active.rescue.def ? active.rescue.def.id : null, twisted: active.rescue.twisted, late: active.rescue.late, hurt: active.rescue.hurt, precision: active.rescue.precision, rank: rankFor(active.rescue.score, active.ep.rank).rank, people: active.rescue.people.map((p) => ({ id: p.id, x: p.x, z: p.z, helped: p.helped })) }
+              ? { score: active.rescue.score, helped: active.rescue.helped, total: active.rescue.total, piece: active.rescue.def ? active.rescue.def.id : null, twisted: active.rescue.twisted, late: active.rescue.late, hurt: active.rescue.hurt, precision: active.rescue.precision, rank: liveScore(active).rank, people: active.rescue.people.map((p) => ({ id: p.id, x: p.x, z: p.z, helped: p.helped })) }
               : null,
             prompt: active.ep.tutorial && currentTutorialGoal(active) ? currentTutorialGoal(active).prompt : null,
           }
         : null,
     offer: () => (offerEp ? { id: offerEp.id, title: offerEp.title } : null),
     best: () => loadBest(storageKey),
+    challenge: (id) => challengeOpen(loadBest(storageKey), id),
+    score: () => (active && !active.ep.tutorial ? liveScore(active) : null),
     tutorial: () => ({ done: tutorialDone(), key: tutKey }),
     skip: () => (active && active.ep.tutorial ? finish("skip") : null),
-    start: (id, via) => {
+    start: (id, via, opts) => {
       const ep = list.find((e) => e.id === id);
-      return ep ? start(ep, via || "api") : false;
+      if (ep && opts && opts.challenge && !challengeOpen(loadBest(storageKey), id)) return false; // locked until cleared
+      return ep ? start(ep, via || "api", opts) : false;
     },
     end: (why) => (active ? finish(why || "api") : null),
     match: (chapter, minutes, opt) => matchEpisode(list, chapter, minutes, opt),

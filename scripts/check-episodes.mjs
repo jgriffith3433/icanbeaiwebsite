@@ -16,6 +16,10 @@ import {
   pickEnding,
   cityFared,
   rankFor,
+  scoreBreakdown,
+  rankOf,
+  challengeEp,
+  challengeOpen,
 } from "../js/episodes.js";
 
 const require = createRequire(import.meta.url);
@@ -191,6 +195,38 @@ ok(!r2.improved, "lower score must not replace best");
 ok(loadBest(E.storageKey, mem).morning.pct === 80, "best stays 80");
 const r3 = recordBest(E.storageKey, "morning", { pct: 95, word: "awesome", text: "z" }, mem);
 ok(r3.improved && loadBest(E.storageKey, mem).morning.pct === 95, "higher score replaces best");
+
+// Unified score, ranks and the Challenge
+const SC = E.scoring;
+ok(SC && SC.weights && SC.bands.map((b) => b.rank).join() === "S,A,B,C", "scoring has weights and S to C bands");
+const full = scoreBreakdown({ people: 1, time: 1, damage: 1, variety: 1 }, SC);
+ok(full.points === full.max && full.pct === 100 && rankOf(full.pct, SC.bands) === "S", "everything is 100% and S");
+ok(rankOf(scoreBreakdown({ people: 0, time: 0, damage: 0, variety: 0 }, SC).pct, SC.bands) === "C", "nothing is C");
+const slow = scoreBreakdown({ people: 1, time: 0, damage: 1, variety: 1 }, SC);
+const sloppy = scoreBreakdown({ people: 1, time: 1, damage: 0, variety: 1 }, SC);
+ok(slow.pct < full.pct && sloppy.pct < full.pct && slow.rows.length === 4, "time and damage each cost points and the card has four rows");
+ok(rankOf(scoreBreakdown({ people: 1, time: 0.5, damage: 0.8, variety: 0.7 }, SC).pct, SC.bands) === "A", "a decent run is an A");
+E.list.filter((e) => !e.tutorial).forEach((ep) => {
+  const c = challengeEp(ep, E.challenge);
+  ok(c.challengeOn && ep.challengeOn === undefined, `${ep.id}: challengeEp copies`);
+  ok(!ep.timer || c.timer < ep.timer, `${ep.id}: challenge timer is tighter`);
+  ok(!ep.strain || c.strain.budget < ep.strain.budget, `${ep.id}: challenge Sky budget is smaller`);
+  if (ep.pieces) {
+    const n = (x) => x.pieces.reduce((t, q) => t + q.people.length, 0);
+    ok(n(c) > n(ep), `${ep.id}: challenge has more people to help`);
+    c.goals.filter((g) => g.kind === "help").forEach((g) => ok(c.pieces.find((q) => q.id === g.piece).people.length === g.count, `${ep.id}/${g.id}: challenge goal count matches its people`));
+    c.pieces.forEach((q) => q.people.forEach((p) => ok(p.id && p.name && p.thanks, `${ep.id}/${q.id}/${p.id}: extra person has a name and thanks`)));
+  }
+});
+const cm = {};
+ok(!challengeOpen(loadBest("k", cm), "morning"), "the Challenge is locked at first");
+const m2 = { v: "", getItem() { return this.v || null; }, setItem(k, v) { this.v = v; } };
+recordBest("k", "morning", { pct: 60, word: "drama", text: "x", rank: "B", cleared: false }, m2);
+ok(!challengeOpen(loadBest("k", m2), "morning"), "a run that is not cleared does not unlock it");
+recordBest("k", "morning", { pct: 40, word: "drama", text: "x", rank: "C", cleared: true }, m2);
+ok(challengeOpen(loadBest("k", m2), "morning") && loadBest("k", m2).morning.rank === "B", "a clear unlocks it and keeps the better rank");
+recordBest("k", "morning", { pct: 30, word: "drizzle", text: "x", rank: "C", cleared: false }, m2);
+ok(challengeOpen(loadBest("k", m2), "morning"), "the unlock stays");
 
 ok(clockMinutes("7:55") === 7 * 60 + 55, "clockMinutes 7:55");
 ok(clockMinutes("18:00") === 18 * 60, "clockMinutes 18:00");
