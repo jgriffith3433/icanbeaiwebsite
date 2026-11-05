@@ -1672,6 +1672,7 @@
         let x = ((tSec * tr.speed * driveScale + tr.offset) % len + len) % len;
         x = tr.dir > 0 ? street.from + 20 + x : street.to - 20 - x;
         const tooClose = Math.hypot(x - car.x, tr.lane - car.z) < 9;
+        if (crowdRef) { tr.car.root.setEnabled(false); tr.car.wipersOn = false; return; } // js/crowd.js drives the lanes now
         tr.car.root.setEnabled(!tooClose);
         tr.car.root.position.set(x, 0, tr.lane);
         tr.car.root.rotation.y = tr.dir > 0 ? PI / 2 : -PI / 2;
@@ -1916,14 +1917,17 @@
       return { y: rayHit.hitPoint.y, body: rayHit.body && rayHit.body.transformNode ? rayHit.body.transformNode.name : "" };
     }
 
+    let crowdRef = null; // js/crowd.js sets it: the district's people and cars
+
     /** What the street is doing for the weather (playtest / console). */
     function streetNow() {
       const wx = (typeof window !== "undefined" && window.weather && window.weather.now && window.weather.now()) || {};
       const umbrellas = streetFolk.filter((f) => f.umbrellaOn && f.person.root.isEnabled()).length;
-      const wipers = traffic.filter((tr) => tr.car.wipersOn && tr.car.root.isEnabled()).length + (myCar.wipersOn ? 1 : 0);
+      const cr = crowdRef && crowdRef.info ? crowdRef.info() : null;
+      const wipers = traffic.filter((tr) => tr.car.wipersOn && tr.car.root.isEnabled()).length + (myCar.wipersOn ? 1 : 0) + (cr ? cr.wipers : 0);
       return {
-        folk: streetFolk.length,
-        umbrellas,
+        folk: streetFolk.length + (cr ? cr.people : 0),
+        umbrellas: umbrellas + (cr ? cr.umbrellas : 0),
         wipers,
         moods: streetFolk.map((f) => f.mood),
         raining: !!(wx.rain > 0.35 || wx.state === "rain" || wx.state === "storm"),
@@ -2017,6 +2021,8 @@
       rooms,
       spots,
       streetNow,
+      get crowd() { return crowdRef; },
+      set crowd(v) { crowdRef = v; },
     };
   }
 

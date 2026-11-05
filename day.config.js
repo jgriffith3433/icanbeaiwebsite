@@ -887,6 +887,27 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     THE CROWD (js/crowd.js) — the district's people and cars, on the day's clock.
+     `curve` is [hour, people, cars], each 0..1 of the budget: commuters in the morning, a lunch crowd,
+     the evening commute and dinner, then a quiet night. Counts are the most that are ever out
+     (thin instances, so the cost barely moves); the quality scale (`lowScale`) and a frame-time guard
+     thin them on slow devices. Rain, storm and snow thin them too.
+     ------------------------------------------------------------------------ */
+  crowd: {
+    budget: { people: 260, cars: 64 },
+    lowScale: 0.4,
+    curve: [
+      [0, 0.03, 0.05], [4, 0.02, 0.04], [5.5, 0.06, 0.14], [6.5, 0.25, 0.4], [7.5, 0.7, 0.85], [8.5, 0.85, 1], [9.5, 0.5, 0.6],
+      [11, 0.45, 0.45], [12, 0.92, 0.6], [13.25, 0.95, 0.65], [14.5, 0.5, 0.45], [16, 0.55, 0.6], [17, 0.8, 0.95], [18, 0.85, 1],
+      [19.5, 0.9, 0.6], [21, 0.55, 0.35], [22.5, 0.2, 0.18], [24, 0.03, 0.05],
+    ],
+    phases: [
+      [0, "night"], [5.5, "early morning"], [6.5, "morning commute"], [9.5, "mid-morning"], [11.5, "lunch"], [14.5, "afternoon"],
+      [16.5, "evening commute"], [18.5, "dinner"], [21, "evening"], [22.5, "night"],
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
      IDLE — when a block's steps finish early and there is no `fill` step,
      the spare time becomes idle time (never stretched actions). These are
      the words for it, by pose, plus the pool of small things done meanwhile.
