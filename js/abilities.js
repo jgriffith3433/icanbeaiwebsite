@@ -137,6 +137,11 @@ export function startAbilityBar(abilities, onPress) {
 .abilitybar .energy .bar{margin-top:3px;height:8px;border-radius:99px;background:rgba(8,12,20,.55);border:1px solid rgba(126,200,255,.45);overflow:hidden}
 .abilitybar .energy .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1a4c7a,#7ec8ff);border-radius:99px}
 html.touch-ui .abilitybar{display:none}
+html:not(.preview-public):not(.touch-ui) .abilitybar{bottom:128px}
+html.in-control:not(.preview-public):not(.touch-ui) .control-btn{bottom:232px}
+html.in-control:not(.preview-public):not(.touch-ui) .quality-btn{bottom:238px}
+html.in-control:not(.preview-public):not(.touch-ui) .control-hint{bottom:278px}
+html.in-control:not(.preview-public):not(.touch-ui) .tutorial{bottom:314px}
 `;
   document.head.appendChild(style);
   const el = document.createElement("div");

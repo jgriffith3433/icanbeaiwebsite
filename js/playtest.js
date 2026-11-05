@@ -328,6 +328,14 @@ async function roofBolt(t) {
   const barUp = !!(barEl && !barEl.hidden && slotEl);
   if (barUp) t.event("ability-bar", `bar up: ${P.now().abilities.map((x) => x.key.toUpperCase() + " " + x.name).join(", ")}; energy ${Math.round(P.now().energy)}`);
   else t.problem("bug", "The ability bar isn't showing while he's the player's");
+  if (barUp) {
+    const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    const bar = barEl.getBoundingClientRect();
+    const others = [".daybar", ".bottom", "#control-btn", ".control-btn"].map((q) => document.querySelector(q)).filter((e) => e && e.offsetParent);
+    const bad = others.filter((e) => hit(bar, e.getBoundingClientRect()));
+    if (bad.length) t.problem("bug", `The ability bar and Energy label cover ${bad.map((e) => e.className || e.id).join(", ")}`);
+    else t.event("ability-bar-clear", `bar at y ${Math.round(bar.top)}-${Math.round(bar.bottom)} clear of the day timeline and Let go`);
+  }
   const e0 = P.now().energy;
   const WXB = window.weather || window.day.weather;
   if (WXB && WXB.now().state === "clear" && WXB.now().rain < 0.05) t.event("calm-before", "clear, no rain, before the bolt");
