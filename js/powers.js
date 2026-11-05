@@ -484,6 +484,8 @@ export function startPowers(world, dayApi) {
     const delay = thunderDelay(dist);
     shake = Math.max(shake, 0.02 + 0.03 * (1 - Math.min(1, dist / 36)));
     showBolt(aim);
+    const wxb = wx();
+    if (wxb && wxb.set) wxb.set("storm", 0.85, "power"); // the strike brings a storm; js/weather.js eases it out
     const scorch = B.MeshBuilder.CreateCylinder("scorch", { diameter: 1.7, height: 0.03, tessellation: 12 }, scene);
     scorch.position.set(aim.x, aim.y + 0.02, aim.z);
     scorch.material = scorchMat;
