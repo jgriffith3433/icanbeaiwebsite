@@ -249,6 +249,7 @@ export function installCityscape(w) {
     m.diffuseTexture = t.albedo;
     m.emissiveTexture = t.emissive;
     m.emissiveColor = new B.Color3(0, 0, 0);
+    m.diffuseColor = new B.Color3(1.35, 1.35, 1.35); // lifts the walls: shaded faces were near-black
     m.specularColor = new B.Color3(0.05, 0.05, 0.06);
     m.maxSimultaneousLights = 4;
     return m;
