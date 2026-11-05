@@ -1495,6 +1495,40 @@
       titleShot = on ? Object.assign({}, TITLE_SHOT, typeof on === "object" ? on : {}) : null;
       return !!titleShot;
     }
+    /* How far a camera at target + dir * r can sit before a building is in the way: a ray from the target
+       against the town's big boxes (buildings and blocks; not trees, lamps, lips or ramps), minus a margin.
+       Doesn't need Havok, so the automatic camera and the player's both use it. Returns r if clear. */
+    function clearRadius(tx, ty, tz, dx, dy, dz, r, margin) {
+      const m = margin == null ? 0.5 : margin;
+      const reach = r + m;
+      let best = reach;
+      for (let i = 0; i < solids.length; i++) {
+        const s = solids[i];
+        if (s.roll || s.yaw || s.pitch || s.h < 2.5 || s.w < 2 || s.d < 2) continue;
+        let t0 = 0;
+        let t1 = best;
+        const lo = [s.x - s.w / 2, s.y - s.h / 2, s.z - s.d / 2];
+        const hi = [s.x + s.w / 2, s.y + s.h / 2, s.z + s.d / 2];
+        const o = [tx, ty, tz];
+        const d = [dx, dy, dz];
+        let ok = true;
+        for (let k = 0; k < 3 && ok; k++) {
+          if (Math.abs(d[k]) < 1e-6) {
+            if (o[k] < lo[k] || o[k] > hi[k]) ok = false;
+          } else {
+            let a = (lo[k] - o[k]) / d[k];
+            let b = (hi[k] - o[k]) / d[k];
+            if (a > b) [a, b] = [b, a];
+            t0 = Math.max(t0, a);
+            t1 = Math.min(t1, b);
+            if (t0 > t1) ok = false;
+          }
+        }
+        // a target already inside a box (t0 = 0) isn't something to pull in for: leave it
+        if (ok && t0 > 0.05 && t0 < best) best = t0;
+      }
+      return best >= reach ? r : Math.max(1.2, best - m);
+    }
     function update(fr, dt, opts) {
       opts = opts || {};
       elapsed += dt;
@@ -1514,7 +1548,7 @@
       sun.direction.set(-Math.cos(ang) * 0.7, -Math.max(0.3, elev), -0.55);
       sun.intensity = hour > SR - 0.3 && hour < SS + 0.3 ? 0.18 + elev * 0.54 : 0.02;
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
-      hemi.intensity = 0.16 + day * 0.38;
+      hemi.intensity = 0.22 + day * 0.5; // the shaded faces of the city's buildings must still read in the morning
       B.Color3.LerpToRef(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
       B.Color3.LerpToRef(C("#12151e"), C("#3a362c"), day, hemi.groundColor);
       if (!scene.metadata || !scene.metadata.dayLook) {
@@ -1874,6 +1908,12 @@
         camera.alpha = cam.alpha + Math.sin(t * 0.05) * 0.04;
         camera.beta = cam.beta;
         camera.radius = cam.radius;
+        /* outdoors (not in a cutaway), keep the camera out of the buildings: pull in rather than sit in a facade */
+        if (!(bd && bd.bounds)) {
+          const sb = Math.sin(camera.beta);
+          const r = clearRadius(cam.x, cam.y, cam.z, Math.cos(camera.alpha) * sb, Math.cos(camera.beta), Math.sin(camera.alpha) * sb, camera.radius, 0.6);
+          if (r < camera.radius) camera.radius = r;
+        }
       }
       sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
     }
@@ -2022,6 +2062,7 @@
       /* js/cityscape.js reads the colliders so far (to find free lots) and adds its own before physics is on */
       solids,
       addSolids: (list) => list.forEach((o) => solids.push(o)),
+      clearRadius,
       groundAt,
       physics: () => physics,
       resize() {

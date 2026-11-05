@@ -483,9 +483,14 @@ function install() {
     const pullWant = s.gliding ? (RIDE.cameraPull || 3.4) : 0;
     glidePull = damp(glidePull, pullWant, dt, 2.4);
     let r = wantRadius + glidePull;
+    const dx = Math.cos(camera.alpha) * Math.sin(camera.beta);
+    const dy = Math.cos(camera.beta);
+    const dz = Math.sin(camera.alpha) * Math.sin(camera.beta);
+    // buildings: the box test needs no Havok, and keeps a margin so the near plane never cuts into a facade
+    if (world.clearRadius) r = Math.min(r, world.clearRadius(t.x, t.y, t.z, dx, dy, dz, r, 0.6));
     const p = world.physics && world.physics();
     if (p) {
-      const dir = new B.Vector3(Math.cos(camera.alpha) * Math.sin(camera.beta), Math.cos(camera.beta), Math.sin(camera.alpha) * Math.sin(camera.beta));
+      const dir = new B.Vector3(dx, dy, dz);
       const from = t.add(dir.scale(0.45)); // outside his own capsule
       p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay);
       if (camRay.hasHit) r = Math.max(1.2, B.Vector3.Distance(t, camRay.hitPoint) - 0.3);
