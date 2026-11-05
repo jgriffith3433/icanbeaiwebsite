@@ -66,6 +66,11 @@
     const d = e.detail || {};
     feature("tutorial", { action: d.action, step: d.step, seconds: d.seconds });
   }));
+  // The title screen (js/title.js): show, play, episodes (each with via), music on/off.
+  window.addEventListener("day:title", safe((e) => {
+    const d = e.detail || {};
+    feature("title", { action: d.action, via: d.via, seconds: d.seconds, music: d.music != null ? d.music : d.on });
+  }));
   // Graphics quality (js/look.js): high or low, from the button.
   window.addEventListener("day:quality", safe((e) => feature("quality", { value: (e.detail || {}).value, via: (e.detail || {}).via || "click" })));
   // The weather wheel (js/weather.js): a key, the radial, or a phone tap. The day's own forecast isn't an interaction.
@@ -91,7 +96,7 @@
   // Chapter episodes (js/episodes.js): offer, start, goals, score card.
   window.addEventListener("day:episode", safe((e) => {
     const d = e.detail || {};
-    feature("episode", { action: d.action, id: d.id, goal: d.goal, pct: d.pct, why: d.why, via: d.via });
+    feature("episode", { action: d.action, id: d.id, goal: d.goal, pct: d.pct, why: d.why, via: d.via, scarred: d.scarred, strain: d.strain, ending: d.ending });
   }));
   document.querySelectorAll('a[href="whatsnew.html"]').forEach((a) => a.addEventListener("click", () => feature("whatsnew")));
   document.querySelectorAll('a[href="privacy.html"]').forEach((a) => a.addEventListener("click", () => feature("privacy")));

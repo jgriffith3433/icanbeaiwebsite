@@ -182,6 +182,26 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     TITLE — the first thing the page shows (js/title.js)
+     ------------------------------------------------------------------------
+     The city's skyline behind his name, Play (takes control of him) and
+     Episodes (the Episodes menu). His day keeps running behind it. Play
+     turns the Sound on unless the player switched Music off here.
+     ------------------------------------------------------------------------ */
+  title: {
+    kicker: "I Can Be",
+    name: "Small Weather",
+    line: "His day runs on its own, live. Take it over and command the sky.",
+    play: "Play",
+    episodes: "Episodes",
+    musicOn: "Music on",
+    musicOff: "Music off",
+    hint: "Enter to play",
+    day: "Day",
+    night: "Night",
+  },
+
+  /* ------------------------------------------------------------------------
      FIRST VISIT — one minute, then it stays quiet
      ------------------------------------------------------------------------
      The first time the page opens, a card walks the player through taking
@@ -261,9 +281,17 @@ window.DAY_CONFIG = {
      ------------------------------------------------------------------------ */
   score: {
     fade: 2.8,
-    musicVol: 0.3,
-    ambVol: 0.62,
-    stingVol: 0.55,
+    /* The mix, in one place (js/score.js). master: everything the score plays; music: the beds; ambience:
+       rain, wind and city hum; sting: take control; thunder: on top of ambience; whoosh: the glide;
+       title: the music level while the title screen is up; duck: how far the music dips under his voice;
+       nightTone: the low-pass (Hz) that softens the music at night. His voice is `voice.volume`. */
+    mix: { master: 0.9, music: 0.3, ambience: 0.55, sting: 0.5, thunder: 0.85, whoosh: 0.55, title: 0.4, duck: 0.45, nightTone: 2400 },
+    /* Clear weather plays a calm day bed by day and its night variation from 7:45 PM to 6:15 AM, crossfaded.
+       Until Hawkes Gen makes their own files (hawkes.assets.json music-day / music-night: add
+       `day: "audio/music/day.mp3", night: "audio/music/night.mp3"` below), they play the clear and snow beds. */
+    nightFrom: 19.75,
+    nightTo: 6.25,
+    fallback: { day: "clear", night: "snow" },
     music: {
       clear: "audio/music/clear.mp3",
       clouds: "audio/music/clouds.mp3",
@@ -426,6 +454,63 @@ window.DAY_CONFIG = {
       timeUp: "Time's up.",
       letGo: "Episode paused — score stands.",
     },
+    /* Strain (the beat sheet's overuse rule, per story episode): every weather call adds to a meter
+       by kind; the same call again inside `stackSec` adds double. Over an episode's `strain.budget`
+       the part is scarred: kick-backs happen in the world and the card says so. */
+    strain: {
+      costs: { rain: 1, gale: 1, sunbreak: 1, fog: 1, bolt: 2, gust: 1, tornado: 2, storm: 2 },
+      stackSec: 60,
+      perHour: 1, // Strain falls by this much for each sim hour after the part that raised it
+      scarPenalty: 25,
+      lines: { clean: "Clean", scarred: "Scarred", meter: "Sky", of: "of" },
+    },
+    /* The ending card after Part 3: chosen from the three parts' marks and the Strain at the Tank (rules.calm /
+       rules.overcast). Same sky each time, different weather. `fared` is the line per need and state
+       (ok, scar, open = never answered). */
+    endings: {
+      rules: { calm: 6, overcast: 10 },
+      lines: { kicker: "How the district fared", tally: "Sky at the Tank", again: "Walk the city" },
+      needs: { park: "The park", turbines: "The turbines", market: "The market", reservoir: "The reservoir" },
+      fared: {
+        park: { ok: "Green. The pond is up a notch. Birdie's tomatoes are not sulking.", scar: "Green, with a brown patch and a pond that ran over the path.", open: "Still straw." },
+        turbines: { ok: "Turning. The roofs have power.", scar: "Turning, but a stall is down in the plaza and a blade shut itself.", open: "Still. Not one has turned." },
+        market: { ok: "Open. Stalls up, the plaza full.", scar: "Open, with a stall shut and some stock lost.", open: "Soft produce. Nothing to sell." },
+        reservoir: { ok: "Full, and holding.", scar: "Full, then the avenue flooded or the sky wouldn't stop.", open: "Still low." },
+      },
+      A: {
+        name: "Fair Weather",
+        scene: "Morning. The park is green, the turbines turn, the market is open, the Tank is full. Birdie waves from the bench. Ines is asleep on the annex roof with her chart.",
+        last: ["He", "Clear skies. He did that, and then stopped."],
+      },
+      B: {
+        name: "Heavy Weather",
+        scene: "The district has all four things, with scars: a brown patch on the lawn, a stall shut, a wet avenue. People nod to him on the street instead of speaking.",
+        last: ["He", "It worked. It cost."],
+      },
+      C: {
+        name: "Overcast",
+        scene: "The sky stays grey for a week. The Board's loudspeaker plays the Weather Warning on a loop. The neighbors watch from windows.",
+        last: ["He", "He asked the sky for everything. It's still thinking about it."],
+      },
+    },
+    /* One score for every episode (js/episodes.js `liveScore`): people helped (or goals done), time left,
+       damage avoided (wrong calls, Sky, kick-backs) and ability variety (distinct abilities used, over the
+       episode's `variety`, else `variety` here). Rank from the percent of the max. */
+    scoring: {
+      weights: { people: 400, time: 200, damage: 250, variety: 150 },
+      variety: 3,
+      bands: [
+        { min: 90, rank: "S" },
+        { min: 70, rank: "A" },
+        { min: 45, rank: "B" },
+        { min: 0, rank: "C" },
+      ],
+      names: { people: "People helped", time: "Time left", damage: "Damage avoided", variety: "Ability variety" },
+      unlockLine: "Challenge unlocked. Find it in the Episodes menu.",
+    },
+    /* The Challenge (unlocks after the first clear of an episode): timer x `timer`, Sky budget + `budget`, and
+       each episode's own `challenge.extra` people in its set pieces. Best rank is kept apart, as `<id>#challenge`. */
+    challenge: { timer: 0.7, budget: -1 },
     /* Bands for the score card copy: "N% chance of <word>". */
     bands: [
       { min: 90, word: "awesome" },
@@ -460,6 +545,7 @@ window.DAY_CONFIG = {
       },
       {
         id: "morning",
+        variety: 2,
         title: "Clear the sky",
         tagline: "Break up the forecast's clouds before he leaves.",
         chapters: ["wake", "ready"],
@@ -475,28 +561,245 @@ window.DAY_CONFIG = {
           done: "Clear skies for the commute. He did that.",
         },
       },
+      /* Story arc, Part 1 (docs/story-arc-beat-sheet.md): the park is dry, the market is losing its
+         stock. Rain belongs on the park and nowhere near the market; the market wants sun. Lunch
+         is when Birdie is on the bench and Dex is in the plaza, so one run needs no clock jump. */
+      {
+        id: "dry-park",
+        variety: 2,
+        part: 1,
+        title: "Part 1: Dry",
+        tagline: "Rain on the park, not the market. Then dry the market out.",
+        chapters: ["work", "lunch"],
+        after: "11:40",
+        before: "12:15",
+        clock: "11:50",
+        timer: 300,
+        zones: {
+          park: { rect: [-34, 20, 30, 68], pad: 6, name: "the park" },
+          market: { rect: [106, 16.8, 130, 36], pad: 8, name: "the market" },
+        },
+        market: { open: false },
+        strain: { budget: 4 },
+        goals: [
+          { id: "rain-park", kind: "ability-in", power: "rain", zone: "park", label: "Rain on the park (R, near Birdie)" },
+          { id: "sun-market", kind: "ability-in", power: "sunbreak", zone: "market", after: "rain-park", label: "Sun break over the market (X)" },
+          { id: "stalls", kind: "stay", zone: "market", seconds: 20, after: "sun-market", label: "Stay while the stalls fill" },
+        ],
+        lines: {
+          start: "The park is straw. The market is soft. Two asks.",
+          done: "The park drank. The market opened.",
+          scarred: "The park drank. The market opened. It cost.",
+        },
+        say: {
+          start: [
+            ["Birdie", "There you are. My tomatoes are sulking. The whole lawn is."],
+            ["Birdie", "A little rain. Not a lot. A little."],
+            ["He", "Rain's the park's. Not the market's."],
+          ],
+          "goal:rain-park": [
+            ["Birdie", "Look at them drink. Bless you."],
+            ["Dex", "Parcels, produce, everything's gone soft. You can't sell soft."],
+            ["Dex", "Sun break. Two minutes. Dry the plaza out, then I'll carry the rest."],
+          ],
+          "goal:sun-market": [["He", "Sun's here."]],
+          "edgy": [["Birdie", "Enough now?"]],
+          "kick:flood": [["Birdie", "That's plenty. That's — plenty."]],
+          "kick:soak": [["Dex", "That's rain. On the produce. On the produce, Small Weather."]],
+          "kick:scorch": [["Dex", "It's brown behind you. The grass. It's brown."]],
+          "end:clean": [
+            ["Board", "Reservoir level: low. Two days. Maybe three."],
+            ["He", "Two days."],
+          ],
+          "end:scarred": [
+            ["Board", "Reservoir level: low. And the sky's been busy."],
+            ["He", "It cost."],
+          ],
+        },
+        toasts: { "goal:rain-park": "The park drank.", "goal:stalls": "The market is open." },
+        scars: { flood: "the pond ran over the path", soak: "the stock got rained on", scorch: "a brown patch on the lawn", shut: "one stall stays shut" },
+      },
+      /* Rooftop storm (the lunch episode, rebuilt as a rescue; docs/story-arc-beat-sheet.md "The lunch storm"). A storm
+         nobody called sits on the district. Three set pieces, each a goal: people to get out of it with the matching
+         ability called within `range` of them (the nearest unhelped one per call). Full points inside `limit` s of a
+         piece starting, `late` after. The twist fires when the second piece is done (fog, debris, the third piece).
+         Rank S..C is points over `max`. Everything the episode says is `say` ([who, text]). */
       {
         id: "lunch",
         title: "Rooftop storm",
-        tagline: "Build a storm and strike the lightning rods on three rooftops.",
+        tagline: "A storm nobody called. Get the stranded out of it: the plaza, the shop roof, the avenue.",
         chapters: ["lunch"],
         clock: "12:20",
-        timer: 240,
-        rods: ["apt", "shop", "annex"],
+        timer: 260,
+        rods: ["shop"],
+        sky: { state: "storm", intensity: 0.85 },
+        zones: {
+          plaza: { rect: [106, 16.8, 130, 36], pad: 6, name: "the plaza" },
+          shop: { rect: [43, -5.5, 57, 6.5], pad: 14, name: "the shop roof" },
+          avenue: { rect: [66, 6, 102, 19], pad: 6, name: "the avenue" },
+        },
+        rank: {
+          help: 100,
+          late: 60,
+          precision: 25,
+          time: 150,
+          max: 775,
+          bands: [
+            { min: 90, rank: "S" },
+            { min: 70, rank: "A" },
+            { min: 45, rank: "B" },
+            { min: 0, rank: "C" },
+          ],
+        },
+        variety: 3,
+        challenge: {
+          timer: 0.7,
+          extra: {
+            shelter: [{ id: "tobin", name: "Tobin", x: 114, z: 22, color: "#4f9a5b", thanks: "Tobin: The umbrella went first. I went second." }],
+            street: [{ id: "juno", name: "Juno", x: 84, z: 11, color: "#a65bb5", thanks: "Juno: I counted the lamp posts. Twice." }],
+          },
+        },
+        pieces: [
+          {
+            id: "shelter",
+            goal: "shelter",
+            powers: ["sunbreak"],
+            range: 9,
+            limit: 70,
+            people: [
+              { id: "odile", name: "Odile", x: 109.5, z: 27, color: "#d9604a", thanks: "Odile: Go on, go on. The chairs can drown." },
+              { id: "pim", name: "Pim", x: 118, z: 31, color: "#4a7fc0", thanks: "Pim: My noodles. My dry noodles." },
+              { id: "gus", name: "Gus", x: 126.5, z: 25.5, color: "#a65bb5", thanks: "Gus: Forty years. Never saw it come in sideways." },
+            ],
+          },
+          {
+            id: "rescue",
+            goal: "rescue",
+            powers: ["bolt"],
+            range: 16,
+            limit: 70,
+            rod: "shop",
+            twist: true,
+            people: [{ id: "hollis", name: "Hollis", x: 53, z: 3, y: 3.3, color: "#e0a53c", thanks: "Hollis: Ladder's in the next street. I'll walk." }],
+          },
+          {
+            id: "street",
+            goal: "street",
+            powers: ["gale", "gust"],
+            range: 13,
+            limit: 70,
+            debris: true,
+            people: [
+              { id: "nell", name: "Nell", x: 78, z: 9.6, color: "#4f9a5b", thanks: "Nell: There. There's the crosswalk." },
+              { id: "ravi", name: "Ravi", x: 90, z: 15.6, color: "#d9a05a", thanks: "Ravi: I couldn't see my own umbrella." },
+            ],
+          },
+        ],
         goals: [
-          { id: "storm", kind: "storm", label: "Call the storm" },
-          { id: "rod-one", kind: "rods", count: 1, label: "Strike a lightning rod" },
-          { id: "rod-all", kind: "rods", count: 3, label: "Hit all three rods" },
+          { id: "shelter", kind: "help", piece: "shelter", count: 3, label: "Shelter the plaza: Sun break near each (X)" },
+          { id: "rescue", kind: "help", piece: "rescue", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop (E)" },
+          { id: "street", kind: "help", piece: "street", count: 2, after: "rescue", label: "Clear the street: Gale or Gust near each (V / G)" },
         ],
         lines: {
-          start: "Lunch break. The roofs are waiting.",
-          done: "Three rods. One sky. His.",
+          start: "Lunch break. A storm nobody called.",
+          done: "Everyone's inside. The cell drifts east, toward the Tank.",
+          timeUp: "The storm took the rest.",
+          late: "{name} has waited too long.",
         },
+        say: {
+          start: [
+            ["Dex", "Small Weather. That storm isn't anyone's. Not the forecast's, not mine."],
+            ["Dex", "The plaza, the shop roof, the avenue. People are stuck in all three."],
+            ["He", "Plaza first."],
+          ],
+          "piece:shelter": [["He", "Sun break. Near each one."]],
+          "late:shelter": [["Odile", "It's coming in sideways! Anyone?"]],
+          "piece:rescue": [
+            ["Hollis", "Up here! The ladder's gone and the roof is humming."],
+            ["He", "Ground it. Lightning."],
+          ],
+          "late:rescue": [["Hollis", "My hair is standing up. That's not a joke."]],
+          "twist": [
+            ["Ines", "That wasn't rain. That was something clearing its throat."],
+            ["Dex", "The rain stopped. It went to fog. The avenue's blind, and there's junk in the road."],
+            ["He", "It's moving. Not passing."],
+          ],
+          "piece:street": [["He", "Wind. Make it move."]],
+          "late:street": [["Nell", "Cars! I can hear cars!"]],
+          "end:S": [["Dex", "Everyone. Every single one. Lunch is on me."], ["He", "Lunch."]],
+          "end:A": [["Dex", "Everyone's out. Mostly dry."], ["He", "Mostly."]],
+          "end:B": [["Dex", "We got out. Some of us waited a long time."], ["He", "He knows."]],
+          "end:C": [["Dex", "You got some of us."], ["He", "Not enough."]],
+        },
+        toasts: { "goal:shelter": "The plaza is out of the storm.", "goal:rescue": "Hollis is down. The fog is in.", "goal:street": "The street is clear." },
       },
+      /* Story arc, Part 2: the wind turbines on the annex roof have been still all week. A steady
+         gale turns them; too much wind (or wind in the plaza) costs the market its stalls. */
+      {
+        id: "still-blades",
+        variety: 2,
+        part: 2,
+        title: "Part 2: Still",
+        tagline: "Wind for the turbines, not for the market stalls.",
+        chapters: ["work"],
+        after: "16:20",
+        before: "17:45",
+        clock: "16:40",
+        timer: 240,
+        zones: {
+          roofs: { rect: [149, -5.5, 165, 6.5], pad: 10, name: "the annex roof" },
+          market: { rect: [106, 16.8, 130, 36], pad: 8, name: "the market" },
+        },
+        turbines: { x: [152, 157, 162], z: 0.5, y: 5.72 },
+        market: { open: true },
+        strain: { budget: 7 },
+        goals: [
+          { id: "ines", kind: "reach", x: 154, z: 9.8, r: 8, label: "Find Ines at the annex" },
+          { id: "turn", kind: "wind-time", zone: "roofs", seconds: 10, after: "ines", label: "Keep a gale on the roof (V)" },
+          { id: "stalls-stand", kind: "intact", after: "turn", label: "Leave every stall standing" },
+        ],
+        lines: {
+          start: "The elevator crawls. The lights are low. Roofs are quiet.",
+          done: "The roofs have power.",
+          scarred: "The blades turn. Not everything stayed up.",
+        },
+        say: {
+          start: [
+            ["He", "Pull request. Push weather."],
+            ["Ines", "Seventeen blades on this roof. Not one has turned since Tuesday."],
+          ],
+          "goal:ines": [
+            ["Ines", "A gale. Steady, not a tantrum. They only turn if the wind is kind."],
+            ["He", "Steady."],
+          ],
+          "goal:turn": [["Ines", "They're turning. Do you see how they turn?"]],
+          "edgy": [["Ines", "Enough now?"]],
+          "kick:topple": [["Dex", "The stalls! Mind the stalls!"]],
+          "kick:overspeed": [["Ines", "Too fast. They've shut themselves. Start again, and kinder."]],
+          "end:clean": [
+            ["Ines", "The charts moved. The reservoir isn't just low. Something has been pulling the sky toward it."],
+            ["He", "Pulling."],
+            ["Ines", "Something wants the water gone. Or the weather very much on."],
+            ["Board", "Reservoir level: critical."],
+          ],
+          "end:scarred": [
+            ["Ines", "They turned. Some things in the plaza didn't stay up."],
+            ["Board", "Reservoir level: critical."],
+          ],
+        },
+        toasts: { "goal:turn": "The roofs have power." },
+        scars: { topple: "stalls down in the plaza", overspeed: "the blades overspeed and shut" },
+      },
+      /* The hurricane drive, rebuilt as a rescue (same engine as the lunch storm, `pieces` + `help` goals, rank S..C).
+         A wind he is partly responsible for is on the avenue, and the way home (west along it, the office lot to the
+         apartment) has four things in it. Each set piece lists the abilities that help (`powers`) and the ones that
+         hurt (`hurts`: points off, a shorter full-points window, the scenery gets worse), so the same key is right at
+         one and wrong at the next: a Gale clears the road and tips the bus stop; Rain floods the underpass and a Sun
+         break dries it. He is on foot (Take control is locked in the car); driving the car himself is not built. */
       {
         id: "commute-home",
         title: "Hurricane drive",
-        tagline: "Get home through the storm you made, with wind and debris.",
+        tagline: "The way home is shut in four places. Wind clears, sun dries, rain floods. Pick the right weather at each.",
         /* Offer as he leaves the office / walks the lot (still "work"), and
            during the drive-home chapter if he isn't in the car. */
         chapters: ["work", "commute"],
@@ -505,36 +808,309 @@ window.DAY_CONFIG = {
         /* 17:53: still on foot in the office (elevator). 17:55+ he's in the car
            and Take control is locked — the episode is a walk/glide home. */
         clock: "17:53",
-        timer: 300,
-        debris: true,
+        timer: 360,
+        sky: { state: "wind", intensity: 0.9 },
+        twistSky: { state: "storm", intensity: 0.9 },
+        zones: {
+          debris: { rect: [106, 6, 128, 19], pad: 6, name: "the road by the plaza" },
+          underpass: { rect: [88, 6, 106, 19], pad: 6, name: "the underpass" },
+          bus: { rect: [58, 6, 74, 19], pad: 6, name: "the bus stop" },
+          bridge: { rect: [8, 6, 30, 19], pad: 6, name: "the bridge" },
+        },
+        rank: {
+          help: 100,
+          late: 60,
+          precision: 0,
+          hurt: 40,
+          time: 150,
+          max: 950,
+          bands: [
+            { min: 90, rank: "S" },
+            { min: 70, rank: "A" },
+            { min: 45, rank: "B" },
+            { min: 0, rank: "C" },
+          ],
+        },
+        variety: 4,
+        challenge: {
+          timer: 0.75,
+          extra: {
+            debris: [{ id: "bea", name: "Bea", x: 116, z: 11, color: "#a65bb5", thanks: "Bea: I only stopped to look." }],
+            bus: [{ id: "otto", name: "Otto", x: 66, z: 14, color: "#d9604a", thanks: "Otto: Is it going? It's going." }],
+          },
+        },
+        pieces: [
+          {
+            id: "debris",
+            goal: "debris",
+            powers: ["gale", "gust", "tornado"],
+            hurts: ["rain", "storm"],
+            hurtText: { rain: "rain soaked the junk and pinned it down", storm: "the storm piled more on" },
+            range: 14,
+            limit: 65,
+            debris: { x0: 108, x1: 128, n: 8 },
+            people: [
+              { id: "marlo", name: "Marlo", x: 121, z: 10, color: "#d9604a", thanks: "Marlo: A shop sign. It came down like a plate." },
+              { id: "cass", name: "Cass", x: 112, z: 15.4, color: "#4a7fc0", thanks: "Cass: I was going to push it. I was not going to push it." },
+            ],
+          },
+          {
+            id: "underpass",
+            goal: "underpass",
+            powers: ["sunbreak"],
+            hurts: ["rain", "storm"],
+            hurtText: { rain: "the water came up another hand", storm: "the water came up another hand" },
+            range: 11,
+            limit: 65,
+            prop: { kind: "water", x: 97, z: 12.6, w: 13, d: 7 },
+            people: [
+              { id: "tamsin", name: "Tamsin", x: 97, z: 10, color: "#a65bb5", thanks: "Tamsin: It was up to the doors. Now it's a puddle with opinions." },
+              { id: "wren", name: "Wren", x: 102, z: 15.4, color: "#e0a53c", thanks: "Wren: I'd have waded. Mum says never wade." },
+            ],
+          },
+          {
+            id: "bus",
+            goal: "bus",
+            powers: ["bolt"],
+            hurts: ["gale", "tornado"],
+            hurtText: { gale: "the gale tore the shelter's roof", tornado: "the funnel rocked the bus" },
+            range: 16,
+            limit: 65,
+            twist: true,
+            prop: { kind: "bus", x: 66, z: 12.6 },
+            people: [
+              { id: "hale", name: "Hale", x: 63, z: 10, color: "#4f9a5b", thanks: "Hale: Battery was flat. Thirty years, that's a first." },
+              { id: "odette", name: "Odette", x: 70, z: 15.4, color: "#d9a05a", thanks: "Odette: Everybody on! Everybody on, it's moving!" },
+            ],
+          },
+          {
+            id: "bridge",
+            goal: "bridge",
+            powers: ["fog"],
+            hurts: ["gale", "tornado", "storm"],
+            hurtText: { gale: "the gust tripped the wind sensor", tornado: "the funnel tripped the wind sensor", storm: "the storm tripped the wind sensor" },
+            range: 14,
+            limit: 65,
+            prop: { kind: "gate", x: 10, z: 12.6 },
+            people: [
+              { id: "sorrel", name: "Sorrel", x: 24, z: 10, color: "#d9604a", thanks: "Sorrel: Over. Over and across. I'll buy you a coffee." },
+              { id: "pike", name: "Pike", x: 17, z: 15.4, color: "#4a7fc0", thanks: "Pike: The barrier stood up for me. I'll say that for it." },
+            ],
+          },
+        ],
         goals: [
-          { id: "blow", kind: "weather-any", states: ["storm", "wind"], label: "Whip up storm or wind" },
-          { id: "debris", kind: "debris", count: 2, label: "Shove the debris (gust or tornado)" },
-          { id: "home", kind: "reach", spot: "parkHome", r: 8, label: "Get home" },
+          { id: "debris", kind: "help", piece: "debris", count: 2, label: "Clear the road: Gale or Gust near each (V / G)" },
+          { id: "underpass", kind: "help", piece: "underpass", count: 2, after: "debris", label: "Drain the underpass: Sun break near each (X)" },
+          { id: "bus", kind: "help", piece: "bus", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it (E)" },
+          { id: "bridge", kind: "help", piece: "bridge", count: 2, after: "bus", label: "Hold the bridge open: Fog near each (C)" },
+          { id: "home", kind: "reach", spot: "parkHome", r: 8, after: "bridge", label: "Get home" },
         ],
         lines: {
-          start: "The lot. Home is through what he makes.",
-          done: "Home. The storm came with him.",
+          start: "The lot. The way home is the avenue, and the avenue is shut.",
+          done: "Home. The storm came with him, and most of them got through.",
+          timeUp: "The light went. The storm stayed.",
+          late: "{name} has waited too long.",
+        },
+        say: {
+          start: [
+            ["Board", "Wind advisory. The avenue is closed in several places. Please remain indoors."],
+            ["He", "Home is west along it. Four closures."],
+            ["He", "Wind first. Clear the road."],
+          ],
+          "piece:debris": [["He", "Gale. It'll lift it."]],
+          "hurt:debris": [["Marlo", "Rain? It's heavier now. It's heavier!"]],
+          "late:debris": [["Marlo", "There's a whole sign on my bonnet. Anyone?"]],
+          "piece:underpass": [
+            ["Tamsin", "The underpass took the car to the doors. The water won't go."],
+            ["He", "Sun. Dry it, don't add to it."],
+          ],
+          "hurt:underpass": [["Tamsin", "It's higher! Don't rain on it, please!"]],
+          "late:underpass": [["Wren", "It's at the mirrors. The mirrors."]],
+          "piece:bus": [
+            ["Hale", "Bus is dead in the road. Flat battery, twelve people on it. Anything with a spark?"],
+            ["He", "Lightning. Close, and kind."],
+          ],
+          "hurt:bus": [["Odette", "The shelter's roof! Wind, no! Wind's the problem here!"]],
+          "late:bus": [["Odette", "We can see the lightning, we're just not in it."]],
+          "twist": [
+            ["Board", "Wind advisory upgraded. Storm cell on the avenue. The bridge will close on high wind."],
+            ["He", "It followed him. Or he followed it."],
+          ],
+          "piece:bridge": [
+            ["Sorrel", "The bridge shuts when the wind sensor trips. Still air. We need still air."],
+            ["He", "Fog. Heavy, quiet."],
+          ],
+          "hurt:bridge": [["Sorrel", "It tripped! The arm's coming down again!"]],
+          "late:bridge": [["Pike", "It's coming down. The arm's coming down."]],
+          "end:S": [["Board", "The avenue is open. No further closures."], ["He", "Home."]],
+          "end:A": [["Board", "The avenue is open."], ["He", "Mostly dry."]],
+          "end:B": [["Board", "The avenue is open. Some delays."], ["He", "Some."]],
+          "end:C": [["Board", "The avenue is open. Please do not do that again."], ["He", "He heard."]],
+        },
+        toasts: {
+          "goal:debris": "The road is clear.",
+          "goal:underpass": "The underpass is draining.",
+          "goal:bus": "The bus is rolling. The cell is on the avenue.",
+          "goal:bridge": "The bridge is open.",
         },
       },
+      /* Story arc, Part 3: the reservoir. The Storm Tank is low. Charge the mast with lightning, then bring
+         enough rain over it. Strain carries in from the earlier parts (falling an hour at a time), and the
+         total at the Tank decides how it ends: 6 or less it fills and holds, 7-9 it floods the avenue, 10 or more
+         the sky won't stop. Offered once Part 2 has been played; always in the Episodes menu. */
       {
-        id: "night",
-        title: "Light show",
-        tagline: "A lightning show over the skyline — timed hits.",
-        chapters: ["computer", "bedtime"],
-        clock: "22:05",
-        timer: 180,
-        rods: ["apt", "shop", "annex"],
-        cue: { every: 4.2, window: 1.6 },
+        id: "low-tank",
+        variety: 2,
+        part: 3,
+        afterPart: 2,
+        title: "Part 3: Low",
+        tagline: "Charge the Storm Tank's mast, then bring it just enough rain.",
+        chapters: ["bedtime"],
+        after: "22:20",
+        before: "23:30",
+        clock: "22:30",
+        timer: 300,
+        zones: { tank: { rect: [180, 34, 200, 54], pad: 12, name: "the Storm Tank" } },
+        gauge: { x: 190, z: 35.4, h: 10 },
+        strain: { budget: 6, costs: { bolt: 1, rain: 1, gale: 1, sunbreak: 1, fog: 1, gust: 1, tornado: 2, storm: 2 }, stackSec: 0 },
         goals: [
-          { id: "storm", kind: "storm", label: "Storm over the skyline" },
-          { id: "timed", kind: "timed-bolts", count: 3, label: "Land three timed bolts" },
-          { id: "finale", kind: "bolts", count: 5, label: "Five bolts for the show" },
+          { id: "charge", kind: "ability-in", power: "bolt", zone: "tank", count: 2, label: "Charge the mast: Lightning at the Tank (E)" },
+          { id: "fill", kind: "weather-time", states: ["rain"], zone: "tank", seconds: 5, after: "charge", label: "Rain on the Tank until the gauge fills (R)" },
         ],
         lines: {
-          start: "Night. The skyline wants a show.",
-          done: "Curtain call. Thunder takes a bow.",
+          start: "The Storm Tank. The gauge needle lies at the bottom.",
+          done: "The gauge is full. The Tank is quiet.",
+          scarred: "The gauge is full. The sky has opinions.",
         },
+        say: {
+          start: [
+            ["Board", "Reservoir level: critical. Please. Anyone with weather."],
+            ["He", "Weather's here."],
+            ["Ines", "Not all at once. Charge the mast first."],
+          ],
+          "goal:charge": [["He", "Down it goes."]],
+          "edgy": [["Ines", "Enough now? It fills on kind weather."]],
+          "kick:flood": [["Board", "Avenue: flooded. Market: closed for the night."]],
+          "kick:overcast": [
+            ["Board", "Weather Warning. Please stay indoors."],
+            ["He", "It won't stop."],
+          ],
+          "end:clean": [["Board", "Reservoir level: full."], ["He", "Quiet."]],
+          "end:scarred": [["Board", "Reservoir level: full. And the sky is not done."]],
+        },
+        toasts: { "goal:charge": "The mast is charged.", "goal:fill": "The Tank is full." },
+        scars: { flood: "the avenue flooded, the market closed for the night", overcast: "the sky stays on and the Board warns the city" },
+      },
+      /* The finale. The city gathers on the plaza and he plays the sky: a choreographed light show of cues, each an
+         ability to call on its beat (`js/episodes.js` show logic, the stage in `js/finale.js`). A call inside `good`
+         seconds of its cue's `at` (seconds from the start) is a hit, inside `perfect` a perfect one; a wrong ability
+         or a call with no cue near it is off the beat. Score: Timing (perfect 1, good 0.6), Chain (best run of hits),
+         Clean calls (off-beat calls cost), Variety (distinct abilities hit, of 5). Afterwards the closing card ties the
+         day's stories together from the arc the three parts left (`cityFared`). */
+      {
+        id: "night",
+        variety: 5,
+        title: "Light show",
+        tagline: "The city is on the plaza. Play the sky on the beat: lightning, rain, fog, wind, sun.",
+        chapters: ["computer", "bedtime"],
+        clock: "22:05",
+        timer: 150,
+        zones: { plaza: { rect: [106, 16.8, 130, 36], pad: 6, name: "the plaza" } },
+        finale: {
+          center: [118, 26],
+          spectators: 30,
+          gatherSec: 6,
+          lead: 8,
+          perfect: 0.45,
+          good: 1.1,
+          beatNeeded: 8,
+          rowNames: { people: "Timing", time: "Chain", damage: "Clean calls", variety: "Variety" },
+          acts: [
+            { at: 7, name: "Pulses" },
+            { at: 17, name: "Neon rain" },
+            { at: 25, name: "Beams in the fog" },
+            { at: 33, name: "Wind" },
+            { at: 41, name: "Gold" },
+            { at: 49, name: "Grand finish" },
+          ],
+          cues: [
+            { at: 8, power: "bolt" },
+            { at: 10.5, power: "bolt" },
+            { at: 13, power: "bolt" },
+            { at: 18, power: "rain" },
+            { at: 21.5, power: "bolt" },
+            { at: 26, power: "fog" },
+            { at: 29.5, power: "bolt" },
+            { at: 34, power: "gale" },
+            { at: 37.5, power: "bolt" },
+            { at: 42, power: "sunbreak" },
+            { at: 45.5, power: "bolt" },
+            { at: 50, power: "rain" },
+            { at: 54.5, power: "fog" },
+            { at: 59, power: "gale" },
+            { at: 61, power: "bolt" },
+            { at: 63, power: "bolt" },
+            { at: 66, power: "sunbreak" },
+            { at: 69, power: "bolt" },
+          ],
+          lines: {
+            gather: "They are coming in off the avenue. Faces up.",
+            act: { Pulses: "Three pulses. Slow.", "Neon rain": "Rain, so the street can take the colours.", "Beams in the fog": "Fog. The beams need something to hold on to.", Wind: "Wind, and the streamers.", Gold: "A little sun, for the middle.", "Grand finish": "Everything now. Everything he has." },
+            perfect: "On the beat",
+            good: "Close",
+            miss: "Missed",
+            off: "Off the beat",
+            done: "Curtain call. The sky takes a bow.",
+          },
+          closing: {
+            kicker: "Closing night",
+            title: "The district, tonight",
+            button: "Walk the city",
+            intro: {
+              A: "The city stands on the plaza and looks up. Fair Weather: the park is green, the turbines turn, the Tank is full.",
+              B: "The city stands on the plaza and looks up. Heavy Weather: it all came back, with scars, and they are here anyway.",
+              C: "The city stands on the plaza and looks up. Overcast: the sky would not stop, so he gave it something to do.",
+              none: "The city stands on the plaza and looks up. He did not do all three. He did this one.",
+            },
+            neighbors: [
+              ["Birdie", "She brought the straw hat and the front-row seat. The tomatoes are fine."],
+              ["Dex", "Parcel box off for once. He counted the bursts, and lost count."],
+              ["Ines", "The telescope pointed the wrong way, at him. Then at the aurora, which she hadn't charted."],
+            ],
+            last: {
+              S: ["He", "A whole day of weather, and this was the part he wanted to keep."],
+              A: ["He", "Mostly on time. The sky forgives."],
+              B: ["He", "Some on the beat. Some of it was just weather."],
+              C: ["He", "They stayed anyway. He'll take it."],
+            },
+            tally: "The show",
+          },
+        },
+        say: {
+          start: [
+            ["Board", "Plaza assembly. The city has gathered. Please stay behind the cones."],
+            ["He", "They came to look up. Fair enough."],
+            ["Ines", "Whatever you do, do it on time. The sky keeps a beat."],
+          ],
+          gather: [["Birdie", "Front row! My tomatoes get the front row."]],
+          "act:Neon rain": [["Dex", "Mind the puddles. They are about to be very pink."]],
+          "act:Grand finish": [["He", "All of it."]],
+          "end:S": [["Ines", "Every cue. I'll put it in the charts."], ["He", "Thank you, everyone."]],
+          "end:A": [["Birdie", "Again! Again!"]],
+          "end:B": [["Dex", "Some of that was perfect. Some of that was weather."]],
+          "end:C": [["Board", "The show has ended. Please go home. Thank you."]],
+        },
+        goals: [
+          { id: "beat", kind: "show-hits", count: 8, label: "Hit eight cues on the beat" },
+          { id: "variety", kind: "show-variety", count: 5, label: "Use all five effects: Lightning, Rain, Fog, Wind, Sun" },
+          { id: "show", kind: "show-end", label: "Play the whole show" },
+        ],
+        lines: {
+          start: "Night. The plaza is filling. The skyline wants a show.",
+          done: "Curtain call. The sky takes a bow.",
+          timeUp: "The lights come up. The plaza is still clapping.",
+        },
+        toasts: { "goal:beat": "The crowd is with him.", "goal:variety": "Every kind of weather, in one night." },
       },
     ],
   },
