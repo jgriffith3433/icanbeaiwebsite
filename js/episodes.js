@@ -135,6 +135,22 @@ export function scoreCard(done, total, left, timer, bands, story) {
   };
 }
 
+/** Rank for a rescue episode: points over `rank.max` as a percent, then the first band (S..C) it reaches. */
+export function rankFor(points, rank) {
+  const r = rank || {};
+  const max = r.max > 0 ? r.max : 1;
+  const pct = Math.max(0, Math.min(100, Math.round((100 * Math.max(0, points)) / max)));
+  const bands = Array.isArray(r.bands) && r.bands.length ? r.bands : [{ min: 0, rank: "C" }];
+  let letter = bands[bands.length - 1].rank;
+  for (let i = 0; i < bands.length; i++) {
+    if (pct >= (bands[i].min | 0)) {
+      letter = bands[i].rank;
+      break;
+    }
+  }
+  return { pct, rank: letter };
+}
+
 export function loadBest(key, store) {
   const s = store || (typeof localStorage !== "undefined" ? localStorage : null);
   if (!s || !key) return {};
@@ -164,7 +180,7 @@ export function recordBest(key, id, card, store) {
   const best = loadBest(key, store);
   const prev = best[id];
   if (!prev || (card.pct | 0) > (prev.pct | 0)) {
-    best[id] = { pct: card.pct, word: card.word, text: card.text, scarred: !!card.scarred, when: Date.now() };
+    best[id] = { pct: card.pct, word: card.word, text: card.text, scarred: !!card.scarred, rank: card.rank || null, when: Date.now() };
     saveBest(key, best, store);
     return { best, improved: true };
   }
@@ -254,6 +270,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-hud .strain i{display:block;height:5px;margin-top:3px;border-radius:3px;background:rgba(159,212,255,.18);overflow:hidden}
 .ep-hud .strain b{display:block;height:100%;background:#9fd4ff;border-radius:3px}
 .ep-hud .strain.over b{background:#e58a7a}
+.ep-hud .rankline{margin-top:8px;display:flex;gap:10px;align-items:baseline;color:#f0c27a;font-variant-numeric:tabular-nums}
+.ep-hud .rankline b{font-size:1.15rem;color:#f6f1e8}
+.ep-hud .pieceline{margin-top:6px;color:#9fd4ff}
+.ep-hud .pieceline.late{color:#e58a7a}
+.ep-panel .rank{margin:6px 0 0;font:800 4rem/1 Outfit,system-ui,sans-serif;letter-spacing:.02em;color:#f0c27a}
+.ep-panel .rank.r-S{color:#ffe08a;text-shadow:0 0 22px rgba(255,224,138,.6)}.ep-panel .rank.r-A{color:#8dceb0}.ep-panel .rank.r-B{color:#9fd4ff}.ep-panel .rank.r-C{color:#e58a7a}
+.ep-panel .rankdetail{font-size:.9rem;color:rgba(246,241,232,.75);margin:2px 0 8px}
 .ep-say{position:fixed;z-index:22;left:50%;bottom:max(96px,calc(env(safe-area-inset-bottom) + 88px));transform:translate(-50%,8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:min(520px,calc(100vw - 28px));padding:10px 16px;border-radius:14px;background:#f6f1e8;color:#1a1c22;font:600 0.9rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.45)}
 .ep-say.on{opacity:1;transform:translate(-50%,0)}
 .ep-say b{display:block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#7a5a1a;margin-bottom:2px}
@@ -297,7 +320,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   hud.id = "episode-hud";
   hud.className = "ep-hud";
   hud.hidden = true;
-  hud.innerHTML = `<div class="ep-card"><h3></h3><p class="tag"></p><ul></ul><div class="timer" hidden></div><div class="strain" hidden></div><div class="cue" hidden></div><p class="prompt" hidden></p><button type="button" class="skip" hidden>Skip</button></div>`;
+  hud.innerHTML = `<div class="ep-card"><h3></h3><p class="tag"></p><ul></ul><div class="timer" hidden></div><div class="strain" hidden></div><div class="rankline" hidden></div><div class="pieceline" hidden></div><div class="cue" hidden></div><p class="prompt" hidden></p><button type="button" class="skip" hidden>Skip</button></div>`;
 
   const offer = document.createElement("div");
   offer.id = "episode-offer";
@@ -309,7 +332,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   scoreEl.id = "episode-score";
   scoreEl.className = "ep-score";
   scoreEl.hidden = true;
-  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><div class="actions"><button type="button" class="primary ok">OK</button></div></div>`;
+  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="rank" hidden></p><p class="rankdetail" hidden></p><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><div class="actions"><button type="button" class="primary ok">OK</button></div></div>`;
 
   const endEl = document.createElement("div");
   endEl.id = "ending-card";
@@ -343,6 +366,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   const hudTimer = hud.querySelector(".timer");
   const hudCue = hud.querySelector(".cue");
   const hudStrain = hud.querySelector(".strain");
+  const hudRank = hud.querySelector(".rankline");
+  const hudPiece = hud.querySelector(".pieceline");
   const hudPrompt = hud.querySelector(".prompt");
   const hudSkip = hud.querySelector(".skip");
   const offerTitle = offer.querySelector("h2");
@@ -355,6 +380,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   const scoreDetail = scoreEl.querySelector(".detail");
   const scoreBest = scoreEl.querySelector(".bestline");
   const scoreStrain = scoreEl.querySelector(".strainline");
+  const scoreRank = scoreEl.querySelector(".rank");
+  const scoreRankDetail = scoreEl.querySelector(".rankdetail");
   const scoreOk = scoreEl.querySelector(".ok");
   const menuList = menu.querySelector(".ep-list");
   const endKicker = endEl.querySelector(".kicker");
@@ -370,7 +397,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   offerDecline.textContent = L.decline;
 
   /* ---- rods / debris meshes (episode-local; not world.js) ---- */
-  const props = { rods: [], debris: [], mats: null };
+  const props = { rods: [], debris: [], people: [], mats: null };
   function ensureMats() {
     if (!B || !world || !world.scene || props.mats) return props.mats;
     const rod = new B.StandardMaterial("ep-rod", world.scene);
@@ -539,6 +566,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       if (r.ball) r.ball.dispose();
     });
     props.debris.forEach((m) => m.dispose && m.dispose());
+    props.people.forEach((q) => q.root && q.root.dispose(false, true));
+    props.people = [];
     props.rods = [];
     props.debris = [];
   }
@@ -694,7 +723,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       markEl.textContent = g.done ? "✓" : g.failed ? "✗" : "·";
       const label = document.createElement("span");
       let text = g.label || g.id;
-      if ((g.kind === "ability-in" && g.count > 1) || g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris") {
+      if ((g.kind === "ability-in" && g.count > 1) || g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris" || g.kind === "help") {
         const need = g.count | 0;
         const have = Math.min(need, g.progress | 0);
         text += ` (${have}/${need})`;
@@ -717,6 +746,21 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       hudStrain.className = "strain" + (active.strain > b ? " over" : "");
       hudStrain.innerHTML = `${sc.meter || "Sky"}: ${active.strain} ${sc.of || "of"} ${b}<i><b style="width:${Math.min(100, Math.round((100 * active.strain) / b))}%"></b></i>`;
     } else hudStrain.hidden = true;
+    const RS = active.rescue;
+    if (RS && active.ep.rank) {
+      const rk = rankFor(RS.score, active.ep.rank);
+      hudRank.hidden = false;
+      hudRank.innerHTML = `Score <b>${RS.score}</b> · ${RS.helped}/${RS.total} helped · Rank <b>${rk.rank}</b>`;
+      hudPiece.hidden = !RS.def;
+      if (RS.def) {
+        const left = Math.max(0, Math.ceil(RS.def.limit - (active.age - RS.at)));
+        hudPiece.className = "pieceline" + (left <= 0 ? " late" : "");
+        hudPiece.textContent = `Set piece ${RS.idx + 1} of ${active.ep.pieces.length}: ` + (left > 0 ? `${left} s for full points` : "late, worth less");
+      }
+    } else {
+      hudRank.hidden = true;
+      hudPiece.hidden = true;
+    }
     const cur = active.ep.tutorial ? currentTutorialGoal(active) : null;
     hudPrompt.hidden = !cur;
     hudPrompt.textContent = cur ? cur.prompt || "" : "";
@@ -736,6 +780,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (tt) showToast(tt);
     sayKey("goal:" + g.id);
     if (g.kind === "wind-time") story.turned = true;
+    if (g.kind === "help" && active.rescue) afterPiece();
     if (active.ep.tutorial) {
       const next = currentTutorialGoal(active);
       if (next) unlockAbility(next.power, active);
@@ -918,6 +963,152 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (A.toppled > 0) A.goals.filter((g) => g.kind === "intact").forEach(failGoal);
   }
 
+  /* ---- rescue episodes (Rooftop storm): stranded people, helped by an ability called near them ---- */
+  function buildPerson(q) {
+    if (!B || !world || !world.scene) return null;
+    const root = new B.TransformNode("ep-person-" + q.id, world.scene);
+    root.position.set(q.x, q.y || 0, q.z);
+    const add = (m, y, mat) => { m.parent = root; m.position.y = y; m.material = mat; m.isPickable = false; return m; };
+    add(B.MeshBuilder.CreateCylinder("ep-person-body-" + q.id, { diameter: 0.5, height: 1.1, tessellation: 10 }, world.scene), 0.65, smat("person", q.color || "#cccccc", 0.15));
+    add(B.MeshBuilder.CreateSphere("ep-person-head-" + q.id, { diameter: 0.38, segments: 8 }, world.scene), 1.45, smat("head", "#e8c9a8", 0.1));
+    const warn = smat("warn", "#ffb347", 0.9);
+    const ring = add(B.MeshBuilder.CreateTorus("ep-person-ring-" + q.id, { diameter: 1.9, thickness: 0.1, tessellation: 20 }, world.scene), 0.08, warn);
+    const beam = add(B.MeshBuilder.CreateCylinder("ep-person-beam-" + q.id, { diameter: 0.14, height: 7, tessellation: 6 }, world.scene), 3.5, warn.clone("ep-warn-beam-" + q.id));
+    beam.material.alpha = 0.35;
+    return { root, ring, beam, warn, ok: smat("ok", "#6be0a0", 0.9) };
+  }
+  function pieceGoal(R) {
+    return active.goals.find((g) => g.kind === "help" && R.def && g.piece === R.def.id);
+  }
+  function beginPiece(i) {
+    const R = active && active.rescue;
+    const def = active && active.ep.pieces && active.ep.pieces[i];
+    if (!R || !def) return;
+    R.idx = i;
+    R.def = def;
+    R.at = active.age;
+    R.lateSaid = false;
+    R.people = def.people.map((q) => {
+      const m = buildPerson(q);
+      const person = Object.assign({}, q, { helped: false, late: false, t: 0, m });
+      if (m) props.people.push(person);
+      return person;
+    });
+    if (def.debris) spawnDebris();
+    sayKey("piece:" + def.id);
+    mark("piece", { id: active.ep.id, piece: def.id, index: i, people: def.people.length });
+    paintHud();
+  }
+  /* The storm turns: the rain stops and a fog the street can't see through takes its place. */
+  function doTwist() {
+    const R = active.rescue;
+    if (R.twisted) return;
+    R.twisted = true;
+    R.sky = { state: "fog", intensity: 1 };
+    const W = window.weather || day.weather;
+    if (W && W.set) W.set("fog", 1, "story");
+    sayKey("twist");
+    mark("twist", { id: active.ep.id, sky: "fog" });
+    storyEvent("twist", { id: active.ep.id });
+  }
+  function afterPiece() {
+    const R = active.rescue;
+    const def = R.def;
+    if (def.twist) doTwist();
+    if (active.ep.pieces[R.idx + 1]) beginPiece(R.idx + 1);
+    else {
+      R.sky = null;
+      R.def = null;
+    }
+  }
+  function helpPerson(p) {
+    const R = active.rescue;
+    const rk = active.ep.rank || {};
+    const def = R.def;
+    p.late = active.age - R.at > def.limit;
+    p.helped = true;
+    const pts = p.late ? rk.late : rk.help;
+    R.score += pts;
+    R.helped += 1;
+    R.lastHelpAt = active.age;
+    if (p.late) R.late += 1;
+    if (p.m) {
+      p.m.ring.material = p.m.ok;
+      p.m.beam.material = p.m.ok;
+    }
+    if (def.debris) {
+      const n = Math.ceil(props.debris.length / def.people.length);
+      for (let k = 0; k < n; k++) {
+        const m = props.debris.find((x) => x.isEnabled());
+        if (m) m.setEnabled(false);
+      }
+    }
+    mark("help", { id: active.ep.id, piece: def.id, person: p.id, points: pts, late: p.late, score: R.score, helped: R.helped });
+    storyEvent("help", { id: active.ep.id, piece: def.id, person: p.id, points: pts, late: p.late, score: R.score });
+    showToast(`+${pts} ${p.name}${p.late ? " (late)" : ""}`);
+    if (p.thanks) {
+      const k = p.thanks.indexOf(": ");
+      sayQueue.push({ who: k > 0 ? p.thanks.slice(0, k) : p.name, text: k > 0 ? p.thanks.slice(k + 2) : p.thanks, key: "thanks:" + p.id, ep: active.ep.id });
+      if (sayLeft <= 0) nextSay();
+    }
+    const A = abil();
+    if (A && A.reset) A.reset(100); // a rescue pays the Pressure back
+    const g = pieceGoal(R);
+    if (g) {
+      g.progress = R.people.filter((x) => x.helped).length;
+      paintHud();
+      if (g.progress >= (g.count | 0)) completeGoal(g, "help");
+    }
+    paintHud();
+  }
+  function onPieceCall(power) {
+    const R = active.rescue;
+    const def = R && R.def;
+    if (!def || def.powers.indexOf(power) < 0) return;
+    const pos = playerPos();
+    if (!pos) return;
+    let best = null;
+    let bd = 1e9;
+    R.people.forEach((p) => {
+      if (p.helped) return;
+      const d = Math.hypot(pos.x - p.x, pos.z - p.z);
+      if (d <= def.range && d < bd) {
+        best = p;
+        bd = d;
+      }
+    });
+    if (best) helpPerson(best);
+    else mark("help-miss", { id: active.ep.id, piece: def.id, power });
+  }
+  function rescueTick(dt) {
+    const A = active;
+    const R = A.rescue;
+    const W = window.weather || day.weather;
+    // The storm holds the sky: after an ability's own weather runs out, it comes back.
+    if (R.sky && W && W.now && W.set && !W.now().manual) W.set(R.sky.state, R.sky.intensity, "story");
+    if (R.def) {
+      const el = A.age - R.at;
+      if (!R.lateSaid && el > R.def.limit) {
+        R.lateSaid = true;
+        sayKey("late:" + R.def.id);
+        mark("late", { id: A.ep.id, piece: R.def.id });
+      }
+    }
+    props.people.forEach((p) => {
+      if (!p.m) return;
+      if (!p.helped) {
+        const k = 1 + 0.12 * Math.sin(A.age * 5 + p.x);
+        p.m.ring.scaling.x = k;
+        p.m.ring.scaling.z = k;
+      } else {
+        p.t += dt;
+        const f = Math.max(0, Math.min(1, (p.t - 1.2) / 0.8));
+        p.m.root.scaling.setAll(Math.max(0.001, 1 - f));
+        if (f >= 1 && p.m.root.isEnabled()) p.m.root.setEnabled(false);
+      }
+    });
+  }
+
   /* ---- start / finish ---- */
   function showOffer(ep) {
     offerEp = ep;
@@ -977,6 +1168,9 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     }
     if (ep.rods && ep.rods.length) spawnRods(ep.rods);
     else clearProps();
+    if (ep.pieces) {
+      active.rescue = { idx: -1, def: null, at: 0, score: 0, helped: 0, late: 0, total: ep.pieces.reduce((n, q) => n + q.people.length, 0), precision: false, lastHelpAt: -9, sky: ep.sky ? Object.assign({}, ep.sky) : null, bonus: 0, people: [], twisted: false, lateSaid: false };
+    }
     if (ep.debris) spawnDebris();
     if (ep.market) spawnStalls(!!ep.market.open);
     if (ep.turbines) spawnTurbines(ep.turbines);
@@ -984,6 +1178,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     sayQueue = [];
     sayLeft = 0;
     sayKey("start", ep);
+    if (active.rescue) {
+      const W = window.weather || day.weather;
+      if (active.rescue.sky && W && W.set) W.set(active.rescue.sky.state, active.rescue.sky.intensity, "story");
+      beginPiece(0);
+    }
     if (ep.lines && ep.lines.start && day.note) day.note(ep.lines.start);
     paintHud();
     mark("start", { id: ep.id, via: via || "play", title: ep.title });
@@ -991,6 +1190,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   }
   function endQuiet() {
     if (active && active.ep.tutorial) openAllAbilities();
+    if (active && active.rescue) active.rescue.sky = null;
     active = null;
     clearProps(true); // the stalls, blades and patches stay: they are how the part ended
     hud.hidden = true;
@@ -1017,6 +1217,18 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       ? { value: run.strain, budget: run.ep.strain.budget, kicks: run.kicks.length, penalty: (cfg.strain && cfg.strain.scarPenalty) || 25 }
       : null;
     const card = scoreCard(goalsDone(run), run.goals.length, run.left, run.ep.timer || 0, bands, storyMeta);
+    if (run.ep.rank && run.rescue) {
+      const R = run.rescue;
+      const rk0 = run.ep.rank;
+      R.bonus = allDone(run) && run.ep.timer > 0 ? Math.round((rk0.time || 0) * (run.left / run.ep.timer)) : 0;
+      const points = R.score + R.bonus;
+      const rk = rankFor(points, rk0);
+      card.pct = rk.pct;
+      card.word = wordFor(rk.pct, bands);
+      card.text = `Today's forecast: ${card.pct}% chance of ${card.word}`;
+      card.rank = rk.rank;
+      card.points = points;
+    }
     const rec = recordBest(storageKey, run.ep.id, card);
     // The scars the card lists: each kick-back, a shut stall in Part 1, a goal that failed.
     const scars = run.kicks.map((k) => (run.ep.scars && run.ep.scars[k]) || k);
@@ -1048,16 +1260,28 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     }
     if (card.scarred && run.strain > run.ep.strain.budget) scars.push(`strain ${run.strain} over ${run.ep.strain.budget}`);
     if (run.ep.strain && (why === "clear" || why === "scarred")) sayKey(card.scarred ? "end:scarred" : "end:clean", run.ep);
+    if (card.rank && (why === "clear" || why === "time")) sayKey("end:" + card.rank, run.ep);
     if (day.note) {
       if ((why === "clear" || why === "scarred") && run.ep.lines && (card.scarred ? run.ep.lines.scarred : run.ep.lines.done)) day.note(card.scarred ? run.ep.lines.scarred : run.ep.lines.done);
       else if (why === "clear" && run.ep.lines && run.ep.lines.done) day.note(run.ep.lines.done);
-      else if (why === "time") day.note(L.timeUp);
+      else if (why === "time") day.note((run.ep.lines && run.ep.lines.timeUp) || L.timeUp);
       else if (why === "let-go") day.note(L.letGo);
       day.note(card.text);
     }
     scoreTitle.textContent = L.scoreTitle;
     scoreForecast.textContent = card.text;
     scoreDetail.textContent = `${card.done} of ${card.total} goals` + (why === "time" ? " · time up" : why === "let-go" ? " · let go" : "");
+    if (card.rank) {
+      const R = run.rescue;
+      scoreRank.hidden = false;
+      scoreRank.textContent = card.rank;
+      scoreRank.className = "rank r-" + card.rank;
+      scoreRankDetail.hidden = false;
+      scoreRankDetail.textContent = `Rank ${card.rank} · ${card.points} of ${run.ep.rank.max} points · ${R.helped} of ${R.total} stranded helped` + (R.late ? ` (${R.late} late)` : "") + ` · help ${R.score - (R.precision ? run.ep.rank.precision : 0)}` + (R.precision ? ` · rod ${run.ep.rank.precision}` : "") + ` · time ${R.bonus}`;
+    } else {
+      scoreRank.hidden = true;
+      scoreRankDetail.hidden = true;
+    }
     scoreEl.classList.toggle("scarred", !!card.scarred);
     if (storyMeta) {
       const sl = (cfg.strain && cfg.strain.lines) || {};
@@ -1067,7 +1291,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     const b = rec.best[run.ep.id];
     scoreBest.textContent = b ? `${L.best}: ${b.pct}% chance of ${b.word}` : "";
     scoreEl.hidden = false;
-    mark("score", { id: run.ep.id, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved, scarred: card.scarred, strain: run.strain, kicks: run.kicks.slice(), scars });
+    mark("score", { id: run.ep.id, rank: card.rank || null, points: card.points == null ? null : card.points, helped: run.rescue ? run.rescue.helped : null, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved, scarred: card.scarred, strain: run.strain, kicks: run.kicks.slice(), scars });
     endQuiet();
     return card;
   }
@@ -1227,6 +1451,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       if (cur && cur.power === power) completeGoal(cur, d.via || "key");
       return;
     }
+    if (active.rescue && d.action === d.power && d.action !== "denied") onPieceCall(d.power);
     if (active.ep.strain && d.action === d.power && d.action !== "denied") {
       onStoryCall(d.power);
       const pos = playerPos();
@@ -1263,6 +1488,14 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
           lightRod(hitRod.id);
           active.rodsHit.add(hitRod.id);
           mark("rod", { id: active.ep.id, rod: hitRod.id });
+          const R = active.rescue;
+          if (R && !R.precision && active.ep.rank && active.ep.pieces.some((q) => q.rod === hitRod.id) && ((R.def && R.def.rod === hitRod.id) || active.age - R.lastHelpAt < 1.5)) {
+            R.precision = true;
+            R.score += active.ep.rank.precision;
+            showToast(`+${active.ep.rank.precision} grounded clean`);
+            mark("precision", { id: active.ep.id, rod: hitRod.id, score: R.score });
+            paintHud();
+          }
         }
         tryGoalsFromSnap("bolt");
       }, 40);
@@ -1351,6 +1584,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (!active) return;
     active.age += dt;
     if (active.ep.strain) storyTick(dt);
+    if (active.rescue) rescueTick(dt);
     if (active.ep.timer) {
       active.left -= dt;
       if (active.left <= 0) {
@@ -1411,6 +1645,9 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
             debris: active.debris,
             cue: active.cueOn,
             unlocked: (active.unlocked || []).slice(),
+            rescue: active.rescue
+              ? { score: active.rescue.score, helped: active.rescue.helped, total: active.rescue.total, piece: active.rescue.def ? active.rescue.def.id : null, twisted: active.rescue.twisted, late: active.rescue.late, precision: active.rescue.precision, rank: rankFor(active.rescue.score, active.ep.rank).rank, people: active.rescue.people.map((p) => ({ id: p.id, x: p.x, z: p.z, helped: p.helped })) }
+              : null,
             prompt: active.ep.tutorial && currentTutorialGoal(active) ? currentTutorialGoal(active).prompt : null,
           }
         : null,

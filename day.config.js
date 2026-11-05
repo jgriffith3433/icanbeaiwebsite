@@ -571,23 +571,111 @@ window.DAY_CONFIG = {
         toasts: { "goal:rain-park": "The park drank.", "goal:stalls": "The market is open." },
         scars: { flood: "the pond ran over the path", soak: "the stock got rained on", scorch: "a brown patch on the lawn", shut: "one stall stays shut" },
       },
+      /* Rooftop storm (the lunch episode, rebuilt as a rescue; docs/story-arc-beat-sheet.md "The lunch storm"). A storm
+         nobody called sits on the district. Three set pieces, each a goal: people to get out of it with the matching
+         ability called within `range` of them (the nearest unhelped one per call). Full points inside `limit` s of a
+         piece starting, `late` after. The twist fires when the second piece is done (fog, debris, the third piece).
+         Rank S..C is points over `max`. Everything the episode says is `say` ([who, text]). */
       {
         id: "lunch",
         title: "Rooftop storm",
-        tagline: "Build a storm and strike the lightning rods on three rooftops.",
+        tagline: "A storm nobody called. Get the stranded out of it: the plaza, the shop roof, the avenue.",
         chapters: ["lunch"],
         clock: "12:20",
-        timer: 240,
-        rods: ["apt", "shop", "annex"],
+        timer: 260,
+        rods: ["shop"],
+        sky: { state: "storm", intensity: 0.85 },
+        zones: {
+          plaza: { rect: [106, 16.8, 130, 36], pad: 6, name: "the plaza" },
+          shop: { rect: [43, -5.5, 57, 6.5], pad: 14, name: "the shop roof" },
+          avenue: { rect: [66, 6, 102, 19], pad: 6, name: "the avenue" },
+        },
+        rank: {
+          help: 100,
+          late: 60,
+          precision: 25,
+          time: 150,
+          max: 775,
+          bands: [
+            { min: 90, rank: "S" },
+            { min: 70, rank: "A" },
+            { min: 45, rank: "B" },
+            { min: 0, rank: "C" },
+          ],
+        },
+        pieces: [
+          {
+            id: "shelter",
+            goal: "shelter",
+            powers: ["sunbreak"],
+            range: 9,
+            limit: 70,
+            people: [
+              { id: "odile", name: "Odile", x: 109.5, z: 27, color: "#d9604a", thanks: "Odile: Go on, go on. The chairs can drown." },
+              { id: "pim", name: "Pim", x: 118, z: 31, color: "#4a7fc0", thanks: "Pim: My noodles. My dry noodles." },
+              { id: "gus", name: "Gus", x: 126.5, z: 25.5, color: "#a65bb5", thanks: "Gus: Forty years. Never saw it come in sideways." },
+            ],
+          },
+          {
+            id: "rescue",
+            goal: "rescue",
+            powers: ["bolt"],
+            range: 16,
+            limit: 70,
+            rod: "shop",
+            twist: true,
+            people: [{ id: "hollis", name: "Hollis", x: 53, z: 3, y: 3.3, color: "#e0a53c", thanks: "Hollis: Ladder's in the next street. I'll walk." }],
+          },
+          {
+            id: "street",
+            goal: "street",
+            powers: ["gale", "gust"],
+            range: 13,
+            limit: 70,
+            debris: true,
+            people: [
+              { id: "nell", name: "Nell", x: 78, z: 9.6, color: "#4f9a5b", thanks: "Nell: There. There's the crosswalk." },
+              { id: "ravi", name: "Ravi", x: 90, z: 15.6, color: "#d9a05a", thanks: "Ravi: I couldn't see my own umbrella." },
+            ],
+          },
+        ],
         goals: [
-          { id: "storm", kind: "storm", label: "Call the storm" },
-          { id: "rod-one", kind: "rods", count: 1, label: "Strike a lightning rod" },
-          { id: "rod-all", kind: "rods", count: 3, label: "Hit all three rods" },
+          { id: "shelter", kind: "help", piece: "shelter", count: 3, label: "Shelter the plaza: Sun break near each (X)" },
+          { id: "rescue", kind: "help", piece: "rescue", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop (E)" },
+          { id: "street", kind: "help", piece: "street", count: 2, after: "rescue", label: "Clear the street: Gale or Gust near each (V / G)" },
         ],
         lines: {
-          start: "Lunch break. The roofs are waiting.",
-          done: "Three rods. One sky. His.",
+          start: "Lunch break. A storm nobody called.",
+          done: "Everyone's inside. The cell drifts east, toward the Tank.",
+          timeUp: "The storm took the rest.",
+          late: "{name} has waited too long.",
         },
+        say: {
+          start: [
+            ["Dex", "Small Weather. That storm isn't anyone's. Not the forecast's, not mine."],
+            ["Dex", "The plaza, the shop roof, the avenue. People are stuck in all three."],
+            ["He", "Plaza first."],
+          ],
+          "piece:shelter": [["He", "Sun break. Near each one."]],
+          "late:shelter": [["Odile", "It's coming in sideways! Anyone?"]],
+          "piece:rescue": [
+            ["Hollis", "Up here! The ladder's gone and the roof is humming."],
+            ["He", "Ground it. Lightning."],
+          ],
+          "late:rescue": [["Hollis", "My hair is standing up. That's not a joke."]],
+          "twist": [
+            ["Ines", "That wasn't rain. That was something clearing its throat."],
+            ["Dex", "The rain stopped. It went to fog. The avenue's blind, and there's junk in the road."],
+            ["He", "It's moving. Not passing."],
+          ],
+          "piece:street": [["He", "Wind. Make it move."]],
+          "late:street": [["Nell", "Cars! I can hear cars!"]],
+          "end:S": [["Dex", "Everyone. Every single one. Lunch is on me."], ["He", "Lunch."]],
+          "end:A": [["Dex", "Everyone's out. Mostly dry."], ["He", "Mostly."]],
+          "end:B": [["Dex", "We got out. Some of us waited a long time."], ["He", "He knows."]],
+          "end:C": [["Dex", "You got some of us."], ["He", "Not enough."]],
+        },
+        toasts: { "goal:shelter": "The plaza is out of the storm.", "goal:rescue": "Hollis is down. The fog is in.", "goal:street": "The street is clear." },
       },
       /* Story arc, Part 2: the wind turbines on the annex roof have been still all week. A steady
          gale turns them; too much wind (or wind in the plaza) costs the market its stalls. */
