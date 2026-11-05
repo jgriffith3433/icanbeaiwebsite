@@ -307,12 +307,29 @@ async function roofBolt(t) {
   else t.problem("bug", `He isn't on the ${b.id} roof (y ${st.y.toFixed(2)} at ${st.x.toFixed(1)},${st.z.toFixed(1)})`);
   const cost = (cfg.powers && cfg.powers.costs && cfg.powers.costs.bolt) || 24;
   await t.until(() => P.now().pressure + 0.05 >= cost, 15000, "Pressure for the bolt").catch(() => {});
+  const barEl = document.getElementById("abilitybar");
+  const slotEl = document.getElementById("ability-bolt");
+  const barUp = !!(barEl && !barEl.hidden && slotEl);
+  if (barUp) t.event("ability-bar", `bar up: ${P.now().abilities.map((x) => x.key.toUpperCase() + " " + x.name).join(", ")}; energy ${Math.round(P.now().energy)}`);
+  else t.problem("bug", "The ability bar isn't showing while he's the player's");
+  const e0 = P.now().energy;
   pressKey("e");
   await t.until(() => P.now().strike, 3000, "a lightning strike").catch(() => {});
   const strike = P.now().strike;
   if (strike) t.event("bolt-struck", `from the roof, at ${strike.x.toFixed(1)},${strike.z.toFixed(1)}`);
   else t.problem("bug", "E didn't throw lightning from the rooftop");
-  await sleep(600);
+  await sleep(250);
+  const bolt = P.now().abilities.find((x) => x.id === "bolt");
+  const spent = e0 - P.now().energy;
+  if (bolt && bolt.remaining > 0 && slotEl && slotEl.classList.contains("cooling") && spent > cost * 0.5) {
+    t.event("ability-used", `lightning cost ${Math.round(spent + 3)} energy now ${Math.round(P.now().energy)}, cooldown ${bolt.remaining.toFixed(1)} s on the bar`);
+  } else t.problem("bug", "The ability bar didn't show energy spent and a cooldown after lightning");
+  pressKey("e");
+  await sleep(150);
+  const again = P.now().blocked;
+  if (again && again.reason === "cooldown") t.event("ability-cooldown", "a second E during the cooldown is refused");
+  else t.problem("bug", "Lightning could be thrown again during its cooldown");
+  await sleep(450);
   pressKey("Escape");
   t.event(strike && onRoof ? "smoke-pass" : "smoke-fail", "city loaded, Small Weather shown, rooftop, one bolt");
 }

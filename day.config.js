@@ -309,7 +309,12 @@ window.DAY_CONFIG = {
     reach: 11, // gust length, metres
     costs: { storm: 40, bolt: 24, gust: 16, tornado: 48 },
     keys: { storm: "f", bolt: "e", gust: "g", tornado: "t" },
+    // js/abilities.js: the bar's cooldown sweep. Seconds before the next call, and how long it lasts.
+    cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8 },
+    durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4 },
+    names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado" },
     lines: {
+      cooling: "Not ready yet.",
       gather: "The sky draws in over him.",
       storm: "He calls the storm down.",
       bolt: "Lightning. Where he aimed.",

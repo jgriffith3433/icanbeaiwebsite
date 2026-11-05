@@ -11,6 +11,7 @@ import {
   nearestStructure,
   streetCourse,
 } from "../js/powers.js";
+import { createAbilities } from "../js/abilities.js";
 
 const problems = [];
 const ok = (cond, msg) => {
@@ -58,6 +59,22 @@ const along = streetCourse(cfg, -5, 12.6, 1, 0);
 ok(along.axis === "x" && along.dir === 1, `streetCourse along the avenue: ${JSON.stringify(along)}`);
 const cross = streetCourse(cfg, 0.2, 5, 0, -1);
 ok(cross.axis === "z" && cross.dir === -1, `streetCourse on a cross: ${JSON.stringify(cross)}`);
+
+const ab = createAbilities({ max: 100, start: 50 });
+ab.register({ id: "bolt", name: "Lightning", key: "e", cost: 24, cooldown: 2, duration: 0.5 });
+ok(ab.use("bolt").ok && Math.abs(ab.now().energy - 26) < 1e-6, "ability use spends its cost");
+const again = ab.use("bolt");
+ok(!again.ok && again.reason === "cooldown" && Math.abs(ab.now().energy - 26) < 1e-6, "a call on cooldown is refused and free");
+ab.step(1, 10);
+ok(ab.get("bolt").remaining > 0.99 && ab.get("bolt").remaining < 1.01, "cooldown counts down with the clock");
+ab.step(1.1, 10);
+ok(ab.get("bolt").ready, "ready after the cooldown");
+ab.step(0, 0);
+ok(ab.use("bolt").ok && !ab.use("nope").ok, "unknown ability refused");
+ab.step(2.1, 0);
+ok(ab.use("bolt").reason === "energy", "refused for energy when too poor");
+ab.step(100, 100);
+ok(ab.now().energy === 100, "energy regenerates up to max");
 
 if (problems.length) {
   console.error("check-powers failed:");

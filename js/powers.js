@@ -10,6 +10,8 @@
    meter with no scene, so npm test can spend it dry. startPowers() is the page.
    ========================================================================== */
 
+import { createAbilities, startAbilityBar } from "./abilities.js";
+
 export const POWER_NAMES = ["storm", "bolt", "gust", "tornado"];
 
 const DEFAULTS = {
@@ -22,6 +24,10 @@ const DEFAULTS = {
   reach: 11,
   costs: { storm: 40, bolt: 24, gust: 16, tornado: 48 },
   keys: { storm: "f", bolt: "e", gust: "g", tornado: "t" },
+  // seconds before it can be called again, and how long it lasts (the bar's sweep and glow)
+  cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8 },
+  durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4 },
+  names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado" },
   lines: {
     gather: "The sky draws in over him.",
     storm: "He calls the storm down.",
@@ -29,6 +35,7 @@ const DEFAULTS = {
     gust: "A hard gust.",
     tornado: "He sends a tornado down the street.",
     dry: "Not enough pressure.",
+    cooling: "Not ready yet.",
   },
 };
 
@@ -127,8 +134,23 @@ export function startPowers(world, dayApi) {
   const cfg = Object.assign({}, DEFAULTS, (window.DAY_CONFIG && window.DAY_CONFIG.powers) || {});
   cfg.costs = Object.assign({}, DEFAULTS.costs, cfg.costs);
   cfg.keys = Object.assign({}, DEFAULTS.keys, cfg.keys);
+  cfg.cooldowns = Object.assign({}, DEFAULTS.cooldowns, cfg.cooldowns);
+  cfg.durations = Object.assign({}, DEFAULTS.durations, cfg.durations);
+  cfg.names = Object.assign({}, DEFAULTS.names, cfg.names);
   cfg.lines = Object.assign({}, DEFAULTS.lines, cfg.lines);
-  const gauge = createGauge(cfg);
+  // The registry every call goes through (js/abilities.js); Energy is the Pressure meter.
+  const abil = createAbilities({ max: cfg.max });
+  POWER_NAMES.forEach((id) => abil.register({ id, name: cfg.names[id], key: cfg.keys[id], cost: cfg.costs[id], cooldown: cfg.cooldowns[id], duration: cfg.durations[id] }));
+  const gauge = {
+    step: (dt, storm) => abil.step(dt, (cfg.regen || 0) + (storm ? cfg.stormRegen || 0 : 0)),
+    now: () => ({ value: abil.now().energy, max: abil.now().max, costs: Object.assign({}, cfg.costs) }),
+  };
+  let lastWhy = null;
+  gauge.spend = (id) => {
+    const r = abil.use(id);
+    lastWhy = r.ok ? null : r.reason;
+    return r.ok;
+  };
   const cosMin = Math.cos(((cfg.cone || 52) * Math.PI) / 180);
   const reach = cfg.reach || 11;
   const aimDist = cfg.aim || 3.6;
@@ -201,7 +223,8 @@ export function startPowers(world, dayApi) {
   }
   function say(action, via, power) {
     const g = gauge.now();
-    emit({ action, via: via || "key", power: power || action, pressure: Math.round(g.value) });
+    const a = abil.get(power || action);
+    emit({ action, via: via || "key", power: power || action, pressure: Math.round(g.value), energy: Math.round(g.value), cooldown: a ? a.cooldown : 0, reason: action === "denied" ? lastWhy : undefined });
   }
 
   /* ---- look: a cloud over him, a bolt, a scorch, the gust's shape, the tornado ---- */
@@ -431,8 +454,8 @@ export function startPowers(world, dayApi) {
 
   /* ---- calls ---- */
   function refuse(power, via) {
-    blocked = { power, pressure: Math.round(gauge.now().value), at: age };
-    note(line("dry"));
+    blocked = { power, pressure: Math.round(gauge.now().value), at: age, reason: lastWhy };
+    note(line(lastWhy === "cooldown" ? "cooling" : "dry"));
     say("denied", via, power);
     return false;
   }
@@ -806,9 +829,12 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     });
   }
 
+  const bar = startAbilityBar(abil, (id) => command(id, "touch"));
+
   function paintMeter() {
     if (!canDom) return;
     const on = mode() === "control";
+    bar.paint(on);
     const g = gauge.now();
     meter.hidden = !on;
     meter.setAttribute("aria-valuenow", String(Math.round(g.value)));
@@ -1121,6 +1147,8 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     const aim = mode() === "control" ? groundAim() : null;
     return {
       pressure: g.value,
+      energy: g.value,
+      abilities: abil.now().abilities,
       max: g.max,
       costs: g.costs,
       storming: storming(),
@@ -1146,6 +1174,7 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     now,
     pose,
     command,
+    abilities: abil,
     hold(on) {
       wantStorm = !!on;
       return wantStorm;
