@@ -13,6 +13,7 @@ import "./world.js";
 import "./main.js";
 import "./analytics.js";
 import "./look.js"; // the city: PBR, neon, skies, quality
+import "./cityscape.js"; // the city's density: facades, lit windows, fillers, skyline, crosswalks, lamps
 import "./control.js"; // the player can take control of him
 import "./weather.js"; // the day's forecast, and the weather he commands while he's the player's
 import "./score.js"; // weather music beds, sampled ambience, take-control sting (after weather)

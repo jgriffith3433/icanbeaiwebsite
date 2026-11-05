@@ -66,6 +66,13 @@ if (cfg.control && cfg.control.model) {
 }
 const { installLook } = await import(new URL('js/look.js', root).href);
 installLook(world);
+const { installCityscape } = await import(new URL('js/cityscape.js', root).href);
+const cs = installCityscape(world);
+ok(cs && cs.info().fillers >= 80, `the city is thin: ${cs && cs.info().fillers} filler buildings`);
+ok(cs && cs.info().tall >= 8, `no tall towers (${cs && cs.info().tall})`);
+ok(cs && cs.info().crossings >= 8, `only ${cs && cs.info().crossings} crosswalk junctions`);
+console.log('cityscape', JSON.stringify(cs.info()));
+ok(cs && cs.info().lamps >= 40, `only ${cs && cs.info().lamps} street lamps`);
 world.update(sandbox.DayEngine.frame(day, 12 * 60), 0.016, { snap: true });
 world.scene.render();
 const look = world.look && world.look.info();
