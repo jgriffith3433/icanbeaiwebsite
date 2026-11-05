@@ -465,6 +465,24 @@ window.DAY_CONFIG = {
         last: ["He", "He asked the sky for everything. It's still thinking about it."],
       },
     },
+    /* One score for every episode (js/episodes.js `liveScore`): people helped (or goals done), time left,
+       damage avoided (wrong calls, Sky, kick-backs) and ability variety (distinct abilities used, over the
+       episode's `variety`, else `variety` here). Rank from the percent of the max. */
+    scoring: {
+      weights: { people: 400, time: 200, damage: 250, variety: 150 },
+      variety: 3,
+      bands: [
+        { min: 90, rank: "S" },
+        { min: 70, rank: "A" },
+        { min: 45, rank: "B" },
+        { min: 0, rank: "C" },
+      ],
+      names: { people: "People helped", time: "Time left", damage: "Damage avoided", variety: "Ability variety" },
+      unlockLine: "Challenge unlocked. Find it in the Episodes menu.",
+    },
+    /* The Challenge (unlocks after the first clear of an episode): timer x `timer`, Sky budget + `budget`, and
+       each episode's own `challenge.extra` people in its set pieces. Best rank is kept apart, as `<id>#challenge`. */
+    challenge: { timer: 0.7, budget: -1 },
     /* Bands for the score card copy: "N% chance of <word>". */
     bands: [
       { min: 90, word: "awesome" },
@@ -499,6 +517,7 @@ window.DAY_CONFIG = {
       },
       {
         id: "morning",
+        variety: 2,
         title: "Clear the sky",
         tagline: "Break up the forecast's clouds before he leaves.",
         chapters: ["wake", "ready"],
@@ -519,6 +538,7 @@ window.DAY_CONFIG = {
          is when Birdie is on the bench and Dex is in the plaza, so one run needs no clock jump. */
       {
         id: "dry-park",
+        variety: 2,
         part: 1,
         title: "Part 1: Dry",
         tagline: "Rain on the park, not the market. Then dry the market out.",
@@ -603,6 +623,14 @@ window.DAY_CONFIG = {
             { min: 0, rank: "C" },
           ],
         },
+        variety: 3,
+        challenge: {
+          timer: 0.7,
+          extra: {
+            shelter: [{ id: "tobin", name: "Tobin", x: 114, z: 22, color: "#4f9a5b", thanks: "Tobin: The umbrella went first. I went second." }],
+            street: [{ id: "juno", name: "Juno", x: 84, z: 11, color: "#a65bb5", thanks: "Juno: I counted the lamp posts. Twice." }],
+          },
+        },
         pieces: [
           {
             id: "shelter",
@@ -681,6 +709,7 @@ window.DAY_CONFIG = {
          gale turns them; too much wind (or wind in the plaza) costs the market its stalls. */
       {
         id: "still-blades",
+        variety: 2,
         part: 2,
         title: "Part 2: Still",
         tagline: "Wind for the turbines, not for the market stalls.",
@@ -773,6 +802,14 @@ window.DAY_CONFIG = {
             { min: 45, rank: "B" },
             { min: 0, rank: "C" },
           ],
+        },
+        variety: 4,
+        challenge: {
+          timer: 0.75,
+          extra: {
+            debris: [{ id: "bea", name: "Bea", x: 116, z: 11, color: "#a65bb5", thanks: "Bea: I only stopped to look." }],
+            bus: [{ id: "otto", name: "Otto", x: 66, z: 14, color: "#d9604a", thanks: "Otto: Is it going? It's going." }],
+          },
         },
         pieces: [
           {
@@ -895,6 +932,7 @@ window.DAY_CONFIG = {
          the sky won't stop. Offered once Part 2 has been played; always in the Episodes menu. */
       {
         id: "low-tank",
+        variety: 2,
         part: 3,
         afterPart: 2,
         title: "Part 3: Low",
@@ -937,6 +975,7 @@ window.DAY_CONFIG = {
       },
       {
         id: "night",
+        variety: 1,
         title: "Light show",
         tagline: "A lightning show over the skyline — timed hits.",
         chapters: ["computer", "bedtime"],

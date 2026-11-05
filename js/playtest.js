@@ -3108,6 +3108,119 @@ async function episodes(options, t) {
   t.progress(1);
 }
 
+/* ---------------- score ranks: the unified score card, the saved best rank, the Challenge unlock ---------------- */
+// Setup shortcuts: the day bar to a moment outdoors beside the car, Pressure refilled, the episode started by its API.
+// Everything else is real input: Enter, R / X / E, weather keys 2 then 1, the Episodes button and the Challenge row.
+// Events: rank-locked (Challenge shut before a clear), rank-card (rank, points, the four rows), rank-unlock,
+// rank-best (saved best rank and storage), rank-challenge (the Challenge running with a tighter timer), rank-challenge-card.
+async function scoreRanks(options, t) {
+  t.scene("Beside the car");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  const cfg = window.DAY_CONFIG;
+  const key = (cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best";
+  try { localStorage.removeItem(key); } catch (err) { /* ignore */ }
+  const day = window.day.today();
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+  const refill = () => { if (P.abilities && P.abilities.reset) P.abilities.reset(100); };
+
+  const openMenu = async () => {
+    const b = $("episodes");
+    if (b) b.click();
+    await t.until(() => !$("episode-menu").hidden, 3000, "the Episodes menu");
+  };
+  const closeMenu = () => { const x = document.querySelector("#episode-menu button.close, #episode-menu .close"); if (x) x.click(); else $("episode-menu").hidden = true; };
+  const readCard = (label) => {
+    const el = $("episode-score");
+    const rank = (el.querySelector(".rank") || {}).textContent || "";
+    const detail = (el.querySelector(".rankdetail") || {}).textContent || "";
+    const rows = [...el.querySelectorAll(".breakdown li")].map((li) => `${li.dataset.part} ${(li.querySelector("em") || {}).textContent}`);
+    t.event(label, `rank ${rank} | ${detail} | ${rows.join(", ")} | ${(el.querySelector(".unlockline") || {}).textContent || "no unlock line"}`);
+    return { rank, detail, rows, unlock: !(el.querySelector(".unlockline") || { hidden: true }).hidden };
+  };
+  // Calls three different abilities (variety), then the weather goals through real keys, standing at the car.
+  const play = async (id) => {
+    Ep.start(id, "playtest");
+    await t.until(() => Ep.now() && Ep.now().id === id, 4000, `${id} running`);
+    refill();
+    pressKey("r"); await sleep(500);
+    pressKey("x"); await sleep(500);
+    pressKey("e"); await sleep(700);
+    refill();
+    pressKey("2");
+    await t.until(() => Ep.now() && Ep.now().goals.some((g) => g.id === "clouds" && g.done), 9000, "clouds goal");
+    pressKey("1");
+    await t.until(() => !$("episode-score").hidden, 12000, "the score card after the clear");
+  };
+
+  t.progress(0.1);
+  await openMenu();
+  const lockedRow = $("ep-challenge-morning");
+  if (!lockedRow || !lockedRow.disabled) t.problem("bug", "The Challenge is open before the episode was cleared");
+  else t.event("rank-locked", `morning Challenge row says: ${(lockedRow.querySelector("small") || {}).textContent}`);
+  if (Ep.start("morning", "playtest", { challenge: true })) t.problem("bug", "A locked Challenge started");
+  closeMenu();
+
+  t.scene("Morning, normal");
+  await play("morning");
+  const first = readCard("rank-card");
+  if (!/^[SABC]$/.test(first.rank)) t.problem("bug", `The score card has no S to C rank ("${first.rank}")`);
+  if (first.rows.length !== 4) t.problem("bug", `The score card shows ${first.rows.length} rows of breakdown, wanted 4 (people, time, damage, variety)`);
+  if (!first.unlock) t.problem("bug", "A first clear did not say the Challenge is unlocked");
+  else t.event("rank-unlock", "the card announces the Challenge");
+  const best1 = Ep.best().morning;
+  if (!best1 || !best1.rank || !best1.cleared) t.problem("bug", `Best rank wasn't kept (${JSON.stringify(best1)})`);
+  else t.event("rank-best", `morning best rank ${best1.rank}, ${best1.pct}%, cleared ${best1.cleared}`);
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) || "{}");
+    if (!raw.morning || !raw.morning.rank) t.problem("bug", "localStorage has no best rank for morning");
+    else t.event("rank-storage", `${key}: morning ${raw.morning.rank}`);
+  } catch (err) { t.problem("bug", `localStorage unreadable: ${err}`); }
+  $("episode-score").querySelector("button.ok").click();
+  t.progress(0.5);
+
+  t.scene("Morning, Challenge");
+  await openMenu();
+  const row = $("ep-challenge-morning");
+  if (!row || row.disabled) { t.problem("bug", "The Challenge stayed locked after a clear"); return; }
+  t.event("rank-open", `morning Challenge row says: ${(row.querySelector("small") || {}).textContent}`);
+  const normalTimer = cfg.episodes.list.find((e) => e.id === "morning").timer;
+  row.click();
+  await t.until(() => Ep.now() && Ep.now().id === "morning" && Ep.now().challenge, 5000, "the Challenge running");
+  const hudText = ($("episode-hud").querySelector("h3") || {}).textContent || "";
+  t.event("rank-challenge", `${hudText}, timer ${Math.ceil(Ep.now().left)} s (normal ${normalTimer} s)`);
+  if (Ep.now().left >= normalTimer) t.problem("bug", "The Challenge timer is not tighter");
+  await sleep(300);
+  refill();
+  pressKey("r"); await sleep(500);
+  pressKey("x"); await sleep(500);
+  pressKey("2");
+  await t.until(() => Ep.now() && Ep.now().goals.some((g) => g.id === "clouds" && g.done), 9000, "clouds goal");
+  pressKey("1");
+  await t.until(() => !$("episode-score").hidden, 12000, "the Challenge score card");
+  const ch = readCard("rank-challenge-card");
+  if (!/Challenge/.test(ch.detail)) t.problem("bug", "The Challenge card doesn't say Challenge");
+  if (ch.unlock) t.problem("bug", "The Challenge card repeats the unlock line");
+  const bestAll = Ep.best();
+  if (!bestAll["morning#challenge"] || !bestAll["morning#challenge"].rank) t.problem("bug", "The Challenge's best rank wasn't kept apart");
+  else t.event("rank-best", `morning Challenge best rank ${bestAll["morning#challenge"].rank}; normal best stays ${bestAll.morning.rank}`);
+  $("episode-score").querySelector("button.ok").click();
+  t.progress(1);
+}
+
 /* ---------------- story parts: Part 1 (Dry) and Part 2 (Still) of the beat sheet, with overuse ---------------- */
 // Setup shortcuts: the day bar to a moment outdoors, the Pressure meter topped up, and starting each part by its
 // API (the Episodes menu would jump the clock into the office). Everything else is real keys: Enter, WASD with
@@ -4007,6 +4120,7 @@ installPlaytest({
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
     { id: "story-ending", title: "Part 3 (the reservoir) after Part 2, and the ending card: three Part 3 runs reach three different endings (Fair Weather, Heavy Weather, Overcast) and the card says how the park, turbines, market and reservoir fared", seconds: 840, tags: ["episodes", "story"], description: "Day bar to a moment outdoors and to 22:30 (setup), Enter, each part started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza, the annex and the Storm Tank, R, X, V and E. Events part3-offered / ending-say / ending-gauge / ending-kick / ending-card / ending-reached / ending-fared / three-endings." },
+    { id: "score-ranks", title: "Score and Challenge: clearing Morning shows a card with a rank (S to C) and a four-row breakdown (people, time, damage avoided, ability variety), saves the best rank, and unlocks the Challenge (tighter timer), which keeps its own best", seconds: 120, tags: ["episodes", "rank"], description: "Day bar beside the car (setup), Enter, Morning started by its API (setup), Pressure refilled (setup). Real keys: R, X, E, then weather keys 2 and 1; the Episodes button and the Challenge row. Events rank-locked / rank-card / rank-unlock / rank-best / rank-storage / rank-open / rank-challenge / rank-challenge-card." },
     { id: "story-parts", title: "Story Parts 1 and 2 as episodes: rain on the park (not the market), sun break and the stalls; overusing rain floods the park and scars the card; Part 2 wind for the turbines, a gale in the plaza topples a stall; neighbor dialogue from the beat sheet", seconds: 420, tags: ["episodes", "story"], description: "Day bar to a moment outdoors (setup), Enter, the parts started by their API (setup) and Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza and the annex, R, X and V. Events story-list / story-menu / story-say / story-goal / story-strain / story-kick / story-wind / story-card (clean vs scarred)." },
     { id: "lunch-rescue", title: "Rooftop storm (lunch): a surprise storm strands people in the plaza, on the shop roof and in the avenue; helping them with Sun break, Lightning and Gale changes the score and the S-C rank; the twist turns the rain to fog; an ending line per rank", seconds: 300, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the plaza cafe, the shop and the avenue, X, E, V, Esc. Run 1 helps one person and lets go (low rank); run 2 plays all three set pieces. Events lunch-opening / lunch-piece / lunch-help / lunch-score / lunch-twist / lunch-sky / lunch-goal / lunch-card / lunch-rank / lunch-say." },
     { id: "hurricane-drive", title: "Hurricane drive (commute home): four closures on the way home (fallen sign, flooded underpass, dead bus, closing bridge); the right ability at each helps, the wrong one hurts (rain on the debris, gale at the bus); a storm twist; an ending line and an S-C rank on the score card", seconds: 360, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift along the avenue, R then V at the fallen sign, V, X, E and C at the four set pieces, Esc. Run 1 uses rain on the debris (hurt) then a gale and lets go (low rank); run 2 plays all four set pieces right and gets home. Events drive-opening / drive-piece / drive-hurt / drive-help / drive-twist / drive-sky / drive-goal / drive-card / drive-rank / drive-say." },
@@ -4039,6 +4153,7 @@ installPlaytest({
       else if (id === "voice") await voice(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);
+      else if (id === "score-ranks") await scoreRanks(options, t);
       else if (id === "story-ending") await storyEnding(options, t);
       else if (id === "lunch-rescue") await lunchRescue(options, t);
       else if (id === "hurricane-drive") await hurricaneDrive(options, t);
