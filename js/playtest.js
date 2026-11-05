@@ -1594,6 +1594,143 @@ async function photos(options, t) {
   t.progress(1);
 }
 
+/* ---------------- crowd: the street's people and cars follow the day's clock; quiet at night, busy at rush hour ---------------- */
+// Setup shortcuts: the day bar to a quiet moment beside the car and to each hour (then 1x so the day plays).
+// Real input: Enter, WASD with Shift to the shops, keys (3 = rain), the quality button. Each hour is a scene with a
+// crowd-<phase> event (people, cars, how many near the camera, how many moved); movement is measured on the same
+// people 2 s apart. The frame rate over the stops is logged as photo-fps, like `photos`.
+async function crowdScenario(options, t) {
+  t.scene("Home street");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.crowd, 8000, "the crowd (js/crowd.js)");
+  const day = window.day.today();
+  const street = window.DAY_CONFIG.street || { z: 12.6 };
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) {
+    t.problem("bug", "No moment beside the car to stand in the street");
+    return;
+  }
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  await sleep(500);
+  const C = window.day.control;
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  const crowd = window.day.crowd;
+  const c0 = crowd.info();
+  t.metric("crowdBudgetPeople", c0.budget.people);
+  t.metric("crowdBudgetCars", c0.budget.cars);
+  t.metric("crowdDoors", c0.doors);
+  t.metric("crowdJunctions", c0.junctions);
+  if (c0.budget.people < 100 || c0.budget.cars < 30 || c0.doors < 30 || c0.junctions < 8) t.problem("bug", `The crowd has little to work with: ${JSON.stringify(c0)}`);
+  t.progress(0.05);
+  const ok = await goTo(58, street.z - 3.2, t, { sprint: true, progress: 0.12, ms: 30000 });
+  if (!ok) t.problem("warning", `He didn't reach the shops (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+
+  const fpsAll = [];
+  const stats = {};
+  async function stop(name, eventName, hour, key) {
+    t.scene(name);
+    scrubTo(Math.round(hour * 60));
+    await sleep(300);
+    clickSpeed(1); // a scrub pauses the day, and a paused day holds the crowd still
+    await sleep(1800);
+    const a = crowd.positions();
+    const samples = [];
+    const obs = world().scene.onAfterRenderObservable.add(() => samples.push(world().engine.getDeltaTime()));
+    await sleep(2000);
+    world().scene.onAfterRenderObservable.remove(obs);
+    const b = crowd.positions();
+    const avg = samples.length ? samples.reduce((x, y) => x + y, 0) / samples.length : 0;
+    const fps = avg ? 1000 / avg : 0;
+    fpsAll.push(fps);
+    // the same people and cars (by slot) two seconds apart
+    const byId = (list) => new Map(list.map((e) => [e.id, e]));
+    const pb = byId(b.people);
+    const cb = byId(b.cars);
+    let n = 0;
+    let moved = 0;
+    a.people.forEach((p) => {
+      const q = pb.get(p.id);
+      if (!q) return;
+      n++;
+      if (Math.hypot(p.x - q.x, p.z - q.z) > 0.3) moved++;
+    });
+    let m = 0;
+    let carsMoved = 0;
+    a.cars.forEach((c) => {
+      const q = cb.get(c.id);
+      if (!q) return;
+      m++;
+      if (Math.hypot(c.x - q.x, c.z - q.z) > 1) carsMoved++;
+    });
+    const i = crowd.info();
+    stats[key] = { people: i.people, cars: i.cars, near: i.near, moved, carsMoved, fps };
+    t.metric(`crowd${key}People`, i.people);
+    t.metric(`crowd${key}Cars`, i.cars);
+    t.event(eventName, `${name} (${i.phase}, ${i.hour.toFixed(1)} h): ${i.people} people and ${i.cars} cars out, ${i.near.people} people and ${i.near.cars} cars near him; ${moved}/${n} walkers and ${carsMoved}/${m} cars moved in 2 s; ${i.walking} walking, ${i.crossing} crossing, ${i.waiting} waiting at a signal, ${i.stopped} cars stopped, ${i.entering} coming out of and ${i.leaving} going into buildings; ${fps.toFixed(0)} fps`);
+    return i;
+  }
+
+  const night = await stop("Night, 3 AM: the street is quiet", "crowd-night", 3, "Night");
+  t.progress(0.25);
+  const rush = await stop("Morning rush, 8:30: busy lanes and sidewalks", "crowd-rush", 8.5, "Rush");
+  t.progress(0.4);
+  const lunch = await stop("Lunch, 12:30: the sidewalks are full", "crowd-lunch", 12.5, "Lunch");
+  t.progress(0.55);
+  const dinner = await stop("Dinner, 7:30 PM: the evening crowd", "crowd-dinner", 19.5, "Dinner");
+  t.progress(0.65);
+  const late = await stop("Late, 11:30 PM: it empties out", "crowd-late", 23.5, "Late");
+  t.progress(0.72);
+  if (night.people > 20 || night.cars > 8) t.problem("bug", `The street isn't quiet at night: ${night.people} people, ${night.cars} cars`);
+  if (rush.cars < 24 || rush.people < night.people + 60) t.problem("bug", `Rush hour isn't busy: ${rush.people} people, ${rush.cars} cars`);
+  if (lunch.people < 80) t.problem("bug", `The lunch crowd is thin: ${lunch.people} people`);
+  if (dinner.people < 70) t.problem("bug", `The dinner crowd is thin: ${dinner.people} people`);
+  if (late.people >= dinner.people) t.problem("bug", `Late evening isn't quieter than dinner (${late.people} vs ${dinner.people})`);
+  [["rush", stats.Rush], ["lunch", stats.Lunch]].forEach(([name, s]) => {
+    if (s.moved < s.people * 0.4) t.problem("bug", `At ${name} only ${s.moved} of ${s.people} walkers moved`);
+    if (s.near.people < 12) t.problem("warning", `At ${name} only ${s.near.people} people are near him`);
+  });
+  if (stats.Rush.carsMoved < 10) t.problem("bug", `At rush hour only ${stats.Rush.carsMoved} cars moved`);
+  t.event("crowd-follows-clock", `night ${night.people}/${night.cars}, rush ${rush.people}/${rush.cars}, lunch ${lunch.people}/${lunch.cars}, dinner ${dinner.people}/${dinner.cars}, late ${late.people}/${late.cars} (people/cars)`);
+
+  // rain: umbrellas and wipers on the crowd
+  t.scene("Lunch in the rain");
+  scrubTo(12.5 * 60);
+  await sleep(300);
+  clickSpeed(1);
+  pressKey("3");
+  await t.until(() => window.weather.now().state === "rain" && window.weather.now().blend > 0.85, 9000, "rain to settle");
+  await sleep(1500);
+  const rain = crowd.info();
+  t.event("crowd-rain", `${rain.people} people (${rain.umbrellas} under umbrellas) and ${rain.cars} cars (${rain.wipers} wipers)`);
+  if (rain.umbrellas < 5 || rain.wipers < 1) t.problem("bug", `In rain the crowd has ${rain.umbrellas} umbrellas and ${rain.wipers} wipers`);
+  pressKey("1");
+  await sleep(800);
+  t.progress(0.82);
+
+  // quality: low thins the crowd
+  const btn = $("quality");
+  if (btn) {
+    if (window.day.look.quality() !== "low") btn.click();
+    await sleep(2500);
+    const low = crowd.info();
+    t.event("crowd-quality-low", `quality ${low.quality}: ${low.people} people and ${low.cars} cars (budget scale ${low.scale})`);
+    if (low.scale >= 0.8 || low.people > lunch.people * 0.7) t.problem("bug", `Quality low didn't thin the crowd (${low.people} people, scale ${low.scale})`);
+    btn.click();
+    await sleep(500);
+  } else t.problem("bug", "There's no quality toggle");
+
+  const min = Math.min(...fpsAll);
+  const avgF = fpsAll.reduce((x, y) => x + y, 0) / fpsAll.length;
+  t.metric("photoFpsMin", Math.round(min * 10) / 10);
+  t.metric("photoFpsAvg", Math.round(avgF * 10) / 10);
+  t.event("photo-fps", `${fpsAll.length} stops with the crowd out: ${avgF.toFixed(0)} fps on average, ${min.toFixed(0)} at the worst`);
+  if (min < 10) t.problem("bug", `A stop ran at ${min.toFixed(1)} fps with the crowd out`);
+  else if (avgF < 20) t.problem("warning", `The stops averaged ${avgF.toFixed(1)} fps with the crowd out`);
+  t.progress(1);
+}
+
 /* ---------------- fill-out: street props, signs, a rooftop, the plaza and its landmarks; neon and lamps at night; wet reflections only in ability weather ---------------- */
 // Setup shortcuts: the day bar beside the car and to the hours. Real input: Enter, WASD with Shift, the ramp, key 3 (rain).
 // Each stop is a scene with an event, so the review reads props, signs and landmarks from the footage and the timeline.
@@ -3079,6 +3216,7 @@ installPlaytest({
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
     { id: "photos", title: "Photos of the dense city: noon at five spots along the avenue, dusk (windows and street lamps come on), night; frame rate at each", seconds: 120, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, then WASD with Shift east along the avenue. Events photo-noon / photo-dusk / photo-night / photo-fps; metrics photoFpsMin, photoFpsAvg, cityFillers, cityLamps." },
+    { id: "crowd", title: "The street's people and cars follow the clock: quiet at 3 AM, busy at the 8:30 rush, full at lunch and dinner, thin again late; they walk, cross, go in and out of buildings; rain opens umbrellas; Quality: low thins them; frame rate at each", seconds: 90, tags: ["crowd", "photos"], description: "Day bar beside the car and to each hour (setup), then 1x. Enter, WASD with Shift to the shops, key 3, the quality button. Events crowd-night / crowd-rush / crowd-lunch / crowd-dinner / crowd-late / crowd-follows-clock / crowd-rain / crowd-quality-low / photo-fps; metrics crowd<Hour>People, crowd<Hour>Cars, photoFpsMin, photoFpsAvg." },
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
@@ -3105,6 +3243,7 @@ installPlaytest({
       else if (id === "look") await look(options, t);
       else if (id === "photos") await photos(options, t);
       else if (id === "fill-out") await fillOut(options, t);
+      else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
