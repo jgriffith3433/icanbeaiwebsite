@@ -176,6 +176,28 @@ loudspeaker is on it. A gauge needle lies at the bottom.
 
 **Needs:** Tank gauge prop and logic; Light show window logic (exists, in `js/episodes.js`); a rain-fills-gauge rule.
 
+## The lunch storm (rebuilt Part 1.3: "Rooftop storm")
+
+At 12:20 a storm arrives that nobody called: a cell the forecast never had, sitting on the district at lunch. It is
+not his. People are stranded in it, and the episode is him getting them out with what he has. It is also the first
+sign of the pull on the sky that Ines names at the end of Part 2: the cell is drifting east, toward the Storm Tank.
+
+- **Opening.** Dex, on his phone from the plaza: the plaza, the shop roof and the avenue each have someone stuck.
+- **Set piece 1, Shelter (the plaza cafe).** Three people under dripping awnings. A Sun break (X) near each lets them
+  out. Odile, Pim, Gus.
+- **Set piece 2, Rescue (the shop roof).** Hollis, a roofer, is stuck up there with the ladder gone and the sky
+  full of charge. A Lightning call (E) from near the shop grounds the roof; if the strike lands on the lightning
+  rod it grounds it clean (a precision bonus).
+- **The twist.** The moment Hollis is down, the rain stops and fog comes in thick: the cell is *moving*, not
+  passing. Debris is in the avenue and two people cannot see the crosswalk. Ines, passing: "That wasn't rain. That
+  was something clearing its throat." It will come back each time he lets it, until the street is clear.
+- **Set piece 3, Clear the street (the avenue).** Nell and Ravi at the crosswalk. A Gale (V) or a Gust (G) near
+  each blows the fog and the debris off their side. Nothing here is the Board's voice: that stays Part 1's evening.
+- **Ending line.** By rank (S to C): Dex says how it went, and He answers in one line.
+- **Pressure.** A 4:20 clock, and each set piece is worth full points for 70 s; after that the rescue still counts
+  but for less ("late"). Rank is points out of the maximum: help (100 each, 60 late), the rod precision (25), time
+  left (up to 150): S 90%, A 70%, B 45%, C below.
+
 ## Three endings
 
 Chosen at the day's end (the day key rolls over). All three are the same sky, different weather; none of them is the
@@ -193,7 +215,7 @@ Endings are reachable in one day of play for A and B; C needs deliberate overuse
 
 - **Morning (Clear the sky)** is Part 1.1's staging; its weather goals (gather clouds, clear, reach the car) are the
   episode's own and are untouched. The Birdie ask is placed so the rain call comes before the clear-sky call.
-- **Lunch (Rooftop storm)** is Part 1.3, unchanged: three rods.
+- **Lunch (Rooftop storm)** is Part 1.3, rebuilt as a rescue (next section): three rods became three set pieces.
 - **Commute home (Hurricane drive)** is Part 2.3, unchanged: storm or wind, shove debris, get home.
 - **Night (Light show)** is Part 3.1 as the Tank's mast timing; its cue and window numbers are reused.
 - The **tutorial** still teaches the five abilities first; the arc never asks for an ability the player hasn't unlocked.

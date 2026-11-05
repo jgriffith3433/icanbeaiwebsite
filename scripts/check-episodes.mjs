@@ -15,6 +15,7 @@ import {
   carryStrain,
   pickEnding,
   cityFared,
+  rankFor,
 } from "../js/episodes.js";
 
 const require = createRequire(import.meta.url);
@@ -94,6 +95,28 @@ ok(!clean.scarred && /clean$/.test(clean.text), `a part under budget is clean: $
 ok(scar.scarred && /scarred$/.test(scar.text) && scar.pct === clean.pct - 25, `over budget is scarred and costs 25: ${scar.text}`);
 ok(scoreCard(3, 3, 100, 300, E.bands, { value: 3, budget: 4, kicks: 1 }).scarred, "a kick-back scars even inside the budget");
 ok(!/scarred|clean/.test(scoreCard(3, 3, 40, 150, E.bands).text), "episodes without strain keep the old card");
+
+// The lunch episode (Rooftop storm): a rescue with three set pieces, a twist, an ending per rank and a rank S to C
+const lunch = E.list.find((e) => e.id === "lunch");
+ok(lunch && lunch.pieces && lunch.pieces.length === 3, "lunch has three set pieces");
+ok(lunch.goals.length === 3 && lunch.goals.every((g) => g.kind === "help" && lunch.pieces.some((q) => q.id === g.piece && q.people.length === g.count)), "each lunch goal is a set piece with its people counted");
+ok(lunch.goals.every((g, i) => (i === 0 ? !g.after : g.after === lunch.goals[i - 1].id)), "the set pieces chain in order");
+ok(lunch.pieces.filter((q) => q.twist).length === 1 && lunch.pieces.find((q) => q.twist).id === "rescue" && Array.isArray(lunch.say.twist), "the twist fires after the second set piece and has lines");
+["start", "twist", "end:S", "end:A", "end:B", "end:C"].forEach((k) => ok(Array.isArray(lunch.say[k]) && lunch.say[k].length, `lunch: dialogue for ${k}`));
+lunch.pieces.forEach((q) => {
+  ok(q.powers.length && q.range > 0 && q.limit > 0, `lunch/${q.id}: powers, range and limit`);
+  ok(lunch.say["piece:" + q.id] && lunch.say["late:" + q.id], `lunch/${q.id}: opening and late lines`);
+  q.people.forEach((p) => ok(p.id && p.name && p.thanks && Math.hypot(p.x, p.z) > 0, `lunch/${q.id}/${p.id}: a person with a thanks line`));
+});
+const pts = lunch.pieces.reduce((n, q) => n + q.people.length, 0) * lunch.rank.help + lunch.rank.precision + lunch.rank.time;
+ok(pts === lunch.rank.max, `rank.max (${lunch.rank.max}) is every help + the rod + the full time bonus (${pts})`);
+ok(["S", "A", "B", "C"].join() === lunch.rank.bands.map((b) => b.rank).join(), "rank bands run S, A, B, C");
+const rk = (n) => rankFor(n, lunch.rank).rank;
+ok(rk(lunch.rank.max) === "S" && rk(0) === "C" && rk(100) === "C", "full points is S, nothing is C");
+ok(rk(6 * lunch.rank.help + lunch.rank.precision + 90) === "S", "everyone, the rod and most of the time left is S");
+ok(rk(6 * lunch.rank.help) === "A" && rk(3 * lunch.rank.help) === "C" && rk(5 * lunch.rank.help) === "B", "more people helped is a higher rank");
+ok(rk(6 * lunch.rank.late) < rk(6 * lunch.rank.help) || rankFor(6 * lunch.rank.late, lunch.rank).pct < rankFor(6 * lunch.rank.help, lunch.rank).pct, "late help is worth less");
+ok(inZone(lunch.zones.plaza, 118, 30) && lunch.pieces[0].people.every((p) => inZone(lunch.zones.plaza, p.x, p.z)), "the shelter people stand in the plaza");
 
 // Story arc, Part 3 and the three endings
 const p3 = E.list.find((e) => e.id === "low-tank");
