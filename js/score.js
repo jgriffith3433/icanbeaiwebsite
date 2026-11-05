@@ -6,15 +6,27 @@
    Recipes: hawkes.assets.json (audio.music / audio.sfx). Paths: day.config.js score.
    ========================================================================== */
 
-const BEDS = ["clear", "clouds", "rain", "storm", "fog", "snow"];
+/* Clear (and wind) weather plays a calm day bed or its night variation by the clock; the other weathers keep
+   their own beds. "day" / "night" have their own files (Hawkes Gen) and fall back to the older beds until
+   those files exist. */
+const BEDS = ["day", "night", "clear", "clouds", "rain", "storm", "fog", "snow"];
+const NIGHT_FROM = 19.75; // 7:45 PM
+const NIGHT_TO = 6.25; // 6:15 AM
 const AMB_LOOPS = ["air", "rain", "wind"];
 const FADE_DEFAULT = 2.8;
 const MUSIC_VOL = 0.3;
 const AMB_VOL = 0.62;
 const STING_VOL = 0.55;
 
+/* The mix (day.config.js score.mix): one place for every level. */
+const DEFAULT_MIX = { master: 0.9, music: 0.3, ambience: 0.62, sting: 0.55, thunder: 0.9, whoosh: 0.62, title: 0.42, duck: 0.45, nightTone: 2400 };
+
 const DEFAULT_PATHS = {
   music: {
+    // day.config.js score.music.day / .night name Gen's files once they're made (hawkes.assets.json music-day,
+    // music-night); unset, they play their fallback beds (never a fetch that 404s: that's a console error).
+    day: null,
+    night: null,
     clear: "audio/music/clear.mp3",
     clouds: "audio/music/clouds.mp3",
     rain: "audio/music/rain.mp3",
@@ -36,17 +48,44 @@ const DEFAULT_PATHS = {
 
 function cfg() {
   const s = (window.DAY_CONFIG && window.DAY_CONFIG.score) || {};
+  const mix = Object.assign({}, DEFAULT_MIX, s.mix || {});
+  // The older single levels still win where a config sets them without a mix.
+  if (!s.mix || s.mix.music == null) mix.music = s.musicVol != null ? s.musicVol : MUSIC_VOL;
+  if (!s.mix || s.mix.ambience == null) mix.ambience = s.ambVol != null ? s.ambVol : AMB_VOL;
+  if (!s.mix || s.mix.sting == null) mix.sting = s.stingVol != null ? s.stingVol : STING_VOL;
+  if (!s.mix || s.mix.whoosh == null) mix.whoosh = s.whooshVol != null ? s.whooshVol : mix.whoosh;
   return {
     fade: s.fade != null ? s.fade : FADE_DEFAULT,
-    musicVol: s.musicVol != null ? s.musicVol : MUSIC_VOL,
-    ambVol: s.ambVol != null ? s.ambVol : AMB_VOL,
-    stingVol: s.stingVol != null ? s.stingVol : STING_VOL,
+    mix,
+    musicVol: mix.music,
+    ambVol: mix.ambience,
+    stingVol: mix.sting,
     music: Object.assign({}, DEFAULT_PATHS.music, s.music || {}),
+    // A bed whose file isn't there (yet) plays this one instead.
+    fallback: Object.assign({ day: "clear", night: "snow" }, s.fallback || {}),
+    nightFrom: s.nightFrom != null ? s.nightFrom : NIGHT_FROM,
+    nightTo: s.nightTo != null ? s.nightTo : NIGHT_TO,
     sting: s.sting || DEFAULT_PATHS.sting,
     whoosh: s.whoosh || DEFAULT_PATHS.whoosh,
-    whooshVol: s.whooshVol != null ? s.whooshVol : 0.62,
+    whooshVol: mix.whoosh,
     ambience: Object.assign({}, DEFAULT_PATHS.ambience, s.ambience || {}),
   };
+}
+
+/** Is this sim hour night for the music? (7:45 PM to 6:15 AM by default.) */
+export function isNightHour(hour, c) {
+  const from = c && c.nightFrom != null ? c.nightFrom : NIGHT_FROM;
+  const to = c && c.nightTo != null ? c.nightTo : NIGHT_TO;
+  const h = ((hour % 24) + 24) % 24;
+  return from > to ? h >= from || h < to : h >= from && h < to;
+}
+
+function simHour() {
+  try {
+    const n = window.day && window.day.now && window.day.now();
+    if (n && typeof n.minutes === "number") return (n.minutes % 1440) / 60;
+  } catch (e) { /* no day yet */ }
+  return 12;
 }
 
 function soundOn() {
@@ -54,10 +93,11 @@ function soundOn() {
   return !!(btn && btn.getAttribute("aria-pressed") === "true");
 }
 
-function bedFor(state) {
-  if (state === "wind") return "clear";
-  if (BEDS.indexOf(state) >= 0) return state;
-  return "clear";
+/** The bed for a weather state at a sim hour: clear and wind play the day bed or the night one. */
+export function bedFor(state, hour) {
+  const night = isNightHour(hour == null ? 12 : hour);
+  if (!state || state === "wind" || state === "clear" || BEDS.indexOf(state) < 0) return night ? "night" : "day";
+  return state;
 }
 
 export function startScore(dayApi) {
@@ -82,6 +122,9 @@ export function startScore(dayApi) {
   let stingAt = 0;
   let whooshAt = 0;
   let lastCrack = 0;
+  let tone = null;
+  let duckUntil = 0;
+  let duckK = 1;
   const live = {
     bed: null,
     target: null,
@@ -94,6 +137,10 @@ export function startScore(dayApi) {
     stingAt: 0,
     whooshAt: 0,
     heard: 0,
+    tod: "day",
+    tone: 18000,
+    duck: 1,
+    title: false,
   };
 
   function ensureCtx() {
@@ -106,9 +153,18 @@ export function startScore(dayApi) {
       master.gain.value = 0;
       musicBus = ctx.createGain();
       musicBus.gain.value = 1;
+      tone = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
+      if (tone) {
+        tone.type = "lowpass";
+        tone.frequency.value = 18000;
+        tone.Q.value = 0.5;
+      }
       ambBus = ctx.createGain();
       ambBus.gain.value = 1;
-      musicBus.connect(master);
+      if (tone) {
+        musicBus.connect(tone);
+        tone.connect(master);
+      } else musicBus.connect(master);
       ambBus.connect(master);
       master.connect(ctx.destination);
     } catch (err) {
@@ -142,7 +198,7 @@ export function startScore(dayApi) {
   async function loadAll() {
     const c = cfg();
     const urls = new Set();
-    BEDS.forEach((b) => urls.add(c.music[b]));
+    BEDS.forEach((b) => c.music[b] && urls.add(c.music[b]));
     urls.add(c.music.wind);
     urls.add(c.sting);
     if (c.whoosh) urls.add(c.whoosh);
@@ -175,10 +231,18 @@ export function startScore(dayApi) {
     return { src, gain: g };
   }
 
+  /** The file a bed plays: its own, or its fallback bed's while its own is missing. */
+  function bedUrl(bed, c) {
+    const url = c.music[bed];
+    if (url && (buffers[url] || !missing[url])) return url;
+    const fb = c.fallback[bed];
+    return (fb && c.music[fb]) || c.music.clear;
+  }
+
   function ensureMusic(bed) {
     const c = cfg();
-    const url = c.music[bed] || c.music.clear;
     if (music[bed]) return music[bed];
+    const url = bedUrl(bed, c);
     const buf = buffers[url];
     if (!buf) return null;
     music[bed] = startLoop(buf, musicBus, 0);
@@ -195,8 +259,8 @@ export function startScore(dayApi) {
     return amb[key];
   }
 
-  function setBed(state, snap) {
-    const next = bedFor(state);
+  function setBed(bed, snap) {
+    const next = BEDS.indexOf(bed) >= 0 ? bed : bedFor(bed, simHour());
     if (next === targetBed && !snap) return;
     if (snap || !currentBed) {
       Object.keys(music).forEach((k) => {
@@ -304,7 +368,7 @@ export function startScore(dayApi) {
     const c = cfg();
     const near = kind === "near" || (kind !== "far" && Math.random() < 0.45);
     const url = near ? c.ambience.thunderNear : c.ambience.thunderFar;
-    const vol = (near ? 0.9 : 0.55) * c.ambVol;
+    const vol = (near ? 1 : 0.6) * c.mix.thunder * c.ambVol;
     const ok = playOneShot(url, vol);
     if (ok) live.amb.thunder = near ? 1 : 0.55;
     return ok;
@@ -319,16 +383,34 @@ export function startScore(dayApi) {
 
     if (on && ctx.state === "suspended") ctx.resume();
     const c = cfg();
-    master.gain.value = on ? 1 : 0;
-    musicBus.gain.value = c.musicVol;
-    ambBus.gain.value = c.ambVol;
+    const d = Math.min(0.5, Math.max(0, dt || 0));
+    master.gain.value = on ? c.mix.master : 0;
+    // Under a spoken line the music dips (duck), and on the title it sits a little lower.
+    const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const duckTo = nowMs < duckUntil ? c.mix.duck : 1;
+    duckK += (duckTo - duckK) * Math.min(1, d * (duckTo < duckK ? 8 : 1.5));
+    const titleUp = !!(day.title && day.title.showing && day.title.showing());
+    const musicGoal = c.musicVol * duckK * (titleUp ? c.mix.title / Math.max(0.01, c.musicVol) : 1);
+    musicBus.gain.value = musicGoal;
+    ambBus.gain.value = c.ambVol * (titleUp ? 0.5 : 1);
+    live.duck = duckK;
+    live.title = titleUp;
 
     const state = (window.weather && window.weather.now && window.weather.now().state) || "clear";
-    setBed(state, false);
+    const hour = simHour();
+    const night = isNightHour(hour, c);
+    live.tod = night ? "night" : "day";
+    // Night softens the top end of every bed a little (a low-pass), the night bed most of all.
+    if (tone) {
+      const goal = night ? c.mix.nightTone : 18000;
+      tone.frequency.value += (goal - tone.frequency.value) * Math.min(1, d * 0.6);
+      live.tone = Math.round(tone.frequency.value);
+    }
+    setBed(bedFor(state, hour), false);
     // Buffers may land mid-session (Gen files after first unlock); attach loops once they exist.
     if (currentBed) ensureMusic(currentBed);
     if (targetBed) ensureMusic(targetBed);
-    stepFade(Math.min(0.5, Math.max(0, dt || 0)));
+    stepFade(d);
 
     const S = (L && L.sound) || {};
     const gust = 0.45 + 0.55 * Math.abs(Math.sin((typeof performance !== "undefined" ? performance.now() : 0) * 0.00045));
@@ -382,6 +464,13 @@ export function startScore(dayApi) {
       whooshAt: live.whooshAt || 0,
       heard: live.heard,
       missing: Object.keys(missing).length,
+      tod: live.tod,
+      tone: live.tone,
+      duck: Math.round(live.duck * 100) / 100,
+      title: live.title,
+      mix: Object.assign({}, cfg().mix),
+      // which file each of the day/night beds is playing (its own, or the fallback until Gen's file lands)
+      files: { day: ctx ? bedUrl("day", cfg()) : null, night: ctx ? bedUrl("night", cfg()) : null },
     };
   }
 
@@ -400,6 +489,11 @@ export function startScore(dayApi) {
     true
   );
 
+  // His spoken lines (js/voice.js): the music dips under them for a couple of seconds.
+  window.addEventListener("day:voice", () => {
+    duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + 2600;
+  });
+
   // Heroic sting when the player takes him.
   window.addEventListener("day:control", (ev) => {
     const d = (ev && ev.detail) || {};
@@ -414,7 +508,8 @@ export function startScore(dayApi) {
     crack,
     unlock,
     usingSamples: () => live.samples,
-    bedFor,
+    bedFor: (state, hour) => bedFor(state, hour == null ? simHour() : hour),
+    isNight: (hour) => isNightHour(hour == null ? simHour() : hour, cfg()),
   };
   day.score = api;
   window.score = api;

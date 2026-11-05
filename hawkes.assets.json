@@ -842,6 +842,46 @@
    }
   },
   {
+   "id": "music-day",
+   "note": "Calm daytime bed for clear weather by day, also under the title screen (js/score.js bed day; add day.config.js score.music.day once made). Until then the clear bed plays.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Calm daytime city bed, bright soft electric piano and warm pads, light airy pulse, gentle hopeful mood, open blue sky over a cartoon city, spacious and unhurried, seamless loop, instrumental, 76 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 76,
+      "key": "C major"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/day.mp3"
+   }
+  },
+  {
+   "id": "music-night",
+   "note": "Night variation of the day bed for clear weather from 7:45 PM to 6:15 AM (js/score.js bed night; add day.config.js score.music.night once made). Until then the snow bed plays, softened.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Night variation of a calm city bed, same gentle melody slowed and hushed, deep warm pads, soft muted electric piano, faint distant neon hum, navy and electric blue night, quiet and dreamy, seamless loop, instrumental, 68 BPM",
+      "lyrics": "[Instrumental]",
+      "seconds": 30,
+      "bpm": 68,
+      "key": "A minor"
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/night.mp3"
+   }
+  },
+  {
    "id": "music-clouds",
    "note": "Building cloudy bed (score.music.clouds).",
    "steps": [

@@ -4361,9 +4361,157 @@ async function firstVisit(options, t) {
 
 const E = () => window.DayEngine;
 
+/* ---------------- console errors (every scenario) ---------------- */
+const consoleErrors = [];
+(function watchConsole() {
+  try {
+    const orig = console.error.bind(console);
+    console.error = (...args) => {
+      consoleErrors.push(args.map((a) => (a && a.message) || String(a)).join(" ").slice(0, 200));
+      return orig(...args);
+    };
+    window.addEventListener("error", (e) => consoleErrors.push(String((e && e.message) || "error").slice(0, 200)));
+    window.addEventListener("unhandledrejection", (e) => consoleErrors.push(String((e && e.reason && e.reason.message) || (e && e.reason) || "rejection").slice(0, 200)));
+  } catch (e) { /* no console */ }
+})();
+function reportConsole(t, from) {
+  const mine = consoleErrors.slice(from);
+  t.metric("consoleErrors", mine.length);
+  if (!mine.length) t.event("console-clean", "no console errors in this run");
+  [...new Set(mine)].slice(0, 5).forEach((m) => t.problem("bug", `Console error: ${m}`));
+}
+
+/** Click a page button like a player: a pointer down/up on it, then the click. */
+async function clickEl(el) {
+  const r = el.getBoundingClientRect();
+  const o = { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 7, pointerType: "mouse" };
+  el.dispatchEvent(new PointerEvent("pointerdown", o));
+  await sleep(80);
+  el.dispatchEvent(new PointerEvent("pointerup", o));
+  el.click();
+}
+
+/* ---------------- the title screen and the day/night music ---------------- */
+async function titleScenario(options, t) {
+  t.scene("Title");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const T = window.day.title;
+  const S = window.day.score;
+  if (!T) {
+    t.problem("blocker", "There's no title screen (js/title.js didn't install)");
+    return;
+  }
+  // Opened with ?playtest=title it is up from the first frame; started by the runner on a page that was
+  // already open, bring it back (setup) so the run starts where a player's does.
+  const first = T.now().showing;
+  if (!first) T.show("playtest");
+  await sleep(300);
+  const el = $("title");
+  const play = $("title-play");
+  const eps = $("title-episodes");
+  const music = $("title-music");
+  t.event("title-open", first ? "the title is the first thing on the page" : "title shown again for this run (the page was already open)");
+  if (!boxOf(el)) t.problem("blocker", "The title screen (#title) isn't on screen");
+  if (!boxOf(play)) t.problem("blocker", "No Play button on the title");
+  if (!boxOf(eps)) t.problem("blocker", "No Episodes button on the title");
+  const hudUp = [document.querySelector(".panel.now"), document.querySelector(".hud.bottom"), $("control"), $("episodes")]
+    .filter((x) => x && getComputedStyle(x).visibility !== "hidden" && boxOf(x));
+  if (hudUp.length) t.problem("bug", `The HUD shows through the title: ${hudUp.map((x) => x.id || x.className).join(", ")}`);
+  if (play && eps && boxesOverlap(boxOf(play), boxOf(eps))) t.problem("bug", "Play and Episodes overlap");
+  t.event("title-buttons", `Play "${play && play.textContent}", Episodes "${eps && eps.textContent}", camera ${T.now().camera ? "skyline orbit" : "his camera"}`);
+  if (!T.now().camera) t.problem("bug", "The title doesn't show the skyline (world.titleShot is off)");
+  t.progress(0.1);
+  await sleep(2500);
+
+  // Music: a real click on the title's Music button turns the Sound on (the browser allows it on a click).
+  if (S && music) {
+    await clickEl(music);
+    await sleep(300);
+    if (music.getAttribute("aria-pressed") !== "true") {
+      await clickEl(music);
+      await sleep(300);
+    }
+    await t.until(() => S.now().on && S.now().samples && S.now().bed, 20000, "the music to load").catch(() => {});
+    const n = S.now();
+    t.event("title-music", `sound ${n.on ? "on" : "off"}, bed ${n.bed}, title level ${n.title}, mix music ${n.mix.music} title ${n.mix.title}`);
+    if (!n.on) t.problem("bug", "The title's Music button didn't turn the Sound on");
+    if (!n.bed) t.problem("bug", "No music bed is playing on the title");
+  } else t.problem("bug", "No score or no Music button on the title");
+  t.progress(0.2);
+
+  // Day and night: the skyline at noon with the day bed, then night with its own bed (crossfaded), then day again.
+  const legs = [
+    ["day", 12 * 60, "Noon skyline"],
+    ["night", 21 * 60 + 40, "Night skyline"],
+    ["day", 13 * 60, "Day again"],
+  ];
+  for (let i = 0; i < legs.length; i++) {
+    const [want, minute, scene] = legs[i];
+    scrubTo(minute);
+    await sleep(500);
+    t.scene(scene);
+    if (!S) break;
+    const early = S.now();
+    await t.until(() => S.now().target === want, 6000, `the ${want} bed`).catch(() => {});
+    await sleep(900);
+    const mid = S.now();
+    if (early.bed && early.bed !== want) t.event("music-crossfade", `${early.bed} → ${want}: fade ${mid.fade.toFixed(2)} at 0.9 s`);
+    await t.until(() => S.now().bed === want && S.now().fade >= 0.99, 9000, `the ${want} bed to settle`).catch(() => {});
+    await sleep(2200);
+    const n = S.now();
+    t.event(`music-${want}`, `${E().fmtClock(minute)}: bed ${n.bed} (file ${n.files[want] || "?"}), tone ${n.tone} Hz, ${n.tod}`);
+    t.metric(`music${want[0].toUpperCase()}${want.slice(1)}Bed`, n.bed);
+    if (n.bed !== want) t.problem("bug", `At ${E().fmtClock(minute)} the music is ${n.bed}, not the ${want} bed`);
+    if (want === "night" && n.tone > 6000) t.problem("polish", `The night music isn't softened (tone ${n.tone} Hz)`);
+    t.progress(0.25 + i * 0.12);
+  }
+  if (S && S.now().files && S.now().files.day === S.now().files.night) t.problem("bug", "Day and night play the same file");
+  else t.event("music-day-night", "day and night play different beds");
+
+  // Play starts the game: the title goes, the HUD is back and he's the player's.
+  t.scene("Play");
+  await clickEl(play);
+  await t.until(() => !T.now().showing, 3000, "the title to close").catch(() => {});
+  await t.until(() => window.day.control && window.day.control.mode() === "control", 5000, "Play to take control").catch(() => {});
+  const mode = window.day.control ? window.day.control.mode() : "none";
+  t.event("title-play", `title ${T.now().showing ? "still up" : "closed"}, he is ${mode === "control" ? "the player's" : mode}`);
+  if (T.now().showing) t.problem("blocker", "Play didn't close the title");
+  if (mode !== "control") t.problem("bug", `Play didn't start the game (control mode ${mode}${window.day.now().frame.person.inCar ? ", he's driving" : ""})`);
+  if (T.now().camera) t.problem("bug", "The title's skyline camera stayed on after Play");
+  await sleep(600);
+  if (!boxOf(document.querySelector(".hud.bottom")) && !document.documentElement.classList.contains("public")) t.problem("bug", "The HUD didn't come back after Play");
+  pressKey("w");
+  await sleep(1400);
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "w", bubbles: true }));
+  t.event("game-started", `he walked; music ${S ? S.now().bed : "-"}, title level off (${S ? S.now().title : "-"})`);
+  t.progress(0.7);
+  pressKey("Escape");
+  await sleep(1500);
+
+  // Episodes: the title again (setup), its Episodes button opens the Episodes menu.
+  t.scene("Episodes");
+  T.show("playtest");
+  await sleep(1500);
+  await clickEl(eps);
+  await sleep(700);
+  const menu = $("episode-menu");
+  const open = !!(menu && !menu.hidden && boxOf(menu));
+  const rows = menu ? menu.querySelectorAll(".ep-row").length : 0;
+  t.event("title-episodes", `title ${T.now().showing ? "still up" : "closed"}, Episodes menu ${open ? "open" : "closed"} with ${rows} rows`);
+  if (T.now().showing) t.problem("bug", "Episodes didn't close the title");
+  if (!open) t.problem("bug", "The title's Episodes button didn't open the Episodes menu");
+  await sleep(2500);
+  const close = menu && menu.querySelector(".close, button.ok, [data-close]");
+  if (close) await clickEl(close);
+  else if (menu) menu.hidden = true;
+  t.progress(1);
+}
+
 installPlaytest({
   product: "icanbe",
   scenarios: [
+    { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
@@ -4396,11 +4544,14 @@ installPlaytest({
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
+    const errFrom = consoleErrors.length;
     try {
+      if (id !== "title" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
-      if (id === "smoke") await smoke(options, t);
+      if (id === "title") await titleScenario(options, t);
+      else if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);
       else if (id === "control") await control(options, t);
@@ -4429,6 +4580,7 @@ installPlaytest({
       else if (id === "light-show") await lightShow(options, t);
       else if (id === "first-visit") await firstVisit(options, t);
       else if (id === "tutorial-episode") await tutorialEpisode(options, t);
+      reportConsole(t, errFrom);
     } finally {
       releaseHeld();
       stopWatching();

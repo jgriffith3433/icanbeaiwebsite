@@ -1488,6 +1488,13 @@
       m.emissiveColor.set(c.r * boost, c.g * boost, c.b * boost);
     }
 
+    /* js/title.js's skyline shot: null = the day's camera */
+    let titleShot = null;
+    const TITLE_SHOT = { x: 92, y: 16, z: 32, alpha: -1.15, beta: 1.22, radius: 98, spin: 0.018 };
+    function setTitleShot(on) {
+      titleShot = on ? Object.assign({}, TITLE_SHOT, typeof on === "object" ? on : {}) : null;
+      return !!titleShot;
+    }
     function update(fr, dt, opts) {
       opts = opts || {};
       elapsed += dt;
@@ -1787,6 +1794,19 @@
         sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
         return;
       }
+      /* the title screen (js/title.js): a slow, high orbit over the district so the skyline sits behind the
+         menu; the day's own camera snaps back to him when the title closes */
+      if (titleShot) {
+        const a = titleShot.alpha + t * titleShot.spin;
+        camera.target.set(titleShot.x, titleShot.y, titleShot.z);
+        camera.alpha = a;
+        camera.beta = titleShot.beta;
+        camera.radius = titleShot.radius;
+        cam.inited = false;
+        cam.user = 0;
+        sun.position.set(titleShot.x - sun.direction.x * 40, 40, titleShot.z - sun.direction.z * 40);
+        return;
+      }
       const roomCam = pp.inCar ? (rooms.road && rooms.road.camera) : rooms[fr.room] && rooms[fr.room].camera;
       const shot = Object.assign({ alpha: 1.3, beta: 1.05, radius: 8 }, roomCam || {});
       const aspect = engine.getRenderWidth() / Math.max(1, engine.getRenderHeight());
@@ -2010,6 +2030,8 @@
       resetCamera() {
         cam.user = 0;
       },
+      titleShot: setTitleShot,
+      titleShotOn: () => !!titleShot,
       person: me.root, // read by the playtest
       car: myCar.root,
       camera, // the player's orbit camera drives it while he's theirs (js/control.js)
