@@ -1467,6 +1467,114 @@ async function photos(options, t) {
   t.progress(1);
 }
 
+/* ---------------- fill-out: street props, signs, a rooftop, the plaza and its landmarks; neon and lamps at night; wet reflections only in ability weather ---------------- */
+// Setup shortcuts: the day bar beside the car and to the hours. Real input: Enter, WASD with Shift, the ramp, key 3 (rain).
+// Each stop is a scene with an event, so the review reads props, signs and landmarks from the footage and the timeline.
+async function fillOut(options, t) {
+  t.scene("Home street");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.cityscape && window.day.cityscape.info().props, 8000, "the city's props (js/props.js)");
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) {
+    t.problem("bug", "No moment beside the car to stand in the street");
+    return;
+  }
+  scrubTo(12 * 60);
+  await sleep(600);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  await sleep(500);
+  const C = window.day.control;
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  const cs = window.day.cityscape;
+  const p0 = cs.info().props;
+  t.metric("propsTrees", p0.trees);
+  t.metric("propsBenches", p0.benches);
+  t.metric("propsHydrants", p0.hydrants);
+  t.metric("propsBusStops", p0.busStops);
+  t.metric("propsSigns", p0.signs);
+  t.metric("propsRoofUnits", p0.roofUnits);
+  t.metric("propsLandmarks", p0.landmarks);
+  if (p0.trees < 10 || p0.benches < 6 || p0.hydrants < 3 || p0.busStops < 1 || p0.signs < 6 || p0.landmarks < 3 || p0.roofUnits < 30) t.problem("bug", `The city is thin on props: ${JSON.stringify(p0)}`);
+  t.progress(0.05);
+
+  // 1. rooftop: the apt roof's AC units and vents, up the ramp
+  const roofB = ((cfg.city && cfg.city.blocks) || []).find((b) => b.stair && b.id === "apt") || ((cfg.city && cfg.city.blocks) || []).find((b) => b.stair);
+  if (roofB) {
+    const s = roofB.stair;
+    t.scene(`Rooftop ${roofB.id}`);
+    const atRamp = await goTo(s.x0 - 0.9, s.z, t, { sprint: true, progress: 0.1, ms: 30000 });
+    const up = atRamp && (await goTo(s.x1 - 0.25, s.z, t, { close: 0.35, progress: 0.15, ms: 20000 }));
+    if (up) await goTo(roofB.x + 2, roofB.z - roofB.d / 2 + 3.2, t, { close: 0.8, progress: 0.2, ms: 12000 });
+    await sleep(900);
+    const st = C.state();
+    if (st.y > roofB.h - 0.45) t.event("photo-rooftop", `on the ${roofB.id} roof (y ${st.y.toFixed(1)}): ${p0.roofUnits} AC units, tanks, vents and antennas across the city`);
+    else t.problem("bug", `He didn't get onto the ${roofB.id} roof for the rooftop photo (y ${st.y.toFixed(1)})`);
+    await goTo(s.x1 - 0.25, s.z, t, { close: 0.6, progress: 0.25, ms: 12000 });
+    await goTo(s.x0 - 0.9, s.z, t, { close: 0.8, progress: 0.28, ms: 20000 });
+  }
+
+  // 2. the street at noon: benches, trees, hydrants, bus stops, shop signs
+  t.scene("Street props at noon");
+  const stops = [[24, "bench and trees"], [60, "shop signs"], [96, "bus stop and hydrant"]];
+  let k = 0;
+  for (const [x, what] of stops) {
+    await goTo(x, street.z - 3.2, t, { sprint: true, progress: 0.3 + 0.08 * k, ms: 30000 });
+    await sleep(900);
+    t.event("photo-street", `${what} at ${C.state().x.toFixed(0)},${C.state().z.toFixed(0)}`);
+    k++;
+  }
+
+  // 3. the plaza: fountain, clock tower, cafe tables
+  t.scene("Plaza and clock tower");
+  const pz = p0.plaza;
+  const okPlaza = await goTo(pz.x0 + 4, pz.z0 + 8, t, { sprint: true, progress: 0.6, ms: 20000 });
+  await sleep(1200);
+  if (!okPlaza) t.problem("warning", `He didn't reach the plaza (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+  t.event("photo-plaza", `the plaza at ${C.state().x.toFixed(0)},${C.state().z.toFixed(0)}: fountain, Clock Tower, benches, cafe tables, ${p0.landmarks} landmarks (Clock Tower, the Needle, the Storm Tank)`);
+
+  // 4. the lit city at night: neon signs, lamps, bloom
+  const dusk = Math.round(18.5 * 60);
+  scrubTo(dusk);
+  await sleep(1500);
+  const bloomDay = cs.info().props.lit.bloom;
+  scrubTo(21 * 60 + 30);
+  await sleep(1800);
+  t.scene("Plaza at night: lamps, clock faces, neon");
+  const n1 = cs.info();
+  t.event("photo-night-plaza", `lamps ${n1.lit.lamps.toFixed(2)}, signs ${n1.props.lit.neon.toFixed(2)}, props glow ${n1.props.lit.glow.toFixed(2)}, bloom ${n1.props.lit.bloom.toFixed(2)}`);
+  if (n1.props.lit.neon < 0.85 || n1.props.lit.glow < 0.85) t.problem("bug", `Neon and lamps aren't glowing at night (${JSON.stringify(n1.props.lit)})`);
+  if (n1.props.lit.bloom <= bloomDay - 0.001 && n1.props.lit.bloom < 0.25) t.problem("warning", `The bloom didn't swell at night (${n1.props.lit.bloom.toFixed(2)})`);
+  t.metric("nightNeon", Math.round(n1.props.lit.neon * 100) / 100);
+  t.metric("nightBloom", Math.round(n1.props.lit.bloom * 100) / 100);
+  await goTo(C.state().x - 22, street.z - 3.2, t, { sprint: true, progress: 0.75, ms: 20000 });
+  await sleep(900);
+  t.scene("Night street: neon shop signs");
+  t.event("photo-night-street", `signs ${cs.info().props.lit.neon.toFixed(2)}, lamps ${cs.info().lit.lamps.toFixed(2)} at ${C.state().x.toFixed(0)},${C.state().z.toFixed(0)}`);
+
+  // 5. reflections only in ability weather
+  const W = window.weather;
+  await sleep(1200);
+  const before = W.now();
+  t.event("reflect-forecast", `forecast ${before.forecast}, showing ${before.shown}, player's weather ${before.manual}, reflections ${before.reflect.toFixed(2)}`);
+  if (!before.manual && before.reflect > 0.05) t.problem("bug", `The street reflects (${before.reflect.toFixed(2)}) without an ability's weather`);
+  t.scene("Night street, dry: no reflections");
+  pressKey("3");
+  await t.until(() => W.now().state === "rain" && W.now().reflect > 0.6, 12000, "the wet street to shine under the rain he called").catch(() => {});
+  await sleep(1200);
+  const wet = W.now();
+  t.scene("Night street, rain from the ability: reflections");
+  t.event("reflect-ability", `rain called by the player: reflections ${wet.reflect.toFixed(2)}, puddles ${wet.puddles}, gloss ${wet.gloss.toFixed(2)}`);
+  if (!(wet.manual && wet.reflect > 0.6 && wet.puddles > 0)) t.problem("bug", `The rain he called didn't make the street reflect (${JSON.stringify({ manual: wet.manual, reflect: wet.reflect, puddles: wet.puddles })})`);
+  t.metric("reflectAbility", Math.round(wet.reflect * 100) / 100);
+  pressKey("Escape");
+  t.progress(1);
+}
+
 /* ---------------- weather: every state, blended, and the road goes wet in the rain ---------------- */
 // Real input: the day bar to the door (setup), Enter, WASD out to the avenue, the Sound button,
 // keys 1–7, hold Q and a wedge, then the phone's Weather button. Each state gets a scene once it has settled.
@@ -2744,6 +2852,7 @@ installPlaytest({
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
     { id: "photos", title: "Photos of the dense city: noon at five spots along the avenue, dusk (windows and street lamps come on), night; frame rate at each", seconds: 120, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, then WASD with Shift east along the avenue. Events photo-noon / photo-dusk / photo-night / photo-fps; metrics photoFpsMin, photoFpsAvg, cityFillers, cityLamps." },
+    { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
@@ -2767,6 +2876,7 @@ installPlaytest({
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "photos") await photos(options, t);
+      else if (id === "fill-out") await fillOut(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
