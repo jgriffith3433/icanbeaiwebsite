@@ -234,8 +234,21 @@ async function smoke(options, t) {
     checkFrame(t, fr);
   });
   clickSpeed(10);
-  await sleep(6000);
+  const WX = window.weather || window.day.weather;
+  const seenWx = new Set();
+  for (let i = 0; i < 12; i++) {
+    await sleep(500);
+    if (WX) seenWx.add(WX.now().state + (WX.now().manual ? "*" : ""));
+  }
   stopWatching();
+  // Calm idle: no storm of its own, and the forecast for the whole day is clear.
+  if (WX) {
+    let dayStates = new Set();
+    const key = window.day.now().key;
+    for (let m = 0; m < 1440; m += 30) dayStates.add(WX.forecast(key, m).state);
+    if (seenWx.size === 1 && seenWx.has("clear") && dayStates.size === 1 && dayStates.has("clear")) t.event("calm-idle", `sky clear while the day ran at 10×; the day's forecast is clear all 24 h`);
+    else t.problem("bug", `Weather started on its own: seen ${[...seenWx].join(",")}, forecast ${[...dayStates].join(",")}`);
+  }
   if (!boxOf(document.querySelector(".daybar")) || !boxOf($("what")) || !boxOf($("tutorial"))) {
     t.problem("bug", "The day bar, narration HUD, or tutorial prompt disappeared during 10× playback");
   }
@@ -313,6 +326,9 @@ async function roofBolt(t) {
   if (barUp) t.event("ability-bar", `bar up: ${P.now().abilities.map((x) => x.key.toUpperCase() + " " + x.name).join(", ")}; energy ${Math.round(P.now().energy)}`);
   else t.problem("bug", "The ability bar isn't showing while he's the player's");
   const e0 = P.now().energy;
+  const WXB = window.weather || window.day.weather;
+  if (WXB && WXB.now().state === "clear" && WXB.now().rain < 0.05) t.event("calm-before", "clear, no rain, before the bolt");
+  else t.problem("bug", `The sky wasn't calm before lightning: ${WXB && WXB.now().state}`);
   pressKey("e");
   await t.until(() => P.now().strike, 3000, "a lightning strike").catch(() => {});
   const strike = P.now().strike;
@@ -324,12 +340,23 @@ async function roofBolt(t) {
   if (bolt && bolt.remaining > 0 && slotEl && slotEl.classList.contains("cooling") && spent > cost * 0.5) {
     t.event("ability-used", `lightning cost ${Math.round(spent + 3)} energy now ${Math.round(P.now().energy)}, cooldown ${bolt.remaining.toFixed(1)} s on the bar`);
   } else t.problem("bug", "The ability bar didn't show energy spent and a cooldown after lightning");
+  if (WXB) {
+    const storm = await t.until(() => WXB.now().state === "storm", 2000, "storm weather after lightning").then(() => true).catch(() => false);
+    if (storm) t.event("weather-on-bolt", `lightning brought ${WXB.now().state}, rain ${WXB.now().rain.toFixed(2)}`);
+    else t.problem("bug", "Lightning didn't bring storm weather");
+  }
   pressKey("e");
   await sleep(150);
   const again = P.now().blocked;
   if (again && again.reason === "cooldown") t.event("ability-cooldown", "a second E during the cooldown is refused");
   else t.problem("bug", "Lightning could be thrown again during its cooldown");
-  await sleep(450);
+  if (WXB) {
+    const t0 = Date.now();
+    const cleared = await t.until(() => WXB.now().state === "clear" && WXB.now().rain < 0.05, 12000, "the storm to clear").then(() => true).catch(() => false);
+    const secs = (Date.now() - t0) / 1000;
+    if (cleared && secs < 10) t.event("weather-cleared", `back to clear ${secs.toFixed(1)} s after the bolt (rain ${WXB.now().rain.toFixed(2)})`);
+    else t.problem("bug", "The storm from lightning didn't clear within seconds");
+  }
   pressKey("Escape");
   t.event(strike && onRoof ? "smoke-pass" : "smoke-fail", "city loaded, Small Weather shown, rooftop, one bolt");
 }

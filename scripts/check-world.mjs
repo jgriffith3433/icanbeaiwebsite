@@ -405,14 +405,19 @@ const wx = cfg.weather || {};
 const castA = forecastAt('2026-10-19', 8 * 60, wx.forecast);
 const castB = forecastAt('2026-10-19', 8 * 60, wx.forecast);
 ok(castA.state === castB.state && castA.intensity === castB.intensity, 'the forecast changed for the same date and minute');
-let forecastDiffers = false;
-for (let d = 1; d <= 27 && !forecastDiffers; d++) {
-  for (let slot = 0; slot < 8; slot++) {
-    const m = slot * 180 + 20;
-    if (forecastAt('2026-10-19', m, wx.forecast).state !== forecastAt(`2026-11-${String(d).padStart(2, '0')}`, m, wx.forecast).state) forecastDiffers = true;
+let calmDays = true;
+for (let d = 1; d <= 27; d++) {
+  for (let m = 0; m < 1440; m += 30) {
+    if (forecastAt(`2026-11-${String(d).padStart(2, '0')}`, m, wx.forecast).state !== 'clear') calmDays = false;
   }
 }
-ok(forecastDiffers, 'every date drew the same weather');
+ok(calmDays, 'the day brought weather by itself: the sky must stay clear until an ability asks');
+const power = createWeather({ blend: wx.blend || 3.4, forecast: wx.forecast });
+power.set('storm', 0.85, 'power');
+power.follow('2026-10-19', 600, 1, false, 'control');
+ok(power.now().state === 'storm' && power.now().manual, 'a power did not bring a storm');
+for (let i = 0; i < 40; i++) power.follow('2026-10-19', 600, 0.25, false, 'control');
+ok(!power.now().manual && power.now().state === 'clear' && power.now().wet < 0.1, `power weather didn't clear within seconds (wet ${power.now().wet.toFixed(2)})`);
 const sim = createWeather({ blend: wx.blend || 3.4, forecast: wx.forecast });
 sim.set('clear', 1, 'key');
 sim.step(1, true);
