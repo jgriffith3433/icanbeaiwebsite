@@ -311,7 +311,10 @@ async function roofBolt(t) {
   }
   const s = b.stair;
   t.scene(`Roof ${b.id}`);
-  const ok = (await goTo(s.x0 - 0.9, s.z, t, { sprint: true, progress: 0.75, ms: 30000 }))
+  // Come to the ramp's foot from the street side first: straight along its line from the driveway he'd walk
+  // under the ramp's high end and wedge there (the capsule is taller than the gap).
+  const ok = (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000 }))
+    && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.75, ms: 8000 }))
     && (await goTo(s.x1 - 0.25, s.z, t, { close: 0.35, progress: 0.8, ms: 20000 }));
   await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 12000 });
   const st = C.state();
