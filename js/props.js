@@ -1,0 +1,636 @@
+/* ==========================================================================
+   Filling the city out (J, 2026-11-05). Read by js/cityscape.js, which hands it the lots, roads and
+   lamp spots it already worked out. Everything is generated, nothing is downloaded, no GPU:
+
+   - Street props along the kerbs: trees, benches, hydrants, bins and bus stops (shelter, glass back,
+     lit stop sign), a few of them solid (`world.addSolids`).
+   - Shop signs and neon: lit wall signs on the lots that face an avenue (BAR, NOODLES, 24H ...), each
+     with a coloured spill of light on the pavement. They glow with the shops (dim by day, full at night).
+   - The park: lawn, pond, a bandstand with string lights, flowerbeds, lamps along the path, more benches.
+   - A plaza with a fountain, paving, benches, cafe tables and lamps.
+   - Three landmarks: the Clock Tower (in the plaza), the Needle (a tall spire with a lit deck and a
+     red beacon) and the Storm Tank (a gasholder with a blue neon band and a lightning mast).
+   - Rooftops: AC units, water tanks, vents, antennas and dishes on the lots, and on the three walkable roofs.
+   - Night: sign neon, lamp globes, tower faces and bus stops follow the dusk / night weights; the bloom
+     gets heavier at dusk and night. `day.cityscape.info().props` says what is there and what is lit.
+   Merged into a handful of meshes (vertex-coloured), so it costs a few draw calls.
+   ========================================================================== */
+const B = window.BABYLON;
+
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const hex = (h) => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
+
+/* Where the plaza and the landmarks stand. cityscape.js keeps its filler buildings off these. */
+export function reserved(cfg) {
+  void cfg;
+  return {
+    plaza: { x0: 106, z0: 16.8, x1: 130, z1: 36 },
+    needle: { x: 60, z: 86 },
+    tank: { x: 190, z: 44 },
+    rects: [
+      [105, 16, 131, 37],
+      [54, 80, 66, 92],
+      [180, 34, 200, 54],
+    ],
+  };
+}
+
+/* A merged, vertex-coloured mesh builder. A frame (ox, oz, yaw) turns local coordinates into world ones. */
+class Part {
+  constructor() {
+    this.pos = [];
+    this.nrm = [];
+    this.col = [];
+    this.idx = [];
+    this.f = { ox: 0, oz: 0, c: 1, s: 0 };
+  }
+  frame(ox, oz, yaw) {
+    this.f = { ox, oz, c: Math.cos(yaw || 0), s: Math.sin(yaw || 0) };
+    return this;
+  }
+  w(x, y, z) {
+    const f = this.f;
+    return [f.ox + x * f.c + z * f.s, y, f.oz - x * f.s + z * f.c];
+  }
+  wn(x, y, z) {
+    const f = this.f;
+    return [x * f.c + z * f.s, y, -x * f.s + z * f.c];
+  }
+  quad(a, b, c, d, n, col) {
+    const base = this.pos.length / 3;
+    [a, b, c, d].forEach((p) => {
+      const q = this.w(p[0], p[1], p[2]);
+      this.pos.push(q[0], q[1], q[2]);
+      const m = this.wn(n[0], n[1], n[2]);
+      this.nrm.push(m[0], m[1], m[2]);
+      this.col.push(col[0], col[1], col[2], 1);
+    });
+    this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  /* centre (x, z), bottom y0, size w x d x h (h up) */
+  box(x, y0, z, w, h, d, col) {
+    const x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, y1 = y0 + h;
+    this.quad([x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [0, 0, 1], col);
+    this.quad([x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [0, 0, -1], col);
+    this.quad([x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [1, 0, 0], col);
+    this.quad([x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [-1, 0, 0], col);
+    this.quad([x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], [0, 1, 0], col);
+    return this;
+  }
+  /* a (tapered) cylinder or cone: radii r0 at the bottom, r1 at the top */
+  cyl(x, y0, z, r0, r1, h, seg, col, cap) {
+    for (let i = 0; i < seg; i++) {
+      const a0 = (i / seg) * Math.PI * 2;
+      const a1 = ((i + 1) / seg) * Math.PI * 2;
+      const am = (a0 + a1) / 2;
+      const p = (r, a, y) => [x + Math.cos(a) * r, y, z + Math.sin(a) * r];
+      const slope = (r0 - r1) / (h || 1);
+      const n = [Math.cos(am), slope, Math.sin(am)];
+      this.quad(p(r0, a1, y0), p(r0, a0, y0), p(r1, a0, y0 + h), p(r1, a1, y0 + h), n, col);
+      if (cap !== false && r1 > 0.001) {
+        const top = this.pos.length / 3;
+        const c = this.w(x, y0 + h, z);
+        const up = this.wn(0, 1, 0);
+        this.pos.push(c[0], c[1], c[2]);
+        this.nrm.push(up[0], up[1], up[2]);
+        this.col.push(col[0], col[1], col[2], 1);
+        [p(r1, a0, y0 + h), p(r1, a1, y0 + h)].forEach((q) => {
+          const wq = this.w(q[0], q[1], q[2]);
+          this.pos.push(wq[0], wq[1], wq[2]);
+          this.nrm.push(up[0], up[1], up[2]);
+          this.col.push(col[0], col[1], col[2], 1);
+        });
+        this.idx.push(top, top + 2, top + 1);
+      }
+    }
+    return this;
+  }
+  /* a squashed low-poly ball */
+  ball(x, y, z, r, sy, col, seg) {
+    seg = seg || 6;
+    const rings = 4;
+    for (let j = 0; j < rings; j++) {
+      const t0 = (j / rings) * Math.PI;
+      const t1 = ((j + 1) / rings) * Math.PI;
+      for (let i = 0; i < seg; i++) {
+        const a0 = (i / seg) * Math.PI * 2;
+        const a1 = ((i + 1) / seg) * Math.PI * 2;
+        const P = (t, a) => [x + Math.cos(a) * Math.sin(t) * r, y + Math.cos(t) * r * sy, z + Math.sin(a) * Math.sin(t) * r];
+        const am = (a0 + a1) / 2;
+        const tm = (t0 + t1) / 2;
+        this.quad(P(t0, a0), P(t0, a1), P(t1, a1), P(t1, a0), [Math.cos(am) * Math.sin(tm), Math.cos(tm), Math.sin(am) * Math.sin(tm)], col);
+      }
+    }
+    return this;
+  }
+  get empty() {
+    return !this.pos.length;
+  }
+  mesh(name, material, scene) {
+    const m = new B.Mesh(name, scene);
+    const vd = new B.VertexData();
+    vd.positions = this.pos;
+    vd.normals = this.nrm;
+    vd.colors = this.col;
+    vd.indices = this.idx;
+    vd.applyToMesh(m);
+    m.material = material;
+    m.isPickable = false;
+    m.freezeWorldMatrix();
+    return m;
+  }
+}
+
+const SIGNS = [
+  { word: "NOODLES", c: "#ff4d8d" },
+  { word: "BAR", c: "#3ecbff" },
+  { word: "24H", c: "#8eff9f" },
+  { word: "CAFE", c: "#ffd36a" },
+  { word: "ARCADE", c: "#c58bff" },
+  { word: "BOOKS", c: "#ff9a4c" },
+  { word: "HOTEL", c: "#3ecbff" },
+  { word: "PHARMACY", c: "#8eff9f" },
+];
+
+export function installProps(ctx) {
+  const { world, blocked, hitsSolid, fillers, roads, crossXs, avZs, lampSpots, canvasTexture, poolTexture, T } = ctx;
+  const scene = world.scene;
+  const cfg = window.DAY_CONFIG || {};
+  const city = cfg.city || { blocks: [], park: null };
+  const street = cfg.street || { z: 12.6 };
+  const R = reserved(cfg);
+  const rng = makeRng(31337);
+  const solid = new Part(); // lit by the scene, vertex colours
+  const warm = new Part(); // glows with the lamps: globes, tower faces, bus stop panels, string lights
+  const colliders = [];
+  const stats = { trees: 0, benches: 0, hydrants: 0, bins: 0, busStops: 0, signs: 0, parkLamps: 0, plazaLamps: 0, roofUnits: 0, landmarks: 0, planters: 0 };
+  const clear = (x, z, r) => !blocked(x - r, z - r, x + r, z + r, 0.15);
+  const clearIn = (x, z, r) => !hitsSolid(x - r, z - r, x + r, z + r, 0.15); // inside the park or plaza, which cityscape keeps free of lots
+
+  const WOOD = hex("#7a5638");
+  const DARK = hex("#2b3038");
+  const METAL = hex("#4b535c");
+  const RED = hex("#b8382e");
+  const GREEN = hex("#2f5a3c");
+  const LEAF = ["#3f6e48", "#4a7a45", "#36603f", "#5b7f3e", "#6a8a46"].map(hex);
+  const CREAM = hex("#efe6cc");
+  const GLOBE = hex("#fff1c9");
+
+  /* ---------------- single props, in a local frame whose +z faces the road ---------------- */
+  function tree(x, z, s) {
+    solid.frame(x, z, 0);
+    solid.cyl(0, 0, 0, 0.17 * s, 0.11 * s, 2.1 * s, 6, hex("#5a4230"));
+    const lc = LEAF[Math.floor(rng() * LEAF.length)];
+    solid.ball(0, 3.0 * s, 0, 1.5 * s, 0.85, lc, 7);
+    solid.ball(0.5 * s, 2.5 * s, 0.3 * s, 1.0 * s, 0.8, lc.map((v) => v * 0.9), 6);
+    colliders.push({ x, y: 1, z, w: 0.4, h: 2, d: 0.4 });
+    stats.trees++;
+  }
+  function bench(x, z, yaw, solidToo) {
+    solid.frame(x, z, yaw);
+    solid.box(0, 0.42, 0, 1.6, 0.07, 0.46, WOOD);
+    solid.box(0, 0.72, -0.2, 1.6, 0.34, 0.06, WOOD);
+    solid.box(-0.7, 0, 0, 0.07, 0.42, 0.4, DARK);
+    solid.box(0.7, 0, 0, 0.07, 0.42, 0.4, DARK);
+    if (solidToo !== false) {
+      const f = solid.f;
+      colliders.push({ x, y: 0.4, z, w: Math.abs(1.6 * f.c) + Math.abs(0.5 * f.s), h: 0.8, d: Math.abs(0.5 * f.c) + Math.abs(1.6 * f.s) });
+    }
+    stats.benches++;
+  }
+  function hydrant(x, z, yaw) {
+    solid.frame(x, z, yaw);
+    solid.cyl(0, 0, 0, 0.17, 0.15, 0.62, 8, RED);
+    solid.cyl(0, 0.62, 0, 0.19, 0.1, 0.14, 8, RED);
+    solid.box(0.22, 0.34, 0, 0.16, 0.12, 0.12, RED);
+    solid.box(-0.22, 0.34, 0, 0.16, 0.12, 0.12, RED);
+    solid.box(0, 0.32, 0.2, 0.14, 0.14, 0.14, hex("#d8c25a"));
+    colliders.push({ x, y: 0.4, z, w: 0.4, h: 0.8, d: 0.4 });
+    stats.hydrants++;
+  }
+  function bin(x, z, yaw) {
+    solid.frame(x, z, yaw);
+    solid.cyl(0, 0, 0, 0.27, 0.3, 0.85, 8, GREEN);
+    solid.cyl(0, 0.85, 0, 0.32, 0.32, 0.06, 8, DARK);
+    colliders.push({ x, y: 0.45, z, w: 0.6, h: 0.9, d: 0.6 });
+    stats.bins++;
+  }
+  function busStop(x, z, yaw) {
+    solid.frame(x, z, yaw);
+    solid.box(0, 0, 0, 3.2, 0.05, 1.3, hex("#555b62")); // base slab
+    [-1.55, 1.55].forEach((px) => solid.box(px, 0.05, -0.5, 0.08, 2.4, 0.08, METAL));
+    solid.box(0, 2.42, -0.1, 3.4, 0.1, 1.5, hex("#2c333c")); // roof
+    solid.box(0, 0.5, -0.56, 0.1, 0.1, 0.1, DARK);
+    solid.box(0, 0.5, -0.4, 2.4, 0.07, 0.4, WOOD); // seat
+    warm.frame(x, z, yaw);
+    warm.box(0, 0.8, -0.58, 3.0, 1.5, 0.05, hex("#bfe3ff")); // lit ad panel / glass back
+    // the stop sign on its own pole, at the kerb end
+    solid.box(1.9, 0, 0.1, 0.07, 3.0, 0.07, METAL);
+    warm.box(1.9, 2.55, 0.1, 0.56, 0.56, 0.06, hex("#3ecbff"));
+    colliders.push({ x: x + solid.f.s * 0, z, y: 1.2, w: Math.abs(3.2 * solid.f.c) + 1.3 * Math.abs(solid.f.s), h: 2.4, d: Math.abs(1.3 * solid.f.c) + 3.2 * Math.abs(solid.f.s) });
+    stats.busStops++;
+  }
+  function lampGlobe(x, z, h) {
+    solid.frame(x, z, 0);
+    solid.cyl(0, 0, 0, 0.09, 0.07, h, 6, DARK);
+    warm.frame(x, z, 0);
+    warm.ball(0, h + 0.2, 0, 0.26, 1, GLOBE, 6);
+    colliders.push({ x, y: h / 2, z, w: 0.22, h, d: 0.22 });
+    return [x, z];
+  }
+
+  /* ---------------- along the kerbs ---------------- */
+  const cycle = ["tree", "bench", "bus", "hydrant", "tree", "bus", "bin", "tree", "bench", "tree", "hydrant", "bus"];
+  const allZ = avZs;
+  const nearJ = (v, lines, pad) => lines.some((l) => Math.abs(v - l) < pad);
+  const lampNear = (x, z) => lampSpots.some((p) => Math.abs(p[0] - x) < 1.6 && Math.abs(p[1] - z) < 1.6);
+  let ci = 0;
+  roads.forEach((r) => {
+    const step = r.main ? 13 : 11;
+    for (let t = r.from + 9; t < r.to - 6; t += step) {
+      const kind = cycle[ci++ % cycle.length];
+      const inter = r.along === "x" ? nearJ(t, crossXs, 9) : nearJ(t, allZ, 9);
+      if (inter) continue;
+      const s = ci % 2 ? 1 : -1;
+      const off = (kind === "tree" ? 3.2 : 3.0) * s;
+      const x = r.along === "x" ? t : r.c + off;
+      const z = r.along === "x" ? r.c + off : t;
+      const yaw = r.along === "x" ? (s > 0 ? Math.PI : 0) : -s * (Math.PI / 2);
+      const pad = kind === "bus" ? 1.8 : 0.5;
+      if (!clear(x, z, pad) || lampNear(x, z)) continue;
+      if (kind === "tree") tree(x, z, 0.85 + rng() * 0.3);
+      else if (kind === "bench") bench(x, z, yaw);
+      else if (kind === "hydrant") hydrant(x, z, yaw);
+      else if (kind === "bin") bin(x, z, yaw);
+      else if (kind === "bus" && r.along === "x") busStop(x, z, yaw);
+    }
+  });
+
+  /* ---------------- shop signs and neon ---------------- */
+  const signMats = SIGNS.map((sg, i) => {
+    const W = 512;
+    const H = 128;
+    const draw = (emit) => (g) => {
+      g.fillStyle = emit ? "#000" : "#14181f";
+      g.fillRect(0, 0, W, H);
+      g.lineWidth = 7;
+      g.strokeStyle = emit ? sg.c : "#252b34";
+      g.strokeRect(10, 10, W - 20, H - 20);
+      g.font = "bold 74px Arial, Helvetica, sans-serif";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      if (emit) {
+        g.shadowColor = sg.c;
+        g.shadowBlur = 16;
+      }
+      g.fillStyle = emit ? sg.c : "#2d333c";
+      g.fillText(sg.word, W / 2, H / 2 + 4);
+    };
+    const m = new B.StandardMaterial("sign-" + sg.word, scene);
+    m.diffuseTexture = canvasTexture("sign-" + sg.word, 512, 128, draw(false));
+    m.emissiveTexture = canvasTexture("sign-lit-" + sg.word, 512, 128, draw(true));
+    m.emissiveColor = new B.Color3(0.3, 0.3, 0.3);
+    m.specularColor = new B.Color3(0, 0, 0);
+    m.backFaceCulling = false;
+    return m;
+  });
+  const signPlane = SIGNS.map((sg, i) => {
+    const p = B.MeshBuilder.CreatePlane("sign-" + sg.word, { width: 1, height: 0.25, sideOrientation: B.Mesh.DOUBLESIDE }, scene);
+    p.material = signMats[i];
+    p.isPickable = false;
+    return p;
+  });
+  const spillMats = {};
+  const spillMeshes = {};
+  function spill(color) {
+    if (spillMeshes[color]) return spillMeshes[color];
+    const tex = poolTexture(color);
+    const m = new B.StandardMaterial("spill-" + color, scene);
+    m.diffuseTexture = tex;
+    m.useAlphaFromDiffuseTexture = true;
+    m.emissiveTexture = tex;
+    m.emissiveColor = new B.Color3(0, 0, 0);
+    m.disableLighting = true;
+    m.alphaMode = B.Engine.ALPHA_ADD;
+    m.backFaceCulling = false;
+    m.zOffset = -2;
+    const g = B.MeshBuilder.CreateGround("spill-" + color, { width: 6, height: 4 }, scene);
+    g.position.y = 0.064;
+    g.bakeCurrentTransformIntoVertices();
+    g.material = m;
+    g.isPickable = false;
+    g.alphaIndex = 11;
+    spillMats[color] = m;
+    spillMeshes[color] = g;
+    return g;
+  }
+  let signN = 0;
+  fillers.forEach((f) => {
+    if (!f.near || rng() > 0.85) return;
+    // the face towards the nearest avenue, if the avenue is close
+    let best = null;
+    avZs.forEach((az) => {
+      const face = f.z > az ? f.z - f.d / 2 : f.z + f.d / 2;
+      const dist = Math.abs(face - az);
+      if (!best || dist < best.dist) best = { az, face, dist, north: f.z > az };
+    });
+    if (!best || best.dist > 9 || f.w < 6) return;
+    const si = signN++ % SIGNS.length;
+    const sw = Math.min(f.w - 1.5, 3.2 + rng() * 1.6);
+    const x = f.x + (rng() - 0.5) * Math.max(0, f.w - sw - 1);
+    const out = best.north ? -1 : 1; // the sign faces the road
+    const z = best.face + out * 0.08;
+    const yaw = best.north ? 0 : Math.PI; // a plane faces -z by default
+    const M = B.Matrix.Compose(new B.Vector3(sw, 1, 1), B.Quaternion.FromEulerAngles(0, yaw, 0), new B.Vector3(x, 3.7 + rng() * 0.9, z));
+    signPlane[si].thinInstanceAdd(M);
+    const c = SIGNS[si].c;
+    spill(c).thinInstanceAdd(T(x, 0, best.az + (best.north ? 1 : -1) * 3.6, 0.7 + sw / 6, 1, 0.9));
+    stats.signs++;
+  });
+  signPlane.forEach((p) => p.thinInstanceRefreshBoundingInfo(true));
+  Object.values(spillMeshes).forEach((g) => g.thinInstanceRefreshBoundingInfo(true));
+
+  /* ---------------- the park ---------------- */
+  const flat = new Part();
+  if (city.park) {
+    const p = city.park;
+    const cx = (p.x0 + p.x1) / 2;
+    flat.box(cx, 0.005, (p.z0 + p.z1) / 2, p.x1 - p.x0 - 1, 0.025, p.z1 - p.z0 - 1, hex("#33543a")); // lawn
+    const pond = { x: 15, z: 60, r: 5 };
+    flat.frame(0, 0, 0);
+    flat.cyl(pond.x, 0.03, pond.z, pond.r + 0.45, pond.r + 0.45, 0.04, 14, hex("#6b6a62")); // stone rim
+    flat.cyl(pond.x, 0.075, pond.z, pond.r, pond.r, 0.02, 14, hex("#16303f")); // water
+    // bandstand
+    const bx = -18;
+    const bz = 41;
+    solid.frame(0, 0, 0);
+    solid.cyl(bx, 0, bz, 3.2, 3.2, 0.3, 10, hex("#8a8174"));
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      solid.box(bx + Math.cos(a) * 2.7, 0.3, bz + Math.sin(a) * 2.7, 0.14, 2.6, 0.14, CREAM);
+    }
+    solid.cyl(bx, 2.9, bz, 3.4, 0.2, 1.3, 10, hex("#a24a3d"));
+    colliders.push({ x: bx, y: 0.15, z: bz, w: 5.6, h: 0.3, d: 5.6 });
+    // string lights round the eaves
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      warm.frame(0, 0, 0);
+      warm.ball(bx + Math.cos(a) * 3.2, 2.85, bz + Math.sin(a) * 3.2, 0.1, 1, i % 2 ? hex("#ffd98a") : hex("#ff9ac1"), 4);
+    }
+    // flowerbeds
+    [[-11, 24, "#d85a7a"], [-5, 24, "#e6b84a"], [-11, 64, "#9a6ad8"], [-5, 64, "#e6b84a"], [4, 45, "#d85a7a"]].forEach(([x, z, c]) => {
+      if (!clearIn(x, z, 0.8)) return;
+      solid.box(x, 0, z, 2.6, 0.22, 1.3, hex("#5b4636"));
+      for (let k = 0; k < 7; k++) solid.ball(x - 1.1 + k * 0.37, 0.3, z + ((k % 2) - 0.5) * 0.5, 0.17, 1, hex(c), 4);
+      stats.planters++;
+    });
+    // lamps and benches along the path (x = -8)
+    for (let z = p.z0 + 5; z < p.z1 - 3; z += 9) {
+      if (clearIn(-6.4, z, 0.3)) {
+        lampGlobe(-6.4, z, 3.3);
+        lampSpots.push([-6.4, z]);
+        stats.parkLamps++;
+      }
+      if (clearIn(-9.8, z + 4.5, 0.9)) bench(-9.8, z + 4.5, Math.PI / 2 + Math.PI);
+    }
+    flat.frame(0, 0, 0);
+  }
+
+  /* ---------------- the plaza ---------------- */
+  const pl = R.plaza;
+  const pcx = (pl.x0 + pl.x1) / 2;
+  const pcz = (pl.z0 + pl.z1) / 2;
+  {
+    flat.frame(0, 0, 0);
+    const tileA = hex("#7d8187");
+    const tileB = hex("#6c7076");
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 5; j++) {
+      const w = (pl.x1 - pl.x0) / 6;
+      const d = (pl.z1 - pl.z0) / 5;
+      flat.box(pl.x0 + w * (i + 0.5), 0.0, pl.z0 + d * (j + 0.5), w - 0.1, 0.07, d - 0.1, (i + j) % 2 ? tileA : tileB);
+    }
+    // fountain at the plaza's heart
+    const fx = pcx;
+    const fz = pl.z0 + 6.5;
+    solid.frame(0, 0, 0);
+    solid.cyl(fx, 0.07, fz, 3.4, 3.4, 0.55, 16, hex("#8d8a80"));
+    flat.cyl(fx, 0.55, fz, 3.0, 3.0, 0.04, 16, hex("#1c4256"));
+    solid.cyl(fx, 0.6, fz, 0.5, 0.35, 1.5, 8, hex("#8d8a80"));
+    solid.cyl(fx, 2.0, fz, 1.2, 0.3, 0.2, 10, hex("#8d8a80"));
+    warm.frame(0, 0, 0);
+    warm.ball(fx, 2.5, fz, 0.35, 1.2, hex("#bfe8ff"), 6);
+    colliders.push({ x: fx, y: 0.5, z: fz, w: 6.2, h: 1.1, d: 6.2 });
+    // clock tower (landmark 1)
+    const tx = pcx;
+    const tz = pl.z1 - 4;
+    solid.cyl(tx, 0.07, tz, 2.4, 2.1, 0.8, 4, hex("#6b5a4c"), true);
+    solid.box(tx, 0.07, tz, 3.2, 12.5, 3.2, hex("#8c7360"));
+    solid.box(tx, 12.5, tz, 3.8, 0.5, 3.8, hex("#6b5a4c"));
+    solid.box(tx, 13.0, tz, 3.4, 4.2, 3.4, hex("#8c7360"));
+    solid.box(tx, 17.2, tz, 4.0, 0.4, 4.0, hex("#6b5a4c"));
+    solid.cyl(tx, 17.6, tz, 2.5, 0.05, 5.5, 4, hex("#3e5b66"), false);
+    warm.frame(0, 0, 0);
+    [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([dx, dz]) => {
+      // a lit clock face on each side
+      const e = 1.72;
+      if (dx === 0) warm.box(tx, 14.4, tz + dz * e, 2.3, 2.3, 0.08, hex("#fff1c9"));
+      else warm.box(tx + dx * e, 14.4, tz, 0.08, 2.3, 2.3, hex("#fff1c9"));
+      solid.frame(0, 0, 0);
+      if (dx === 0) { solid.box(tx, 14.4, tz + dz * (e + 0.05), 0.12, 0.9, 0.06, DARK); solid.box(tx + 0.3, 14.4, tz + dz * (e + 0.05), 0.7, 0.1, 0.06, DARK); }
+      else { solid.box(tx + dx * (e + 0.05), 14.4, tz, 0.06, 0.9, 0.12, DARK); solid.box(tx + dx * (e + 0.05), 14.4, tz + 0.3, 0.06, 0.1, 0.7, DARK); }
+    });
+    solid.box(tx, 22.9, tz, 0.12, 2.2, 0.12, METAL);
+    colliders.push({ x: tx, y: 8.6, z: tz, w: 3.4, h: 17.2, d: 3.4 });
+    stats.landmarks++;
+    // benches, cafe tables, lamps and planters
+    [[pl.x0 + 3, pcz + 2], [pl.x1 - 3, pcz + 2], [pl.x0 + 3, pcz - 2], [pl.x1 - 3, pcz - 2]].forEach(([x, z], i) => bench(x, z, i % 2 ? -Math.PI / 2 : Math.PI / 2));
+    [[pl.x0 + 5, pl.z1 - 12], [pl.x1 - 5, pl.z1 - 12], [pl.x0 + 8, pl.z1 - 8]].forEach(([x, z]) => {
+      solid.frame(x, z, 0);
+      solid.cyl(0, 0.07, 0, 0.5, 0.5, 0.05, 8, hex("#c9c2b0"));
+      solid.cyl(0, 0.07, 0, 0.05, 0.05, 0.75, 6, METAL);
+      solid.cyl(0, 2.0, 0, 1.3, 0.05, 0.45, 8, hex("#c04a46"));
+      solid.cyl(0, 0.07, 0, 0.05, 0.05, 2.0, 6, METAL);
+      [[0.9, 0], [-0.9, 0]].forEach(([dx, dz]) => solid.cyl(dx, 0.07, dz, 0.22, 0.22, 0.45, 6, DARK));
+      colliders.push({ x, y: 0.4, z, w: 1.0, h: 0.8, d: 1.0 });
+    });
+    [[pl.x0 + 1.2, pl.z0 + 1.2], [pl.x1 - 1.2, pl.z0 + 1.2], [pl.x0 + 1.2, pl.z1 - 1.2], [pl.x1 - 1.2, pl.z1 - 1.2], [pcx - 6, pl.z0 + 12], [pcx + 6, pl.z0 + 12]].forEach(([x, z]) => {
+      lampGlobe(x, z, 3.6);
+      lampSpots.push([x, z]);
+      stats.plazaLamps++;
+    });
+    [[pl.x0 + 1.4, pcz], [pl.x1 - 1.4, pcz]].forEach(([x, z]) => {
+      solid.box(x, 0.07, z, 1.6, 0.5, 1.6, hex("#5b4636"));
+      tree(x, z, 0.7);
+      colliders.pop();
+      colliders.push({ x, y: 0.5, z, w: 1.6, h: 1, d: 1.6 });
+      stats.planters++;
+    });
+  }
+
+  /* ---------------- landmark 2: the Needle ---------------- */
+  {
+    const nx = R.needle.x;
+    const nz = R.needle.z;
+    solid.frame(0, 0, 0);
+    solid.cyl(nx, 0, nz, 3.2, 1.0, 44, 8, hex("#7d8791"));
+    solid.cyl(nx, 0, nz, 3.8, 3.8, 1.2, 8, hex("#3a4350"));
+    solid.cyl(nx, 40, nz, 5.4, 6.2, 1.1, 12, hex("#2c333c"));
+    solid.cyl(nx, 41.1, nz, 5.0, 5.0, 2.4, 12, hex("#1d2a3a"));
+    solid.cyl(nx, 43.5, nz, 6.0, 4.4, 0.7, 12, hex("#2c333c"));
+    solid.cyl(nx, 44.2, nz, 0.7, 0.18, 24, 6, hex("#9aa3ab"));
+    warm.frame(0, 0, 0);
+    warm.cyl(nx, 41.2, nz, 5.08, 5.08, 2.1, 12, hex("#9fd6ff"), false); // the lit observation deck
+    warm.cyl(nx, 39.6, nz, 6.3, 6.3, 0.16, 12, hex("#3ecbff"), false); // neon ring under it
+    warm.ball(nx, 68.6, nz, 0.55, 1, hex("#ff4a3a"), 6); // beacon
+    colliders.push({ x: nx, y: 6, z: nz, w: 5.4, h: 12, d: 5.4 });
+    stats.landmarks++;
+  }
+
+  /* ---------------- landmark 3: the Storm Tank ---------------- */
+  {
+    const tx = R.tank.x;
+    const tz = R.tank.z;
+    solid.frame(0, 0, 0);
+    solid.cyl(tx, 0, tz, 7.1, 7.1, 20, 16, hex("#4f5a66"));
+    solid.cyl(tx, 20, tz, 7.2, 5.6, 2.2, 16, hex("#39424d"));
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      solid.box(tx + Math.cos(a) * 7.25, 0, tz + Math.sin(a) * 7.25, 0.35, 21, 0.35, hex("#2c333c")); // lattice ribs
+    }
+    solid.box(tx, 22.2, tz, 0.3, 14, 0.3, METAL); // lightning mast
+    solid.box(tx, 29, tz, 2.4, 0.18, 0.18, METAL);
+    solid.box(tx, 27.6, tz, 1.6, 0.18, 0.18, METAL);
+    warm.frame(0, 0, 0);
+    warm.cyl(tx, 13.2, tz, 7.2, 7.2, 0.55, 16, hex("#3ecbff"), false); // blue neon band
+    warm.cyl(tx, 6.1, tz, 7.2, 7.2, 0.28, 16, hex("#3e7bff"), false);
+    warm.ball(tx, 36.4, tz, 0.5, 1, hex("#ff4a3a"), 6);
+    colliders.push({ x: tx, y: 11, z: tz, w: 13.6, h: 22, d: 13.6 }, { x: tx, y: 11, z: tz, w: 13.6, h: 22, d: 13.6, yaw: Math.PI / 4 });
+    stats.landmarks++;
+  }
+
+  /* ---------------- rooftops ---------------- */
+  const roof = new Part();
+  const GREY = [hex("#7b848d"), hex("#6a7078"), hex("#8a8f94")];
+  function acUnit(x, y, z, yaw) {
+    roof.frame(x, z, yaw);
+    roof.box(0, y, 0, 1.5, 0.9, 1.1, GREY[Math.floor(rng() * GREY.length)]);
+    roof.cyl(-0.35, y + 0.9, 0, 0.36, 0.36, 0.06, 8, DARK);
+    roof.box(0.45, y + 0.2, 0.56, 0.4, 0.4, 0.04, DARK);
+    stats.roofUnits++;
+  }
+  function waterTank(x, y, z) {
+    roof.frame(x, z, 0);
+    [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]].forEach(([dx, dz]) => roof.box(dx, y, dz, 0.14, 1.6, 0.14, hex("#4a3b30")));
+    roof.cyl(0, y + 1.6, 0, 1.2, 1.2, 2.0, 10, hex("#8a6a4c"), true);
+    roof.cyl(0, y + 3.6, 0, 1.3, 0.05, 0.6, 10, hex("#5b4636"), false);
+    roof.box(0, y + 1.6, 0, 2.6, 0.1, 2.6, hex("#4a3b30"));
+    stats.roofUnits++;
+  }
+  function antenna(x, y, z, tall) {
+    roof.frame(x, z, 0);
+    roof.box(0, y, 0, 0.12, tall, 0.12, METAL);
+    roof.box(0, y + tall * 0.7, 0, 1.4, 0.08, 0.08, METAL);
+    roof.box(0, y + tall * 0.85, 0, 0.9, 0.08, 0.08, METAL);
+    stats.roofUnits++;
+  }
+  function dish(x, y, z, yaw) {
+    roof.frame(x, z, yaw);
+    roof.box(0, y, 0, 0.1, 0.9, 0.1, METAL);
+    roof.cyl(0, y + 0.9, 0.2, 0.55, 0.12, 0.2, 8, hex("#d8dde0"), true);
+    stats.roofUnits++;
+  }
+  function vent(x, y, z) {
+    roof.frame(x, z, 0);
+    roof.cyl(0, y, 0, 0.3, 0.3, 0.8, 6, METAL);
+    roof.cyl(0, y + 0.8, 0, 0.5, 0.05, 0.2, 6, DARK, false);
+    stats.roofUnits++;
+  }
+  fillers.forEach((f) => {
+    if (!f.near) return;
+    const k = rng();
+    const qx = f.w * 0.28;
+    const qz = f.d * 0.28;
+    if (f.w >= 7 && f.d >= 7) {
+      if (k < 0.5) acUnit(f.x + qx * (rng() < 0.5 ? -1 : 1), f.h, f.z + qz * (rng() < 0.5 ? -1 : 1), rng() < 0.5 ? 0 : Math.PI / 2);
+      if (k > 0.25 && k < 0.6) waterTank(f.x - qx, f.h, f.z - qz * (rng() < 0.5 ? -1 : 1));
+      if (k > 0.55 && k < 0.8) dish(f.x + qx, f.h, f.z - qz, rng() * 6);
+      if (k > 0.8) vent(f.x - qx, f.h, f.z + qz);
+      if (f.h > 24 && rng() < 0.6) antenna(f.x + f.w * 0.3, f.h, f.z + f.d * 0.3, 6 + rng() * 5);
+    }
+  });
+  /* the walkable roofs: a few units on the south half, away from the ramp's landing on the north */
+  (city.blocks || []).forEach((b) => {
+    const sx = b.w * 0.28;
+    if (b.stair) {
+      // along the back (south) parapet, clear of the ramp's landing and of the roof-to-roof glide down the middle
+      const zb = b.z - b.d / 2 + 1.4;
+      acUnit(b.x - sx, b.h, zb, 0);
+      acUnit(b.x + sx * 0.2, b.h, zb, 0);
+      vent(b.x + sx * 1.1, b.h, zb);
+      colliders.push({ x: b.x - sx, y: b.h + 0.45, z: zb, w: 1.5, h: 0.9, d: 1.1 }, { x: b.x + sx * 0.2, y: b.h + 0.45, z: zb, w: 1.5, h: 0.9, d: 1.1 });
+    } else if (b.w >= 12) {
+      acUnit(b.x - sx, b.h, b.z, 0);
+      waterTank(b.x + sx, b.h, b.z + b.d * 0.1);
+      antenna(b.x, b.h, b.z - b.d * 0.2, 5);
+    }
+  });
+
+  /* ---------------- meshes and materials ---------------- */
+  const solidMat = new B.StandardMaterial("props-solid", scene);
+  solidMat.diffuseColor = new B.Color3(1, 1, 1);
+  solidMat.specularColor = new B.Color3(0.04, 0.04, 0.05);
+  solidMat.maxSimultaneousLights = 4;
+  const warmMat = new B.StandardMaterial("props-glow", scene);
+  warmMat.diffuseColor = new B.Color3(0.2, 0.2, 0.2);
+  warmMat.specularColor = new B.Color3(0, 0, 0);
+  warmMat.emissiveColor = new B.Color3(0.15, 0.15, 0.15);
+  warmMat.maxSimultaneousLights = 2;
+  const meshes = [];
+  if (!solid.empty) meshes.push(solid.mesh("props-solid", solidMat, scene));
+  if (!roof.empty) meshes.push(roof.mesh("props-roof", solidMat, scene));
+  if (!flat.empty) {
+    const fm = flat.mesh("props-flat", solidMat, scene);
+    fm.receiveShadows = true;
+    meshes.push(fm);
+  }
+  if (!warm.empty) meshes.push(warm.mesh("props-glow", warmMat, scene));
+  meshes.forEach((m) => {
+    m.useVertexColors = true;
+    m.hasVertexAlpha = false;
+  });
+  if (colliders.length) world.addSolids(colliders);
+
+  const pipeline = world.stage && world.stage.pipeline;
+  const baseBloom = pipeline && pipeline.bloomWeight != null ? pipeline.bloomWeight : 0.16;
+  let state = { neon: 0, glow: 0, bloom: baseBloom };
+
+  /* called from the city's night loop (every 0.3 s) with the same weights it lights the windows by */
+  function update(w, lit) {
+    const neon = Math.min(1, lit.shops);
+    const lamps = Math.min(1, lit.lamps);
+    signMats.forEach((m) => m.emissiveColor.set(0.3 + neon * 1.0, 0.3 + neon * 1.0, 0.3 + neon * 1.0));
+    Object.values(spillMats).forEach((m) => m.emissiveColor.set(neon * 0.8, neon * 0.8, neon * 0.8));
+    warmMat.emissiveColor.set(0.15 + lamps * 1.35, 0.15 + lamps * 1.35, 0.15 + lamps * 1.2);
+    // soft bloom swells as the light goes
+    const bloom = baseBloom + 0.16 * Math.min(1, w.dusk * 0.6 + w.night);
+    if (pipeline && Math.abs(bloom - pipeline.bloomWeight) > 0.003) pipeline.bloomWeight = bloom;
+    state = { neon, glow: lamps, bloom };
+  }
+
+  return {
+    update,
+    info() {
+      return { ...stats, meshes: meshes.length, colliders: colliders.length, signKinds: SIGNS.length, lit: { ...state }, plaza: { ...R.plaza }, needle: { ...R.needle }, tank: { ...R.tank } };
+    },
+  };
+}

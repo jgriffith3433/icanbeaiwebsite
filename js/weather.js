@@ -258,6 +258,7 @@ export function startWeather(world, dayApi) {
     flashes: 0,
     particles: "off",
     puddles: 0,
+    reflect: 0,
   };
   let flash = 0;
   let nextFlash = 1.6;
@@ -757,8 +758,17 @@ export function startWeather(world, dayApi) {
     }
   }
 
-  function applyLook(L, dt) {
+  /* Reflections (clear coat on the road and the wet surfaces, the mirror puddles) show only while the weather
+     is an ability's: set by the player (keys 1–7, the wheel, Storm) and held after let-go. The forecast's rain
+     still darkens the road and falls, but doesn't shine. */
+  let abilityK = 0;
+  function applyLook(L, dt, snap) {
     windT += dt;
+    const isAbility = !!weather.now().manual;
+    abilityK = snap ? (isAbility ? 1 : 0) : abilityK + ((isAbility ? 1 : 0) - abilityK) * (1 - Math.exp(-Math.max(0, dt) / 1.2));
+    if (Math.abs(abilityK - (isAbility ? 1 : 0)) < 0.004) abilityK = isAbility ? 1 : 0;
+    const wetR = L.wet * abilityK;
+    live.reflect = wetR;
     const tod = scene.clearColor;
     scratch.tod.set(tod.r, tod.g, tod.b);
     scratch.tint.set(L.sky[0], L.sky[1], L.sky[2]);
@@ -793,7 +803,7 @@ export function startWeather(world, dayApi) {
         fogDensity: L.fog,
         exposure: targetExp,
         cover: L.cover,
-        wet: L.wet,
+        wet: wetR,
         rain: L.rain,
         storm: L.lightning,
         wind: L.wind,
@@ -807,22 +817,23 @@ export function startWeather(world, dayApi) {
     }
     if (roadMat && dryDiffuse) {
       const wet = L.wet;
-      const g = 0.04 + wet * 0.66;
+      const g = 0.04 + wetR * 0.66;
       const low = !!(world.look && world.look.quality && world.look.quality() === "low");
-      if (Math.abs(wet - (roadMat.__lastWet ?? -1)) > 0.005 || low !== roadMat.__lastLow) {
+      if (Math.abs(wet - (roadMat.__lastWet ?? -1)) > 0.005 || Math.abs(wetR - (roadMat.__lastWetR ?? -1)) > 0.005 || low !== roadMat.__lastLow) {
         roadMat.__lastWet = wet;
+        roadMat.__lastWetR = wetR;
         roadMat.__lastLow = low;
         if (roadIsPbr) {
           dryDiffuse.scaleToRef(1 - wet * 0.48, scratch.diff);
           scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
           if (!roadMat.albedoColor) roadMat.albedoColor = scratch.diff.clone();
           else roadMat.albedoColor.copyFrom(scratch.diff);
-          roadMat.roughness = Math.max(0.18, (dryRough == null ? 0.84 : dryRough) - wet * 0.58);
+          roadMat.roughness = Math.max(0.18, (dryRough == null ? 0.84 : dryRough) - wetR * 0.58);
           if (roadMat.clearCoat) {
-            const wantCoat = wet > 0.06 && !low;
+            const wantCoat = wetR > 0.06 && !low;
             if (roadMat.clearCoat.isEnabled !== wantCoat) roadMat.clearCoat.isEnabled = wantCoat;
-            roadMat.clearCoat.intensity = wet * 0.62;
-            roadMat.clearCoat.roughness = 0.12 + (1 - wet) * 0.18;
+            roadMat.clearCoat.intensity = wetR * 0.62;
+            roadMat.clearCoat.roughness = 0.12 + (1 - wetR) * 0.18;
           }
         } else {
           dryDiffuse.scaleToRef(1 - wet * 0.52, scratch.diff);
@@ -838,11 +849,11 @@ export function startWeather(world, dayApi) {
     const cam = scene.activeCamera;
     const px = cam && cam.target ? cam.target.x : 0;
     puddles.forEach((p) => {
-      const show = L.wet > 0.2;
+      const show = wetR > 0.2;
       p.mesh.setEnabled(show);
       p.mesh.position.x = px + p.dx;
       p.mesh.position.z = p.rz + p.dz;
-      p.mesh.material.alpha = show ? Math.min(0.78, 0.18 + L.wet * 0.56) : 0;
+      p.mesh.material.alpha = show ? Math.min(0.78, 0.18 + wetR * 0.56) : 0;
     });
     live.puddles = puddles.filter((p) => p.mesh.isEnabled()).length;
     if (canSway) {
@@ -922,7 +933,7 @@ export function startWeather(world, dayApi) {
     tickReact(c.mode, n, snap ? 0 : wall);
     const L = weather.look();
     try {
-      applyLook(L, wall);
+      applyLook(L, wall, snap);
     } catch (err) {
       console.error("[weather]", err);
     }
@@ -943,6 +954,7 @@ export function startWeather(world, dayApi) {
       flashes: live.flashes,
       particles: live.particles,
       puddles: live.puddles,
+      reflect: live.reflect || 0,
     });
   }
   const api = {
