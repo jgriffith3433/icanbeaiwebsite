@@ -8,6 +8,11 @@
    After let-go the set weather holds for a few real seconds, then drifts back.
    ========================================================================== */
 
+/* ---- tunables: weather is the player's, never the day's ---- */
+export const AUTOMATIC_WEATHER = false; // true brings back the date-seeded forecast (off: the sky is calm and clear)
+export const ABILITY_HOLD_SEC = 3; // real seconds an ability's weather lasts after its last call (and after let-go for keys 1–7)
+export const ABILITY_FADE_SEC = 2; // real seconds the sky takes to ease back to clear once that's over
+
 export const STATES = ["clear", "clouds", "rain", "storm", "fog", "wind", "snow"];
 
 export const STATE_NAMES = {
@@ -58,6 +63,7 @@ function makeRng(seed) {
 
 /** The weather his day has at this minute: same date, same answer. */
 export function forecastAt(dateKey, minutes, forecast) {
+  if (!AUTOMATIC_WEATHER) return { state: "clear", intensity: 1, slot: 0 };
   const hours = (forecast && forecast.hours) || 3;
   const weight = (forecast && forecast.weight) || DEFAULT_WEIGHT;
   const span = hours * 60;
@@ -123,8 +129,9 @@ function withIntensity(mixed, k) {
 export function createWeather(opt) {
   opt = opt || {};
   const blendSec = opt.blend > 0 ? opt.blend : 3.4;
-  const holdSec = opt.hold > 0 ? opt.hold : 24;
+  const holdSec = opt.hold > 0 ? opt.hold : ABILITY_HOLD_SEC;
   const tau = blendSec / 3;
+  const fadeTau = ABILITY_FADE_SEC / 3;
   const weights = {};
   STATES.forEach((s) => (weights[s] = s === "clear" ? 1 : 0));
   let target = "clear";
@@ -133,10 +140,12 @@ export function createWeather(opt) {
   let manual = false;
   let wasHeld = false;
   let holdLeft = 0;
+  let powerLeft = 0; // an ability's own weather: lasts ABILITY_HOLD_SEC from its last call, in control or not
   let lastForecast = { state: "clear", intensity: 1, slot: 0 };
 
   function step(dt, snap) {
-    const k = snap ? 1 : 1 - Math.exp(-Math.max(0, dt) / tau);
+    const fading = target === "clear" && !manual;
+    const k = snap ? 1 : 1 - Math.exp(-Math.max(0, dt) / (fading ? fadeTau : tau));
     for (const s of STATES) {
       const g = s === target ? 1 : 0;
       weights[s] += (g - weights[s]) * k;
@@ -185,7 +194,7 @@ export function createWeather(opt) {
       cover: L.cover,
       sound: Object.assign({}, L.sound),
       manual,
-      hold: holdLeft,
+      hold: Math.max(holdLeft, powerLeft),
       holdSec,
       forecast: lastForecast.state,
       forecastIntensity: lastForecast.intensity,
@@ -199,6 +208,7 @@ export function createWeather(opt) {
     if (via !== "forecast") {
       manual = true;
       holdLeft = 0;
+      powerLeft = via === "power" ? holdSec : 0;
       if (opt.onSet) opt.onSet({ state, intensity: targetIntensity, via: via || "set" });
     }
     return true;
@@ -217,6 +227,14 @@ export function createWeather(opt) {
       holdLeft = Math.max(0, holdLeft - Math.max(0, dt));
       if (holdLeft <= 0 && manual) {
         manual = false;
+        if (opt.onDrift) opt.onDrift({ from: target, to: lastForecast.state });
+      }
+    }
+    if (powerLeft > 0 && manual && !snap) {
+      powerLeft = Math.max(0, powerLeft - Math.max(0, dt));
+      if (powerLeft <= 0) {
+        manual = false;
+        holdLeft = 0;
         if (opt.onDrift) opt.onDrift({ from: target, to: lastForecast.state });
       }
     }

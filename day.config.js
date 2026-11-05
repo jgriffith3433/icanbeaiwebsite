@@ -213,18 +213,17 @@ window.DAY_CONFIG = {
   /* ------------------------------------------------------------------------
      WEATHER — the sky over his day, and what he commands while you have him
      ------------------------------------------------------------------------
-     With nobody in control, the day follows a forecast seeded by the date
-     (the same idea as `seed: "date"`): each 3-hour block is one state, the
-     same every time you open that date. Take control and 1–7, hold Q, or a
-     tap on a phone sets it; let go and that weather holds for `hold` real
-     seconds, then drifts back to the forecast. The blend is in real seconds.
+     The sky is calm and clear: nothing changes it on its own (the old
+     date-seeded forecast is off: AUTOMATIC_WEATHER in js/weather.js). Weather
+     starts only when a power is used (lightning, Storm) or he sets it (1–7,
+     hold Q, a tap), and a few real seconds after the last call it eases back. The blend is in real seconds.
      Lines are his, short, for the action log. `react` lines go in the log
      while autopilot still has the weather he left behind. Steps and pools
      can use `when: { weather: "rain" }` (or an array) against the forecast.
      ------------------------------------------------------------------------ */
   weather: {
     blend: 3.4,
-    hold: 22, // real seconds the player's weather lasts after let-go
+    // How long a power's weather lasts and how fast it eases out: ABILITY_HOLD_SEC / ABILITY_FADE_SEC at the top of js/weather.js.
     forecast: {
       hours: 3,
       weight: { clear: 26, clouds: 22, rain: 16, storm: 8, fog: 10, wind: 10, snow: 8 },
