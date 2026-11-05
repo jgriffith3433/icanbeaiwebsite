@@ -432,8 +432,38 @@ window.DAY_CONFIG = {
     strain: {
       costs: { rain: 1, gale: 1, sunbreak: 1, fog: 1, bolt: 2, gust: 1, tornado: 2, storm: 2 },
       stackSec: 60,
+      perHour: 1, // Strain falls by this much for each sim hour after the part that raised it
       scarPenalty: 25,
       lines: { clean: "Clean", scarred: "Scarred", meter: "Sky", of: "of" },
+    },
+    /* The ending card after Part 3: chosen from the three parts' marks and the Strain at the Tank (rules.calm /
+       rules.overcast). Same sky each time, different weather. `fared` is the line per need and state
+       (ok, scar, open = never answered). */
+    endings: {
+      rules: { calm: 6, overcast: 10 },
+      lines: { kicker: "How the district fared", tally: "Sky at the Tank", again: "Walk the city" },
+      needs: { park: "The park", turbines: "The turbines", market: "The market", reservoir: "The reservoir" },
+      fared: {
+        park: { ok: "Green. The pond is up a notch. Birdie's tomatoes are not sulking.", scar: "Green, with a brown patch and a pond that ran over the path.", open: "Still straw." },
+        turbines: { ok: "Turning. The roofs have power.", scar: "Turning, but a stall is down in the plaza and a blade shut itself.", open: "Still. Not one has turned." },
+        market: { ok: "Open. Stalls up, the plaza full.", scar: "Open, with a stall shut and some stock lost.", open: "Soft produce. Nothing to sell." },
+        reservoir: { ok: "Full, and holding.", scar: "Full, then the avenue flooded or the sky wouldn't stop.", open: "Still low." },
+      },
+      A: {
+        name: "Fair Weather",
+        scene: "Morning. The park is green, the turbines turn, the market is open, the Tank is full. Birdie waves from the bench. Ines is asleep on the annex roof with her chart.",
+        last: ["He", "Clear skies. He did that, and then stopped."],
+      },
+      B: {
+        name: "Heavy Weather",
+        scene: "The district has all four things, with scars: a brown patch on the lawn, a stall shut, a wet avenue. People nod to him on the street instead of speaking.",
+        last: ["He", "It worked. It cost."],
+      },
+      C: {
+        name: "Overcast",
+        scene: "The sky stays grey for a week. The Board's loudspeaker plays the Weather Warning on a loop. The neighbors watch from windows.",
+        last: ["He", "He asked the sky for everything. It's still thinking about it."],
+      },
     },
     /* Bands for the score card copy: "N% chance of <word>". */
     bands: [
@@ -638,6 +668,52 @@ window.DAY_CONFIG = {
           start: "The lot. Home is through what he makes.",
           done: "Home. The storm came with him.",
         },
+      },
+      /* Story arc, Part 3: the reservoir. The Storm Tank is low. Charge the mast with lightning, then bring
+         enough rain over it. Strain carries in from the earlier parts (falling an hour at a time), and the
+         total at the Tank decides how it ends: 6 or less it fills and holds, 7-9 it floods the avenue, 10 or more
+         the sky won't stop. Offered once Part 2 has been played; always in the Episodes menu. */
+      {
+        id: "low-tank",
+        part: 3,
+        afterPart: 2,
+        title: "Part 3: Low",
+        tagline: "Charge the Storm Tank's mast, then bring it just enough rain.",
+        chapters: ["bedtime"],
+        after: "22:20",
+        before: "23:30",
+        clock: "22:30",
+        timer: 300,
+        zones: { tank: { rect: [180, 34, 200, 54], pad: 12, name: "the Storm Tank" } },
+        gauge: { x: 190, z: 35.4, h: 10 },
+        strain: { budget: 6, costs: { bolt: 1, rain: 1, gale: 1, sunbreak: 1, fog: 1, gust: 1, tornado: 2, storm: 2 }, stackSec: 0 },
+        goals: [
+          { id: "charge", kind: "ability-in", power: "bolt", zone: "tank", count: 2, label: "Charge the mast: Lightning at the Tank (E)" },
+          { id: "fill", kind: "weather-time", states: ["rain"], zone: "tank", seconds: 5, after: "charge", label: "Rain on the Tank until the gauge fills (R)" },
+        ],
+        lines: {
+          start: "The Storm Tank. The gauge needle lies at the bottom.",
+          done: "The gauge is full. The Tank is quiet.",
+          scarred: "The gauge is full. The sky has opinions.",
+        },
+        say: {
+          start: [
+            ["Board", "Reservoir level: critical. Please. Anyone with weather."],
+            ["He", "Weather's here."],
+            ["Ines", "Not all at once. Charge the mast first."],
+          ],
+          "goal:charge": [["He", "Down it goes."]],
+          "edgy": [["Ines", "Enough now? It fills on kind weather."]],
+          "kick:flood": [["Board", "Avenue: flooded. Market: closed for the night."]],
+          "kick:overcast": [
+            ["Board", "Weather Warning. Please stay indoors."],
+            ["He", "It won't stop."],
+          ],
+          "end:clean": [["Board", "Reservoir level: full."], ["He", "Quiet."]],
+          "end:scarred": [["Board", "Reservoir level: full. And the sky is not done."]],
+        },
+        toasts: { "goal:charge": "The mast is charged.", "goal:fill": "The Tank is full." },
+        scars: { flood: "the avenue flooded, the market closed for the night", overcast: "the sky stays on and the Board warns the city" },
       },
       {
         id: "night",

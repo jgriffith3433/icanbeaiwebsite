@@ -12,6 +12,9 @@ import {
   recordBest,
   inZone,
   strainCost,
+  carryStrain,
+  pickEnding,
+  cityFared,
 } from "../js/episodes.js";
 
 const require = createRequire(import.meta.url);
@@ -32,10 +35,10 @@ const cfg = globalThis.DAY_CONFIG;
 ok(cfg && cfg.episodes, "day.config.js has no episodes section");
 const E = cfg.episodes;
 ok(E.storageKey === "icanbe.episodes.best", `storageKey is ${E.storageKey}`);
-ok(Array.isArray(E.list) && E.list.length === 7, `expected 7 episodes, got ${E.list && E.list.length}`);
+ok(Array.isArray(E.list) && E.list.length === 8, `expected 8 episodes, got ${E.list && E.list.length}`);
 
 const ids = E.list.map((e) => e.id);
-ok(ids.join(",") === "tutorial,morning,dry-park,lunch,still-blades,commute-home,night", `episode ids are ${ids.join(",")}`);
+ok(ids.join(",") === "tutorial,morning,dry-park,lunch,still-blades,commute-home,low-tank,night", `episode ids are ${ids.join(",")}`);
 
 const tut = E.list[0];
 ok(tut.tutorial && tut.id === "tutorial", "the tutorial is first in the list");
@@ -91,6 +94,32 @@ ok(!clean.scarred && /clean$/.test(clean.text), `a part under budget is clean: $
 ok(scar.scarred && /scarred$/.test(scar.text) && scar.pct === clean.pct - 25, `over budget is scarred and costs 25: ${scar.text}`);
 ok(scoreCard(3, 3, 100, 300, E.bands, { value: 3, budget: 4, kicks: 1 }).scarred, "a kick-back scars even inside the budget");
 ok(!/scarred|clean/.test(scoreCard(3, 3, 40, 150, E.bands).text), "episodes without strain keep the old card");
+
+// Story arc, Part 3 and the three endings
+const p3 = E.list.find((e) => e.id === "low-tank");
+ok(p3 && p3.part === 3 && p3.afterPart === 2 && p3.strain.budget === 6, "Part 3 is in the list, after Part 2, budget 6");
+ok(p3.goals.map((g) => g.id).join(",") === "charge,fill" && p3.gauge && p3.zones.tank, "Part 3 has charge and fill goals, a gauge and a tank zone");
+ok(inZone(p3.zones.tank, 190, 44) && !inZone(p3.zones.tank, 118, 26), "the tank zone has the Storm Tank");
+["start", "end:clean", "end:scarred", "edgy", "kick:flood", "kick:overcast"].forEach((k) => ok(Array.isArray(p3.say[k]) && p3.say[k].length, `low-tank: dialogue for ${k}`));
+ok(p3.say.start[0][1] === "Reservoir level: critical. Please. Anyone with weather.", "Part 3 opens with the Board's line from the sheet");
+const arcP2 = { parts: { 2: { strain: 7, at: 1000 } } };
+ok(!matchEpisode(E.list, "bedtime", clockMinutes("22:30")) || matchEpisode(E.list, "bedtime", clockMinutes("22:30")).id !== "low-tank", "Part 3 is not offered before Part 2 is played");
+ok(matchEpisode(E.list, "bedtime", clockMinutes("22:30"), { arc: arcP2 }).id === "low-tank", "Part 3 is offered at 22:30 once Part 2 is played");
+ok(matchEpisode(E.list, "bedtime", clockMinutes("22:10")).id === "night", "the light show still owns 22:10");
+ok(carryStrain({ parts: { 1: { strain: 4, at: 710 }, 2: { strain: 7, at: 1000 } } }, 1350, 3) === 1, "strain falls an hour at a time: 7 from 16:40 is 1 at 22:30, 4 from 11:50 is gone");
+ok(carryStrain({ parts: { 2: { strain: 7, at: 1000 } } }, 1000, 3) === 7, "no time has passed, no strain has fallen");
+const mk = (marks) => ({ parts: { 1: { scarred: marks[0] }, 2: { scarred: marks[1] }, 3: { scarred: marks[2] } } });
+ok(pickEnding(mk([false, false, false]), 5, E.endings.rules) === "A", "three clean parts, calm Tank: Fair Weather");
+ok(pickEnding(mk([false, false, false]), 7, E.endings.rules) === "B", "three clean parts, but the avenue flooded: Heavy Weather");
+ok(pickEnding(mk([true, false, false]), 4, E.endings.rules) === "B", "one scarred part: Heavy Weather");
+ok(pickEnding(mk([false, false, false]), 10, E.endings.rules) === "C", "strain 10 at the Tank: Overcast");
+ok(pickEnding(mk([true, true, true]), 3, E.endings.rules) === "C", "all three scarred: Overcast");
+ok(pickEnding({ parts: { 3: { scarred: false } } }, 3, E.endings.rules) === "B", "an unplayed part keeps it from Fair Weather");
+["A", "B", "C"].forEach((k) => ok(E.endings[k] && E.endings[k].name && E.endings[k].scene && E.endings[k].last.length === 2, `ending ${k} has a name, scene and last line`));
+ok(E.endings.A.last[1] === "Clear skies. He did that, and then stopped." && E.endings.B.last[1] === "It worked. It cost." && E.endings.C.last[0] === "He", "endings keep the sheet's last lines");
+const fa = cityFared({ parts: { 1: { goals: ["rain-park", "stalls"], kicks: ["flood"] }, 2: { goals: ["turn"], kicks: [] }, 3: { goals: ["charge", "fill"], kicks: [] } } }, E.endings.fared);
+ok(fa.map((f) => f.state).join(",") === "scar,ok,ok,ok" && fa.length === 4 && fa.every((f) => f.text && !/: (ok|scar|open)$/.test(f.text)), `the city fared: ${fa.map((f) => f.state)}`);
+ok(cityFared({ parts: {} }, E.endings.fared).every((f) => f.state === "open"), "nothing played, every need open");
 
 const card = scoreCard(3, 3, 40, 150, E.bands);
 ok(card.pct >= 90, `full clear should be awesome-ish, got ${card.pct}% ${card.word}`);
