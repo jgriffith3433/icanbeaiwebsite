@@ -147,6 +147,41 @@ ok(low.quality === 'low', `quality is ${low.quality}`);
   world.look.quality('high');
 }
 
+
+// reactions: ability weather moves the citizens, and they are back to routine soon after it clears
+{
+  settle(12.5);
+  let wx = { state: 'clear', manual: false, sun: 0, rain: 0, fog: 0, wind: 0, snow: 0, lightning: 0 };
+  globalThis.weather = { now: () => wx };
+  const base = crowd.info();
+  ok(base.reaction === '' && base.reacting === 0, 'reacting with a clear sky');
+  const cases = [
+    ['lookup', { state: 'storm', lightning: 0.8, rain: 0.6 }, (i) => i.lookingUp > 5],
+    ['rain', { state: 'rain', rain: 0.9 }, (i) => i.running > 5 && i.umbrellas > 5],
+    ['gale', { state: 'wind', wind: 0.9 }, (i) => i.hats > 5],
+    ['fog', { state: 'fog', fog: 0.05 }, (i) => i.reacting > 5],
+    ['sun', { state: 'clear', sun: 0.9 }, (i) => i.cheering > 5],
+  ];
+  for (const [kind, w, seen] of cases) {
+    wx = { state: 'clear', manual: true, sun: 0, rain: 0, fog: 0, wind: 0, snow: 0, lightning: 0, ...w };
+    run(1.2);
+    const i = crowd.info();
+    ok(i.reaction === kind, `${kind}: reaction is "${i.reaction}"`);
+    ok(seen(i), `${kind}: citizens did not react (${JSON.stringify({ r: i.reacting, l: i.lookingUp, h: i.hats, c: i.cheering, u: i.umbrellas })})`);
+    wx = { state: 'clear', manual: false, sun: 0, rain: 0, fog: 0, wind: 0, snow: 0, lightning: 0 };
+    run(1.3);
+    const back = crowd.info();
+    ok(back.reaction === '' && back.reacting === 0, `${kind}: still reacting 1.3 s after it cleared (${back.reacting})`);
+  }
+  // fog slows the cars
+  settle(8.5);
+  const v0 = crowd.info().carSpeed;
+  wx = { state: 'fog', manual: true, sun: 0, rain: 0, fog: 0.05, wind: 0, snow: 0, lightning: 0 };
+  run(6);
+  ok(crowd.info().carSpeed < v0 * 0.9, `fog did not slow the cars (${v0} -> ${crowd.info().carSpeed})`);
+  delete globalThis.weather;
+}
+
 // the sim itself is cheap
 const t0 = performance.now();
 settle(8.5);

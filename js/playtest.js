@@ -361,6 +361,82 @@ async function roofBolt(t) {
   t.event(strike && onRoof ? "smoke-pass" : "smoke-fail", "city loaded, Small Weather shown, rooftop, one bolt");
 }
 
+/* ---------------- crowd-reacts: citizens answer each ability's weather, then go back to routine ---------------- */
+async function crowdReacts(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const P = window.powers || (window.day && window.day.powers);
+  const W = window.weather || (window.day && window.day.weather);
+  const C = window.day.control;
+  await t.until(() => window.day.crowd, 8000, "the crowd (js/crowd.js)");
+  const crowd = window.day.crowd;
+  if (!P || !W || !C) {
+    t.problem("bug", "powers, weather or Take control isn't installed");
+    return;
+  }
+  // setup shortcut: the clock to lunch, when the sidewalks are full
+  scrubTo(12.4 * 60);
+  clickSpeed(1);
+  await sleep(1500);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const calm = () => {
+    const n = W.now();
+    return n.state === "clear" && n.rain < 0.05 && n.fog < 0.015 && n.wind < 0.2 && n.sun < 0.05;
+  };
+  await t.until(calm, 6000, "a calm sky to start").catch(() => {});
+  await sleep(1500);
+  const base = crowd.info();
+  t.event("crowd-routine", `${base.people} people, ${base.cars} cars, ${base.reacting} reacting, car speed ${base.carSpeed.toFixed(1)} m/s`);
+  const cases = [
+    { id: "bolt", key: "e", kind: "lookup", count: (i) => i.lookingUp, what: "stop and look up at the flash" },
+    { id: "rain", key: "r", kind: "rain", count: (i) => i.running, what: "run for cover (umbrellas up, the rest into doorways)" },
+    { id: "gale", key: "v", kind: "gale", count: (i) => i.hats, what: "lean into the wind with a hand on the hat" },
+    { id: "fog", key: "c", kind: "fog", count: (i) => i.reacting, what: "slow down; traffic crawls", cars: true },
+    { id: "sunbreak", key: "x", kind: "sun", count: (i) => i.cheering, what: "stroll and cheer, hands up" },
+  ];
+  let reacted = 0;
+  let n = 0;
+  for (const c of cases) {
+    n++;
+    t.scene(`Citizens: ${c.id}`);
+    t.progress(0.1 + 0.16 * n);
+    const cost = (P.now().abilities.find((x) => x.id === c.id) || {}).cost || 20;
+    await t.until(() => P.now().energy + 0.05 >= cost, 15000, `Energy for ${c.id}`).catch(() => {});
+    await t.until(calm, 10000, "a calm sky").catch(() => {});
+    await t.until(() => crowd.info().reacting === 0, 6000, "the crowd back to routine").catch(() => {});
+    const before = crowd.info();
+    pressKey(c.key);
+    let peak = before;
+    let best = 0;
+    const t0 = Date.now();
+    while (Date.now() - t0 < 3500) {
+      await sleep(250);
+      const i = crowd.info();
+      if (c.count(i) > best) { best = c.count(i); peak = i; }
+      if (best >= 8 && (!c.cars || i.carSpeed < before.carSpeed * 0.9)) break;
+    }
+    const carNote = c.cars ? `, car speed ${before.carSpeed.toFixed(1)} -> ${peak.carSpeed.toFixed(1)} m/s` : "";
+    if (peak.reaction === c.kind && best >= 5) {
+      reacted++;
+      t.event(`react-${c.id}`, `${best} of ${peak.people} citizens ${c.what}${carNote}`);
+    } else t.problem("bug", `${c.id}: the citizens didn't react (${peak.reaction || "no reaction"}, ${best} reacting of ${peak.people})`);
+    t.metric(`reacting-${c.id}`, best);
+    // the ability weather ends; they should be back to routine within seconds
+    const t1 = Date.now();
+    const back = await t.until(() => calm() && crowd.info().reacting === 0 && crowd.info().reaction === "", 14000, `${c.id}: back to routine`).then(() => true).catch(() => false);
+    const secs = (Date.now() - t1) / 1000;
+    const after = crowd.info();
+    if (back) t.event(`routine-${c.id}`, `routine again ${secs.toFixed(1)} s after the call: ${after.walking} walking, ${after.cars} cars at ${after.carSpeed.toFixed(1)} m/s`);
+    else t.problem("bug", `${c.id}: the citizens were still reacting ${secs.toFixed(0)} s later (${after.reacting})`);
+  }
+  t.metric("reactedAbilities", reacted);
+  if (reacted >= 4) t.event("crowd-reacts-pass", `${reacted} of 5 abilities changed what the citizens do, and each ended with the weather`);
+  else t.problem("bug", `Only ${reacted} abilities changed the citizens' behaviour`);
+  pressKey("Escape");
+}
+
 /* ---------------- weather-abilities: rain, gale, fog, sun break and lightning, one call each ---------------- */
 async function weatherAbilities(options, t) {
   t.scene("Outside");
@@ -3208,6 +3284,7 @@ installPlaytest({
   scenarios: [
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
+    { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
@@ -3246,6 +3323,7 @@ installPlaytest({
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-abilities") await weatherAbilities(options, t);
+      else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
