@@ -1995,6 +1995,9 @@
         bedroomLight: (roomLights.find((rl) => rl.id === "bedroom") || {}).light || null,
       },
       enablePhysics,
+      /* js/cityscape.js reads the colliders so far (to find free lots) and adds its own before physics is on */
+      solids,
+      addSolids: (list) => list.forEach((o) => solids.push(o)),
       groundAt,
       physics: () => physics,
       resize() {

@@ -1386,6 +1386,87 @@ async function look(options, t) {
   t.progress(1);
 }
 
+/* ---------------- photos: the dense city at several spots, noon then dusk then night, with the frame rate ---------------- */
+// Setup shortcuts: the day bar to the car and to the hour. Real input: Enter, then WASD with Shift along the avenue.
+// Each stop is a "photo" (scene + event); the frame time is sampled over 1.5 s at each, so the review has
+// photo-fps from the footage and the timeline. Windows and street lamps are read from day.cityscape.info().
+async function photos(options, t) {
+  t.scene("Home street");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.cityscape, 8000, "the city's density (js/cityscape.js)");
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) {
+    t.problem("bug", "No moment beside the car to stand in the street");
+    return;
+  }
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  await sleep(500);
+  const C = window.day.control;
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  const cs = window.day.cityscape;
+  const info0 = cs.info();
+  t.metric("cityFillers", info0.fillers);
+  t.metric("cityTall", info0.tall);
+  t.metric("cityLamps", info0.lamps);
+  t.metric("cityCrossings", info0.crossings);
+  if (info0.fillers < 80 || info0.lamps < 40 || info0.crossings < 8) t.problem("bug", `The city is thin: ${JSON.stringify(info0)}`);
+  const fpsAll = [];
+  async function photo(name, eventName) {
+    t.scene(name);
+    await sleep(700);
+    const samples = [];
+    const obs = world().scene.onAfterRenderObservable.add(() => samples.push(world().engine.getDeltaTime()));
+    await sleep(1500);
+    world().scene.onAfterRenderObservable.remove(obs);
+    const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
+    const fps = avg ? 1000 / avg : 0;
+    fpsAll.push(fps);
+    const i = cs.info();
+    const st = C.state();
+    t.event(eventName, `${name} at ${st.x.toFixed(0)},${st.z.toFixed(0)}: ${fps.toFixed(0)} fps, windows ${i.lit.windows.toFixed(2)}, shops ${i.lit.shops.toFixed(2)}, lamps ${i.lit.lamps.toFixed(2)}, ${i.fillers} fillers`);
+    return i;
+  }
+  const noonStops = [[18, "Noon, the avenue by his place"], [58, "Noon, the shops"], [100, "Noon, downtown crossing"], [150, "Noon, towards the office"]];
+  scrubTo(12 * 60);
+  await sleep(1200);
+  const first = await photo("Noon, home", "photo-noon");
+  if (first.lit.windows > 0.1) t.problem("bug", `Windows are lit at noon (${first.lit.windows.toFixed(2)})`);
+  let k = 0;
+  for (const [x, name] of noonStops) {
+    const ok = await goTo(x, street.z - 3.2, t, { sprint: true, progress: 0.1 + 0.1 * k, ms: 30000 });
+    if (!ok) t.problem("warning", `He didn't reach x ${x} (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+    await photo(name, "photo-noon");
+    k++;
+  }
+  scrubTo(18 * 60 + 30);
+  await sleep(1500);
+  const dusk = await photo("Dusk, windows and lamps coming on", "photo-dusk");
+  if (dusk.lit.windows < 0.25) t.problem("bug", `Windows didn't come on at dusk (${dusk.lit.windows.toFixed(2)})`);
+  if (dusk.lit.lamps < 0.25) t.problem("bug", `Street lamps didn't come on at dusk (${dusk.lit.lamps.toFixed(2)})`);
+  await goTo(C.state().x - 30, street.z - 3.2, t, { sprint: true, progress: 0.7, ms: 20000 });
+  await photo("Dusk, back along the avenue", "photo-dusk");
+  scrubTo(21 * 60 + 30);
+  await sleep(1500);
+  const night = await photo("Night, the lit city", "photo-night");
+  if (night.lit.windows < 0.85) t.problem("bug", `Windows aren't fully lit at night (${night.lit.windows.toFixed(2)})`);
+  if (night.lit.lamps < 0.85) t.problem("bug", `Street lamps aren't fully lit at night (${night.lit.lamps.toFixed(2)})`);
+  await goTo(C.state().x - 40, street.z - 3.2, t, { sprint: true, progress: 0.9, ms: 20000 });
+  await photo("Night, the avenue", "photo-night");
+  const min = Math.min(...fpsAll);
+  const avg = fpsAll.reduce((a, b) => a + b, 0) / fpsAll.length;
+  t.metric("photoFpsMin", Math.round(min * 10) / 10);
+  t.metric("photoFpsAvg", Math.round(avg * 10) / 10);
+  t.event("photo-fps", `${fpsAll.length} photos: ${avg.toFixed(0)} fps on average, ${min.toFixed(0)} at the worst`);
+  if (min < 10) t.problem("bug", `A photo ran at ${min.toFixed(1)} fps`);
+  else if (avg < 20) t.problem("warning", `The photos averaged ${avg.toFixed(1)} fps`);
+  t.progress(1);
+}
+
 /* ---------------- weather: every state, blended, and the road goes wet in the rain ---------------- */
 // Real input: the day bar to the door (setup), Enter, WASD out to the avenue, the Sound button,
 // keys 1–7, hold Q and a wedge, then the phone's Weather button. Each state gets a scene once it has settled.
@@ -2662,6 +2743,7 @@ installPlaytest({
     { id: "storm-ride", title: "Storm-riding: hold Space in the air to glide with wind trails; a Gust updraft lifts him from the street to rooftop height; glide apt roof to shop roof without touching the ground", seconds: 240, tags: ["control", "powers"], description: "Day bar beside the car. Storm weather (4), real keys for glide, G for updraft, climb apt then glide to shop." },
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
+    { id: "photos", title: "Photos of the dense city: noon at five spots along the avenue, dusk (windows and street lamps come on), night; frame rate at each", seconds: 120, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, then WASD with Shift east along the avenue. Events photo-noon / photo-dusk / photo-night / photo-fps; metrics photoFpsMin, photoFpsAvg, cityFillers, cityLamps." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
@@ -2684,6 +2766,7 @@ installPlaytest({
       else if (id === "model") await model(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
+      else if (id === "photos") await photos(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
