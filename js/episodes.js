@@ -217,16 +217,46 @@ export function recordBest(key, id, card, store) {
   const best = loadBest(key, store);
   const prev = best[id];
   const cleared = !!(card.cleared || (prev && prev.cleared));
+  const done = !!(card.done || cleared || (prev && (prev.done || prev.cleared)));
   if (!prev || (card.pct | 0) > (prev.pct | 0)) {
-    best[id] = { pct: card.pct, word: card.word, text: card.text, scarred: !!card.scarred, rank: card.rank || null, points: card.points == null ? null : card.points, cleared, when: Date.now() };
+    best[id] = { pct: card.pct, word: card.word, text: card.text, scarred: !!card.scarred, rank: card.rank || null, points: card.points == null ? null : card.points, cleared, done, when: Date.now() };
     saveBest(key, best, store);
     return { best, improved: true };
   }
-  if (cleared && !prev.cleared) {
-    prev.cleared = true;
+  if ((cleared && !prev.cleared) || (done && !prev.done)) {
+    prev.cleared = cleared;
+    prev.done = done;
     saveBest(key, best, store);
   }
   return { best, improved: false };
+}
+
+/** An episode counts as finished once a run reached its end (a clear, time up or scarred), not a let-go. */
+export function episodeDone(best, id) {
+  const b = best && best[id];
+  return !!(b && (b.done || b.cleared));
+}
+
+/** The playable episodes in menu order (the tutorial is always open and is not part of the chain). */
+export function chainOf(list) {
+  return (Array.isArray(list) ? list : []).filter((e) => e && e.id && !e.tutorial);
+}
+
+/** Why an episode is locked: the title of the episode before it that is not finished yet, or null when it is open.
+    The first one is always open; each later one opens when the one before it is finished. */
+export function episodeLock(list, best, id) {
+  const chain = chainOf(list);
+  const i = chain.findIndex((e) => e.id === id);
+  if (i <= 0) return null;
+  const prev = chain[i - 1];
+  return episodeDone(best, prev.id) ? null : prev.title || prev.id;
+}
+
+/** The episode after `id` in the chain, or null at the end. */
+export function nextEpisode(list, id) {
+  const chain = chainOf(list);
+  const i = chain.findIndex((e) => e.id === id);
+  return i >= 0 && i < chain.length - 1 ? chain[i + 1] : null;
 }
 
 /** The Challenge is open once the episode has been cleared (every goal done) in the normal mode. */
@@ -345,6 +375,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-panel .breakdown i{display:block;height:6px;border-radius:3px;background:rgba(246,241,232,.14);overflow:hidden}
 .ep-panel .breakdown i b{display:block;height:100%;background:#f0c27a}
 .ep-panel .breakdown em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums}
+.ep-panel .nextline{margin:8px 0 0;font-size:.82rem;color:rgba(246,241,232,.55)}
+.ep-panel button[disabled]{opacity:.45;cursor:default}
+.ep-menu .ep-row.locked{opacity:.5;cursor:default}
+.ep-menu .ep-row .rk{display:inline-block;min-width:1.2em;margin-right:6px;font-weight:800;color:#f0c27a}
+.ep-menu .ep-list{max-height:min(60vh,520px);overflow:auto}
 .ep-panel .unlockline{margin:6px 0 0;font-size:.9rem;color:#9fd4ff;font-weight:700}
 .ep-menu .ep-row.chal{padding-left:24px;border-style:dashed}
 .ep-menu .ep-row.chal[disabled]{opacity:.45;cursor:default}
@@ -387,7 +422,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   scoreEl.id = "episode-score";
   scoreEl.className = "ep-score";
   scoreEl.hidden = true;
-  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="rank" hidden></p><p class="rankdetail" hidden></p><ul class="breakdown" hidden></ul><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><p class="unlockline" hidden></p><div class="actions"><button type="button" class="primary ok">OK</button></div></div>`;
+  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="rank" hidden></p><p class="rankdetail" hidden></p><ul class="breakdown" hidden></ul><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><p class="unlockline" hidden></p><div class="actions"><button type="button" class="primary next">Next episode</button><button type="button" class="replay">Replay</button><button type="button" class="ok">OK</button></div><p class="nextline" hidden></p></div>`;
 
   const endEl = document.createElement("div");
   endEl.id = "ending-card";
@@ -440,6 +475,10 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   const scoreBreak = scoreEl.querySelector(".breakdown");
   const scoreUnlock = scoreEl.querySelector(".unlockline");
   const scoreOk = scoreEl.querySelector(".ok");
+  const scoreNext = scoreEl.querySelector(".next");
+  const scoreReplay = scoreEl.querySelector(".replay");
+  const scoreNextLine = scoreEl.querySelector(".nextline");
+  let lastRun = null; // { id, challenge } of the run the card shows
   const menuList = menu.querySelector(".ep-list");
   const endKicker = endEl.querySelector(".kicker");
   const endTitle = endEl.querySelector("h2");
@@ -1393,6 +1432,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     card.rank = sb.rank;
     card.points = sb.points;
     card.cleared = why === "clear" || (why !== "time" && why !== "let-go" && allDone(run));
+    card.done = why === "clear" || why === "time" || why === "scarred" || card.cleared;
+    lastRun = { id: run.ep.id, challenge: !!run.ep.challengeOn };
     const bestId = run.ep.challengeOn ? run.ep.id + "#challenge" : run.ep.id;
     const prevBest = loadBest(storageKey)[bestId];
     const rec = recordBest(storageKey, bestId, card);
@@ -1473,6 +1514,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     const unlocked = !run.ep.challengeOn && card.cleared && !(prevBest && prevBest.cleared) && run.ep.id !== "tutorial";
     scoreUnlock.hidden = !unlocked;
     scoreUnlock.textContent = unlocked ? (scoring.unlockLine || "Challenge unlocked. Find it in the Episodes menu.") : "";
+    paintScoreButtons(why);
     scoreEl.hidden = false;
     mark("score", { id: run.ep.id, challenge: !!run.ep.challengeOn, cleared: card.cleared, unlocked, best: b ? b.rank : null, parts: sb.rows.map((r) => r.id + ":" + r.points).join(","), variety: sb.used.join(","), rank: card.rank || null, points: card.points == null ? null : card.points, helped: run.rescue ? run.rescue.helped : null, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved, scarred: card.scarred, strain: run.strain, kicks: run.kicks.slice(), scars });
     endQuiet();
@@ -1513,6 +1555,30 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     storyEvent("ending", { ending: id, name: e.name, tank, fared: fared.map((f) => ({ need: f.need, state: f.state })) });
     return { id, name: e.name, fared };
   }
+  /* Replay and Next episode on the score card. Next shows what it opens, or why it is shut. */
+  function paintScoreButtons(why) {
+    const best = loadBest(storageKey);
+    const base = lastRun && list.find((e) => e.id === lastRun.id);
+    const nxt = base && !base.tutorial ? nextEpisode(list, base.id) : null;
+    const lock = nxt ? episodeLock(list, best, nxt.id) : null;
+    const hold = !!pendingEnding; // the ending card comes first; its button is the way on
+    scoreReplay.hidden = !base || hold;
+    scoreNext.hidden = !!lastRun && lastRun.challenge ? true : hold || !nxt;
+    scoreNext.disabled = !!lock;
+    scoreNext.textContent = nxt && !lock ? `Next: ${nxt.title}` : "Next episode";
+    scoreNextLine.hidden = !(nxt && lock) || scoreNext.hidden;
+    scoreNextLine.textContent = lock ? `Next episode is locked. Finish ${lock} first.` : "";
+    scoreEl.dataset.next = nxt && !lock && !scoreNext.hidden ? nxt.id : "";
+  }
+  /* Jump the clock to an episode's chapter, take control and start it (the menu, Replay and Next all go this way). */
+  function launch(ep, opts) {
+    if (day.jump && ep.clock) day.jump(ep.clock);
+    const C = day.control;
+    setTimeout(() => {
+      if (C && C.mode && C.mode() === "schedule") C.take();
+      start(ep, "menu", opts);
+    }, 120);
+  }
   function hideScore() {
     scoreEl.hidden = true;
     if (pendingEnding) {
@@ -1532,20 +1598,24 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ep-row";
+      btn.id = "ep-row-" + ep.id;
       const b = best[ep.id];
-      btn.innerHTML = `<strong>${ep.title}</strong><small>${ep.tagline || ""}${b ? ` · ${L.best} ${b.rank ? "rank " + b.rank + " · " : ""}${b.pct}%` : ""}</small>`;
+      const lock = ep.tutorial ? null : episodeLock(list, best, ep.id);
+      btn.dataset.locked = lock ? "1" : "0";
+      btn.dataset.rank = b && b.rank ? b.rank : "";
+      btn.innerHTML = lock
+        ? `<strong>${ep.title}</strong><small>Locked · finish ${lock} first</small>`
+        : `<strong>${b && b.rank ? `<span class="rk">${b.rank}</span>` : ""}${ep.title}</strong><small>${ep.tagline || ""}${b ? ` · ${L.best} ${b.rank ? "rank " + b.rank + " · " : ""}${b.pct}%${episodeDone(best, ep.id) ? " · finished" : ""}` : ""}</small>`;
+      if (lock) {
+        btn.disabled = true;
+        btn.classList.add("locked");
+      }
       btn.addEventListener("click", () => {
         hideMenu();
-        if (day.jump && ep.clock) day.jump(ep.clock);
-        const C = day.control;
-        const go = () => {
-          if (C && C.mode && C.mode() === "schedule") C.take();
-          start(ep, "menu");
-        };
-        setTimeout(go, 120);
+        launch(ep);
       });
       menuList.appendChild(btn);
-      if (ep.tutorial) return;
+      if (ep.tutorial || (btn.disabled && btn.classList.contains("locked"))) return;
       const ch = challengeEp(ep, cfg.challenge);
       const open = challengeOpen(best, ep.id);
       const cb = document.createElement("button");
@@ -1559,12 +1629,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       if (!open) cb.disabled = true;
       cb.addEventListener("click", () => {
         hideMenu();
-        if (day.jump && ep.clock) day.jump(ep.clock);
-        const C = day.control;
-        setTimeout(() => {
-          if (C && C.mode && C.mode() === "schedule") C.take();
-          start(ep, "menu", { challenge: true });
-        }, 120);
+        launch(ep, { challenge: true });
       });
       menuList.appendChild(cb);
     });
@@ -1604,6 +1669,21 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (active && active.ep.tutorial) finish("skip");
   });
   scoreOk.addEventListener("click", hideScore);
+  scoreReplay.addEventListener("click", () => {
+    const base = lastRun && list.find((e) => e.id === lastRun.id);
+    if (!base || pendingEnding) return;
+    scoreEl.hidden = true;
+    mark("replay", { id: base.id, challenge: lastRun.challenge });
+    launch(base, lastRun.challenge ? { challenge: true } : undefined);
+  });
+  scoreNext.addEventListener("click", () => {
+    const base = lastRun && list.find((e) => e.id === lastRun.id);
+    const nxt = base && nextEpisode(list, base.id);
+    if (!nxt || pendingEnding || episodeLock(list, loadBest(storageKey), nxt.id)) return;
+    scoreEl.hidden = true;
+    mark("next", { id: nxt.id, from: base.id });
+    launch(nxt);
+  });
   scoreEl.addEventListener("click", (e) => {
     if (e.target === scoreEl) hideScore();
   });
@@ -1860,6 +1940,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         : null,
     offer: () => (offerEp ? { id: offerEp.id, title: offerEp.title } : null),
     best: () => loadBest(storageKey),
+    lock: (id) => episodeLock(list, loadBest(storageKey), id),
     challenge: (id) => challengeOpen(loadBest(storageKey), id),
     score: () => (active && !active.ep.tutorial ? liveScore(active) : null),
     tutorial: () => ({ done: tutorialDone(), key: tutKey }),

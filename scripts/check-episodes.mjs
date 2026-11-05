@@ -20,6 +20,9 @@ import {
   rankOf,
   challengeEp,
   challengeOpen,
+  episodeDone,
+  episodeLock,
+  nextEpisode,
 } from "../js/episodes.js";
 
 const require = createRequire(import.meta.url);
@@ -227,6 +230,20 @@ recordBest("k", "morning", { pct: 40, word: "drama", text: "x", rank: "C", clear
 ok(challengeOpen(loadBest("k", m2), "morning") && loadBest("k", m2).morning.rank === "B", "a clear unlocks it and keeps the better rank");
 recordBest("k", "morning", { pct: 30, word: "drizzle", text: "x", rank: "C", cleared: false }, m2);
 ok(challengeOpen(loadBest("k", m2), "morning"), "the unlock stays");
+
+// Progress: each episode opens when the one before it is finished
+const chain = E.list.filter((e) => !e.tutorial);
+const cb = {};
+ok(episodeLock(E.list, cb, chain[0].id) === null, "the first episode is always open");
+ok(episodeLock(E.list, cb, chain[1].id) === chain[0].title, "the second is locked until the first is finished");
+const m3 = { v: "", getItem() { return this.v || null; }, setItem(k, v) { this.v = v; } };
+recordBest("k", chain[0].id, { pct: 10, word: "drizzle", text: "x", rank: "C", cleared: false, done: false }, m3);
+ok(episodeLock(E.list, loadBest("k", m3), chain[1].id) !== null, "a let-go run does not unlock the next");
+recordBest("k", chain[0].id, { pct: 5, word: "drizzle", text: "x", rank: "C", cleared: false, done: true }, m3);
+ok(episodeDone(loadBest("k", m3), chain[0].id) && episodeLock(E.list, loadBest("k", m3), chain[1].id) === null, "a run that reached its end unlocks the next, even a poor one");
+ok(episodeLock(E.list, loadBest("k", m3), chain[2].id) !== null, "the one after that stays locked");
+ok(nextEpisode(E.list, chain[0].id).id === chain[1].id && nextEpisode(E.list, chain[chain.length - 1].id) === null, "nextEpisode follows the list and stops at the end");
+ok(episodeLock(E.list, {}, "tutorial") === null, "unknown or tutorial ids are never locked");
 
 ok(clockMinutes("7:55") === 7 * 60 + 55, "clockMinutes 7:55");
 ok(clockMinutes("18:00") === 18 * 60, "clockMinutes 18:00");
