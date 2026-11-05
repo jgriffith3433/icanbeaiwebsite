@@ -30,12 +30,18 @@ const cfg = globalThis.DAY_CONFIG;
 ok(cfg && cfg.episodes, "day.config.js has no episodes section");
 const E = cfg.episodes;
 ok(E.storageKey === "icanbe.episodes.best", `storageKey is ${E.storageKey}`);
-ok(Array.isArray(E.list) && E.list.length === 4, `expected 4 episodes, got ${E.list && E.list.length}`);
+ok(Array.isArray(E.list) && E.list.length === 5, `expected 5 episodes, got ${E.list && E.list.length}`);
 
 const ids = E.list.map((e) => e.id);
-ok(ids.join(",") === "morning,lunch,commute-home,night", `episode ids are ${ids.join(",")}`);
+ok(ids.join(",") === "tutorial,morning,lunch,commute-home,night", `episode ids are ${ids.join(",")}`);
 
-E.list.forEach((ep) => {
+const tut = E.list[0];
+ok(tut.tutorial && tut.id === "tutorial", "the tutorial is first in the list");
+ok(tut.goals.map((g) => g.power).join(",") === "bolt,rain,gale,fog,sunbreak", "the tutorial teaches the five abilities in order");
+tut.goals.forEach((g, i) => ok(g.kind === "ability" && g.prompt && g.label && (i === 0 ? !g.after : g.after === tut.goals[i - 1].id), `tutorial goal ${g.id}: kind, prompt, label and a chain`));
+ok(!matchEpisode(E.list, "ready", clockMinutes("7:55")).tutorial, "the tutorial is never matched by chapter");
+
+E.list.filter((e) => !e.tutorial).forEach((ep) => {
   ok(ep.title && ep.tagline, `${ep.id}: needs title and tagline`);
   ok(Array.isArray(ep.chapters) && ep.chapters.length, `${ep.id}: needs chapters`);
   ok(ep.clock, `${ep.id}: needs a clock jump`);

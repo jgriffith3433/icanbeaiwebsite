@@ -2781,6 +2781,105 @@ async function episodes(options, t) {
   t.progress(1);
 }
 
+/* ---------------- tutorial episode: five abilities, one at a time, a toast each, skippable ---------------- */
+// Needs ?playtest=tutorial-episode (the offer is only made by itself for a player or this scenario).
+async function tutorialEpisode(options, t) {
+  t.scene("Learn the weather");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  if (!Ep || !C) {
+    t.problem("bug", "There's no episodes API or Take control");
+    return;
+  }
+  const cfg = window.DAY_CONFIG.episodes;
+  const tut = cfg.list[0];
+  if (!tut || !tut.tutorial) t.problem("bug", "The tutorial isn't first in the episode list");
+  try { localStorage.removeItem(cfg.tutorialKey || "icanbe.episodes.tutorial"); } catch (e) { /* ignore */ }
+  const quiet = quietMoment(window.day.today());
+  if (quiet) {
+    scrubTo(quiet.start + Math.min(0.4, (quiet.end - quiet.start) / 3));
+    await sleep(400);
+  }
+  const A = () => window.powers.abilities;
+  const slotState = (id) => ($("ability-" + id) || {}).dataset && $("ability-" + id).dataset.state;
+
+  async function takeAndAccept() {
+    if (C.mode() !== "control") pressKey("Enter");
+    await t.until(() => C.mode() === "control", 5000, "Take control");
+    await sleep(400);
+    const offer = $("episode-offer");
+    if (!offer || offer.hidden) {
+      t.problem("bug", "Taking control didn't offer the tutorial episode");
+      Ep.start("tutorial", "playtest");
+    } else {
+      t.event("tutorial-offer", (offer.querySelector("h2") || {}).textContent || "offered");
+      offer.querySelector("button.accept").click();
+    }
+    await t.until(() => Ep.now() && Ep.now().id === "tutorial", 4000, "the tutorial running");
+  }
+
+  await takeAndAccept();
+  const hud = $("episode-hud");
+  if (!hud || hud.hidden) t.problem("bug", "The tutorial has no HUD");
+  const skipBtn = hud && hud.querySelector(".skip");
+  if (!skipBtn || skipBtn.hidden) t.problem("bug", "The tutorial has no Skip button");
+  else t.event("tutorial-skip-ready", "Skip is on the tutorial card");
+
+  const order = tut.goals.map((g) => g.power);
+  const keys = { bolt: "e", rain: "r", gale: "v", fog: "c", sunbreak: "x" };
+  for (let i = 0; i < order.length; i++) {
+    const id = order[i];
+    const goal = tut.goals[i];
+    // Exactly the abilities before this one are open.
+    await t.until(() => Ep.now() && Ep.now().unlocked.indexOf(id) >= 0, 4000, `${id} to unlock`).catch(() => {});
+    const toastEl = $("ability-toast");
+    const open = Ep.now() ? Ep.now().unlocked.join(",") : "";
+    if (open !== order.slice(0, i + 1).join(",")) t.problem("bug", `Open abilities are [${open}] but should be [${order.slice(0, i + 1).join(",")}]`);
+    if (!toastEl || !toastEl.classList.contains("on") || !/New ability/.test(toastEl.textContent)) t.problem("bug", `No unlock toast for ${id}`);
+    else t.event("unlock-toast", `${id}: ${toastEl.textContent}`);
+    if (i + 1 < order.length && slotState(order[i + 1]) !== "locked") t.problem("bug", `${order[i + 1]} should still be locked`);
+    const prompt = Ep.now() && Ep.now().prompt;
+    if (!prompt) t.problem("bug", `No prompt for ${id}`);
+    else t.event("tutorial-prompt", `${id}: ${prompt}`);
+    if (i === 1) {
+      // A locked ability refuses, changes nothing.
+      const before = window.powers.now().energy;
+      tapKey("v", 120);
+      await sleep(300);
+      if (window.powers.abilities.get("gale").uses > 0) t.problem("bug", "Gale worked while locked");
+      else t.event("locked-refused", "Gale (V) is refused before it unlocks");
+      void before;
+    }
+    for (let k = 0; k < 6 && !(Ep.now() && Ep.now().goals[i].done); k++) {
+      await tapKey(keys[id], 140);
+      await sleep(900);
+    }
+    if (!(Ep.now() ? Ep.now().goals[i].done : true)) t.problem("bug", `Goal "${goal.label}" never completed`);
+    else t.event("tutorial-goal", goal.label);
+    t.progress(0.1 + (i + 1) * 0.12);
+  }
+  await t.until(() => !Ep.now(), 4000, "the tutorial to finish");
+  const left = A().now().abilities.filter((a) => a.locked);
+  if (left.length) t.problem("bug", `${left.length} abilities still locked after the tutorial`);
+  else t.event("all-unlocked", "every ability is open at the end");
+  if (!/done/.test(localStorage.getItem(cfg.tutorialKey || "icanbe.episodes.tutorial") || "")) t.problem("bug", "The finished tutorial wasn't remembered");
+
+  // Skip: start it again from the menu path, skip at once.
+  t.scene("Skip");
+  Ep.start("tutorial", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "tutorial", 3000, "the tutorial again");
+  if (!A().now().abilities.some((a) => a.locked)) t.problem("bug", "Restarting the tutorial didn't lock abilities");
+  $("episode-hud").querySelector(".skip").click();
+  await sleep(300);
+  if (Ep.now()) t.problem("bug", "Skip didn't end the tutorial");
+  else if (A().now().abilities.some((a) => a.locked)) t.problem("bug", "Skip left abilities locked");
+  else t.event("tutorial-skipped", "Skip ends it and opens every ability");
+  pressKey("Escape");
+  t.progress(1);
+}
+
 /* ---------------- first visit: the tutorial, then every phone control, then the player events ---------------- */
 function boxesOverlap(a, b) {
   const pad = 2;
@@ -2988,6 +3087,7 @@ installPlaytest({
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
+    { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
   async start(id, options, t) {
@@ -3013,6 +3113,7 @@ installPlaytest({
       else if (id === "voice") await voice(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "first-visit") await firstVisit(options, t);
+      else if (id === "tutorial-episode") await tutorialEpisode(options, t);
     } finally {
       releaseHeld();
       stopWatching();

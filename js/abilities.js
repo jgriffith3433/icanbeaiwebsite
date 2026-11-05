@@ -19,6 +19,7 @@ export function createAbilities(opt) {
   let clock = 0;
   const list = [];
   const byId = {};
+  const locked = new Set(); // ids the player hasn't unlocked yet (the tutorial episode); empty = everything open
 
   function register(def) {
     if (!def || !def.id) throw new Error("an ability needs an id");
@@ -45,10 +46,11 @@ export function createAbilities(opt) {
     energy = Math.min(max, energy + (rate || 0) * dt);
   }
 
-  /** Why `id` can't be used right now: "unknown", "cooldown" or "energy"; null when it can. */
+  /** Why `id` can't be used right now: "unknown", "locked", "cooldown" or "energy"; null when it can. */
   function why(id) {
     const a = byId[id];
     if (!a) return "unknown";
+    if (locked.has(id)) return "locked";
     if (clock < a.readyAt - 1e-6) return "cooldown";
     if (energy < a.cost - 1e-4) return "energy";
     return null;
@@ -79,6 +81,7 @@ export function createAbilities(opt) {
       fraction: a.cooldown > 0 ? Math.min(1, left / a.cooldown) : 0, // 1 just used, 0 ready
       active: clock < a.activeUntil,
       affordable: energy >= a.cost - 1e-4,
+      locked: locked.has(a.id),
       ready: !why(a.id),
       uses: a.uses,
     };
@@ -97,7 +100,16 @@ export function createAbilities(opt) {
     if (toEnergy != null) energy = Math.max(0, Math.min(max, toEnergy));
   }
 
-  return { register, step, use, why, now, reset, get: (id) => byId[id] && view(byId[id]), ids: () => list.map((a) => a.id) };
+  /** Lock these ids (all of them when none are given), or open one / all. */
+  function lock(ids) {
+    (ids || list.map((a) => a.id)).forEach((id) => locked.add(id));
+  }
+  function unlock(id) {
+    if (id == null) locked.clear();
+    else locked.delete(id);
+  }
+
+  return { lock, unlock, isLocked: (id) => locked.has(id), register, step, use, why, now, reset, get: (id) => byId[id] && view(byId[id]), ids: () => list.map((a) => a.id) };
 }
 
 /** The on-screen row. Returns { paint(visible), el }. No DOM in the tests: it returns a no-op. */
@@ -118,6 +130,8 @@ export function startAbilityBar(abilities, onPress) {
 .abilitybar .ab.cooling .cd{display:flex}
 .abilitybar .ab.poor{border-color:rgba(196,85,74,.7)}
 .abilitybar .ab.poor .k{color:#e08a80}
+.abilitybar .ab.locked{opacity:.38;border-style:dashed;filter:grayscale(1)}
+.abilitybar .ab.unlocked-now{border-color:#f0c27a;box-shadow:0 0 14px rgba(240,194,122,.9)}
 .abilitybar .ab.active{border-color:#fff;box-shadow:0 0 12px rgba(126,200,255,.9)}
 .abilitybar .energy{width:100%;min-width:230px}
 .abilitybar .energy .bar{margin-top:3px;height:8px;border-radius:99px;background:rgba(8,12,20,.55);border:1px solid rgba(126,200,255,.45);overflow:hidden}
@@ -170,11 +184,12 @@ html.touch-ui .abilitybar{display:none}
       if (!slots[id]) slot(a);
       const sl = slots[id];
       sl.b.classList.toggle("cooling", a.remaining > 0.05);
-      sl.b.classList.toggle("poor", !a.affordable);
+      sl.b.classList.toggle("locked", a.locked);
+      sl.b.classList.toggle("poor", !a.affordable && !a.locked);
       sl.b.classList.toggle("active", a.active);
       sl.sweep.style.height = Math.round(a.fraction * 100) + "%";
       sl.cd.textContent = a.remaining > 0.05 ? a.remaining.toFixed(a.remaining < 10 ? 1 : 0) : "";
-      sl.b.dataset.state = a.remaining > 0.05 ? "cooldown" : a.affordable ? "ready" : "energy";
+      sl.b.dataset.state = a.locked ? "locked" : a.remaining > 0.05 ? "cooldown" : a.affordable ? "ready" : "energy";
     });
     en.setAttribute("aria-valuemax", String(s.max));
     en.setAttribute("aria-valuenow", String(Math.round(s.energy)));
