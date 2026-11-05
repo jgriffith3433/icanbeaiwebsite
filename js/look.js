@@ -519,7 +519,8 @@ export function installLook(world) {
   function applyQuality(level, via) {
     quality = level === "low" ? "low" : "high";
     const low = quality === "low";
-    try { localStorage.setItem("icanbe.quality", quality); } catch (e) { /* private mode */ }
+    // only a choice the player made is kept: the automatic picks must stay automatic on the next visit
+    if (via === "click" || via === "api") { try { localStorage.setItem("icanbe.quality", quality); } catch (e) { /* private mode */ } }
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     engine.setHardwareScalingLevel(low ? 1 : 1 / Math.min(dpr, 1.5));
     if (pipeline) {
@@ -645,6 +646,21 @@ export function installLook(world) {
   }
   mountButton();
   applyQuality(quality);
+  /* Quality scale for weaker devices: when nobody chose a level, a page that runs slowly for a few seconds drops
+     itself to low once (never saved, never back up, so the picture can't flicker between the two). */
+  {
+    let ms = 0, n = 0, warm = 0;
+    const watch = scene.onAfterRenderObservable.add(() => {
+      const bot = typeof navigator !== "undefined" && navigator.webdriver; // a playtest's picture must not change under it
+      if (bot || qualityPick.how !== "auto" || quality === "low") { scene.onAfterRenderObservable.remove(watch); return; }
+      warm += engine.getDeltaTime();
+      if (warm < 5000 || (typeof document !== "undefined" && document.hidden)) return;
+      ms += Math.min(engine.getDeltaTime(), 250);
+      if (++n < 120) return;
+      if (ms / n > 45) { applyQuality("low", "auto"); scene.onAfterRenderObservable.remove(watch); }
+      else { ms = 0; n = 0; }
+    });
+  }
   if (world.freezeStaticMeshes) world.freezeStaticMeshes();
 
   const api = {
