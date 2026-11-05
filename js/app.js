@@ -21,6 +21,7 @@ import "./score.js"; // weather music beds, sampled ambience, take-control sting
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
 import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
+import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
 import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause perf & leak monitor (window.hawkesPerf)
 import HavokPhysics from "@babylonjs/havok";

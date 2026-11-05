@@ -82,6 +82,12 @@
     const d = e.detail || {};
     if (d.action === "play") feature("voice", { id: d.id, group: d.group, via: d.via });
   }));
+  // Neighbors (js/neighbors.js): a beat starts, is answered, pays a reward.
+  window.addEventListener("day:neighbor", safe((e) => {
+    const d = (e && e.detail) || {};
+    feature("neighbor", { action: d.action, id: d.id, beat: d.beat, kind: d.kind, score: d.score });
+  }));
+
   // Chapter episodes (js/episodes.js): offer, start, goals, score card.
   window.addEventListener("day:episode", safe((e) => {
     const d = e.detail || {};

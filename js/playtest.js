@@ -437,6 +437,120 @@ async function crowdReacts(options, t) {
   pressKey("Escape");
 }
 
+/* ---------------- neighbors: find three neighbors, answer their asks, collect thank-yous and surprises ---------------- */
+// Setup shortcuts: the day bar (to the morning, then to each surprise's hour) and Take control beside the car.
+// Everything else is real keys: WASD/Shift to walk the sidewalk to each neighbor, then R, X, E for what they ask.
+async function neighborsScenario(options, t) {
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  await t.until(() => window.day.neighbors, 8000, "the neighbors (js/neighbors.js)");
+  const N = window.day.neighbors;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const day = window.day.today();
+  if (!N || !C || !P) {
+    t.problem("bug", "neighbors, powers or Take control isn't installed");
+    return;
+  }
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const sideZ = street.z - 2.8;
+  const roster = N.now().people;
+  if (roster.length === 3) t.event("neighbors-three", roster.map((p) => `${p.name} (${p.parts} parts, ${p.look})`).join("; "));
+  else t.problem("bug", `${roster.length} neighbors, wanted 3`);
+  const who = (id) => N.now().people.find((p) => p.id === id);
+  const toast = () => $("neighbor-toast");
+
+  // setup: the clock beside the car, then Take control
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) {
+    t.problem("bug", "No moment beside the car to take control");
+    return;
+  }
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const setClock = async (hour, why) => {
+    scrubTo(hour * 60);
+    clickSpeed(1);
+    await sleep(700);
+    t.event("clock", `${why}: ${E().fmtClock(hour * 60)}`);
+    if (C.mode() !== "control") {
+      pressKey("Enter");
+      await t.until(() => C.mode() === "control", 4000, "Take control again");
+    }
+  };
+  await setClock(8 + 10 / 60, "morning");
+
+  // walk the sidewalk (real keys) to a spot, in hops so the stair ramps and cross streets are no trap
+  async function walkTo(x, z, progress) {
+    await goTo(C.state().x, sideZ, t, { sprint: true, progress, ms: 12000, close: 1.2 });
+    for (let k = 0; k < 14; k++) {
+      const s = C.state();
+      if (Math.abs(s.x - x) < 1.6) break;
+      const nx = s.x + Math.max(-22, Math.min(22, x - s.x));
+      if (!(await goTo(nx, sideZ, t, { sprint: true, progress, ms: 14000, close: 1.2 }))) break;
+    }
+    return goTo(x, z, t, { progress, ms: 8000, close: 1.4 });
+  }
+  async function visit(id, x, z, key, scene, progress) {
+    t.scene(scene);
+    const spot = await walkTo(x, z, progress);
+    const me = C.state();
+    const p = who(id);
+    if (!spot) t.problem("bug", `${id}: he didn't reach ${x},${z} (at ${me.x.toFixed(1)},${me.z.toFixed(1)})`);
+    const dist = Math.hypot(p.x - me.x, p.z - me.z);
+    if (dist < 10) t.event(`found-${id}`, `${p.name} found ${dist.toFixed(1)} m away at ${p.x.toFixed(1)},${p.z.toFixed(1)}`);
+    else t.problem("bug", `${p.name} isn't where the finder says (${dist.toFixed(0)} m)`);
+    const asked = await t.until(() => who(id).asking, 5000, `${id}'s request`).then(() => true).catch(() => false);
+    if (!asked) return t.problem("bug", `${p.name} never asked (stage ${who(id).stage})`);
+    t.event(`beat-ask-${id}`, `"${who(id).bubble}"`);
+    await sleep(900);
+    const ab = (window.DAY_CONFIG.neighbors.list.find((n) => n.id === id).beats[0] || {}).ability;
+    const cost = (P.now().abilities.find((a) => a.id === ab) || {}).cost || 20;
+    await t.until(() => P.now().energy + 0.05 >= cost, 20000, `Energy for ${ab}`).catch(() => {});
+    const before = N.now().score;
+    pressKey(key);
+    const paid = await t.until(() => N.now().score > before, 7000, `${id}'s thank-you`).then(() => true).catch(() => false);
+    if (paid) {
+      t.event(`beat-thanks-${id}`, `"${who(id).bubble}" — ${toast().textContent}`);
+      t.event(`reward-${id}`, `score ${before} -> ${N.now().score}, ${who(id).stars}, toast "${toast().textContent}" ${toast().classList.contains("on") ? "showing" : "gone"}`);
+      await sleep(1200);
+    } else t.problem("bug", `${p.name}: using ${ab} didn't pay a reward (stage ${who(id).stage}, score ${N.now().score})`);
+    await t.until(() => (P.now().abilities.find((a) => a.id === ab) || {}).cooldown <= 0, 12000, "cooldown").catch(() => {});
+  }
+  async function surprise(id, hour, x, z, scene, progress) {
+    t.scene(scene);
+    await setClock(hour, `${id}'s surprise`);
+    if (Math.hypot(who(id).x - C.state().x, who(id).z - C.state().z) > 8) await walkTo(x, z, progress);
+    const before = N.now().score;
+    const ok = await t.until(() => N.now().score > before, 9000, `${id}'s surprise`).then(() => true).catch(() => false);
+    if (ok) t.event(`beat-surprise-${id}`, `"${who(id).bubble}" — ${toast().textContent}; score ${before} -> ${N.now().score}`);
+    else t.problem("bug", `${who(id).name}'s surprise never came (hour ${hour}, ${Math.hypot(who(id).x - C.state().x, who(id).z - C.state().z).toFixed(0)} m away)`);
+    await sleep(1000);
+  }
+
+  await visit("birdie", -24.5, 9.6, "r", "Birdie, the apt block", 0.12);
+  await visit("dex", 43.2, 9.9, "x", "Dex, the shop", 0.3);
+  await surprise("dex", 16.5, 43.2, 9.9, "Dex, late afternoon", 0.4);
+  await surprise("birdie", 17.4, -24.5, 9.6, "Birdie, evening", 0.5);
+  await setClock(17.6, "evening");
+  await visit("quill", 151.5, 9.9, "e", "Ines Quill, the annex", 0.7);
+  await surprise("quill", 21, 151.5, 9.9, "Ines Quill, night", 0.9);
+
+  const fin = N.now();
+  const done = fin.people.reduce((n, p) => n + p.done.length, 0);
+  t.metric("neighborBeats", done);
+  t.metric("neighborScore", fin.score);
+  if (done >= 9 && fin.people.every((p) => p.done.length >= 2)) t.event("neighbors-pass", `${done} beats across 3 neighbors, good-neighbor score ${fin.score}`);
+  else t.problem("bug", `Only ${done} neighbor beats were completed (${fin.people.map((p) => p.id + ":" + p.done.length).join(" ")})`);
+  pressKey("Escape");
+}
+
 /* ---------------- weather-abilities: rain, gale, fog, sun break and lightning, one call each ---------------- */
 async function weatherAbilities(options, t) {
   t.scene("Outside");
@@ -3285,6 +3399,7 @@ installPlaytest({
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
+    { id: "neighbors", title: "Walk the avenue to Birdie, Dex and Ines Quill: each asks for a weather ability in a speech bubble, answering it pays a thank-you and a reward, and a later surprise pays more", seconds: 260, tags: ["neighbors", "story"], description: "Day bar beside the car (setup), Enter, then real WASD/Shift to each neighbor and R, X, E for their asks; the day bar jumps to each surprise hour. Events found-<id>, beat-ask-<id>, beat-thanks-<id>, reward-<id>, beat-surprise-<id>." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
@@ -3323,6 +3438,7 @@ installPlaytest({
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-abilities") await weatherAbilities(options, t);
+      else if (id === "neighbors") await neighborsScenario(options, t);
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
