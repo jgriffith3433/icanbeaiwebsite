@@ -3108,6 +3108,163 @@ async function episodes(options, t) {
   t.progress(1);
 }
 
+/* ---------------- story parts: Part 1 (Dry) and Part 2 (Still) of the beat sheet, with overuse ---------------- */
+// Setup shortcuts: the day bar to a moment outdoors, the Pressure meter topped up, and starting each part by its
+// API (the Episodes menu would jump the clock into the office). Everything else is real keys: Enter, WASD with
+// Shift, R, X and V, Esc. Events: story-* with the dialogue as it is spoken, the Strain meter, kick-backs, the cards.
+async function storyParts(options, t) {
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  const cfg = window.DAY_CONFIG;
+  const list = (cfg.episodes && cfg.episodes.list) || [];
+  const p1 = list.find((e) => e.id === "dry-park");
+  const p2 = list.find((e) => e.id === "still-blades");
+  if (!p1 || !p2) return t.problem("bug", "Parts 1 and 2 aren't in the episode list");
+  t.event("story-list", list.map((e) => e.title).join(" | "));
+  const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
+  const heard = [];
+  const onStory = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "say") {
+      heard.push(d);
+      t.event("story-say", `${d.who}: ${d.text}`);
+    }
+    if (d.action === "kick") t.event("story-kick", `${d.kick} at strain ${d.strain}`);
+  };
+  window.addEventListener("day:story", onStory);
+  try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
+
+  const day = window.day.today();
+  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+
+  // The menu lists both parts.
+  const menuBtn = $("episodes");
+  if (menuBtn) {
+    menuBtn.click();
+    await sleep(300);
+    const rows = [...document.querySelectorAll("#episode-menu .ep-row")].map((r) => r.textContent);
+    if (rows.some((r) => /Part 1/.test(r)) && rows.some((r) => /Part 2/.test(r))) t.event("story-menu", rows.filter((r) => /Part [12]/.test(r)).join(" | "));
+    else t.problem("bug", "The Episodes menu doesn't list Part 1 and Part 2");
+    const close = document.querySelector("#episode-menu button.close");
+    if (close) close.click();
+  }
+
+  const refill = () => { if (P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  async function walkTo(x, z, progress) {
+    await goTo(C.state().x, sideZ, t, { sprint: true, progress, ms: 12000, close: 1.2 });
+    for (let k = 0; k < 14; k++) {
+      const s = C.state();
+      if (Math.abs(s.x - x) < 1.6) break;
+      const nx = s.x + Math.max(-22, Math.min(22, x - s.x));
+      if (!(await goTo(nx, sideZ, t, { sprint: true, progress, ms: 14000, close: 1.2 }))) break;
+    }
+    return goTo(x, z, t, { progress, ms: 8000, close: 1.4 });
+  }
+  const goalDone = (id) => { const n = Ep.now(); return !!(n && n.goals.some((g) => g.id === id && g.done)); };
+  const lastSay = () => ($("episode-say") || {}).textContent || "";
+  async function card(label) {
+    await t.until(() => !$("episode-score").hidden, 8000, `${label}: the score card`);
+    const el = $("episode-score");
+    const text = (el.querySelector(".forecast") || {}).textContent || "";
+    const strain = (el.querySelector(".strainline") || {}).textContent || "";
+    t.event("story-card", `${label}: ${text} | ${strain}`);
+    await sleep(1600); // a beat for the footage
+    el.querySelector("button.ok").click();
+    return { text, strain, scarred: /scarred/.test(text) };
+  }
+  async function press(key, wait) { pressKey(key); await sleep(wait || 600); }
+
+  /* ---- Part 1, overused: three rains on the park go past the budget of 4 ---- */
+  t.scene("Part 1: the park, overused");
+  Ep.start("dry-park", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "dry-park", 3000, "Part 1 running");
+  if (!$("episode-hud") || $("episode-hud").hidden) t.problem("bug", "The episode HUD isn't up for Part 1");
+  await sleep(2500);
+  t.event("story-dialogue", `Part 1 opens: "${lastSay()}"`);
+  if (!(await walkTo(-6, 24.5, 0.1))) t.problem("bug", "He didn't reach the park bench");
+  refill();
+  await press("r", 900);
+  await t.until(() => goalDone("rain-park"), 5000, "the rain-on-the-park goal");
+  t.event("story-goal", "Part 1: rain on the park done, strain " + Ep.story().strain);
+  for (let i = 0; i < 2; i++) {
+    await sleep(4300);
+    refill();
+    await press("r", 700);
+    t.event("story-strain", `rain again: strain ${Ep.story().strain} of ${Ep.story().budget}`);
+  }
+  await t.until(() => Ep.story() && Ep.story().kicks.includes("flood"), 4000, "the pond overflowing").catch(() => t.problem("bug", "Overusing rain never flooded the path"));
+  await sleep(2500);
+  Ep.end("overuse");
+  const over = await card("Part 1 overused");
+  if (!over.scarred) t.problem("bug", `Overusing rain on the park left the card ${over.text}`);
+
+  /* ---- Part 1, clean: one rain on the park, one sun break on the market, stay while it fills ---- */
+  t.scene("Part 1: the park and the market");
+  Ep.start("dry-park", "playtest");
+  await sleep(300);
+  refill();
+  await press("r", 900);
+  await t.until(() => goalDone("rain-park"), 5000, "rain on the park (clean run)");
+  await sleep(2500);
+  t.event("story-dialogue", `After the rain: "${lastSay()}"`);
+  if (!(await walkTo(117, 27.5, 0.4))) t.problem("bug", "He didn't reach the plaza");
+  refill();
+  await press("x", 900);
+  await t.until(() => goalDone("sun-market"), 5000, "sun break over the market");
+  t.event("story-goal", "Part 1: sun break on the market done");
+  await t.until(() => goalDone("stalls"), 40000, "the stalls to fill (20 s in the plaza)");
+  const clean = await card("Part 1 clean");
+  if (clean.scarred) t.problem("bug", `A clean Part 1 came out ${clean.text}`);
+  if (over.text === clean.text) t.problem("bug", "Overuse and clean left the same card");
+
+  /* ---- Part 2: wind for the turbines, not for the stalls ---- */
+  t.scene("Part 2: the market stalls");
+  Ep.start("still-blades", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "still-blades", 3000, "Part 2 running");
+  await sleep(2200);
+  t.event("story-dialogue", `Part 2 opens: "${lastSay()}"`);
+  if (!(await walkTo(117, 27.5, 0.6))) t.problem("bug", "He didn't reach the plaza for the test gale");
+  refill();
+  await press("v", 1500);
+  const topple = Ep.story();
+  if (topple && topple.toppled > 0) t.event("story-kick", `a gale in the plaza toppled a stall: ${topple.stalls.join(",")}`);
+  else t.problem("bug", "A gale in the plaza left every stall standing");
+  await sleep(2500);
+  t.scene("Part 2: the annex roof");
+  if (!(await walkTo(154, 9.8, 0.75))) t.problem("bug", "He didn't reach Ines");
+  await t.until(() => goalDone("ines"), 4000, "finding Ines");
+  await sleep(2600);
+  t.event("story-dialogue", `Ines: "${lastSay()}"`);
+  for (let i = 0; i < 5 && !goalDone("turn") && Ep.now(); i++) {
+    refill();
+    await press("v", 3200);
+    const st = Ep.story();
+    if (st) t.event("story-wind", `gale ${i + 1}: ${st.windSec.toFixed(1)} s of 10, strain ${st.strain} of ${st.budget}, blades ${st.turbine.toFixed(1)} rad/s`);
+    await sleep(2200);
+  }
+  const scarred = await card("Part 2");
+  if (!scarred.scarred) t.problem("bug", `Toppling a stall didn't scar Part 2: ${scarred.text}`);
+  if (!heard.some((h) => /Seventeen blades/.test(h.text)) || !heard.some((h) => /Reservoir level: critical/.test(h.text))) t.problem("bug", "Part 2's dialogue from the beat sheet didn't play");
+  await sleep(4000); // the hand-off lines
+  window.removeEventListener("day:story", onStory);
+  t.event("story-lines", `${heard.length} lines spoken`);
+  t.progress(1);
+}
+
 /* ---------------- tutorial episode: five abilities, one at a time, a toast each, skippable ---------------- */
 // Needs ?playtest=tutorial-episode (the offer is only made by itself for a player or this scenario).
 async function tutorialEpisode(options, t) {
@@ -3417,6 +3574,7 @@ installPlaytest({
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
+    { id: "story-parts", title: "Story Parts 1 and 2 as episodes: rain on the park (not the market), sun break and the stalls; overusing rain floods the park and scars the card; Part 2 wind for the turbines, a gale in the plaza topples a stall; neighbor dialogue from the beat sheet", seconds: 420, tags: ["episodes", "story"], description: "Day bar to a moment outdoors (setup), Enter, the parts started by their API (setup) and Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza and the annex, R, X and V. Events story-list / story-menu / story-say / story-goal / story-strain / story-kick / story-wind / story-card (clean vs scarred)." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
@@ -3445,6 +3603,7 @@ installPlaytest({
       else if (id === "powers") await powers(options, t);
       else if (id === "voice") await voice(options, t);
       else if (id === "episodes") await episodes(options, t);
+      else if (id === "story-parts") await storyParts(options, t);
       else if (id === "first-visit") await firstVisit(options, t);
       else if (id === "tutorial-episode") await tutorialEpisode(options, t);
     } finally {

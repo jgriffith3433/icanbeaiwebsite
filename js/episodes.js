@@ -33,8 +33,31 @@ export function matchEpisode(list, chapter, minutes, opt) {
   return null;
 }
 
-/** Forecast-style score: percent + band word from day.config.js bands. */
-export function scoreCard(done, total, left, timer, bands) {
+/** Is (x, z) inside a zone { rect: [x0, z0, x1, z1], pad }? */
+export function inZone(zone, x, z) {
+  if (!zone || !zone.rect) return false;
+  const r = zone.rect;
+  const pad = zone.pad || 0;
+  return x >= r[0] - pad && x <= r[2] + pad && z >= r[1] - pad && z <= r[3] + pad;
+}
+
+/** What one weather call adds to the Strain meter: its cost, doubled if the same call came inside stackSec. */
+export function strainCost(cfg, power, lastAt, now) {
+  const base = (cfg && cfg.costs && cfg.costs[power]) != null ? cfg.costs[power] : 1;
+  const stack = (cfg && cfg.stackSec) || 60;
+  return lastAt != null && now - lastAt <= stack ? base * 2 : base;
+}
+
+function wordFor(pct, bands) {
+  const list = Array.isArray(bands) && bands.length ? bands : [{ min: 0, word: "weather" }];
+  for (let i = 0; i < list.length; i++) if (pct >= (list[i].min | 0)) return list[i].word;
+  return list[list.length - 1].word;
+}
+
+/** Forecast-style score: percent + band word from day.config.js bands.
+    `story` = { value, budget, kicks, penalty } for the arc's parts: over the budget (or any kick-back)
+    the part is scarred: the percent drops and the card says so. */
+export function scoreCard(done, total, left, timer, bands, story) {
   const n = Math.max(1, total | 0);
   const d = Math.max(0, Math.min(n, done | 0));
   let pct = Math.round((100 * d) / n);
@@ -44,20 +67,21 @@ export function scoreCard(done, total, left, timer, bands) {
   } else if (timer > 0 && left <= 0 && d < n) {
     pct = Math.max(0, pct - 8);
   }
-  const list = Array.isArray(bands) && bands.length ? bands : [{ min: 0, word: "weather" }];
-  let word = list[list.length - 1].word;
-  for (let i = 0; i < list.length; i++) {
-    if (pct >= (list[i].min | 0)) {
-      word = list[i].word;
-      break;
-    }
+  let scarred = false;
+  if (story) {
+    scarred = story.value > story.budget || (story.kicks | 0) > 0;
+    if (scarred) pct = Math.max(0, pct - (story.penalty != null ? story.penalty : 25));
   }
+  const word = wordFor(pct, bands);
   return {
     pct,
     word,
-    text: `Today's forecast: ${pct}% chance of ${word}`,
+    text: `Today's forecast: ${pct}% chance of ${word}` + (story ? (scarred ? " · scarred" : " · clean") : ""),
     done: d,
     total: n,
+    scarred,
+    strain: story ? story.value : 0,
+    budget: story ? story.budget : 0,
   };
 }
 
@@ -90,7 +114,7 @@ export function recordBest(key, id, card, store) {
   const best = loadBest(key, store);
   const prev = best[id];
   if (!prev || (card.pct | 0) > (prev.pct | 0)) {
-    best[id] = { pct: card.pct, word: card.word, text: card.text, when: Date.now() };
+    best[id] = { pct: card.pct, word: card.word, text: card.text, scarred: !!card.scarred, when: Date.now() };
     saveBest(key, best, store);
     return { best, improved: true };
   }
@@ -167,6 +191,17 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-hud .prompt{margin:8px 0 0;color:#f0c27a}
 .ep-hud .skip{margin-top:8px;appearance:none;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.8rem Outfit,system-ui,sans-serif;cursor:pointer}
 .ep-hud .skip:hover{background:rgba(240,194,122,.14)}
+.ep-hud li.failed{color:#e58a7a;text-decoration:line-through}
+.ep-hud .strain{margin-top:8px;color:#9fd4ff}
+.ep-hud .strain.over{color:#e58a7a}
+.ep-hud .strain i{display:block;height:5px;margin-top:3px;border-radius:3px;background:rgba(159,212,255,.18);overflow:hidden}
+.ep-hud .strain b{display:block;height:100%;background:#9fd4ff;border-radius:3px}
+.ep-hud .strain.over b{background:#e58a7a}
+.ep-say{position:fixed;z-index:22;left:50%;bottom:max(96px,calc(env(safe-area-inset-bottom) + 88px));transform:translate(-50%,8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:min(520px,calc(100vw - 28px));padding:10px 16px;border-radius:14px;background:#f6f1e8;color:#1a1c22;font:600 0.9rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.ep-say.on{opacity:1;transform:translate(-50%,0)}
+.ep-say b{display:block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#7a5a1a;margin-bottom:2px}
+.ep-panel .strainline{font-size:.9rem;color:#9fd4ff;margin:0 0 10px}
+.ep-score.scarred .forecast,.ep-score.scarred .strainline{color:#e58a7a}
 .ep-toast{position:fixed;z-index:9;left:50%;top:max(64px,calc(env(safe-area-inset-top) + 56px));transform:translate(-50%,-8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(14,16,22,.9);border:1px solid #f0c27a;color:#f6f1e8;font:600 0.95rem Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap;max-width:calc(100vw - 24px)}
 .ep-toast.on{opacity:1;transform:translate(-50%,0)}
 .ep-offer,.ep-score,.ep-menu{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
@@ -195,7 +230,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   hud.id = "episode-hud";
   hud.className = "ep-hud";
   hud.hidden = true;
-  hud.innerHTML = `<div class="ep-card"><h3></h3><p class="tag"></p><ul></ul><div class="timer" hidden></div><div class="cue" hidden></div><p class="prompt" hidden></p><button type="button" class="skip" hidden>Skip</button></div>`;
+  hud.innerHTML = `<div class="ep-card"><h3></h3><p class="tag"></p><ul></ul><div class="timer" hidden></div><div class="strain" hidden></div><div class="cue" hidden></div><p class="prompt" hidden></p><button type="button" class="skip" hidden>Skip</button></div>`;
 
   const offer = document.createElement("div");
   offer.id = "episode-offer";
@@ -207,7 +242,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   scoreEl.id = "episode-score";
   scoreEl.className = "ep-score";
   scoreEl.hidden = true;
-  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="forecast"></p><p class="detail"></p><p class="bestline"></p><div class="actions"><button type="button" class="primary ok">OK</button></div></div>`;
+  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><div class="actions"><button type="button" class="primary ok">OK</button></div></div>`;
 
   const menu = document.createElement("div");
   menu.id = "episode-menu";
@@ -221,13 +256,20 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   toast.setAttribute("role", "status");
   toast.setAttribute("aria-live", "polite");
 
-  document.body.append(menuBtn, hud, offer, scoreEl, menu, toast);
+  const say = document.createElement("div");
+  say.id = "episode-say";
+  say.className = "ep-say";
+  say.setAttribute("role", "status");
+  say.setAttribute("aria-live", "polite");
+
+  document.body.append(menuBtn, hud, offer, scoreEl, menu, toast, say);
 
   const hudTitle = hud.querySelector("h3");
   const hudTag = hud.querySelector(".tag");
   const hudList = hud.querySelector("ul");
   const hudTimer = hud.querySelector(".timer");
   const hudCue = hud.querySelector(".cue");
+  const hudStrain = hud.querySelector(".strain");
   const hudPrompt = hud.querySelector(".prompt");
   const hudSkip = hud.querySelector(".skip");
   const offerTitle = offer.querySelector("h2");
@@ -239,6 +281,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   const scoreForecast = scoreEl.querySelector(".forecast");
   const scoreDetail = scoreEl.querySelector(".detail");
   const scoreBest = scoreEl.querySelector(".bestline");
+  const scoreStrain = scoreEl.querySelector(".strainline");
   const scoreOk = scoreEl.querySelector(".ok");
   const menuList = menu.querySelector(".ep-list");
   const menuClose = menu.querySelector(".close");
@@ -264,7 +307,116 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     props.mats = { rod, lit, junk };
     return props.mats;
   }
-  function clearProps() {
+  /* ---- story props (Parts 1 and 2): market stalls, roof turbines, scorch and flood patches ---- */
+  const story = { stalls: [], turbines: [], patches: [], spin: 0, turned: false };
+  const STALL_AT = [[109, 20.4], [114, 20.4], [123, 20.4], [127.5, 20.4], [118, 33.4]];
+  const STALL_COLORS = ["#d9604a", "#e0a53c", "#4f9a5b", "#4a7fc0", "#a65bb5"];
+  function smat(name, hex, emissive) {
+    const m = new B.StandardMaterial("ep-" + name + hex, world.scene);
+    const c = B.Color3.FromHexString(hex);
+    m.diffuseColor = c;
+    m.emissiveColor = c.scale(emissive || 0.12);
+    m.specularColor = new B.Color3(0.05, 0.05, 0.05);
+    return m;
+  }
+  function spawnStalls(open) {
+    if (!B || !world || !world.scene) return;
+    STALL_AT.forEach(([x, z], i) => {
+      const node = new B.TransformNode("ep-stall-" + i, world.scene);
+      node.position.set(x, 0, z);
+      const parts = [];
+      const add = (m) => { m.parent = node; m.isPickable = false; parts.push(m); return m; };
+      const table = add(B.MeshBuilder.CreateBox("ep-stall-table-" + i, { width: 2.2, height: 0.85, depth: 1 }, world.scene));
+      table.position.y = 0.43;
+      table.material = smat("table", "#8a6a44");
+      [-1, 1].forEach((sx) => {
+        const post = add(B.MeshBuilder.CreateCylinder("ep-stall-post-" + i, { diameter: 0.08, height: 2.3, tessellation: 6 }, world.scene));
+        post.position.set(sx * 1.05, 1.15, -0.4);
+        post.material = smat("post", "#5a5a60");
+      });
+      const awning = add(B.MeshBuilder.CreateBox("ep-stall-awning-" + i, { width: 2.5, height: 0.07, depth: 1.5 }, world.scene));
+      awning.position.set(0, 2.3, -0.05);
+      awning.rotation.x = 0.18;
+      const goods = add(B.MeshBuilder.CreateBox("ep-stall-goods-" + i, { width: 1.7, height: 0.22, depth: 0.6 }, world.scene));
+      goods.position.set(0, 0.96, 0);
+      const st = { node, awning, goods, color: STALL_COLORS[i % STALL_COLORS.length], open: false, down: false, tilt: 0, shut: false };
+      st.matOpen = smat("awn", st.color, 0.25);
+      st.matShut = smat("awn", "#3a3c44", 0.02);
+      st.matGoods = smat("goods", "#9fc060", 0.18);
+      st.matBare = smat("bare", "#4a4a50", 0.02);
+      story.stalls.push(st);
+      setStall(st, !!open);
+    });
+  }
+  function setStall(st, on) {
+    st.open = on;
+    st.awning.material = on ? st.matOpen : st.matShut;
+    st.goods.material = on ? st.matGoods : st.matBare;
+    st.goods.setEnabled(on);
+  }
+  function shutStall(st) {
+    st.shut = true;
+    setStall(st, false);
+  }
+  function toppleStall(dir) {
+    const up = story.stalls.filter((s) => !s.down);
+    if (!up.length) return null;
+    const st = up[Math.floor(up.length / 2)];
+    st.down = true;
+    st.tiltTo = Math.PI / 2 * (dir || 1);
+    return st;
+  }
+  function spawnTurbines(cfgT) {
+    if (!B || !world || !world.scene || !cfgT) return;
+    cfgT.x.forEach((x, i) => {
+      const root = new B.TransformNode("ep-turbine-" + i, world.scene);
+      root.position.set(x, cfgT.y, cfgT.z);
+      const pole = B.MeshBuilder.CreateCylinder("ep-turbine-pole-" + i, { diameterTop: 0.14, diameterBottom: 0.26, height: 3.4, tessellation: 8 }, world.scene);
+      pole.parent = root;
+      pole.position.y = 1.7;
+      pole.material = smat("pole", "#cfd4dc", 0.1);
+      pole.isPickable = false;
+      const rotor = new B.TransformNode("ep-turbine-rotor-" + i, world.scene);
+      rotor.parent = root;
+      rotor.position.set(0, 3.5, 0.3);
+      const hub = B.MeshBuilder.CreateSphere("ep-turbine-hub-" + i, { diameter: 0.42, segments: 8 }, world.scene);
+      hub.parent = rotor;
+      hub.material = smat("hub", "#c9ced6", 0.15);
+      hub.isPickable = false;
+      for (let k = 0; k < 3; k++) {
+        const arm = new B.TransformNode("ep-turbine-arm-" + i + k, world.scene);
+        arm.parent = rotor;
+        arm.rotation.z = (k * Math.PI * 2) / 3;
+        const blade = B.MeshBuilder.CreateBox("ep-turbine-blade-" + i + k, { width: 0.2, height: 1.9, depth: 0.05 }, world.scene);
+        blade.parent = arm;
+        blade.position.y = 1.15;
+        blade.material = smat("blade", "#f2f0ea", 0.18);
+        blade.isPickable = false;
+      }
+      story.turbines.push({ root, rotor, hub, w: 0, still: true, lit: false, matHub: hub.material });
+    });
+  }
+  function patch(kind, x, z, r, hex, alpha) {
+    if (!B || !world || !world.scene) return;
+    const d = B.MeshBuilder.CreateCylinder("ep-patch-" + kind, { diameter: r * 2, height: 0.05, tessellation: 20 }, world.scene);
+    d.position.set(x, kind === "flood" ? 0.1 : 0.07, z);
+    const m = smat(kind, hex, 0.15);
+    if (alpha < 1) m.alpha = alpha;
+    d.material = m;
+    d.isPickable = false;
+    story.patches.push(d);
+  }
+  function clearStory() {
+    story.stalls.forEach((s) => s.node.dispose(false, false));
+    story.turbines.forEach((t) => t.root.dispose(false, false));
+    story.patches.forEach((d) => d.dispose());
+    story.turned = false;
+    story.stalls = [];
+    story.turbines = [];
+    story.patches = [];
+  }
+  function clearProps(keepStory) {
+    if (!keepStory) clearStory();
     props.rods.forEach((r) => {
       if (r.mesh) r.mesh.dispose();
       if (r.ball) r.ball.dispose();
@@ -319,13 +471,21 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 
   /* ---- goal helpers ---- */
   function goalState(ep) {
-    return (ep.goals || []).map((g) => Object.assign({}, g, { done: false, progress: 0 }));
+    return (ep.goals || []).map((g) => {
+      const o = Object.assign({}, g, { done: false, failed: false, progress: 0 });
+      if (g.seconds) o.count = g.seconds;
+      return o;
+    });
   }
   function goalsDone(run) {
     return run.goals.filter((g) => g.done).length;
   }
   function allDone(run) {
     return run.goals.length > 0 && run.goals.every((g) => g.done);
+  }
+  /* A story part ends when every goal is done or failed (a failed one makes it a scarred finish). */
+  function settled(run) {
+    return run.goals.length > 0 && run.goals.every((g) => g.done || g.failed);
   }
   function afterMet(g, run) {
     if (!g.after) return true;
@@ -412,14 +572,17 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     active.goals.forEach((g) => {
       const li = document.createElement("li");
       if (g.done) li.className = "done";
+      else if (g.failed) li.className = "failed";
       const markEl = document.createElement("i");
-      markEl.textContent = g.done ? "✓" : "·";
+      markEl.textContent = g.done ? "✓" : g.failed ? "✗" : "·";
       const label = document.createElement("span");
       let text = g.label || g.id;
       if (g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris") {
         const need = g.count | 0;
         const have = Math.min(need, g.progress | 0);
         text += ` (${have}/${need})`;
+      } else if (g.seconds) {
+        text += ` (${Math.min(g.seconds, Math.floor(g.progress || 0))}/${g.seconds} s)`;
       }
       label.textContent = text;
       li.append(markEl, label);
@@ -430,6 +593,13 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       const sec = Math.max(0, Math.ceil(active.left));
       hudTimer.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     } else hudTimer.hidden = true;
+    if (active.ep.strain) {
+      const sc = (cfg.strain && cfg.strain.lines) || {};
+      const b = active.ep.strain.budget;
+      hudStrain.hidden = false;
+      hudStrain.className = "strain" + (active.strain > b ? " over" : "");
+      hudStrain.innerHTML = `${sc.meter || "Sky"}: ${active.strain} ${sc.of || "of"} ${b}<i><b style="width:${Math.min(100, Math.round((100 * active.strain) / b))}%"></b></i>`;
+    } else hudStrain.hidden = true;
     const cur = active.ep.tutorial ? currentTutorialGoal(active) : null;
     hudPrompt.hidden = !cur;
     hudPrompt.textContent = cur ? cur.prompt || "" : "";
@@ -445,12 +615,17 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     g.progress = Math.max(g.progress | 0, g.count | 0);
     if (day.note) day.note((g.label || g.id) + ".");
     mark("goal", { id: active.ep.id, goal: g.id, via: via || "play" });
+    const tt = active.ep.toasts && active.ep.toasts["goal:" + g.id];
+    if (tt) showToast(tt);
+    sayKey("goal:" + g.id);
+    if (g.kind === "wind-time") story.turned = true;
     if (active.ep.tutorial) {
       const next = currentTutorialGoal(active);
       if (next) unlockAbility(next.power, active);
     }
     paintHud();
     if (allDone(active)) finish("clear");
+    else if (active.ep.strain && settled(active)) finish("scarred");
     return true;
   }
   function bumpProgress(g, n, via) {
@@ -469,7 +644,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     const pos = playerPos();
 
     active.goals.forEach((g) => {
-      if (g.done || !afterMet(g, active)) return;
+      if (!active || g.done || !afterMet(g, active)) return;
       if (g.kind === "weather" && wx && wx.state === g.state) completeGoal(g, via || "weather");
       if (g.kind === "weather-any" && wx && (g.states || []).indexOf(wx.state) >= 0) completeGoal(g, via || "weather");
       if (g.kind === "storm" && ((wx && wx.state === "storm") || (pow && pow.storming) || (pow && pow.called))) {
@@ -486,6 +661,10 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
           }
         }
         if (tx != null && Math.hypot(pos.x - tx, pos.z - tz) <= (g.r != null ? g.r : 5)) completeGoal(g, via || "reach");
+      }
+      if (g.kind === "intact") {
+        if (active.toppled > 0) failGoal(g);
+        else completeGoal(g, via || "intact");
       }
       if (g.kind === "rods") {
         g.progress = active.rodsHit.size;
@@ -508,6 +687,111 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
         else paintHud();
       }
     });
+  }
+
+  /* ---- story parts: dialogue, Strain, kick-backs ---- */
+  const said = []; // every line spoken: { t, who, text, key, ep }
+  let sayQueue = [];
+  let sayLeft = 0;
+  function storyEvent(action, detail) {
+    if (typeof window.CustomEvent !== "function" || !window.dispatchEvent) return;
+    try {
+      window.dispatchEvent(new window.CustomEvent("day:story", { detail: Object.assign({ action }, detail || {}) }));
+    } catch (err) {
+      /* node tests */
+    }
+  }
+  /* The lines a key holds, in order, each shown for a few seconds (box at the bottom, and the log). */
+  function sayKey(key, ep) {
+    const e = ep || (active && active.ep);
+    const lines = e && e.say && e.say[key];
+    if (!lines) return;
+    lines.forEach(([who, text]) => sayQueue.push({ who, text, key, ep: e.id }));
+    if (sayLeft <= 0) nextSay();
+  }
+  function nextSay() {
+    const n = sayQueue.shift();
+    if (!n) {
+      sayLeft = 0;
+      say.classList.remove("on");
+      return;
+    }
+    sayLeft = 2.4 + n.text.length * 0.035;
+    say.innerHTML = "";
+    const who = document.createElement("b");
+    who.textContent = n.who;
+    say.append(who, document.createTextNode(n.text));
+    say.classList.add("on");
+    said.push({ t: performance.now(), who: n.who, text: n.text, key: n.key, ep: n.ep });
+    if (said.length > 80) said.shift();
+    if (day.note) day.note(`${n.who}: ${n.text}`);
+    storyEvent("say", { who: n.who, text: n.text, key: n.key, id: n.ep });
+  }
+  function failGoal(g) {
+    if (g.done || g.failed) return;
+    g.failed = true;
+    mark("goal-failed", { id: active.ep.id, goal: g.id });
+    paintHud();
+    if (settled(active)) finish("scarred");
+  }
+  function kick(id, extra) {
+    if (!active || active.kicks.indexOf(id) >= 0) return false;
+    active.kicks.push(id);
+    sayKey("kick:" + id);
+    const text = (active.ep.scars && active.ep.scars[id]) || id;
+    if (day.note) day.note(`Kick-back: ${text}.`);
+    mark("kick", Object.assign({ id: active.ep.id, kick: id }, extra || {}));
+    storyEvent("kick", { id: active.ep.id, kick: id, strain: active.strain });
+    return true;
+  }
+  /* One weather call during a story part: Strain, then what the sky does about it where he stood. */
+  function onStoryCall(power) {
+    const A = active;
+    const sc = cfg.strain || {};
+    const budget = A.ep.strain.budget;
+    const nowS = performance.now() / 1000;
+    const add = strainCost(sc, power, A.lastCall[power], nowS);
+    A.lastCall[power] = nowS;
+    A.strain += add;
+    A.calls[power] = (A.calls[power] | 0) + 1;
+    const pos = playerPos();
+    const zones = A.ep.zones || {};
+    const at = (name) => !!(pos && inZone(zones[name], pos.x, pos.z));
+    const wasOver = A.over;
+    A.over = A.strain > budget;
+    mark("strain", { id: A.ep.id, power, add, strain: A.strain, budget, over: A.over });
+    if (!A.edgy && A.strain >= budget - 1) {
+      A.edgy = true;
+      sayKey("edgy");
+    }
+    if (A.ep.id === "dry-park") {
+      if (power === "rain" && at("market")) {
+        A.strain += 2;
+        A.marketWet = true;
+        kick("soak", { x: pos.x, z: pos.z });
+      }
+      if (power === "rain" && at("park") && A.over && kick("flood")) patch("flood", 15, 60, 9, "#2c6f98", 0.55);
+      if (power === "sunbreak" && at("market")) A.marketWet = false;
+      if (power === "sunbreak" && A.over && pos && kick("scorch")) patch("scorch", pos.x - 1.5, pos.z + 3, 3.2, "#6b4a22", 1);
+    } else if (A.ep.id === "still-blades") {
+      if (power === "gale" && at("market")) {
+        toppleStall(1);
+        A.toppled += 1;
+        kick("topple", { x: pos.x, z: pos.z });
+      }
+      if (power === "gale" && A.over && at("roofs")) {
+        A.windSec = 0;
+        const g = A.goals.find((x) => x.kind === "wind-time");
+        if (g && !g.done) g.progress = 0;
+        A.shutUntil = A.age + 6;
+        toppleStall(-1);
+        A.toppled += 1;
+        kick("overspeed");
+      }
+    }
+    A.over = A.strain > budget;
+    paintHud();
+    if (A.toppled > 0) A.goals.filter((g) => g.kind === "intact").forEach(failGoal);
   }
 
   /* ---- start / finish ---- */
@@ -551,6 +835,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       via: via || "play",
     };
     active.unlocked = [];
+    Object.assign(active, { strain: 0, over: false, edgy: false, lastCall: {}, calls: {}, kicks: [], marketWet: false, toppled: 0, windSec: 0, stay: 0, shutUntil: 0, age: 0 });
     if (ep.tutorial) {
       const A = abil();
       if (A) A.lock();
@@ -560,6 +845,11 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     if (ep.rods && ep.rods.length) spawnRods(ep.rods);
     else clearProps();
     if (ep.debris) spawnDebris();
+    if (ep.market) spawnStalls(!!ep.market.open);
+    if (ep.turbines) spawnTurbines(ep.turbines);
+    sayQueue = [];
+    sayLeft = 0;
+    sayKey("start", ep);
     if (ep.lines && ep.lines.start && day.note) day.note(ep.lines.start);
     paintHud();
     mark("start", { id: ep.id, via: via || "play", title: ep.title });
@@ -568,7 +858,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
   function endQuiet() {
     if (active && active.ep.tutorial) openAllAbilities();
     active = null;
-    clearProps();
+    clearProps(true); // the stalls, blades and patches stay: they are how the part ended
     hud.hidden = true;
   }
   function finish(why) {
@@ -589,10 +879,26 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       endQuiet();
       return null;
     }
-    const card = scoreCard(goalsDone(run), run.goals.length, run.left, run.ep.timer || 0, bands);
+    const storyMeta = run.ep.strain
+      ? { value: run.strain, budget: run.ep.strain.budget, kicks: run.kicks.length, penalty: (cfg.strain && cfg.strain.scarPenalty) || 25 }
+      : null;
+    const card = scoreCard(goalsDone(run), run.goals.length, run.left, run.ep.timer || 0, bands, storyMeta);
     const rec = recordBest(storageKey, run.ep.id, card);
+    // The scars the card lists: each kick-back, a shut stall in Part 1, a goal that failed.
+    const scars = run.kicks.map((k) => (run.ep.scars && run.ep.scars[k]) || k);
+    if (run.ep.id === "dry-park" && story.stalls.length) {
+      const filled = run.goals.some((g) => g.kind === "stay" && g.done);
+      if (filled) story.stalls.forEach((x) => setStall(x, true));
+      if (card.scarred && filled) {
+        shutStall(story.stalls[story.stalls.length - 1]);
+        scars.push((run.ep.scars && run.ep.scars.shut) || "a stall stays shut");
+      }
+    }
+    if (card.scarred && run.strain > run.ep.strain.budget) scars.push(`strain ${run.strain} over ${run.ep.strain.budget}`);
+    if (run.ep.strain && (why === "clear" || why === "scarred")) sayKey(card.scarred ? "end:scarred" : "end:clean", run.ep);
     if (day.note) {
-      if (why === "clear" && run.ep.lines && run.ep.lines.done) day.note(run.ep.lines.done);
+      if ((why === "clear" || why === "scarred") && run.ep.lines && (card.scarred ? run.ep.lines.scarred : run.ep.lines.done)) day.note(card.scarred ? run.ep.lines.scarred : run.ep.lines.done);
+      else if (why === "clear" && run.ep.lines && run.ep.lines.done) day.note(run.ep.lines.done);
       else if (why === "time") day.note(L.timeUp);
       else if (why === "let-go") day.note(L.letGo);
       day.note(card.text);
@@ -600,10 +906,16 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     scoreTitle.textContent = L.scoreTitle;
     scoreForecast.textContent = card.text;
     scoreDetail.textContent = `${card.done} of ${card.total} goals` + (why === "time" ? " · time up" : why === "let-go" ? " · let go" : "");
+    scoreEl.classList.toggle("scarred", !!card.scarred);
+    if (storyMeta) {
+      const sl = (cfg.strain && cfg.strain.lines) || {};
+      scoreStrain.hidden = false;
+      scoreStrain.textContent = `${sl.meter || "Sky"} ${run.strain} ${sl.of || "of"} ${run.ep.strain.budget} · ${card.scarred ? sl.scarred || "Scarred" : sl.clean || "Clean"}` + (scars.length ? `: ${scars.join("; ")}` : "");
+    } else scoreStrain.hidden = true;
     const b = rec.best[run.ep.id];
     scoreBest.textContent = b ? `${L.best}: ${b.pct}% chance of ${b.word}` : "";
     scoreEl.hidden = false;
-    mark("score", { id: run.ep.id, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved });
+    mark("score", { id: run.ep.id, pct: card.pct, word: card.word, text: card.text, why, improved: rec.improved, scarred: card.scarred, strain: run.strain, kicks: run.kicks.slice(), scars });
     endQuiet();
     return card;
   }
@@ -722,6 +1034,15 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
       if (cur && cur.power === power) completeGoal(cur, d.via || "key");
       return;
     }
+    if (active.ep.strain && d.action === d.power && d.action !== "denied") {
+      onStoryCall(d.power);
+      const pos = playerPos();
+      active.goals.forEach((g) => {
+        if (g.kind !== "ability-in" || g.done || !afterMet(g, active) || g.power !== d.power) return;
+        if (pos && inZone((active.ep.zones || {})[g.zone], pos.x, pos.z)) completeGoal(g, d.via || "key");
+      });
+      if (!active) return;
+    }
     if (power === "storm") tryGoalsFromSnap("storm");
     if (power === "gust" || power === "tornado") {
       active.debris += 1;
@@ -753,13 +1074,74 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     }
   });
 
+  /* Seconds in a zone count only while the sky is right; the stalls and blades follow them. */
+  function storyTick(dt) {
+    const A = active;
+    const W = window.weather || day.weather;
+    const wx = W && W.now ? W.now() : null;
+    const pos = playerPos();
+    const zones = A.ep.zones || {};
+    A.goals.forEach((g) => {
+      if (g.done || g.failed || !afterMet(g, A)) return;
+      if (g.kind === "stay" && pos && inZone(zones[g.zone], pos.x, pos.z) && !A.marketWet) {
+        g.progress = Math.min(g.seconds, (g.progress || 0) + dt);
+        A.stay = g.progress;
+        if (g.progress >= g.seconds) completeGoal(g, "stay");
+      }
+      if (g.kind === "wind-time" && pos && inZone(zones[g.zone], pos.x, pos.z) && wx && wx.state === "wind" && A.age >= A.shutUntil) {
+        g.progress = Math.min(g.seconds, (g.progress || 0) + dt);
+        A.windSec = g.progress;
+        if (g.progress >= g.seconds) completeGoal(g, "wind");
+      }
+    });
+  }
+  function animateStory(dt) {
+    const A = active;
+    // Part 1: stalls open as the market fills (a fifth of the way each), the ones scarred stay shut.
+    const stay = A && A.goals ? A.goals.find((g) => g.kind === "stay") : null;
+    if (stay && story.stalls.length) {
+      const n = stay.done ? story.stalls.length : Math.floor((story.stalls.length * (stay.progress || 0)) / stay.seconds);
+      story.stalls.forEach((st, i) => {
+        if (!st.shut && !st.down && st.open !== i < n) setStall(st, i < n);
+      });
+    }
+    story.stalls.forEach((st) => {
+      if (st.down && Math.abs(st.tilt - st.tiltTo) > 0.01) {
+        st.tilt += (st.tiltTo - st.tilt) * Math.min(1, dt * 5);
+        st.node.rotation.z = st.tilt;
+        st.node.position.y = Math.abs(Math.sin(st.tilt)) * 0.4;
+      }
+    });
+    // Part 2: blades turn with the wind on the roof; a shut turbine stands dead; a won one turns for good.
+    if (story.turbines.length) {
+      const W = window.weather || day.weather;
+      const wx = W && W.now ? W.now() : null;
+      const turned = story.turned;
+      const shut = A && A.age < A.shutUntil;
+      const blowing = !!(wx && wx.state === "wind") && !!A;
+      const want = shut ? 0 : turned ? 2.2 : blowing ? 6 : 0;
+      story.turbines.forEach((t) => {
+        t.w += (want - t.w) * Math.min(1, dt * 1.6);
+        t.rotor.rotation.z -= t.w * dt;
+      });
+      story.spin = story.turbines[0].w;
+    }
+  }
+
   /* ---- tick (through world.update wrap) ---- */
   let lastWall = performance.now();
   function tick() {
     const now = performance.now();
     const dt = Math.min(0.5, (now - lastWall) / 1000);
     lastWall = now;
+    if (sayLeft > 0) {
+      sayLeft -= dt;
+      if (sayLeft <= 0) nextSay();
+    }
+    animateStory(dt);
     if (!active) return;
+    active.age += dt;
+    if (active.ep.strain) storyTick(dt);
     if (active.ep.timer) {
       active.left -= dt;
       if (active.left <= 0) {
@@ -834,6 +1216,23 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     end: (why) => (active ? finish(why || "api") : null),
     match: (chapter, minutes, opt) => matchEpisode(list, chapter, minutes, opt),
     log: () => log.slice(),
+    said: () => said.slice(),
+    story: () =>
+      active && active.ep.strain
+        ? {
+            id: active.ep.id,
+            strain: active.strain,
+            budget: active.ep.strain.budget,
+            over: active.over,
+            kicks: active.kicks.slice(),
+            toppled: active.toppled,
+            stay: active.stay,
+            windSec: active.windSec,
+            marketWet: active.marketWet,
+            stalls: story.stalls.map((x) => (x.down ? "down" : x.open ? "open" : x.shut ? "shut" : "closed")),
+            turbine: story.spin,
+          }
+        : null,
     menu: showMenu,
   };
   day.episodes = api;
