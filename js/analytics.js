@@ -66,6 +66,11 @@
     const d = e.detail || {};
     feature("tutorial", { action: d.action, step: d.step, seconds: d.seconds });
   }));
+  // The title screen (js/title.js): show, play, episodes (each with via), music on/off.
+  window.addEventListener("day:title", safe((e) => {
+    const d = e.detail || {};
+    feature("title", { action: d.action, via: d.via, seconds: d.seconds, music: d.music != null ? d.music : d.on });
+  }));
   // Graphics quality (js/look.js): high or low, from the button.
   window.addEventListener("day:quality", safe((e) => feature("quality", { value: (e.detail || {}).value, via: (e.detail || {}).via || "click" })));
   // The weather wheel (js/weather.js): a key, the radial, or a phone tap. The day's own forecast isn't an interaction.

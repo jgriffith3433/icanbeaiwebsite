@@ -182,6 +182,26 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     TITLE — the first thing the page shows (js/title.js)
+     ------------------------------------------------------------------------
+     The city's skyline behind his name, Play (takes control of him) and
+     Episodes (the Episodes menu). His day keeps running behind it. Play
+     turns the Sound on unless the player switched Music off here.
+     ------------------------------------------------------------------------ */
+  title: {
+    kicker: "I Can Be",
+    name: "Small Weather",
+    line: "His day runs on its own, live. Take it over and command the sky.",
+    play: "Play",
+    episodes: "Episodes",
+    musicOn: "Music on",
+    musicOff: "Music off",
+    hint: "Enter to play",
+    day: "Day",
+    night: "Night",
+  },
+
+  /* ------------------------------------------------------------------------
      FIRST VISIT — one minute, then it stays quiet
      ------------------------------------------------------------------------
      The first time the page opens, a card walks the player through taking
@@ -261,9 +281,17 @@ window.DAY_CONFIG = {
      ------------------------------------------------------------------------ */
   score: {
     fade: 2.8,
-    musicVol: 0.3,
-    ambVol: 0.62,
-    stingVol: 0.55,
+    /* The mix, in one place (js/score.js). master: everything the score plays; music: the beds; ambience:
+       rain, wind and city hum; sting: take control; thunder: on top of ambience; whoosh: the glide;
+       title: the music level while the title screen is up; duck: how far the music dips under his voice;
+       nightTone: the low-pass (Hz) that softens the music at night. His voice is `voice.volume`. */
+    mix: { master: 0.9, music: 0.3, ambience: 0.55, sting: 0.5, thunder: 0.85, whoosh: 0.55, title: 0.4, duck: 0.45, nightTone: 2400 },
+    /* Clear weather plays a calm day bed by day and its night variation from 7:45 PM to 6:15 AM, crossfaded.
+       Until Hawkes Gen makes their own files (hawkes.assets.json music-day / music-night: add
+       `day: "audio/music/day.mp3", night: "audio/music/night.mp3"` below), they play the clear and snow beds. */
+    nightFrom: 19.75,
+    nightTo: 6.25,
+    fallback: { day: "clear", night: "snow" },
     music: {
       clear: "audio/music/clear.mp3",
       clouds: "audio/music/clouds.mp3",
