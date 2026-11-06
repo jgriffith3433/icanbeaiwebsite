@@ -346,10 +346,16 @@ async function roofBolt(t) {
   t.scene(`Roof ${b.id}`);
   // Come to the ramp's foot from the street side first: straight along its line from the driveway he'd walk
   // under the ramp's high end and wedge there (the capsule is taller than the gap).
-  const ok = (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000 }))
-    && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.75, ms: 8000 }))
-    && (await goTo(s.x1 - 0.25, s.z, t, { close: 0.35, progress: 0.8, ms: 20000 }));
-  await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 12000 });
+  // A slow frame or a hitch mid-ramp can trip goTo's stall check (smoke failed once at y 3.18 on the ramp): if he
+  // isn't on the roof yet, go again from wherever he is, from the ramp's foot, up to twice.
+  let ok = false;
+  for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+    ok = (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000, stall: 5000 }))
+      && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.75, ms: 8000, stall: 5000 }))
+      && (await goTo(s.x1 - 0.25, s.z, t, { close: 0.35, progress: 0.8, ms: 20000, stall: 5000 }));
+    await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 12000, stall: 5000 });
+    if (C.state().y > b.h - 0.4) ok = true;
+  }
   const st = C.state();
   const onRoof = ok && st.y > b.h - 0.4;
   if (onRoof) t.event("on-rooftop", `on the ${b.id} roof at y ${st.y.toFixed(2)}`);
@@ -1508,7 +1514,7 @@ async function goTo(tx, tz, t, opts) {
       if (Math.hypot(st.x - last.x, st.z - last.z) > 0.12) {
         stillSince = performance.now();
         last = st;
-      } else if (performance.now() - stillSince > 2800) return false;
+      } else if (performance.now() - stillSince > (opts.stall || 2800)) return false;
       const far = Math.hypot(st.x - tx, st.z - tz);
       setHeld(steerKeys(tx, tz, sprint && far > 2.5));
       if (ticks++ % 6 === 0) t.progress(opts.progress || 0.5);
