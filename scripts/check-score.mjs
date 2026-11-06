@@ -29,6 +29,8 @@ ok(C && C.score && C.score.fallback && C.score.fallback.day !== C.score.fallback
 ok(!C.score.music.day || fs.existsSync(new URL("../" + C.score.music.day, import.meta.url)), "score.music.day names a file that exists (a missing file is a 404 in the console)");
 ok(!C.score.music.night || fs.existsSync(new URL("../" + C.score.music.night, import.meta.url)), "score.music.night names a file that exists");
 
+const pr = C.score.pressure;
+ok(!pr || (pr.from >= 0 && pr.from < 1 && pr.gain >= 0 && pr.gain <= 1 && pr.rate >= 0 && pr.rate <= 0.2), "score.pressure is sane");
 if (bad) {
   console.error(`check-score: ${bad} failed`);
   process.exit(1);
