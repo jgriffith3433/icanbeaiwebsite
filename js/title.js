@@ -156,6 +156,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     if (!up) return false;
     if (musicWanted) setSound(true);
     hide("play", via);
+    // A first Play opens with js/opening.js (skippable); it takes control when it ends.
+    if (day.opening && day.opening.pending()) return day.opening.start(via) || true;
     // The page's own Take control button, so it counts as a button press. He can't be taken while driving:
     // then the title just opens on his day.
     const c = day.control;

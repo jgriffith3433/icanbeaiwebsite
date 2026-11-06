@@ -4556,9 +4556,83 @@ async function titleScenario(options, t) {
   t.progress(1);
 }
 
+/* ---------------- opening: Small Weather's skippable intro on a first Play ---------------- */
+// Needs ?playtest=opening. Run 1 watches two beats and clicks Skip; run 2 skips with Esc; run 3 is a returning player (no opening).
+async function openingScenario(options, t) {
+  t.scene("Opening");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const T = window.day.title;
+  const O = window.day.opening;
+  if (!O) {
+    t.problem("blocker", "There's no opening (js/opening.js didn't install)");
+    return;
+  }
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const ctl = () => (window.day.control ? window.day.control.mode() : "none");
+  async function toTitle() {
+    if (ctl() === "control") { pressKey("Escape"); await sleep(1800); }
+    O.reset();
+    T.show("playtest");
+    await sleep(600);
+  }
+  // Run 1: the first Play shows the opening on him, then Skip hands him over.
+  await toTitle();
+  await clickEl($("title-play"));
+  await t.until(() => O.now().showing, 3000, "the opening").catch(() => {});
+  const o1 = O.now();
+  t.event("opening-start", `opening ${o1.showing ? "showing" : "NOT showing"}, ${o1.beats} beats, model ${o1.model}`);
+  if (!o1.showing) { t.problem("blocker", "A first Play didn't open the opening"); return; }
+  if (!boxOf($("opening"))) t.problem("blocker", "The opening card (#opening) isn't on screen");
+  if (o1.model !== "small-weather") t.problem("blocker", `The opening doesn't show Small Weather's model (engine says "${o1.model}")`);
+  else t.event("opening-model", "Small Weather's own model is on screen, no placeholder");
+  const skipBtn = $("opening-skip");
+  if (!boxOf(skipBtn)) t.problem("blocker", "The opening has no Skip button");
+  else t.event("opening-skip-ready", `Skip button "${skipBtn.textContent}"`);
+  const hudUp = [document.querySelector(".hud.bottom"), $("control"), $("episodes")]
+    .filter((x) => x && getComputedStyle(x).visibility !== "hidden" && boxOf(x));
+  if (hudUp.length) t.problem("bug", "The HUD shows through the opening");
+  await t.until(() => O.now().beat >= 1, 9000, "the second line");
+  t.event("opening-line", `"${($("opening-say") || {}).textContent}"`);
+  t.progress(0.35);
+  await clickEl(skipBtn);
+  await t.until(() => !O.now().showing && ctl() === "control", 4000, "Skip to hand him over").catch(() => {});
+  t.event("opening-skipped", `opening ${O.now().showing ? "still up" : "closed"} after beat ${O.now().beat + 1}, he is ${ctl() === "control" ? "the player's" : ctl()}`);
+  if (O.now().showing) t.problem("blocker", "Skip didn't close the opening");
+  if (ctl() !== "control") t.problem("bug", `After Skip he isn't the player's (${ctl()})`);
+  if (!O.now().seen) t.problem("bug", "A skipped opening wasn't remembered");
+  pressKey("w");
+  await sleep(1200);
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "w", bubbles: true }));
+  t.progress(0.55);
+
+  // Run 2: Esc skips too.
+  await toTitle();
+  await clickEl($("title-play"));
+  await t.until(() => O.now().showing, 3000, "the opening again").catch(() => {});
+  await sleep(1500);
+  pressKey("Escape");
+  await t.until(() => !O.now().showing, 3000, "Esc to skip").catch(() => {});
+  t.event("opening-esc", `Esc ${O.now().showing ? "did not skip" : "skipped the opening"}`);
+  if (O.now().showing) t.problem("bug", "Esc doesn't skip the opening");
+  await sleep(1200);
+  t.progress(0.8);
+
+  // Run 3: a returning player's Play goes straight to him.
+  await toTitle();
+  O.reset();
+  window.localStorage.setItem("icanbe.opening", "skip");
+  await clickEl($("title-play"));
+  await sleep(1500);
+  t.event("opening-once", `second Play: opening ${O.now().showing ? "shown again" : "not shown"}, he is ${ctl() === "control" ? "the player's" : ctl()}`);
+  if (O.now().showing) t.problem("bug", "The opening shows again for a returning player");
+  t.progress(1);
+}
+
 installPlaytest({
   product: "icanbe",
   scenarios: [
+    { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
@@ -4598,7 +4672,8 @@ installPlaytest({
       if (id !== "smoke" && id !== "first-visit" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
-      if (id === "title") await titleScenario(options, t);
+      if (id === "opening") await openingScenario(options, t);
+      else if (id === "title") await titleScenario(options, t);
       else if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);
