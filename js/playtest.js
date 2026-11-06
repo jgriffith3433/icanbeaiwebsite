@@ -4711,9 +4711,75 @@ async function momentsScenario(options, t) {
   t.progress(1);
 }
 
+async function barksScenario(options, t) {
+  t.scene("Barks");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const B = window.day.barks;
+  const C = window.day.control;
+  const W = window.weather;
+  if (!B) { t.problem("blocker", "There's no barks module (js/barks.js didn't install)"); return; }
+  const heard = [];
+  window.addEventListener("day:bark", (e) => heard.push(e.detail));
+  const key = window.day.now().key;
+  const dayStart = window.day.today().dayStart;
+  // Setup shortcut: the morning, then the sky by real keys, each given time for its bark.
+  scrubTo(dayStart + 0.2);
+  await sleep(800);
+  clickSpeed(1);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  t.progress(0.1);
+  const states = [["3", "rain"], ["4", "storm"], ["5", "fog"], ["6", "wind"], ["7", "snow"], ["1", "clear"]];
+  for (let i = 0; i < states.length; i++) {
+    const [k, st] = states[i];
+    pressKey(k);
+    await t.until(() => W.now().state === st, 9000, `${st} to start`).catch(() => {});
+    const n0 = heard.length;
+    await t.until(() => heard.some((h, j) => j >= n0 && h.kind === "weather" && h.key === st), 6000, `a ${st} bark`).catch(() => {});
+    const h = heard.find((x, j) => j >= n0 && x.kind === "weather" && x.key === st);
+    t.event(`bark-weather-${st}`, h ? `"${h.text}"` : "no bark");
+    if (!h) t.problem("bug", `No bark when the sky went to ${st}`);
+    t.progress(0.1 + 0.07 * (i + 1));
+  }
+  pressKey("Escape");
+  await t.until(() => C.mode() === "schedule", 20000, "him back on his day").catch(() => {});
+
+  // His needs: the day at speed (the day bar buttons), reading the log as it goes.
+  const hours = [6.5, 9, 11.5, 13, 15, 17.5, 19, 21, 23];
+  for (let i = 0; i < hours.length; i++) {
+    scrubTo(hours[i] * 60);
+    await sleep(500);
+    clickSpeed(1200);
+    await sleep(5000);
+    t.progress(0.55 + 0.04 * (i + 1));
+  }
+  clickSpeed(1);
+  const needs = heard.filter((h) => h.kind === "need");
+  needs.forEach((h) => t.event(`bark-need-${h.key}`, `${E().fmtClock(h.minutes)} "${h.text}"`));
+  const texts = heard.map((h) => h.text);
+  const dup = texts.filter((x, i) => texts.indexOf(x) !== i);
+  const notes = (window.day.notes() || []).map((n) => n.text);
+  const logDup = notes.filter((x, i) => notes.indexOf(x) !== i && barkTexts().has(x));
+  t.metric("barks", heard.length);
+  t.metric("distinct-barks", new Set(texts).size);
+  t.event("bark-lines", `${new Set(texts).size} distinct lines: ${heard.filter((h) => h.kind === "weather").length} weather, ${needs.length} needs`);
+  if (new Set(texts).size < 12) t.problem("bug", `Only ${new Set(texts).size} distinct bark lines were heard (want 12 or more)`);
+  if (dup.length || logDup.length) t.problem("bug", `A line repeated within one day: ${[...dup, ...logDup][0]}`);
+  else t.event("no-repeat", `no line repeated on ${key}`);
+  if (!needs.length) t.problem("bug", "No hunger, thirst or tiredness bark in a day at speed");
+  t.progress(1);
+}
+
+function barkTexts() {
+  const b = (window.DAY_CONFIG && window.DAY_CONFIG.barks) || {};
+  return new Set([...Object.values(b.needs || {}).flatMap((n) => n.lines || []), ...Object.values(b.weather || {}).flat()]);
+}
+
 installPlaytest({
   product: "icanbe",
   scenarios: [
+    { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
@@ -4755,7 +4821,8 @@ installPlaytest({
       if (id !== "smoke" && id !== "first-visit" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
-      if (id === "moments") await momentsScenario(options, t);
+      if (id === "barks") await barksScenario(options, t);
+      else if (id === "moments") await momentsScenario(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
       else if (id === "smoke") await smoke(options, t);

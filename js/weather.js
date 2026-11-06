@@ -305,7 +305,8 @@ export function startWeather(world, dayApi) {
     forecast: cfg.forecast,
     onSet(detail) {
       const line = (cfg.lines && cfg.lines[detail.state]) || STATE_NAMES[detail.state];
-      if (noted.state !== detail.state && day.note) day.note(line);
+      const again = day.notes && day.notes().some((n) => n.text === line); // a label is logged once a day
+      if (noted.state !== detail.state && day.note && !again) day.note(line);
       noted.state = detail.state;
       if (typeof CustomEvent === "function" && window.dispatchEvent) {
         window.dispatchEvent(new CustomEvent("day:weather", { detail }));
@@ -331,7 +332,13 @@ export function startWeather(world, dayApi) {
       react.at -= wall;
       return;
     }
-    const text = lines[Math.floor(Math.random() * lines.length)];
+    // One use of a line per day (js/barks.js keeps the list); a state whose lines are all used stays quiet.
+    const text = day.barks ? day.barks.take(lines) : lines[Math.floor(Math.random() * lines.length)];
+    if (!text) {
+      react.state = n.state;
+      react.at = react.cool;
+      return;
+    }
     if (day.note) day.note(text);
     react.state = n.state;
     react.at = react.cool;
