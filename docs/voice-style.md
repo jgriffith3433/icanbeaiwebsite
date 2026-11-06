@@ -1,0 +1,31 @@
+# Small Weather's voice: style note for the log and barks
+
+Status: **built** for the log (`js/barks.js`, data in `day.config.js` `barks` and `weather.react`). Spoken lines
+(`voice`, DoD Eric) are first person and follow the same temper.
+
+## Who he is on the page
+A quiet developer who happens to command the sky. Dry, patient, a little amused, never loud. He notices his body
+and the weather the way someone does who is used to both. The storm is where he is calmest.
+
+## Rules
+1. **He, plainly.** Log lines say "He" (he/him), never "they" for him, and name him "Small Weather" only at the
+   day's few named moments. Other people stay "they".
+2. **Short and matter-of-fact.** One or two sentences, present tense, about 4 to 14 words. No exclamation marks, no
+   questions, no emoji, no jokes that need a setup.
+3. **One concrete thing.** A body sensation or a small action (a blink, a tap, a breath), not a feeling named in
+   the abstract. "His mouth is dry", not "He feels thirsty and uncomfortable".
+4. **Understated.** He grins at thunder and keeps the joke to himself. Never gloat about the power.
+5. **Needs read as body, weather reads as mood.** Hunger, thirst, tired, bladder, stress and boredom are small,
+   physical and a little wry. Rain, storm, fog, wind, snow and clear sky are what he likes or lets be.
+   Rain with a need can combine (`hunger@rain`).
+6. **No repeats in a day.** A line is used once per in-game day (`day.barks.fresh/take`, which the weather log
+   uses too); a pool that runs out stays quiet rather than say it twice. Needs wait `gap` minutes between any two
+   barks and `again` for the same need, so he never chatters.
+7. **Don't duplicate the labels.** The plain "Rain." label stays as the fact; the bark is what he does about it.
+   It arrives about a second and a half later.
+8. **No game words.** No "Pressure", "ability", "cooldown" in barks; he doesn't know he's in a game.
+
+## Adding a line
+Put it in `barks.needs.<need>.lines` or `barks.weather.<state>`, check it against the rules above, and run
+`npm test` (`scripts/check-barks.mjs`: at least 12 distinct lines across needs and weather, no duplicates, no
+"they", short, no exclamations).
