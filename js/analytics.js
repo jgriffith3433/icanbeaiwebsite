@@ -71,6 +71,11 @@
     const d = e.detail || {};
     feature("title", { action: d.action, via: d.via, seconds: d.seconds, music: d.music != null ? d.music : d.on });
   }));
+  // Staged moments (js/moments.js): the take-over push and line, the day-end recap.
+  window.addEventListener("day:moment", safe((e) => {
+    const d = (e && e.detail) || {};
+    feature("moment", { moment: d.moment, action: d.action, via: d.via, seconds: d.seconds });
+  }));
   // Graphics quality (js/look.js): high or low, from the button.
   window.addEventListener("day:quality", safe((e) => feature("quality", { value: (e.detail || {}).value, via: (e.detail || {}).via || "click" })));
   // The weather wheel (js/weather.js): a key, the radial, or a phone tap. The day's own forecast isn't an interaction.

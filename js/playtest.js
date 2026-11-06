@@ -4629,9 +4629,92 @@ async function openingScenario(options, t) {
   t.progress(1);
 }
 
+/* ---------------- moments: the take-over push and line, the day-end recap ---------------- */
+// Needs ?playtest=moments. Real input: the Take control button, Skip, Esc, movement keys and the 1200x speed button.
+async function momentsScenario(options, t) {
+  t.scene("Moments");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const M = window.day.moments;
+  if (!M) { t.problem("blocker", "There's no moments module (js/moments.js didn't install)"); return; }
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const ctl = () => (window.day.control ? window.day.control.mode() : "none");
+  const evs = [];
+  window.addEventListener("day:moment", (e) => evs.push(e.detail));
+  const radius = () => window.day.world().camera.radius;
+  async function back() { if (ctl() === "control") { pressKey("Escape"); await t.until(() => ctl() === "schedule", 15000, "him back on his day").catch(() => {}); } }
+  scrubTo(window.day.dayStart + 0.2);
+  await sleep(1200);
+
+  // Take over 1: the camera pushes in and one line shows; Skip closes it.
+  await clickEl($("control"));
+  await t.until(() => M.now().line, 3000, "the take-over line").catch(() => {});
+  const r0 = radius();
+  const n1 = M.now();
+  t.event("takeover-line", `line ${n1.line ? "showing" : "NOT showing"}: "${n1.text}", pushing ${n1.pushing}, camera radius ${r0.toFixed(1)}`);
+  if (!n1.line) { t.problem("blocker", "Taking over shows no line"); }
+  if (!n1.pushing) t.problem("blocker", "Taking over plays no camera push");
+  if (!boxOf($("moment-line"))) t.problem("bug", "The take-over line isn't on screen");
+  await sleep(1000);
+  const r1 = radius();
+  t.event("takeover-push", `camera radius ${r0.toFixed(1)} -> ${r1.toFixed(1)} m while pushing in`);
+  if (!(r1 < r0 - 1)) t.problem("bug", `The camera doesn't push in (radius ${r0.toFixed(1)} -> ${r1.toFixed(1)})`);
+  await clickEl($("moment-skip"));
+  await sleep(300);
+  t.event("takeover-skipped", `line ${M.now().line ? "still up" : "closed"}, push ${M.now().pushing ? "still on" : "ended"}`);
+  if (M.now().line || M.now().pushing) t.problem("blocker", "Skip doesn't end the take-over moment");
+  t.progress(0.25);
+
+  // Take over 2: moving ends it too.
+  await back();
+  await clickEl($("control"));
+  await t.until(() => M.now().line, 3000, "the take-over line again").catch(() => {});
+  await sleep(500);
+  pressKey("w");
+  await sleep(600);
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: "w", bubbles: true }));
+  t.event("takeover-move", `after W: line ${M.now().line ? "still up" : "closed"}, push ${M.now().pushing ? "still on" : "ended"}`);
+  if (M.now().line || M.now().pushing) t.problem("bug", "Walking doesn't end the take-over moment");
+  await back();
+  t.progress(0.45);
+
+  // Day end 1: the clock rolls into the next day; three events from the log; Skip closes it.
+  async function rollDay() {
+    scrubTo(window.day.dayEnd - 3);
+    await sleep(600);
+    const b = [...$("speeds").children].find((x) => x.dataset.speed === "1200") || $("speeds").lastElementChild;
+    await clickEl(b);
+    await t.until(() => M.now().recap, 15000, "the day-end recap").catch(() => {});
+  }
+  await rollDay();
+  const d1 = M.now();
+  const items = [...document.querySelectorAll("#day-end-events li")].map((li) => li.textContent);
+  t.event("dayend-recap", `recap ${d1.recap ? "showing" : "NOT showing"}, ${items.length} events: ${items.join(" | ")}`);
+  if (!d1.recap) { t.problem("blocker", "The day's end shows no recap"); return; }
+  if (items.length !== 3) t.problem("blocker", `The recap has ${items.length} events, not 3`);
+  if (!boxOf($("day-end"))) t.problem("bug", "The recap card isn't on screen");
+  await sleep(2600);
+  await clickEl($("day-end-skip"));
+  await sleep(300);
+  t.event("dayend-skipped", `recap ${M.now().recap ? "still up" : "closed"}`);
+  if (M.now().recap) t.problem("blocker", "Skip doesn't close the recap");
+  t.progress(0.75);
+
+  // Day end 2: Esc skips it too.
+  await rollDay();
+  await sleep(800);
+  pressKey("Escape");
+  await sleep(300);
+  t.event("dayend-esc", `Esc ${M.now().recap ? "did not skip" : "skipped"} the recap`);
+  if (M.now().recap) t.problem("bug", "Esc doesn't skip the recap");
+  t.event("moments-log", evs.map((e) => `${e.moment}:${e.action}${e.via ? "(" + e.via + ")" : ""}`).join(" "));
+  t.progress(1);
+}
+
 installPlaytest({
   product: "icanbe",
   scenarios: [
+    { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
@@ -4672,7 +4755,8 @@ installPlaytest({
       if (id !== "smoke" && id !== "first-visit" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
-      if (id === "opening") await openingScenario(options, t);
+      if (id === "moments") await momentsScenario(options, t);
+      else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
       else if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);

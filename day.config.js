@@ -223,6 +223,38 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     MOMENTS — two staged beats (js/moments.js), both skippable
+     ------------------------------------------------------------------------
+     takeover: when the player takes him, the camera starts wide and pushes in
+       to his shoulder (from metres, secs, a little fov) and he says one line
+       (first person, his voice; one is picked at random). Any movement, the
+       Skip button or a tap ends it. Voice mp3s for the lines are not made yet.
+     dayEnd: when the clock rolls into the next day while the page is playing
+       or live, a card closes the day: his sign-off, three events from the log
+       (a spread across the day; a note from the player's own take-over wins the
+       middle slot), and a last line. Skip, Esc, Enter, a tap, or 12 s.
+     ------------------------------------------------------------------------ */
+  moments: {
+    takeover: {
+      push: { from: 15, secs: 1.5, fov: 0.22 },
+      lineSecs: 3.2,
+      skip: "Skip",
+      lines: ["Okay. My turn.", "Finally. Let's see the sky.", "All right. Where to?"],
+    },
+    dayEnd: {
+      kicker: "Small Weather",
+      title: "That was the day.",
+      intro: "Here's what I remember.",
+      outro: "Same again tomorrow. Maybe with weather.",
+      outroPlayed: "Tomorrow I'd like the sky again.",
+      skip: "Skip",
+      hint: "Esc to skip",
+      secs: 12,
+      events: 3,
+    },
+  },
+
+  /* ------------------------------------------------------------------------
      FIRST VISIT — one minute, then it stays quiet
      ------------------------------------------------------------------------
      The first time the page opens, a card walks the player through taking
