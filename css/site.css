@@ -210,11 +210,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 .log li {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 64px minmax(0, 1fr);
   gap: 8px;
   padding: 4px 6px;
   border-radius: 8px;
 }
+.log li span { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 .log time {
   color: var(--faint);
   font-variant-numeric: tabular-nums;
@@ -692,20 +693,25 @@ html.touch-ui.preview-public .quality-btn {
 .control-hint {
   position: fixed;
   z-index: 3;
-  left: 50%;
+  left: calc((100vw - 330px - 2 * var(--gutter)) / 2);
   transform: translateX(-50%);
   bottom: 196px;
+  /* wraps, and stays left of the Details panel (330px + its gutter) so it never crosses the Thirst row */
+  width: max-content;
+  max-width: min(640px, calc(100vw - 330px - 3 * var(--gutter) - 24px));
+  text-align: center;
+  line-height: 1.35;
   margin: 0;
-  padding: 5px 12px;
-  border-radius: 999px;
+  padding: 6px 14px;
+  border-radius: 14px;
   background: rgba(14, 16, 22, 0.5);
   color: var(--muted);
   font-size: 0.74rem;
-  white-space: nowrap;
+  white-space: normal;
   pointer-events: none;
 }
 .control-hint[hidden] { display: none; }
-.preview-public .control-hint { bottom: 80px; }
+.preview-public .control-hint { bottom: 80px; left: 50%; max-width: min(640px, calc(100vw - 2 * var(--gutter))); }
 .what.steered { color: var(--accent); }
 .log li.note span { color: var(--accent); }
 
