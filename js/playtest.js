@@ -346,14 +346,19 @@ async function roofBolt(t) {
   t.scene(`Roof ${b.id}`);
   // Come to the ramp's foot from the street side first: straight along its line from the driveway he'd walk
   // under the ramp's high end and wedge there (the capsule is taller than the gap).
-  // A slow frame or a hitch mid-ramp can trip goTo's stall check (smoke failed once at y 3.18 on the ramp): if he
-  // isn't on the roof yet, go again from wherever he is, from the ramp's foot, up to twice.
+  // A slow bot (the morning rush, software rendering) runs the sim at a fraction of real time: main.js caps a frame
+  // at 0.1 s, and at 2.4 m/s the 15 m ramp then outlasts a goTo's limit (smoke failed at y 3.18, half way up). So the
+  // ramp legs sprint, the limits are generous, and a retry carries on from where he stands if he's already on the ramp.
+  const onRamp = () => {
+    const p = C.state();
+    return p.y > 0.4 && p.y <= b.h - 0.4 && p.x > s.x0 - 1.2 && p.x < s.x1 + 0.5 && Math.abs(p.z - s.z) < s.w;
+  };
   let ok = false;
   for (let attempt = 0; attempt < 3 && !ok; attempt++) {
-    ok = (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000, stall: 5000 }))
-      && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.75, ms: 8000, stall: 5000 }))
-      && (await goTo(s.x1 - 0.25, s.z, t, { close: 0.35, progress: 0.8, ms: 20000, stall: 5000 }));
-    await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 12000, stall: 5000 });
+    ok = (onRamp() || (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000, stall: 5000 })
+      && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.75, ms: 8000, stall: 5000 }))))
+      && (await goTo(s.x1 - 0.25, s.z, t, { sprint: true, close: 0.35, progress: 0.8, ms: 40000, stall: 5000 }));
+    await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 20000, stall: 5000 });
     if (C.state().y > b.h - 0.4) ok = true;
   }
   const st = C.state();
