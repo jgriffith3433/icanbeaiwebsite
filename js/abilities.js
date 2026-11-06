@@ -142,6 +142,7 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-btn{bottom:232px}
 html.in-control:not(.preview-public):not(.touch-ui) .quality-btn{bottom:238px}
 html.in-control:not(.preview-public):not(.touch-ui) .control-hint{bottom:278px}
 html.in-control:not(.preview-public):not(.touch-ui) .tutorial{bottom:314px}
+html.in-control:not(.preview-public):not(.touch-ui) .side{max-height:calc(100vh - 78px - 240px)}
 `;
   document.head.appendChild(style);
   const el = document.createElement("div");

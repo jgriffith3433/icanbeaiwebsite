@@ -282,6 +282,39 @@ async function smoke(options, t) {
   t.progress(1);
 }
 
+/** While he's the player's: the controls hint wraps clear of the Details panel, every Details row (Thirst too)
+ *  is readable (not under the hint or the ability bar), and the highlighted log row shows whole. */
+function hudReadable(t) {
+  const hint = document.querySelector(".control-hint");
+  const side = document.querySelector(".side");
+  const hb = boxOf(hint);
+  const sb = side && boxOf(side);
+  if (!hb) t.problem("bug", "The controls hint isn't showing while he's the player's");
+  else {
+    const lines = Math.round(hb.height / (parseFloat(getComputedStyle(hint).lineHeight) || 16));
+    if (sb && boxesOverlap(hb, sb)) t.problem("bug", "The controls hint overlaps the Details panel");
+    else t.event("hint-clear", `hint ${Math.round(hb.width)}x${Math.round(hb.height)} (${lines} lines) clear of the Details panel`);
+  }
+  if (sb) {
+    const bar = boxOf(document.getElementById("abilitybar"));
+    const rows = [...side.querySelectorAll(".meters > *")];
+    const bad = rows.filter((r) => {
+      const b = r.getBoundingClientRect();
+      const vis = b.top >= sb.top - 1 && b.bottom <= sb.bottom + 1;
+      return (hb && boxesOverlap(hb, b)) || (bar && boxesOverlap(bar, b)) || (!vis && side.scrollHeight <= side.clientHeight);
+    });
+    if (bad.length) t.problem("bug", `${bad.length} Body row(s) in Details are covered (${bad.map((r) => r.textContent.trim().slice(0, 12)).join(", ")})`);
+    else t.event("details-readable", `${rows.length} Body rows clear of the hint and ability bar; panel bottom ${Math.round(sb.bottom)}`);
+    const now = side.querySelector(".log li.now, .log li.note:last-child");
+    if (now) {
+      const sp = now.querySelector("span");
+      const clipped = sp.scrollWidth > sp.clientWidth + 1 || now.scrollWidth > now.clientWidth + 1;
+      if (clipped) t.problem("bug", `The highlighted log row is clipped: "${sp.textContent.slice(0, 40)}"`);
+      else t.event("log-row-whole", `highlighted log row wraps fully (${Math.round(now.getBoundingClientRect().height)}px): "${sp.textContent.slice(0, 40)}"`);
+    }
+  }
+}
+
 /** Smoke's last step: take control outside, climb the first rooftop with a stair, throw one bolt (E). */
 async function roofBolt(t) {
   const C = window.day.control;
@@ -328,6 +361,7 @@ async function roofBolt(t) {
   const barUp = !!(barEl && !barEl.hidden && slotEl);
   if (barUp) t.event("ability-bar", `bar up: ${P.now().abilities.map((x) => x.key.toUpperCase() + " " + x.name).join(", ")}; energy ${Math.round(P.now().energy)}`);
   else t.problem("bug", "The ability bar isn't showing while he's the player's");
+  hudReadable(t);
   if (barUp) {
     const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
     const bar = barEl.getBoundingClientRect();
