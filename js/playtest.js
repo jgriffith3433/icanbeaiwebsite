@@ -2385,6 +2385,103 @@ async function weatherAudio(options, t) {
   t.progress(1);
 }
 
+/* ---------------- atmosphere: rain intensity, pressure scores the music, mute is remembered, frame rate ---------------- */
+// Real input: Sound on with a pointer, Enter to take control, key 3 for rain (and weather.set for a light
+// shower: a named setup shortcut), the Pressure meter set low then high (abilities.reset: a named shortcut),
+// M to mute, and a frame-rate sample in the rain and at the full storm.
+async function atmosphere(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const W = window.weather;
+  const S = window.day && window.day.score;
+  const C = window.day.control;
+  const P = window.powers;
+  if (!W || !S || !C || !P) {
+    t.problem("bug", "Weather, score, control or powers is missing");
+    return;
+  }
+  const d = window.day.today();
+  const out = d.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(d);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  await sleep(400);
+  clickSpeed(1);
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") !== "true") {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 5, pointerType: "mouse" }));
+    sound.click();
+  }
+  await sleep(500);
+  if (sound.getAttribute("aria-pressed") !== "true") t.problem("bug", "Sound button didn't turn on");
+  t.event("sound-on", `button "${sound.textContent}", saved ${localStorage.getItem("icanbe.sound")}`);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const street = window.DAY_CONFIG.street || { z: 12.6 };
+  await goTo(C.state().x, street.z, t, { close: 1.4, ms: 16000, progress: 0.3 });
+  t.progress(0.3);
+
+  // 1. Rain intensity: a light shower, then the full downpour (key 3). Sight (streaks) and sound (rain level).
+  const fps = async (ms) => {
+    let n = 0;
+    const t0 = performance.now();
+    await new Promise((res) => {
+      const f = () => (performance.now() - t0 < ms ? (n++, requestAnimationFrame(f)) : res());
+      requestAnimationFrame(f);
+    });
+    return (n * 1000) / (performance.now() - t0);
+  };
+  W.set("rain", 0.3, "playtest");
+  await sleep(5000);
+  const light = W.now();
+  const lightAmb = S.now().amb.rain;
+  t.event("rain-light", `rain ${light.rain.toFixed(2)}, rain sound ${lightAmb.toFixed(2)}`);
+  pressKey("3");
+  await sleep(5500);
+  const heavy = W.now();
+  const heavyAmb = S.now().amb.rain;
+  t.event("rain-heavy", `rain ${heavy.rain.toFixed(2)}, rain sound ${heavyAmb.toFixed(2)}`);
+  if (!(heavy.rain > light.rain + 0.1)) t.problem("bug", `Rain doesn't grow with intensity (${light.rain.toFixed(2)} → ${heavy.rain.toFixed(2)})`);
+  if (!(heavyAmb > lightAmb + 0.05)) t.problem("bug", `Rain sound doesn't grow with intensity (${lightAmb.toFixed(2)} → ${heavyAmb.toFixed(2)})`);
+  const rainFps = await fps(2500);
+  t.metric("fpsRain", Math.round(rainFps));
+  t.progress(0.5);
+
+  // 2. Pressure scores the music: low meter, then high.
+  P.abilities.reset(4);
+  await sleep(3000);
+  const low = S.now();
+  t.event("pressure-low", `pressure ${low.pressure}, tension ${low.tension}, music speed ${low.rate}, pulse ${low.pulse} Hz`);
+  P.abilities.reset(96);
+  await sleep(4500);
+  const high = S.now();
+  t.event("pressure-high", `pressure ${high.pressure}, tension ${high.tension}, music speed ${high.rate}, pulse ${high.pulse} Hz`);
+  if (!(high.tension > low.tension + 0.3)) t.problem("bug", `Music doesn't shift with pressure (tension ${low.tension} → ${high.tension})`);
+  if (!(high.rate > low.rate)) t.problem("bug", "The music doesn't speed up at high pressure");
+  t.progress(0.7);
+
+  // 3. Mute is there and remembered.
+  pressKey("m");
+  await sleep(300);
+  const muted = sound.getAttribute("aria-pressed") !== "true";
+  t.event("mute", `M pressed: button "${sound.textContent}", saved ${localStorage.getItem("icanbe.sound")}, heard ${S.now().heard.toFixed(3)}`);
+  if (!muted || localStorage.getItem("icanbe.sound") !== "off") t.problem("bug", "Mute (M) didn't turn Sound off and save it");
+  if (S.now().heard > 0.02) t.problem("bug", "Still hearing the score after mute");
+  pressKey("m");
+  await sleep(300);
+  t.event("unmute", `button "${sound.textContent}", saved ${localStorage.getItem("icanbe.sound")}`);
+  if (sound.getAttribute("aria-pressed") !== "true" || localStorage.getItem("icanbe.sound") !== "on") t.problem("bug", "Unmute didn't turn Sound on and save it");
+
+  // 4. Frame rate in a full storm with the pressure score up.
+  pressKey("4");
+  await sleep(4000);
+  const stormFps = await fps(3000);
+  t.metric("fpsStorm", Math.round(stormFps));
+  t.event("fps", `rain ${rainFps.toFixed(0)} fps, storm ${stormFps.toFixed(0)} fps`);
+  if (Math.min(rainFps, stormFps) < 30) t.problem("bug", `Frame rate dipped under 30 fps (rain ${rainFps.toFixed(0)}, storm ${stormFps.toFixed(0)})`);
+  t.progress(1);
+}
+
 /* ---------------- powers: storm, lightning, gust, tornado, and the Pressure meter ---------------- */
 // Real input: day bar beside the car (setup), Sound on, Enter, WASD to the avenue near the loose props,
 // hold F for the storm, E bolt, G gust, T tornado; then try one dry so the meter refuses.
@@ -4809,6 +4906,7 @@ installPlaytest({
     { id: "crowd", title: "The street's people and cars follow the clock: quiet at 3 AM, busy at the 8:30 rush, full at lunch and dinner, thin again late; they walk, cross, go in and out of buildings; rain opens umbrellas; Quality: low thins them; frame rate at each", seconds: 90, tags: ["crowd", "photos"], description: "Day bar beside the car and to each hour (setup), then 1x. Enter, WASD with Shift to the shops, key 3, the quality button. Events crowd-night / crowd-rush / crowd-lunch / crowd-dinner / crowd-late / crowd-follows-clock / crowd-rain / crowd-quality-low / photo-fps; metrics crowd<Hour>People, crowd<Hour>Cars, photoFpsMin, photoFpsAvg." },
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
+    { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
@@ -4851,6 +4949,7 @@ installPlaytest({
       else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
       else if (id === "crowd-reacts") await crowdReacts(options, t);
+      else if (id === "atmosphere") await atmosphere(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);

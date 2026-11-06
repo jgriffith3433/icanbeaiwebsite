@@ -188,10 +188,11 @@
   let audio = null;
   let soundOn = false;
   let nextBeep = 0;
-  el.sound.addEventListener("click", () => {
-    soundOn = !soundOn;
+  function paintSound() {
     el.sound.setAttribute("aria-pressed", soundOn ? "true" : "false");
     el.sound.textContent = soundOn ? "Sound on" : "Sound off";
+  }
+  function ensureAudio() {
     if (soundOn && !audio) {
       try {
         audio = new (window.AudioContext || window.webkitAudioContext)();
@@ -200,6 +201,30 @@
       }
     }
     if (audio && audio.state === "suspended") audio.resume();
+  }
+  el.sound.addEventListener("click", () => {
+    soundOn = !soundOn;
+    try { localStorage.setItem("icanbe.sound", soundOn ? "on" : "off"); } catch (e) { /* private mode */ }
+    paintSound();
+    ensureAudio();
+  });
+  // The mute choice is remembered. A saved "on" shows as on and starts the audio at the first gesture
+  // (browsers won't play before one); a saved "off" stays off, and the title's Play leaves it off.
+  let savedSound = null;
+  try { savedSound = localStorage.getItem("icanbe.sound"); } catch (e) { /* none */ }
+  window.__soundSaved = savedSound;
+  if (savedSound === "on") {
+    soundOn = true;
+    paintSound();
+    const arm = () => ensureAudio();
+    ["pointerdown", "keydown", "touchstart"].forEach((t) => window.addEventListener(t, arm, { once: true, capture: true }));
+  }
+  // M mutes and unmutes (not while typing, or with a modifier).
+  window.addEventListener("keydown", (e) => {
+    if ((e.key || "").toLowerCase() !== "m" || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    const tg = e.target && e.target.tagName;
+    if (tg === "INPUT" || tg === "TEXTAREA") return;
+    el.sound.click();
   });
   function beep(at, freq, len, vol) {
     if (!audio) return;

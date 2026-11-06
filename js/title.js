@@ -79,7 +79,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
 
   let up = false;
   let shownAt = 0;
-  let musicWanted = true; // Play turns the Sound on unless the player said no here
+  let musicWanted = window.__soundSaved !== "off"; // Play turns the Sound on unless the player said no here
   let clockTimer = 0;
   const log = [];
 
