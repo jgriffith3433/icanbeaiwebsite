@@ -324,6 +324,89 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     BARKS — Small Weather's small reactions in the log (js/barks.js)
+     ------------------------------------------------------------------------
+     One short log line when a need gets loud (hunger, thirst, tired, bladder, stress, boredom) or the
+     sky changes under him. Voice rules: docs/voice-style.md. A line is used once per in-game day (the
+     module keeps the day's used lines), so a pool that runs dry stays quiet. `x@rain` pools are for
+     the need while it's raining. Gaps are sim minutes (`gap` between any two need barks, `again` for
+     the same need); `delay` is real seconds after the weather changes.
+     ------------------------------------------------------------------------ */
+  barks: {
+    gap: 25,
+    again: 150,
+    delay: 1.6,
+    weatherGap: 12,
+    needs: {
+      hunger: { above: 0.62, lines: [
+        "His stomach says something. He agrees with it.",
+        "Hungry now. The next meal can't come soon enough.",
+        "He thinks about toast. Only toast.",
+      ] },
+      thirst: { above: 0.64, lines: [
+        "His mouth is dry. Water, soon.",
+        "He licks his lips and looks for the glass.",
+        "Thirsty enough to notice it. Not enough to stop.",
+      ] },
+      energy: { below: 0.3, lines: [
+        "His eyes go heavy. He blinks it off.",
+        "He rubs his face. Long day.",
+        "He is running low, and knows it.",
+      ] },
+      bladder: { above: 0.82, lines: [
+        "He shifts in place. That can't wait much longer.",
+        "He is going to need a bathroom. Soon.",
+      ] },
+      stress: { above: 0.55, lines: [
+        "His shoulders have crept up to his ears. He drops them.",
+        "A slow breath out. Then he goes back to it.",
+      ] },
+      boredom: { above: 0.72, lines: [
+        "He taps the desk. Twice. Then again.",
+        "He has watched the same patch of wall for a while now.",
+      ] },
+      "hunger@rain": { above: 0.62, lines: [
+        "Rain and an empty stomach. Soup, he decides.",
+        "Hungry, and the rain makes it worse.",
+      ] },
+      "thirst@rain": { above: 0.64, lines: [
+        "It is pouring and he is thirsty. He sees the joke and keeps it to himself.",
+      ] },
+    },
+    weather: {
+      rain: [
+        "Rain. He lets it be a minute before he moves.",
+        "The rain suits him. He doesn't say so.",
+        "He listens to the rain on the glass.",
+      ],
+      storm: [
+        "Thunder, close. He feels it in his teeth and grins.",
+        "A storm. His hands go still, then easy.",
+        "The sky goes dark and he is the calmest thing in it.",
+      ],
+      fog: [
+        "Fog takes the far end of the street. He leaves it alone.",
+        "The edges of everything go soft. He likes that.",
+      ],
+      wind: [
+        "Wind. He holds his jacket shut and lets it push.",
+        "Something loose rattles outside. He knows the sound.",
+      ],
+      snow: [
+        "Snow. He watches the first of it come down.",
+        "Everything goes quiet. He lets it.",
+      ],
+      clear: [
+        "Clear sky. He lets out a breath he didn't know he had.",
+        "The clouds are gone. He misses them a little.",
+      ],
+      clouds: [
+        "Clouds, low and grey. Good light for thinking.",
+      ],
+    },
+  },
+
+  /* ------------------------------------------------------------------------
      SCORE — adaptive music and ambience that follow the weather (js/score.js)
      ------------------------------------------------------------------------
      Loopable beds from Hawkes Gen audio.music (ACE-Step), ambience and thunder

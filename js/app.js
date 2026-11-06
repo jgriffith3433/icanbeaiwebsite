@@ -19,6 +19,7 @@ import "./control.js"; // the player can take control of him
 import "./weather.js"; // the day's forecast, and the weather he commands while he's the player's
 import "./score.js"; // weather music beds, sampled ambience, take-control sting (after weather)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
+import "./barks.js"; // Small Weather's needs and weather reactions in the log, once each per day (docs/voice-style.md)
 import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
