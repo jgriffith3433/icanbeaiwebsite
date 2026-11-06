@@ -471,9 +471,28 @@ function install() {
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
     glidePull = 0;
   }
+  /* The take-over push: the camera starts wide and fast-pushes in to his shoulder (js/moments.js asks for it).
+     Any move, jump or stick input, or push(null), ends it. */
+  const push = { on: false, t: 0, secs: 1.4, extra: 0, fov: 0, baseFov: 0 };
+  function pushStart(spec) {
+    if (!spec) return pushEnd();
+    push.on = true;
+    push.t = 0;
+    push.secs = spec.secs || 1.4;
+    push.extra = Math.max(0, (spec.from || 14) - wantRadius);
+    push.fov = spec.fov || 0;
+    push.baseFov = camera.fov;
+    return true;
+  }
+  function pushEnd() {
+    if (!push.on) return false;
+    push.on = false;
+    camera.fov = push.baseFov || camera.fov;
+    return true;
+  }
   function cameraFollow(dt, look) {
     // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
-    if (lastRadius != null && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
+    if (!push.on && lastRadius != null && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
     camera.alpha -= look.x * 2.4 * dt;
     camera.beta = Math.max(camera.lowerBetaLimit, Math.min(camera.upperBetaLimit, camera.beta - look.y * 1.5 * dt));
     const t = camera.target;
@@ -483,6 +502,14 @@ function install() {
     const pullWant = s.gliding ? (RIDE.cameraPull || 3.4) : 0;
     glidePull = damp(glidePull, pullWant, dt, 2.4);
     let r = wantRadius + glidePull;
+    if (push.on) {
+      push.t += dt;
+      const k = Math.min(1, push.t / push.secs);
+      const e = 1 - Math.pow(1 - k, 3);
+      r += push.extra * (1 - e);
+      camera.fov = push.baseFov + push.fov * (1 - e);
+      if (k >= 1) pushEnd();
+    }
     const dx = Math.cos(camera.alpha) * Math.sin(camera.beta);
     const dy = Math.cos(camera.beta);
     const dz = Math.sin(camera.alpha) * Math.sin(camera.beta);
@@ -495,7 +522,7 @@ function install() {
       p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay);
       if (camRay.hasHit) r = Math.max(1.2, B.Vector3.Distance(t, camRay.hitPoint) - 0.3);
     }
-    camera.radius = r < camera.radius ? r : damp(camera.radius, r, dt, 3);
+    camera.radius = r < camera.radius || push.on ? r : damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
   }
 
@@ -766,6 +793,7 @@ function install() {
     catchUpAt = 0;
     keys.clear();
     stick.x = stick.y = 0;
+    pushEnd();
     day.note(L.letGo);
     mark("let-go", { via });
     syncUi();
@@ -778,6 +806,7 @@ function install() {
       avatar.show(false);
       world.avatar.show(true);
     }
+    pushEnd();
     cameraGive();
     document.documentElement.classList.remove("catching-up");
     day.note(how === "catch-up" ? L.catchUp : L.back);
@@ -803,7 +832,9 @@ function install() {
         ambientAge = 0;
         refreshAmbientUpdrafts();
       }
-      mover.step(dt, readInput(gp));
+      const inp = readInput(gp);
+      if (push.on && (inp.jump || inp.x || inp.z)) pushEnd();
+      mover.step(dt, inp);
       tickGlideFx(dt);
       text = steeringLines[Math.floor(since / 9) % steeringLines.length];
     } else {
@@ -856,6 +887,8 @@ function install() {
     ride: RIDE,
     log: () => log.slice(),
     take: () => take("console"),
+    push: (spec) => pushStart(spec),
+    pushing: () => push.on,
     letGo: () => letGo("console"),
     spawnUpdraft: (x, z, opt) => {
       const d = mover.spawnUpdraft(x != null ? x : s.x, z != null ? z : s.z, Object.assign({

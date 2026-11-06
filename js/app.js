@@ -23,6 +23,8 @@ import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to powe
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
+import "./opening.js"; // the first Play: a short skippable intro on Small Weather
+import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./title.js"; // the title screen: the skyline, Play and Episodes (opens first)
 import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause perf & leak monitor (window.hawkesPerf)
 import HavokPhysics from "@babylonjs/havok";
