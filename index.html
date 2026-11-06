@@ -40,8 +40,9 @@
         } catch (e) {}
       })();
     </script>
-    <script src="https://hawkesgen.ai/sdk/analytics@1.js" data-product="icanbe"></script>
-    <script>window.hawkesAnalytics && hawkesAnalytics.loadStart();</script>
+    <script src="https://hawkesgen.ai/sdk/analytics@1.js" data-product="icanbe" defer></script>
+    <!-- deferred, so a slow hawkesgen.ai can't hold up parsing; a module script runs in order after it, before js/app.js -->
+    <script type="module">window.hawkesAnalytics && hawkesAnalytics.loadStart();</script>
   </head>
   <body>
     <canvas id="view" aria-label="A 3D view of Small Weather's day"></canvas>
