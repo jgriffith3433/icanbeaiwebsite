@@ -69,6 +69,10 @@ function cfg() {
     whoosh: s.whoosh || DEFAULT_PATHS.whoosh,
     whooshVol: mix.whoosh,
     ambience: Object.assign({}, DEFAULT_PATHS.ambience, s.ambience || {}),
+    // Pressure scoring: the meter fraction where tension starts, the drone's top level, the beds' top speed-up.
+    pressureFrom: s.pressure && s.pressure.from != null ? s.pressure.from : 0.4,
+    pressureGain: s.pressure && s.pressure.gain != null ? s.pressure.gain : 0.5,
+    pressureRate: s.pressure && s.pressure.rate != null ? s.pressure.rate : 0.06,
   };
 }
 
@@ -123,6 +127,10 @@ export function startScore(dayApi) {
   let whooshAt = 0;
   let lastCrack = 0;
   let tone = null;
+  // Pressure (the energy meter) scores the music: above `pressureFrom` a low drone with a pulse swells in,
+  // the beds speed up a little and the night low-pass opens. All procedural: no files.
+  let tension = null; // { gain, lp, oscs, lfo, lfoGain }
+  let pk = 0;
   let duckUntil = 0;
   let duckK = 1;
   const live = {
@@ -141,6 +149,10 @@ export function startScore(dayApi) {
     tone: 18000,
     duck: 1,
     title: false,
+    pressure: 0,
+    tension: 0,
+    rate: 1,
+    pulse: 0,
   };
 
   function ensureCtx() {
@@ -172,6 +184,42 @@ export function startScore(dayApi) {
       return null;
     }
     return ctx;
+  }
+
+  function ensureTension() {
+    if (tension || !ctx) return tension;
+    try {
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 500;
+      const pulse = ctx.createGain(); // the throb
+      pulse.gain.value = 0.7;
+      const oscs = [55, 82.4, 110.6].map((f, i) => {
+        const o = ctx.createOscillator();
+        o.type = i === 2 ? "triangle" : "sawtooth";
+        o.frequency.value = f;
+        o.detune.value = i * 7 - 7;
+        o.connect(lp);
+        o.start();
+        return o;
+      });
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.8;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 0.3;
+      lfo.connect(lfoGain);
+      lfoGain.connect(pulse.gain);
+      lfo.start();
+      lp.connect(pulse);
+      pulse.connect(g);
+      g.connect(musicBus);
+      tension = { gain: g, lp, oscs, lfo };
+    } catch (err) {
+      tension = null;
+    }
+    return tension;
   }
 
   async function loadUrl(url) {
@@ -396,13 +444,37 @@ export function startScore(dayApi) {
     live.duck = duckK;
     live.title = titleUp;
 
+    // Pressure: how full the meter is (0..1), eased so a call's spend falls away smoothly.
+    let pTarget = 0;
+    try {
+      const pw = window.powers && window.powers.now && window.powers.now();
+      if (pw && pw.pressure != null && pw.max) pTarget = Math.max(0, Math.min(1, pw.pressure / pw.max));
+    } catch (e) { /* no powers yet */ }
+    pk += (pTarget - pk) * Math.min(1, d * 0.9);
+    const from = c.pressureFrom;
+    const tk = Math.max(0, Math.min(1, (pk - from) / Math.max(0.01, 1 - from)));
+    const T = ensureTension();
+    if (T) {
+      T.gain.gain.value = on ? tk * tk * c.pressureGain : 0;
+      T.lp.frequency.value = 260 + tk * 1100;
+      T.lfo.frequency.value = 0.7 + tk * 2.6;
+    }
+    const rate = 1 + tk * c.pressureRate;
+    Object.keys(music).forEach((k) => {
+      if (music[k] && music[k].src && music[k].src.playbackRate) music[k].src.playbackRate.value = rate;
+    });
+    live.pressure = Math.round(pk * 100) / 100;
+    live.tension = Math.round(tk * 100) / 100;
+    live.rate = Math.round(rate * 1000) / 1000;
+    live.pulse = T ? Math.round(T.lfo.frequency.value * 100) / 100 : 0;
+
     const state = (window.weather && window.weather.now && window.weather.now().state) || "clear";
     const hour = simHour();
     const night = isNightHour(hour, c);
     live.tod = night ? "night" : "day";
     // Night softens the top end of every bed a little (a low-pass), the night bed most of all.
     if (tone) {
-      const goal = night ? c.mix.nightTone : 18000;
+      const goal = night ? c.mix.nightTone + (18000 - c.mix.nightTone) * tk * 0.5 : 18000;
       tone.frequency.value += (goal - tone.frequency.value) * Math.min(1, d * 0.6);
       live.tone = Math.round(tone.frequency.value);
     }
@@ -468,6 +540,10 @@ export function startScore(dayApi) {
       tone: live.tone,
       duck: Math.round(live.duck * 100) / 100,
       title: live.title,
+      pressure: live.pressure,
+      tension: live.tension,
+      rate: live.rate,
+      pulse: live.pulse,
       mix: Object.assign({}, cfg().mix),
       // which file each of the day/night beds is playing (its own, or the fallback until Gen's file lands)
       files: { day: ctx ? bedUrl("day", cfg()) : null, night: ctx ? bedUrl("night", cfg()) : null },

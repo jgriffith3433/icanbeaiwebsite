@@ -427,6 +427,9 @@ window.DAY_CONFIG = {
        `day: "audio/music/day.mp3", night: "audio/music/night.mp3"` below), they play the clear and snow beds. */
     nightFrom: 19.75,
     nightTo: 6.25,
+    /* Pressure scores the music (js/score.js): above `from` of the meter a low drone and pulse swell in
+       (top level `gain`), the beds speed up by up to `rate`, and the night low-pass opens. Procedural, no files. */
+    pressure: { from: 0.4, gain: 0.5, rate: 0.06 },
     fallback: { day: "clear", night: "snow" },
     music: {
       clear: "audio/music/clear.mp3",
