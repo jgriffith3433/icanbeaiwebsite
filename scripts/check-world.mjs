@@ -395,6 +395,31 @@ if (modelPath) {
     const box = skin.root.getHierarchyBoundingVectors(true);
     const tall = box.max.y - box.min.y;
     ok(tall >= 1.55 && tall <= 1.9, `his model is ${tall.toFixed(2)} m tall (expected 1.55–1.90 m)`);
+    // In bed: lying, on his side and reclined, head toward the headboard, body inside the bed and on the mattress.
+    const bedSpot = day.spots.bed;
+    if (bedSpot) {
+      const node = (n) => skin.root.getChildTransformNodes(false).find((t) => t.name.endsWith(n));
+      for (const [pose, hand] of [['lie', 'none'], ['side', 'none'], ['recline', 'phone']]) {
+        for (let i = 0; i < 3; i++) {
+          const f = JSON.parse(JSON.stringify(E.frame(day, day.dayStart + 10)));
+          Object.assign(f.person, { x: bedSpot.x, z: bedSpot.z, yaw: bedSpot.face, pose, hand, walking: false, inCar: false });
+          world.update(f, 0.5, { snap: true });
+        }
+        world.scene.render();
+        skin.meshes.forEach((m) => m.skeleton && m.skeleton.prepare(true));
+        const at = (n) => {
+          const v = node(n).getAbsolutePosition();
+          return { x: v.x - bedSpot.x, y: v.y, z: v.z - bedSpot.z };
+        };
+        const head = at('Head');
+        const hips = at('Hips');
+        const feet = [at('LeftFoot'), at('RightFoot')];
+        ok(head.z < hips.z - 0.5 && head.z > -1.25, `${pose} in bed: his head is at z ${head.z.toFixed(2)} (hips ${hips.z.toFixed(2)}): not on the pillow end`);
+        ok(feet.every((v) => v.z > hips.z + 0.3 && v.z < 0.8), `${pose} in bed: his feet are not at the foot of the bed`);
+        ok([head, hips, ...feet].every((v) => Math.abs(v.x) < 0.45), `${pose} in bed: he is not along the bed's long axis`);
+        ok(hips.y > 0.7 && hips.y < 0.95, `${pose} in bed: his hips are at y ${hips.y.toFixed(2)}, not on the mattress (0.62)`);
+      }
+    }
     modelInfo = `model ${(bytes.length / 1048576).toFixed(2)} MB, ${skin.clips.length} clips, ${tall.toFixed(2)} m, his day played ${[...seen].join(' ')}`;
   }
 }
