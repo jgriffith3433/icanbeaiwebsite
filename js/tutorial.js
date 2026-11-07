@@ -43,6 +43,8 @@ export function startTutorial() {
     // A bot (any scenario but first-visit and smoke) starts with empty storage: keep the card out of its way.
     const id = new URLSearchParams(location.search).get("playtest");
     if (id && id !== "first-visit" && id !== "smoke") quietForPlaytest = true;
+    // The runner can start a scenario without ?playtest= (start() on a webdriver tab): also quiet.
+    else if (!id && navigator.webdriver) quietForPlaytest = true;
   } catch (e) { /* no location */ }
 
   function seen() {
