@@ -391,6 +391,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-hud .rankline b{font-size:1.15rem;color:#f6f1e8}
 .ep-hud .pieceline{margin-top:6px;color:#9fd4ff}
 .ep-hud .pieceline.late{color:#e58a7a}
+@media (min-width:900px){html:has(.side:not([hidden])) .ep-hud{right:calc(var(--gutter,18px) + 330px + 12px)}}
 .ep-panel .rank{margin:6px 0 0;font:800 4rem/1 Outfit,system-ui,sans-serif;letter-spacing:.02em;color:#f0c27a}
 .ep-panel .rank.r-S{color:#ffe08a;text-shadow:0 0 22px rgba(255,224,138,.6)}.ep-panel .rank.r-A{color:#8dceb0}.ep-panel .rank.r-B{color:#9fd4ff}.ep-panel .rank.r-C{color:#e58a7a}
 .ep-panel .rankdetail{font-size:.9rem;color:rgba(246,241,232,.75);margin:2px 0 8px}
