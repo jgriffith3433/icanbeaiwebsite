@@ -1705,7 +1705,7 @@ async function city(options, t) {
 // Day bar to the sidewalk (setup), then real keys walk him in front of a block. Scrub holds the clock
 // (a scrub leaves the day paused) so the three times stay put for the shot. The quality button is a real click.
 async function look(options, t) {
-  t.scene("City noon");
+  t.scene("Setup: beside the car");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.look, 8000, "the city look");
@@ -1715,11 +1715,13 @@ async function look(options, t) {
   const shop = ((cfg.city && cfg.city.blocks) || []).find((b) => b.id === "shop") || { x: 50, z: 0.5 };
   const outside = carSideMoment(day);
   if (!outside) {
-    t.problem("bug", "No moment beside the car to stand in the street");
+    t.problem("blocker", "No moment beside the car to stand in the street (look can't start)");
     return;
   }
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   await sleep(500);
+  const at0 = window.day.now().minutes;
+  if (Math.abs(at0 - outside.start) > 5) t.problem("bug", `The setup didn't reach the car (clock ${at0.toFixed(0)} min, wanted ${outside.start.toFixed(0)})`);
   const C = window.day.control;
   if (!C) {
     t.problem("bug", "There's no Take control");
@@ -1735,6 +1737,8 @@ async function look(options, t) {
     t.scene(sceneName);
     scrubTo(minutes);
     return sleep(900).then(() => {
+      const clock = window.day.now().minutes;
+      if (Math.abs(clock - minutes) > 15) t.problem("bug", `${sceneName}: the clock reads ${Math.floor(clock / 60)}:${String(Math.floor(clock % 60)).padStart(2, "0")}, not the scene's time`);
       const info = window.day.look.info();
       const sky = info.sky || {};
       t.event(eventName, `${sceneName}: source ${info.source}, ${info.pbr} PBR, ${info.textured} textured, ${info.neon} neon, exposure ${info.exposure.toFixed(2)}, sky ${sky.day.toFixed(2)}/${sky.dusk.toFixed(2)}/${sky.night.toFixed(2)}, neon ${info.neonLevel.toFixed(2)}`);
