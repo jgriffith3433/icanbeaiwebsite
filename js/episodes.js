@@ -404,6 +404,9 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-toast.on{opacity:1;transform:translate(-50%,0)}
 .ep-offer,.ep-score,.ep-menu,.ep-ending{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
 body:has(.ep-offer:not([hidden])) .mo-line,body:has(.ep-offer:not([hidden])) .control-hint{visibility:hidden}
+html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abilitybar,html.ep-offer-up #control,html.ep-offer-up .tutorial{visibility:hidden}
+.ep-offer{z-index:60;background:rgba(6,8,14,.82)}
+.ep-offer .ep-panel{background:#0e1016}
 .ep-offer[hidden],.ep-score[hidden],.ep-menu[hidden],.ep-ending[hidden]{display:none}
 .ep-panel{width:min(420px,100%);background:rgba(14,16,22,.92);border:1px solid rgba(246,241,232,.18);border-radius:20px;padding:22px 22px 18px;color:#f6f1e8;font:500 0.95rem/1.4 Outfit,system-ui,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.45)}
 .ep-panel h2{margin:0 0 6px;font-size:1.25rem}
@@ -1381,10 +1384,12 @@ body:has(.ep-offer:not([hidden])) .mo-line,body:has(.ep-offer:not([hidden])) .co
     offerHint.textContent = ep.tutorial ? "" : L.offer;
     offerHint.hidden = !offerHint.textContent;
     offer.hidden = false;
+    document.documentElement.classList.add("ep-offer-up");
     mark("offer", { id: ep.id });
   }
   function hideOffer() {
     offer.hidden = true;
+    document.documentElement.classList.remove("ep-offer-up");
     offerEp = null;
   }
   /* ---- the finale: the show's cues, judged on timing; the stage is js/finale.js ---- */
