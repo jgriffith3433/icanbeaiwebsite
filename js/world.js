@@ -1207,9 +1207,9 @@
       sitBed: { y: 0.71, pitch: 0, roll: 0, torso: 0.12, hip: -1.45, knee: 1.4, sh: -0.2, el: -0.6 },
       toilet: { y: 0.61, pitch: 0, roll: 0, torso: 0.18, hip: -1.5, knee: 1.5, sh: -0.35, el: -0.95 },
       sitCar: { y: 0.55, pitch: 0, roll: 0, torso: -0.18, hip: -1.3, knee: 1.05, sh: -0.95, el: -0.55 },
-      lie: { y: 0.8, pitch: -PI / 2, roll: 0, torso: 0, hip: 0, knee: 0, sh: 0.08, el: -0.15 },
+      lie: { y: 0.76, pitch: -PI / 2, roll: 0, torso: 0, hip: 0, knee: 0, sh: 0.08, el: -0.15 },
       side: { y: 0.86, pitch: -PI / 2, roll: 1.35, torso: 0.1, hip: -0.55, knee: 0.95, sh: -0.7, el: -1.1 },
-      recline: { y: 0.88, pitch: -1.0, roll: 0, torso: 0, hip: -0.6, knee: 0.08, sh: -0.2, el: -0.7 },
+      recline: { y: 0.78, pitch: -1.0, roll: 0, torso: 0, hip: -0.6, knee: 0.08, sh: -0.2, el: -0.7 },
       /* the player's moves (js/control.js): the stand-in for a rigged model's clips */
       run: { y: 1.0, pitch: 0, roll: 0, torso: 0.2, hip: -0.1, knee: 0.15, sh: 0.0, el: -1.35, swing: 1.7 },
       jump: { y: 1.01, pitch: 0, roll: 0, torso: 0.12, hip: -0.75, knee: 1.25, sh: -0.9, el: -0.7 },
@@ -1669,9 +1669,12 @@
         quiltDown.setEnabled(!(inBed && things.blanket !== "down"));
         /* lying: the quilt covers him from the hips down, so his chest, head and the 3D model show above it */
         const lying = pp.pose === "lie" || pp.pose === "side";
-        quiltUp.scaling.z = pp.pose === "recline" ? 0.72 : lying ? 0.8 : 1;
-        quiltUp.position.z = pp.pose === "recline" ? 0.55 : lying ? 0.58 : 0.36;
-        quiltUp.position.y = lying ? 0.96 : 0.9;
+        /* on his back the quilt comes up to his chest (his torso under it, head on the pillow); on his side
+           (shoulder up) and reclined it stays at the hips */
+        const toChest = pp.pose === "lie";
+        quiltUp.scaling.z = pp.pose === "recline" ? 0.72 : lying && !toChest ? 0.8 : 1;
+        quiltUp.position.z = pp.pose === "recline" ? 0.55 : lying && !toChest ? 0.58 : 0.36;
+        quiltUp.position.y = toChest ? 0.94 : lying ? 0.96 : 0.9;
       }
 
       /* car */

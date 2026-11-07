@@ -44,7 +44,9 @@ export function makeSkin(B, scene, res, hipsTarget, container) {
   const glbRoot = res.meshes[0];
   const wrap = new B.TransformNode("small-weather", scene);
   wrap.setEnabled(false);
-  glbRoot.parent = wrap;
+  /* With a container, __root__ is parented to the wrap only in attach(), after addAllToScene(): parenting it to a node
+     outside the container makes Babylon warn "Asset Container hierarchy is not valid" and rebuild the hierarchy. */
+  if (!container) glbRoot.parent = wrap;
   const meshes = res.meshes.filter((m) => m.getTotalVertices && m.getTotalVertices() > 0);
   /* __root__ has no vertices but parents the mesh; it stays enabled, so it counts as his */
   if (glbRoot && !meshes.includes(glbRoot)) meshes.unshift(glbRoot);
@@ -143,6 +145,7 @@ export function makeSkin(B, scene, res, hipsTarget, container) {
       if (container) {
         container.addAllToScene();
         container = null;
+        glbRoot.parent = wrap;
       }
       wrap.setEnabled(true);
     },

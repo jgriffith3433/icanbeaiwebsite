@@ -208,6 +208,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   font-size: 0.84rem;
   line-height: 1.32;
 }
+/* a long log must not push BODY out of the panel: the log scrolls on its own */
+.side .log { max-height: 30vh; overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain; }
 .log li {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
@@ -226,7 +228,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .log li.past:nth-child(1) { opacity: 0.45; }
 .log li.past:nth-child(2) { opacity: 0.6; }
 .log li.past:nth-child(3) { opacity: 0.75; }
-.log li.now {
+.side .log li.now {
+  width: auto; /* the clock panel's .now sets a 460px width; don't inherit it on the current row */
   background: rgba(255, 255, 255, 0.1);
   color: var(--ink);
 }

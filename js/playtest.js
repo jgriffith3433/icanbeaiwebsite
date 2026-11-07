@@ -329,7 +329,7 @@ async function roofBolt(t) {
   }
   await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1)
+  const outside = carSideMoment(day)
     || day.actions.find((a) => /steps out/.test(a.text || ""))
     || quietMoment(day);
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
@@ -537,7 +537,7 @@ async function neighborsScenario(options, t) {
   const toast = () => $("neighbor-toast");
 
   // setup: the clock beside the car, then Take control
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) {
     t.problem("bug", "No moment beside the car to take control");
     return;
@@ -637,7 +637,7 @@ async function weatherAbilities(options, t) {
     return;
   }
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1)
+  const outside = carSideMoment(day)
     || day.actions.find((a) => /steps out/.test(a.text || ""))
     || quietMoment(day);
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
@@ -1121,6 +1121,14 @@ async function measure(act) {
 }
 
 /** A quiet moment at home: he's on the couch (or anywhere at home, not walking, for a while). */
+/** A moment he stands beside his car at home (unlock, out of the car, lock): the longest one. Action times are sim
+ * minutes and these last only 3-7 sim seconds (0.04-0.12), so there is no minimum length. */
+function carSideMoment(day) {
+  return day.actions
+    .filter((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.pose !== "walk" && a.end > a.start)
+    .reduce((best, a) => (!best || a.end - a.start > best.end - best.start ? a : best), null);
+}
+
 function quietMoment(day) {
   const home = (a) => !a.inCar && !a.path && a.room && window.DAY_CONFIG.rooms[a.room] && window.DAY_CONFIG.rooms[a.room].building === "home";
   return (
@@ -1604,7 +1612,7 @@ async function city(options, t) {
     t.problem("bug", "There's no Take control");
     return;
   }
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   t.scene("Streets");
   if (!outside) {
     t.problem("bug", "No moment beside the car to take control");
@@ -1697,7 +1705,7 @@ async function city(options, t) {
 // Day bar to the sidewalk (setup), then real keys walk him in front of a block. Scrub holds the clock
 // (a scrub leaves the day paused) so the three times stay put for the shot. The quality button is a real click.
 async function look(options, t) {
-  t.scene("City noon");
+  t.scene("Setup: beside the car");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.look, 8000, "the city look");
@@ -1705,13 +1713,15 @@ async function look(options, t) {
   const cfg = window.DAY_CONFIG;
   const street = cfg.street || { z: 12.6 };
   const shop = ((cfg.city && cfg.city.blocks) || []).find((b) => b.id === "shop") || { x: 50, z: 0.5 };
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) {
-    t.problem("bug", "No moment beside the car to stand in the street");
+    t.problem("blocker", "No moment beside the car to stand in the street (look can't start)");
     return;
   }
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   await sleep(500);
+  const at0 = window.day.now().minutes;
+  if (Math.abs(at0 - outside.start) > 5) t.problem("bug", `The setup didn't reach the car (clock ${at0.toFixed(0)} min, wanted ${outside.start.toFixed(0)})`);
   const C = window.day.control;
   if (!C) {
     t.problem("bug", "There's no Take control");
@@ -1727,6 +1737,8 @@ async function look(options, t) {
     t.scene(sceneName);
     scrubTo(minutes);
     return sleep(900).then(() => {
+      const clock = window.day.now().minutes;
+      if (Math.abs(clock - minutes) > 15) t.problem("bug", `${sceneName}: the clock reads ${Math.floor(clock / 60)}:${String(Math.floor(clock % 60)).padStart(2, "0")}, not the scene's time`);
       const info = window.day.look.info();
       const sky = info.sky || {};
       t.event(eventName, `${sceneName}: source ${info.source}, ${info.pbr} PBR, ${info.textured} textured, ${info.neon} neon, exposure ${info.exposure.toFixed(2)}, sky ${sky.day.toFixed(2)}/${sky.dusk.toFixed(2)}/${sky.night.toFixed(2)}, neon ${info.neonLevel.toFixed(2)}`);
@@ -1788,7 +1800,7 @@ async function photos(options, t) {
   const day = window.day.today();
   const cfg = window.DAY_CONFIG;
   const street = cfg.street || { z: 12.6 };
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) {
     t.problem("bug", "No moment beside the car to stand in the street");
     return;
@@ -1869,7 +1881,7 @@ async function crowdScenario(options, t) {
   await t.until(() => window.day.crowd, 8000, "the crowd (js/crowd.js)");
   const day = window.day.today();
   const street = window.DAY_CONFIG.street || { z: 12.6 };
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) {
     t.problem("bug", "No moment beside the car to stand in the street");
     return;
@@ -2005,7 +2017,7 @@ async function fillOut(options, t) {
   const day = window.day.today();
   const cfg = window.DAY_CONFIG;
   const street = cfg.street || { z: 12.6 };
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) {
     t.problem("bug", "No moment beside the car to stand in the street");
     return;
@@ -2517,7 +2529,7 @@ async function powers(options, t) {
   const day = window.day.today();
   const cfg = window.DAY_CONFIG;
   const street = cfg.street || { z: 12.6 };
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1)
+  const outside = carSideMoment(day)
     || day.actions.find((a) => /steps out/.test(a.text || ""))
     || quietMoment(day);
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
@@ -2824,7 +2836,7 @@ async function stormRide(options, t) {
     t.problem("bug", "Need two roofs with stairs (apt and shop) for storm-riding");
     return;
   }
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1) || quietMoment(day);
+  const outside = carSideMoment(day) || quietMoment(day);
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
   await sleep(600);
@@ -3296,7 +3308,7 @@ async function scoreRanks(options, t) {
   const key = (cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best";
   try { localStorage.removeItem(key); } catch (err) { /* ignore */ }
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) return t.problem("bug", "No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
@@ -3411,7 +3423,7 @@ async function episodeSelect(options, t) {
   try { localStorage.removeItem(key); } catch (err) { /* ignore */ }
   const chain = cfg.episodes.list.filter((e) => !e.tutorial);
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) return t.problem("bug", "No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
@@ -3526,7 +3538,7 @@ async function storyParts(options, t) {
   try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
 
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) return t.problem("bug", "No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
@@ -3687,7 +3699,7 @@ async function lunchRescue(options, t) {
   try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
 
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) return t.problem("bug", "No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
@@ -3821,7 +3833,7 @@ async function hurricaneDrive(options, t) {
   try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
 
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) return t.problem("bug", "No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
@@ -3948,7 +3960,7 @@ async function storyEnding(options, t) {
   Ep.resetArc();
 
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) return t.problem("bug", "No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
@@ -4111,7 +4123,7 @@ async function lightShow(options, t) {
   } catch (err) { /* ignore */ }
 
   const day = window.day.today();
-  const outside = day.actions.find((a) => a.place === "carSideHome" && !a.inCar && !a.path && a.end - a.start > 1);
+  const outside = carSideMoment(day);
   if (!outside) return t.problem("bug", "No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
@@ -4304,6 +4316,8 @@ async function tutorialEpisode(options, t) {
     if (open !== order.slice(0, i + 1).join(",")) t.problem("bug", `Open abilities are [${open}] but should be [${order.slice(0, i + 1).join(",")}]`);
     if (!toastEl || !toastEl.classList.contains("on") || !/New ability/.test(toastEl.textContent)) t.problem("bug", `No unlock toast for ${id}`);
     else t.event("unlock-toast", `${id}: ${toastEl.textContent}`);
+    // The bar repaints once a frame, so give it a few frames to show the lock before judging it.
+    if (i + 1 < order.length) await t.until(() => slotState(order[i + 1]) === "locked", 2000, `${order[i + 1]} to show locked`).catch(() => {});
     if (i + 1 < order.length && slotState(order[i + 1]) !== "locked") t.problem("bug", `${order[i + 1]} should still be locked`);
     const prompt = Ep.now() && Ep.now().prompt;
     if (!prompt) t.problem("bug", `No prompt for ${id}`);

@@ -466,6 +466,35 @@ function install() {
     lastRadius = null;
     glidePull = 0;
   }
+  /* Taken outside (the day's camera is a cutaway shot looking into the house): put the camera along the street,
+     on the side with the most room, so he, the street and the sky are what show, not the bedroom behind him. */
+  function frameOutdoors(fr, at) {
+    const rm = fr.room && world.rooms && world.rooms[fr.room];
+    if (rm && rm.building) return;
+    const bd = window.DAY_CONFIG && window.DAY_CONFIG.buildings;
+    const x = at && at.x != null ? at.x : fr.person.x;
+    const z = at && at.z != null ? at.z : fr.person.z;
+    // inside a cutaway building's footprint the day's own shot is right
+    if (bd) {
+      for (const k of Object.keys(bd)) {
+        const b = bd[k];
+        if (!b || !b.bounds) continue;
+        const o = b.origin || [0, 0];
+        if (x > b.bounds[0] + o[0] && x < b.bounds[2] + o[0] && z > b.bounds[1] + o[1] && z < b.bounds[3] + o[1]) return;
+      }
+    }
+    const beta = 1.1;
+    let best = null;
+    [0.5, Math.PI - 0.5, 0, Math.PI, 1.5708 + 0.9, 1.5708 - 0.9].forEach((a) => {
+      const sb = Math.sin(beta);
+      const clear = world.clearRadius ? world.clearRadius(x, 1.35, z, Math.cos(a) * sb, Math.cos(beta), Math.sin(a) * sb, wantRadius, 0.6) : wantRadius;
+      if (!best || clear > best.clear + 0.3) best = { a, clear };
+    });
+    if (best) {
+      camera.alpha = best.a;
+      camera.beta = beta;
+    }
+  }
   function cameraGive() {
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (camera[k] = saved[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
@@ -778,6 +807,7 @@ function install() {
     keys.clear();
     jumps = 0;
     cameraTake();
+    frameOutdoors(fr, at);
     refreshAmbientUpdrafts();
     ambientAge = 0;
     wasGliding = false;

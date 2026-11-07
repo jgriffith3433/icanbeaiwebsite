@@ -75,13 +75,19 @@
   }
   function mergeRows(actions) {
     const rows = [];
+    let lastBase = null; // the last non-micro row: the base line comes back after each micro, and the log shows it once
     actions.forEach((a) => {
       const last = rows[rows.length - 1];
       if (last && last.text === a.text && last.kind === a.kind) {
         last.end = a.end;
         last.last = a.i;
       } else {
-        rows.push({ start: a.start, end: a.end, text: a.text, kind: a.kind, first: a.i, last: a.i });
+        const row = { start: a.start, end: a.end, text: a.text, kind: a.kind, first: a.i, last: a.i };
+        if (a.kind !== "micro") {
+          if (lastBase && lastBase.text === a.text) row.again = true;
+          lastBase = row;
+        }
+        rows.push(row);
       }
     });
     return rows;
@@ -354,6 +360,7 @@
     const list = [];
     for (let i = from; i <= to; i++) {
       const r = rows[i];
+      if (r.again && i !== idx) continue;
       list.push({ at: r.start, start: r.start, text: r.text, cls: (i < idx ? "past" : i === idx ? "now" : "soon") + (r.kind === "micro" ? " micro" : "") });
     }
     // Notes since the earliest row shown. While the player has him, the latest note is what's happening; after,
@@ -378,6 +385,9 @@
       li.appendChild(s);
       el.log.appendChild(li);
     });
+    // the log is a capped scroller (css/site.css): keep the current row in view
+    const nowLi = el.log.querySelector("li.now");
+    if (nowLi) el.log.scrollTop = Math.max(0, nowLi.offsetTop - el.log.offsetTop - el.log.clientHeight / 2);
   }
 
   /* ---------------- world ---------------- */
