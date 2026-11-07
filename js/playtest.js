@@ -4304,6 +4304,8 @@ async function tutorialEpisode(options, t) {
     if (open !== order.slice(0, i + 1).join(",")) t.problem("bug", `Open abilities are [${open}] but should be [${order.slice(0, i + 1).join(",")}]`);
     if (!toastEl || !toastEl.classList.contains("on") || !/New ability/.test(toastEl.textContent)) t.problem("bug", `No unlock toast for ${id}`);
     else t.event("unlock-toast", `${id}: ${toastEl.textContent}`);
+    // The bar repaints once a frame, so give it a few frames to show the lock before judging it.
+    if (i + 1 < order.length) await t.until(() => slotState(order[i + 1]) === "locked", 2000, `${order[i + 1]} to show locked`).catch(() => {});
     if (i + 1 < order.length && slotState(order[i + 1]) !== "locked") t.problem("bug", `${order[i + 1]} should still be locked`);
     const prompt = Ep.now() && Ep.now().prompt;
     if (!prompt) t.problem("bug", `No prompt for ${id}`);
