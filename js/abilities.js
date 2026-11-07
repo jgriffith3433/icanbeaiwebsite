@@ -143,6 +143,8 @@ html.in-control:not(.preview-public):not(.touch-ui) .quality-btn{bottom:238px}
 html.in-control:not(.preview-public):not(.touch-ui) .control-hint{bottom:278px}
 html.in-control:not(.preview-public):not(.touch-ui) .tutorial{bottom:314px}
 html.in-control:not(.preview-public):not(.touch-ui) .side{max-height:calc(100vh - 78px - 240px)}
+html.in-control:not(.preview-public):not(.touch-ui) .pressure{bottom:278px}
+body:has(.mo-line:not([hidden])) .control-hint,body:has(.tutorial:not([hidden])) .control-hint{visibility:hidden}
 `;
   document.head.appendChild(style);
   const el = document.createElement("div");
