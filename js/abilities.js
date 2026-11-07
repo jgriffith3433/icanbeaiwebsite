@@ -126,8 +126,9 @@ export function startAbilityBar(abilities, onPress) {
 .abilitybar .ab .n{font-size:.66rem;opacity:.85}
 .abilitybar .ab .c{position:absolute;top:3px;right:5px;font-size:.62rem;color:#7ec8ff}
 .abilitybar .ab .sweep{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(3,6,12,.72)}
-.abilitybar .ab .cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:.95rem;color:#fff}
+.abilitybar .ab .cd{position:absolute;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;padding:1px 0;font-size:.7rem;line-height:1;color:#fff;background:rgba(3,6,12,.8)}
 .abilitybar .ab.cooling .cd{display:flex}
+.abilitybar .ab.cooling .k,.abilitybar .ab.cooling .n{opacity:.5}
 .abilitybar .ab.poor{border-color:rgba(196,85,74,.7)}
 .abilitybar .ab.poor .k{color:#e08a80}
 .abilitybar .ab.locked{opacity:.38;border-style:dashed;filter:grayscale(1)}
