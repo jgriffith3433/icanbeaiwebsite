@@ -843,6 +843,7 @@ body:has(.ep-offer:not([hidden])) .mo-line,body:has(.ep-offer:not([hidden])) .co
     // start with empty storage and must not meet the offer.
     const pid = new URLSearchParams(location.search).get("playtest");
     if (pid && pid !== "tutorial-episode") botQuiet = true;
+    else if (!pid && navigator.webdriver) botQuiet = true; // runner start() without ?playtest=
   } catch (e) { /* no location */ }
   function tutorialDone() {
     try { return !!localStorage.getItem(tutKey); } catch (e) { return false; }
