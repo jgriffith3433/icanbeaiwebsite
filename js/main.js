@@ -378,6 +378,9 @@
       li.appendChild(s);
       el.log.appendChild(li);
     });
+    // the log is a capped scroller (css/site.css): keep the current row in view
+    const nowLi = el.log.querySelector("li.now");
+    if (nowLi) el.log.scrollTop = Math.max(0, nowLi.offsetTop - el.log.offsetTop - el.log.clientHeight / 2);
   }
 
   /* ---------------- world ---------------- */
