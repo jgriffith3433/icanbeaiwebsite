@@ -179,6 +179,9 @@ async function smoke(options, t) {
   checkFrame(t, fr0);
   t.note(`${fr0.action.block}: ${fr0.action.text}`);
   t.log(`date ${window.day.now().key}, ${$("time").textContent}${$("ampm").textContent}, ${fr0.action.text}`);
+  const markText = ($("mark-title") || {}).textContent || "";
+  if (/\[object/i.test(markText) || !markText.trim()) t.problem("bug", `The status card's label reads "${markText}" instead of a name`);
+  else t.event("status-card-label", `status card label "${markText}"`);
   if (personOnScreen()) t.event("person-visible");
   else t.problem("warning", "The person isn't on screen at load");
   const daybarBox = boxOf(document.querySelector(".daybar"));
