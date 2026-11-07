@@ -356,14 +356,25 @@ async function roofBolt(t) {
     const p = C.state();
     return p.y > 0.4 && p.y <= b.h - 0.4 && p.x > s.x0 - 1.2 && p.x < s.x1 + 0.5 && Math.abs(p.z - s.z) < s.w;
   };
+  // Climb until a deadline, not a fixed number of tries: on a slow frame rate the sim crawls (0.1 s a frame at most)
+  // and the ramp can outlast any one goTo. Each pass carries on from where he stands (onRamp), and only a roof
+  // arrival walks him to the middle, so a timed-out pass never drags him sideways into the wall mid-ramp.
   let ok = false;
-  for (let attempt = 0; attempt < 3 && !ok; attempt++) {
-    ok = (onRamp() || (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000, stall: 5000 })
+  const climbUntil = performance.now() + 150000;
+  const f0 = window.day.now().minutes;
+  const t0 = performance.now();
+  while (!ok && performance.now() < climbUntil) {
+    const y0 = C.state().y;
+    const reached = (onRamp() || (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000, stall: 5000 })
       && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.75, ms: 8000, stall: 5000 }))))
       && (await goTo(s.x1 - 0.25, s.z, t, { sprint: true, close: 0.35, progress: 0.8, ms: 40000, stall: 5000 }));
-    await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 20000, stall: 5000 });
-    if (C.state().y > b.h - 0.4) ok = true;
+    if (reached || C.state().y > b.h - 0.4) {
+      await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 20000, stall: 5000 });
+      ok = C.state().y > b.h - 0.4;
+    } else if (!onRamp() && C.state().y <= y0 + 0.05 && performance.now() - t0 > 60000) break; // truly stuck, not slow
   }
+  t.metric("climbSec", Math.round((performance.now() - t0) / 100) / 10);
+  t.metric("climbSimMin", Math.round((window.day.now().minutes - f0) * 100) / 100);
   const st = C.state();
   const onRoof = ok && st.y > b.h - 0.4;
   if (onRoof) t.event("on-rooftop", `on the ${b.id} roof at y ${st.y.toFixed(2)}`);
