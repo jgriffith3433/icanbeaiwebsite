@@ -402,6 +402,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-toast{position:fixed;z-index:9;left:50%;top:max(64px,calc(env(safe-area-inset-top) + 56px));transform:translate(-50%,-8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(14,16,22,.9);border:1px solid #f0c27a;color:#f6f1e8;font:600 0.95rem Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap;max-width:calc(100vw - 24px)}
 .ep-toast.on{opacity:1;transform:translate(-50%,0)}
 .ep-offer,.ep-score,.ep-menu,.ep-ending{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
+body:has(.ep-offer:not([hidden])) .mo-line,body:has(.ep-offer:not([hidden])) .control-hint{visibility:hidden}
 .ep-offer[hidden],.ep-score[hidden],.ep-menu[hidden],.ep-ending[hidden]{display:none}
 .ep-panel{width:min(420px,100%);background:rgba(14,16,22,.92);border:1px solid rgba(246,241,232,.18);border-radius:20px;padding:22px 22px 18px;color:#f6f1e8;font:500 0.95rem/1.4 Outfit,system-ui,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.45)}
 .ep-panel h2{margin:0 0 6px;font-size:1.25rem}
@@ -1375,7 +1376,8 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
     offerEp = ep;
     offerTitle.textContent = ep.title;
     offerTag.textContent = ep.tagline || "";
-    offerHint.textContent = ep.tutorial ? "New here? Learn the five weather abilities, one at a time." : L.offer;
+    offerHint.textContent = ep.tutorial ? "" : L.offer;
+    offerHint.hidden = !offerHint.textContent;
     offer.hidden = false;
     mark("offer", { id: ep.id });
   }
