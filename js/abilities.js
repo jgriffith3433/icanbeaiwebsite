@@ -145,7 +145,7 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-hint{bottom:278px}
 html.in-control:not(.preview-public):not(.touch-ui) .tutorial{bottom:314px}
 html.in-control:not(.preview-public):not(.touch-ui) .side{max-height:calc(100vh - 78px - 240px)}
 html.in-control:not(.preview-public):not(.touch-ui) .side .log{max-height:22vh}
-html.in-control:not(.preview-public):not(.touch-ui) .pressure{bottom:278px}
+html.in-control:not(.preview-public):not(.touch-ui) .pressure{bottom:250px}
 body:has(.mo-line:not([hidden])) .control-hint,body:has(.tutorial:not([hidden])) .control-hint{visibility:hidden}
 `;
   document.head.appendChild(style);
