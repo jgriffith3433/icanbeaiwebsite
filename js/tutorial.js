@@ -191,6 +191,7 @@ html.in-control .tutorial{bottom:232px}
 .preview-public.in-control .tutorial{bottom:116px}
 html.touch-ui .tutorial{width:min(280px,calc(100vw - 32px))}
 html.touch-ui.in-control .tutorial{bottom:max(256px,calc(env(safe-area-inset-bottom) + 244px))}
+html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x){top:156px;bottom:auto}
 .tutorial.intro{width:min(360px,calc(100vw - 32px));padding:16px 18px 12px}
 .tutorial .intro-copy .title{font:600 1.3rem/1.25 Fraunces,Georgia,serif}
 .tutorial .intro-copy .line{margin-top:6px;color:rgba(246,241,232,.82)}

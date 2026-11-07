@@ -4407,6 +4407,15 @@ async function firstVisit(options, t) {
   await untilStep("move");
   await playUntil("jump", () => holdKeys(["w"], 900), 8);
   await untilStep("jump");
+  {
+    const card = boxOf($("tutorial"));
+    const hits = [...document.querySelectorAll(".nb-bubble:not([hidden]), .nb-name")].filter((el) => {
+      const r = boxOf(el);
+      return card && r && boxesOverlap(card, r);
+    });
+    if (hits.length) t.problem("bug", "The tutorial card covers a neighbor's bubble or name tag");
+    else t.event("tutorial-clear-of-bubbles", "the card doesn't cover a neighbor's bubble or name");
+  }
   await playUntil("bolt", () => tapKey(" ", 160).then(() => sleep(700)), 5);
   await untilStep("bolt");
   await playUntil("letgo", async () => {

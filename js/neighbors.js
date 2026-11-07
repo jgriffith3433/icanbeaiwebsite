@@ -111,7 +111,7 @@ function install() {
   /* ---- DOM: tags, bubbles, toast, tally, the finder panel ---- */
   const style = document.createElement("style");
   style.textContent = `
-.nb-layer{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden;font-family:Outfit,system-ui,sans-serif}
+.nb-layer{position:fixed;inset:0;z-index:9;pointer-events:none;overflow:hidden;font-family:Outfit,system-ui,sans-serif}
 .nb-tag{position:absolute;transform:translate(-50%,-100%);text-align:center;white-space:nowrap;transition:opacity .2s}
 .nb-name{display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(10,14,22,.78);border:2px solid var(--nb,#f0c27a);color:#f6f1e8;font:700 0.74rem Outfit,system-ui,sans-serif}
 .nb-name b{color:var(--nb,#f0c27a);margin-left:6px;letter-spacing:1px}
