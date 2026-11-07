@@ -37,7 +37,9 @@
     el.what.textContent = "day.config.js didn't load. Check it for a syntax error.";
     return;
   }
-  el.title.textContent = cfg.title || "A day";
+  // `title` is also the title screen's object in day.config.js (a later key wins), so take its kicker.
+  const markTitle = typeof cfg.title === "string" ? cfg.title : (cfg.title && (cfg.title.kicker || cfg.title.name)) || "";
+  el.title.textContent = markTitle || "I Can Be";
   const who = (cfg.person && cfg.person.name) || "";
   if (who && el.logTitle) el.logTitle.textContent = `${who} · every action`;
   const dayStart = E.parseClock(cfg.dayStart || "7:30");
