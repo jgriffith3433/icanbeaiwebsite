@@ -668,6 +668,15 @@ function install() {
         }
         return;
       }
+      if (mode === "returning") {
+        // A second Esc while he walks back must not reach the day's Esc = "go live", which
+        // would throw a scrubbed or sped-up clock to the real time.
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+        return;
+      }
       if (mode !== "control") return;
       if (e.key === "Escape") {
         letGo("key");
