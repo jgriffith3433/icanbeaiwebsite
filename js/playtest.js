@@ -1055,7 +1055,7 @@ async function analytics(options, t) {
       return;
     }
     t.scene("The question");
-    t.event("feedback-prompt", `shown after ${window.day.analytics.watched()} s: "What would you want this to be?"`);
+    t.event("feedback-prompt", `shown after ${window.day.analytics.watched()} s: "Are you enjoying this so far?"`);
     await sleep(5000); // long enough to read in the footage
     const close = card().shadowRoot && card().shadowRoot.querySelector(".ha-x");
     if (!close) t.problem("bug", "The feedback question has no close button");
