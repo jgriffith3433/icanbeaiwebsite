@@ -854,6 +854,9 @@ function install() {
   }
 
   /* ---------- every frame (main.js calls this before drawing) ---------- */
+  // Game seconds he has really been simulated as the player's (each control step's dt, which main.js caps at 0.1 s a
+  // frame): the clock a playtest measures a climb in, so a slow browser doesn't read as a stuck one.
+  let simT = 0;
   day.pilot((fr, dt) => {
     lastFrame = fr;
     const driving = !!(fr && fr.person.inCar);
@@ -874,6 +877,7 @@ function install() {
       const inp = readInput(gp);
       if (push.on && (inp.jump || inp.x || inp.z)) pushEnd();
       mover.step(dt, inp);
+      simT += dt;
       tickGlideFx(dt);
       text = steeringLines[Math.floor(since / 9) % steeringLines.length];
     } else {
@@ -923,6 +927,8 @@ function install() {
       cameraPull: Math.round(glidePull * 100) / 100,
     }),
     move: mover.move,
+    /** Game seconds simulated while he's the player's (sum of the control steps' dt). */
+    simTime: () => simT,
     // Playtest hook: stand him at x,z (street level) while he's the player's, so a scenario needn't walk a slow bot there.
     place: (x, z, yaw) => (mode === "control" ? mover.start(x, z, yaw == null ? s.yaw : yaw) : null),
     ride: RIDE,

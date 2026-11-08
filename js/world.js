@@ -369,6 +369,22 @@
       const ramp = box(b.id + "ramp", L, thick, s.w, cx, cy, s.z, stepM, null, false);
       ramp.rotation.z = theta;
       solids.push({ x: cx, y: cy, z: s.z, w: L, h: thick, d: s.w, roll: theta });
+      /* Close the wedge under the ramp: its high end and its street side are walls, so nobody walks in under the
+         ramp where the gap is lower than the capsule and gets stuck. The side is stepped to follow the underside
+         (always a little below it, so it never touches the walkable slope). */
+      const wallM = mat("#2f3538");
+      const endH = Math.max(0.5, b.h - 0.35);
+      box(b.id + "rampend", 0.3, endH, s.w + 0.4, s.x1 + 0.15, endH / 2, s.z, wallM, null, false);
+      solids.push({ x: s.x1 + 0.15, y: endH / 2, z: s.z, w: 0.3, h: endH, d: s.w + 0.4 });
+      const sideZ = s.z + s.w / 2 + 0.12;
+      for (let xa = s.x0; xa < s.x1 - 0.01; xa += 0.5) {
+        const xb = Math.min(xa + 0.5, s.x1);
+        const under = (xa - s.x0) * Math.tan(theta) - thick / Math.cos(theta);
+        const h = under - 0.06;
+        if (h < 0.1) continue;
+        box(b.id + "rampside" + xa, xb - xa, h, 0.24, (xa + xb) / 2, h / 2, sideZ, wallM, null, false);
+        solids.push({ x: (xa + xb) / 2, y: h / 2, z: sideZ, w: xb - xa, h, d: 0.24 });
+      }
       const mark = new B.TransformNode("at-roof-" + b.id, scene);
       mark.position.set(b.x, b.h, b.z);
     });
