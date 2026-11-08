@@ -4150,17 +4150,19 @@ async function storyEnding(options, t) {
 // Run 1 plays every cue on the beat; run 2 presses only Lightning, late. Events: show-opening / show-gather / show-begin / show-act /
 // show-cue / show-miss / show-off / show-stage / show-over / show-card / show-closing / show-compare; metrics showPoints*, showAurora, showBursts.
 async function lightShow(options, t) {
-  t.scene("Outside, before the show");
+  // A setup that can't be reached is a failed run, never 'done': the harness reports 'done' when the bot just returns.
+  const bail = (msg) => { t.problem("bug", msg); t.finish("fail"); };
+  t.scene("Setup");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
   const Ep = window.episodes || window.day.episodes;
   const C = window.day.control;
   const P = window.powers || window.day.powers;
-  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  if (!Ep || !C || !P) return bail("episodes, powers or Take control isn't installed");
   const cfg = window.DAY_CONFIG;
   const ep = ((cfg.episodes && cfg.episodes.list) || []).find((e) => e.id === "night");
-  if (!ep || !ep.finale) return t.problem("bug", "The finale isn't in the episode list");
+  if (!ep || !ep.finale) return bail("The finale isn't in the episode list");
   const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
   try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
   // The three parts played clean, Fair Weather (setup): what the closing card ties together.
@@ -4172,8 +4174,9 @@ async function lightShow(options, t) {
   } catch (err) { /* ignore */ }
 
   const day = window.day.today();
-  const outside = carSideMoment(day);
-  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  const outside = carSideMoment(day) ||
+    day.actions.find((a) => !a.inCar && !a.path && a.end > a.start && !(window.DAY_CONFIG.rooms || {})[a.room]);
+  if (!outside) return bail("No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
   await sleep(600);
@@ -4181,8 +4184,15 @@ async function lightShow(options, t) {
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   const offer = $("episode-offer");
   if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+  // Confirm he is really outdoors before the scene is named: he takes control where the day had him.
+  const here = C.state();
+  if (Math.hypot(here.x - outside.x, here.z - outside.z) > 8) return bail(`Not at the outdoor moment after Take control: he is at ${Math.round(here.x)}, ${Math.round(here.z)}, not near ${Math.round(outside.x)}, ${Math.round(outside.z)}`);
+  t.scene("Outside, before the show");
   scrubTo(22 * 60 + 5);
   await sleep(500);
+  const mins = window.day.now().minutes;
+  const showAt = window.DayEngine.parseClock("22:05", window.day.today().dayStart);
+  if (Math.abs(mins - showAt) > 10) return bail(`The clock isn't at the show: ${window.DayEngine.fmtClock(mins, true)}, not about 22:05`);
 
   const events = [];
   const onEp = (e) => {
