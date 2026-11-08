@@ -923,6 +923,8 @@ function install() {
       cameraPull: Math.round(glidePull * 100) / 100,
     }),
     move: mover.move,
+    // Playtest hook: stand him at x,z (street level) while he's the player's, so a scenario needn't walk a slow bot there.
+    place: (x, z, yaw) => (mode === "control" ? mover.start(x, z, yaw == null ? s.yaw : yaw) : null),
     ride: RIDE,
     log: () => log.slice(),
     take: () => take("console"),
