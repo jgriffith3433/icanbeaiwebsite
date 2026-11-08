@@ -179,7 +179,7 @@ export function startTutorial() {
   function build() {
     const style = document.createElement("style");
     style.textContent = `
-.tutorial{position:fixed;z-index:8;left:50%;bottom:202px;top:auto;transform:translateX(-50%);width:min(300px,calc(100vw - 32px));padding:12px 14px 10px;border-radius:16px;background:rgba(14,16,22,.88);border:1px solid rgba(240,194,122,.45);color:#f6f1e8;font:500 0.95rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 16px 40px rgba(0,0,0,.4);pointer-events:auto}
+.tutorial{z-index:8;width:min(300px,calc(100vw - 32px));padding:12px 14px 10px;border-radius:16px;background:rgba(14,16,22,.88);border:1px solid rgba(240,194,122,.45);color:#f6f1e8;font:500 0.95rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 16px 40px rgba(0,0,0,.4);pointer-events:auto}
 .tutorial[hidden]{display:none}
 .tutorial.finished .row{display:none}
 .tutorial p{margin:0}
@@ -188,12 +188,7 @@ export function startTutorial() {
 .tutorial .row{display:flex;justify-content:flex-end;margin-top:8px}
 .tutorial button{appearance:none;min-height:44px;padding:8px 16px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.85rem Outfit,system-ui,sans-serif;cursor:pointer}
 .tutorial button:hover{background:rgba(240,194,122,.14)}
-html.in-control .tutorial{bottom:232px}
-.preview-public .tutorial{bottom:max(72px,calc(env(safe-area-inset-bottom) + 62px))}
-.preview-public.in-control .tutorial{bottom:116px}
 html.touch-ui .tutorial{width:min(280px,calc(100vw - 32px))}
-html.touch-ui.in-control .tutorial{bottom:max(256px,calc(env(safe-area-inset-bottom) + 244px))}
-html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x){top:156px;bottom:auto}
 .tutorial.intro{width:min(360px,calc(100vw - 32px));padding:16px 18px 12px}
 .tutorial .intro-copy .title{font:600 1.3rem/1.25 Fraunces,Georgia,serif}
 .tutorial .intro-copy .line{margin-top:6px;color:rgba(246,241,232,.82)}

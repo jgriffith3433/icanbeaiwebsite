@@ -19,6 +19,69 @@ function boxOf(el) {
   return r;
 }
 
+
+/* ---------- the HUD check (css/hud.css lays the HUD out; this measures it) ----------
+   checkHud(t, label) measures every visible HUD element's rect and reports any two that intersect as a bug, and any
+   visible placeholder text (a lone dash) as a bug. Called by look, photos, episodes, tutorial-episode and control,
+   at each stage of the run (the label says which). Each distinct finding is reported once per run. */
+const HUD_PARTS = [
+  [".panel.now", "status card"], ["#sound", "Sound"], ["#details", "Details"], [".side", "Details panel"],
+  [".hud.bottom", "timeline"], ["#control", "Take control / Let go"], ["#quality", "Quality"],
+  ["#weather-btn", "Weather"], ["#pressure", "Pressure"], ["#episodes", "Episodes"], ["#neighbors-btn", "Neighbors"],
+  ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .energy", "Energy"],
+  [".powerpad button", "power pad"], [".touchpad .stick", "stick"], [".touchpad .jump", "jump"],
+  [".tutorial", "tutorial card"], [".ep-hud", "episode HUD"], [".control-hint", "controls hint"],
+];
+const hudSeen = new Set();
+function hudVisible(el) {
+  if (!el || el.hidden) return null;
+  for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+    const s = getComputedStyle(n);
+    if (s.display === "none" || s.visibility === "hidden" || parseFloat(s.opacity) < 0.05) return null;
+  }
+  const r = el.getBoundingClientRect();
+  if (r.width < 8 || r.height < 8 || r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return null;
+  return r;
+}
+function hudRects() {
+  const out = [];
+  HUD_PARTS.forEach(([sel, name]) => {
+    document.querySelectorAll(sel).forEach((el, i) => {
+      const r = hudVisible(el);
+      if (r) out.push({ el, r, name: el.id ? "#" + el.id : name + (i ? " " + (i + 1) : "") });
+    });
+  });
+  return out;
+}
+const HUD_PLACEHOLDER = /^[\s–—.…?-]+$/;
+function checkHud(t, label) {
+  const parts = hudRects();
+  const found = [];
+  for (let i = 0; i < parts.length; i++) {
+    for (let j = i + 1; j < parts.length; j++) {
+      const a = parts[i], b = parts[j];
+      if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      if (boxesOverlap(a.r, b.r)) found.push(a.name + " overlaps " + b.name);
+    }
+  }
+  const roots = ["header.hud", ".side", "footer.hud", ".abilitybar", ".pressure", ".tutorial", ".ep-hud", ".powerpad", "#control", "#episodes", "#weather-btn", "#quality"];
+  roots.forEach((sel) => document.querySelectorAll(sel).forEach((root) => {
+    if (!hudVisible(root)) return;
+    [root, ...root.querySelectorAll("*")].forEach((el) => {
+      if (el.children.length || !hudVisible(el)) return;
+      const txt = (el.textContent || "").trim();
+      if (txt && HUD_PLACEHOLDER.test(txt)) found.push('placeholder text "' + txt + '" shows in ' + (el.id ? "#" + el.id : el.tagName.toLowerCase() + (el.className ? "." + String(el.className).split(" ")[0] : "")));
+    });
+  }));
+  const fresh = found.filter((f) => !hudSeen.has(f));
+  fresh.forEach((f) => {
+    hudSeen.add(f);
+    t.problem("bug", "HUD (" + label + ", " + innerWidth + "x" + innerHeight + "): " + f);
+  });
+  if (!found.length) t.event("hud-clear", label + ": " + parts.length + " HUD elements at " + innerWidth + "x" + innerHeight + ", none overlap, no placeholder text");
+  return !found.length;
+}
+
 function world() {
   return window.day && window.day.world();
 }
@@ -1372,6 +1435,8 @@ async function control(options, t) {
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
   await checkStatusCard(t, "foot", "right after Take control" + (side ? " beside the car" : ""));
+  await sleep(300);
+  checkHud(t, "control: on foot");
   const st = C.state();
   t.event("control-taken", `Enter · at ${st.x.toFixed(2)},${st.z.toFixed(2)} · Havok controller ${st.physics ? "on" : "OFF"} · button "${btn && btn.textContent}"`);
   if (!st.physics) t.problem("bug", "He moves without the Havok character controller (physics off?)");
@@ -1504,6 +1569,7 @@ async function control(options, t) {
   await t.until(() => C.state().flights > tf0, 8000, "him to land after the touch jumps");
   const tfl = C.state().lastFlight || { jumps: 0 };
   t.event("touch-jump", `the jump button: ${tfl.jumps} jumps, ${tfl.height} m`);
+  checkHud(t, "control: phone controls");
   if (tfl.jumps < 2) t.problem("bug", `The touch jump button gave ${tfl.jumps} jumps for three taps`);
   t.progress(0.85);
 
@@ -1940,6 +2006,7 @@ async function look(options, t) {
       const sky = info.sky || {};
       t.event(eventName, `${sceneName}: source ${info.source}, ${info.pbr} PBR, ${info.textured} textured, ${info.neon} neon, exposure ${info.exposure.toFixed(2)}, sky ${sky.day.toFixed(2)}/${sky.dusk.toFixed(2)}/${sky.night.toFixed(2)}, neon ${info.neonLevel.toFixed(2)}`);
       if (info.pbr < 4 || info.textured < 4) t.problem("bug", "The city surfaces are still flat colours");
+      checkHud(t, "look: " + sceneName);
       return info;
     });
   }
@@ -1980,6 +2047,7 @@ async function look(options, t) {
   const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
   t.metric("frameMsLow", Math.round(avg * 10) / 10);
   t.metric("qualityScaling", low.scaling);
+  checkHud(t, "look: quality low");
   t.event("quality-low", `low: bloom off, shadows off, samples ${low.samples}, scaling ${low.scaling}, ${avg.toFixed(1)} ms a frame over ${samples.length} frames`);
   if (samples.length && avg > 40) t.problem("warning", `Low quality averaged ${avg.toFixed(1)} ms a frame`);
   t.progress(1);
@@ -2025,6 +2093,7 @@ async function photos(options, t) {
     const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
     const fps = avg ? 1000 / avg : 0;
     fpsAll.push(fps);
+    checkHud(t, "photos: " + name);
     const i = cs.info();
     const st = C.state();
     t.event(eventName, `${name} at ${st.x.toFixed(0)},${st.z.toFixed(0)}: ${fps.toFixed(0)} fps, windows ${i.lit.windows.toFixed(2)}, shops ${i.lit.shops.toFixed(2)}, lamps ${i.lit.lamps.toFixed(2)}, ${i.fillers} fillers`);
@@ -3425,6 +3494,8 @@ async function episodes(options, t) {
     const hud = $("episode-hud");
     if (!hud || hud.hidden) t.problem("bug", `Episode HUD hidden for ${id}`);
     else t.event("episode-hud", `${id}: ${Ep.now().goals.length} goals`);
+    await sleep(400);
+    checkHud(t, "episodes: " + id);
     t.progress(0.15 + i * 0.12);
 
     if (id === "morning") {
@@ -4576,6 +4647,7 @@ async function tutorialEpisode(options, t) {
     const prompt = Ep.now() && Ep.now().prompt;
     if (!prompt) t.problem("bug", `No prompt for ${id}`);
     else t.event("tutorial-prompt", `${id}: ${prompt}`);
+    checkHud(t, "tutorial-episode: " + id + (touch ? " (touch)" : ""));
     if (i === 1) {
       // A locked ability refuses, changes nothing.
       const before = window.powers.now().energy;
