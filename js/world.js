@@ -2193,6 +2193,16 @@
         const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
         const t0 = Date.now();
         try {
+          /* Materials of meshes outside the first view (the city the title orbits over, the skin once on) would
+             otherwise compile the frame they first come into view. One mesh per material, in the current light set. */
+          const seen = new Set();
+          for (const m of scene.meshes) {
+            const mat = m.material;
+            if (!mat || seen.has(mat) || !m.getTotalVertices || !m.getTotalVertices() || !mat.forceCompilationAsync) continue;
+            seen.add(mat);
+            if (Date.now() - t0 > (maxMs || 8000) / 2) break;
+            try { await mat.forceCompilationAsync(m); } catch (e) { /* skip this one */ }
+          }
           for (const g of sets) {
             if (Date.now() - t0 > (maxMs || 8000)) break;
             warmGroups = new Set(g);

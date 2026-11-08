@@ -61,10 +61,13 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
 (function warmUp() {
   const w = window.day && window.day.world && window.day.world();
   if (!w || !w.warmLights) { ready.lights = true; return; }
+  /* Runs once his model is on (or has failed): his skinned PBR shader is one of the ones that recompiles per light set,
+     so warming before he joins the scene left that compile for the first night or office jump. */
   const go = () => w.warmLights(8000).catch(() => {}).finally(() => { ready.lights = true; maybeDone(); });
-  (function afterFrame() {
+  window.__warmLights = () => (function afterFrame() {
     if (window.day.now && window.day.now().frame) go(); else requestAnimationFrame(afterFrame);
   })();
+  if (!(window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.model)) window.__warmLights();
 })();
 
 const skinWorld = control.model && window.day && window.day.world();
@@ -116,9 +119,11 @@ if (skinWorld) {
       ready.model = true;
       loading.set("model", 1);
       maybeDone();
+      if (window.__warmLights) window.__warmLights();
       console.info(`[world] Small Weather's model: ${skin.clips.length} clips (${skin.clips.join(" ")})`);
     })
     .catch((err) => {
+      if (window.__warmLights) window.__warmLights();
       w.setSkin(null); // he stays hidden: Small Weather or nothing, never the box figure
       Object.assign(status, { model: "none", modelError: String((err && err.message) || err) });
       console.error("[world] Small Weather's model didn't load:", err);
