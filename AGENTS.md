@@ -92,6 +92,15 @@ Every HUD **placement** (position, top/right/bottom/left, transform) is in `css/
   localStorage `icanbe.tutorial` keeps it away. While it's up, the episode offer waits. A bot's tab (`?playtest=`
   other than `first-visit`, or `navigator.webdriver`) never shows it; `day.tutorial.reset()` shows it again.
 
+### Sound for what happens (`js/sfx.js`)
+
+All synthesized in WebAudio, no files, gated on the Sound button: footsteps by stride (wetter in rain), jump, landing
+thump and dust by fall height, let go, updraft, the bolt's crack where it lands, the tornado's travelling roar, every
+episode beat (goal, fail, piece, kick, unlock, score, show cues), a babble per speaker for episode dialogue and
+neighbor bubbles, and city life (birds by day in fair weather, cars passing by the crowd's count, a far siren at
+night). It only listens (`day:*` events and `day.control.state()`); `scripts/check-sfx.mjs` (npm test) checks that
+each of those is heard and that Sound off is silent. New player-facing beats get a sound here and a line in that check.
+
 ### His 3D model
 
 - **The file:** `models/small-weather.glb` (GLB only, under 10 MB; `npm test` checks), named by `day.config.js`
@@ -145,6 +154,40 @@ Every HUD **placement** (position, top/right/bottom/left, transform) is in `css/
   github-pages skill). **Studio's staging site needs a build recipe** for `icanbe` in `hawkesstudio/src/previews.ts`
   (`{ build: 'npm run build', site: 'none', out: { from: 'dist', to: '' } }`): without it the beta site copies the
   source, and the page can't load `@babylonjs/core`. The playtests use `npm run dev`, which works without it.
+
+## Rendering rules (`scripts/check-render.mjs`, npm test)
+
+Jaycee's 3D quality rules, checked on the built world and city under the NullEngine (thin instances included):
+no mesh wound against its normals (inside out; `Part.cyl/ball` in props.js wind like `box()`), no negative scale
+on a mesh or thin instance, no double-sided canvas-textured mesh (a double-sided sign shows its text mirrored),
+no two up-facing surfaces of different materials within 3 mm over the same ground (z-fighting: butt pieces
+together, don't overlap them; light decals use `zOffset` and `disableDepthWrite`), asphalt on top at every
+junction, and the sky dome behind the farthest skyline tower and inside `camera.maxZ`. Road/box UVs are world
+space (`tileBox` in look.js) so pieces that meet carry one texture. The camera's near plane is 0.2 m; under
+control a wall may pull it in to 0.5 m, and he fades below 1 m.
+
+## Grounding and motion rules (`scripts/check-ground.mjs`, npm test)
+
+Feet go on what's under them, never on y = 0 by habit. Ground heights: road 0.04, sidewalk 0.06 (RZ and every
+road +-2.3 to 3.5, with an L of sidewalk at each junction corner), park lawn 0.03, plaza paving 0.07, room
+floors 0.1. Kerb props are built with `G` (props.js) set to the surface they stand on, and bus stop slabs fit
+the sidewalk's 1.2 m. Code-placed people and things use `world.surfaceAt(x, z)` (no physics needed); his day
+uses the colliders (`groundAt`) for stand and walk poses. Crowd people walk 2.6 m from a road's centre, their
+legs don't bob (only body and head), they turn at 10/s and step at a cadence from the speed they move at.
+Neighbours drop their hips by the swung leg's lift so the leading foot stays down. Under control he follows
+ramps, stairs and kerbs down up to 0.45 m (`STEP_DOWN`, control.js) instead of falling, keeps walk/run for
+the first 0.15 s off the ground, casts only standing (grounded, under 0.8 m/s), and the clips play at a
+speed from their measured stride (walk 0.86 m, run 1.25 m: `WALK_STRIDE`/`RUN_STRIDE`, small-weather.js).
+The check fails on a prop foot 3 to 12 cm off the ground, a walker on the grass, his day's feet off the floor,
+or falling/jumping frames walking or running down a rooftop ramp.
+
+## Spoken dialogue (`js/dialogue.js`, `scripts/check-dialogue.mjs`, npm test)
+
+- The story parts' `say` lines and the neighbors' beats are spoken, each speaker in their own ElevenLabs voice (`dialogue.cast` in day.config.js; he is DoD Eric, as in `voice`). A "He" line about him in the third person stays text.
+- Each line's id is `dlg-<who>-<hash of who and text>` and its clip is `audio/dialogue/<id>.mp3`. Change a line's words and it gets a new id, so its old clip simply stops being used.
+- `node scripts/sync-dialogue.mjs` rewrites the `dlg-*` recipes in hawkes.assets.json from the config and `audio/dialogue/index.json` from the clips on disk. Run it after changing lines or adding clips; npm test fails if either is stale.
+- Only clips listed in index.json play (the build rewrites it from disk), only once Sound is on, one at a time. A line without a clip keeps its text and js/sfx.js's babble; a voiced line skips the babble and ducks the music (`day:dialogue`).
+- Clips come from the recipes through Studio's asset pipeline (Hawkes Gen `audio.voice`, about $0.0003 a character, 104 lines about $1.20). Spending Gen credits needs Jaycee's yes.
 
 ## Hawkes Gen art direction (for a later Gen change)
 

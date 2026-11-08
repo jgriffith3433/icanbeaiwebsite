@@ -535,7 +535,6 @@ async function roofBolt(t) {
   // Climb until a deadline, not a fixed number of tries: on a slow frame rate the sim crawls (0.1 s a frame at most)
   // and the ramp can outlast any one goTo. Each pass carries on from where he stands (onRamp), and only a roof
   // arrival walks him to the middle, so a timed-out pass never drags him sideways into the wall mid-ramp.
-  await rampWedgeCheck(t, b);
   let ok = false;
   // He takes over ~30 m east of the ramp; on a slow bot that walk alone ate the runner's 180 s. Smoke tests the climb
   // and the bolt, not the street walk (the `city` scenario walks it), so stand him at the ramp's foot.
@@ -571,6 +570,7 @@ async function roofBolt(t) {
   const climbWall = (performance.now() - wall0) / 1000;
   t.metric("climbSimSec", Math.round(climbSim * 10) / 10);
   t.metric("climbWallSec", Math.round(climbWall * 10) / 10);
+  if (ok && climbSim > 30) t.problem("polish", `The ${b.id} climb took ${climbSim.toFixed(0)} game s (it takes ~12 at a walk)`);
   if (ok) t.event("climb-done", `up the ${b.id} ramp in ${climbSim.toFixed(1)} game s (${climbWall.toFixed(1)} s wall, ${(climbSim / Math.max(climbWall, 0.001)).toFixed(2)}x real time)`);
   else if (stuck) t.problem("bug", `He is stuck on the ${b.id} ramp: no height gained in ${STUCK_SIM_SEC} game s (best y ${bestY.toFixed(2)}, at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
   else t.problem("bug", `The ${b.id} climb was slow, not stuck, and ran out of ${CLIMB_SIM_SEC} game s (${climbWall.toFixed(0)} s wall, y ${C.state().y.toFixed(2)} of ${b.h})`);
@@ -629,6 +629,9 @@ async function roofBolt(t) {
     if (cleared && secs < 10) t.event("weather-cleared", `back to clear ${secs.toFixed(1)} s after the bolt (rain ${WXB.now().rain.toFixed(2)})`);
     else t.problem("bug", "The storm from lightning didn't clear within seconds");
   }
+  // The wedge check walks him around the ramp for a while, so it runs after the roof moment, not between
+  // Take control and "on-rooftop" (that gap is what the review reads as the climb time).
+  await rampWedgeCheck(t, b);
   // Let go: On foot on every sample while he walks (or catches up) back to his day.
   pressKey("Escape");
   await t.until(() => C.mode() !== "control", 3000, "letting go");
@@ -5670,8 +5673,77 @@ function barkTexts() {
   return new Set([...Object.values(b.needs || {}).flatMap((n) => n.lines || []), ...Object.values(b.weather || {}).flat()]);
 }
 
+/* ---------------- spot: a feel replay, a short probe where the feel sensor flagged something ---------------- */
+// options.spot (t.spot) is a place the playtest's feel sensor flagged (falling through the floor, stuck, a camera snap,
+// a collision shove...). Any scenario run with a spot plays this probe there instead of the whole scenario, so the recheck
+// after a fix plays that exact place in seconds. Setup shortcut (named): day.control.place stands him at the spot.
+// Real input: Enter to take control, then WASD each way, Shift to run, Space to jump.
+async function spotProbe(options, t, spot) {
+  t.scene("Replay spot");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const C = window.day.control;
+  if (!C) {
+    t.problem("bug", "There's no Take control (js/control.js didn't install)");
+    return;
+  }
+  if (C.mode() !== "control") await tapKey("Enter");
+  await t.until(() => C.mode() === "control", 8000, "taking control").catch(() => {});
+  if (C.mode() !== "control") {
+    t.problem("bug", "Enter didn't take control for the spot replay");
+    return;
+  }
+  await sleep(800);
+  t.cut();
+  const yaw = spot.yaw != null ? (spot.yaw * Math.PI) / 180 : undefined;
+  const at = C.place(spot.x, spot.z, yaw); // setup shortcut: stand him at the flagged spot
+  t.event("spot", `asked ${spot.x.toFixed(1)},${spot.y.toFixed(1)},${spot.z.toFixed(1)}; stood at ${at ? `${at.x.toFixed(1)},${at.z.toFixed(1)}` : "nowhere (not in control)"}`);
+  t.progress(0.2);
+  await sleep(1000);
+  const legs = [["w"], ["d"], ["s"], ["a"], ["Shift", "w"], ["Shift", "s"]];
+  for (let i = 0; i < legs.length; i++) {
+    await holdKeys(legs[i], 1100);
+    await sleep(250);
+    t.progress(0.2 + (0.6 * (i + 1)) / legs.length);
+  }
+  for (const k of [["w"], ["s"]]) {
+    keyDown(k[0]);
+    await sleep(200);
+    await tapKey(" ");
+    await sleep(900);
+    keyUp(k[0]);
+    await sleep(400);
+  }
+  const st = C.state();
+  t.metric("spotDrift", Math.round(Math.hypot(st.x - spot.x, st.z - spot.z) * 10) / 10);
+  t.event("spot-probe", `ended at ${st.x.toFixed(1)},${st.y.toFixed(1)},${st.z.toFixed(1)}, grounded ${st.grounded}`);
+  t.progress(1);
+}
+
+/* The feel sensor (hawkes-feel.js): his figure while he's the player's; while the day plays itself (the cutaway
+   camera cuts room to room by design) only frame hitches are watched. */
+const feelControl = () => (window.day && window.day.control && window.day.control.mode() === "control" ? window.day.control : null);
+
 installPlaytest({
   product: "icanbe",
+  feel: {
+    active: () => !!feelControl(),
+    player: () => {
+      const C = feelControl();
+      return C && C.avatar ? C.avatar().root : null;
+    },
+    grounded: () => {
+      const C = feelControl();
+      return C ? !!C.state().grounded : false;
+    },
+    // the walk cycle runs at his ground speed; "idle" while the body moves is the foot sliding the sensor looks for
+    animSpeed: () => {
+      const C = feelControl();
+      if (!C) return 0;
+      const st = C.state();
+      return st.anim === "idle" ? 0 : st.speed;
+    },
+  },
   scenarios: [
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
@@ -5717,7 +5789,8 @@ installPlaytest({
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
-      if (id === "barks") await barksScenario(options, t);
+      if (t.spot) await spotProbe(options, t, t.spot);
+      else if (id === "barks") await barksScenario(options, t);
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);

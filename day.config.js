@@ -503,6 +503,49 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     DIALOGUE — the story parts' lines and the neighbors' beats, spoken (js/dialogue.js).
+     Each speaker has an ElevenLabs voice (Hawkes Gen audio.voice); he is DoD Eric as in `voice`. A
+     "He" line about him in the third person stays text. Speakers not in `cast` take one of `extras`
+     by their name. Files: audio/dialogue/dlg-<who>-<hash>.mp3, recipes in hawkes.assets.json.
+     ------------------------------------------------------------------------ */
+  dialogue: {
+    volume: 0.9,
+    model: "eleven_v4",
+    cast: {
+      He: "cjVigY5qzO86Huf0OWal", // Eric (his voice everywhere)
+      Birdie: "EXAVITQu4vr4xnSDxMaL", // Sarah: warm, mature
+      Dex: "TX3LPaxmHKxFdv7VOQHJ", // Liam: quick, friendly
+      Ines: "Xb7hH8MSUJpSbSDYk0k2", // Alice: clear, precise
+      Board: "onwK4e9ZLuTAKqWW03F9", // Daniel: the loudspeaker's broadcaster
+      // the people he helps in the story parts, one voice each
+      Odile: "cgSgspJ2msm6clMCkdW9", // Jessica
+      Hollis: "IKne3meq5aSn9XLyUdCD", // Charlie
+      Nell: "FGY2WhTYpPnrIDTdsKH5", // Laura
+      Marlo: "bIHbv24MWmeRgasZH58o", // Will
+      Tamsin: "pFZP5JQG7iQjIQuC4Bku", // Lily
+      Wren: "hpp4J3VqNfWAUOO0d1Us", // Bella
+      Hale: "nPczCjzI2devNBz1zQrb", // Brian
+      Odette: "XrExE9yKIg1WjnnlVkGX", // Matilda
+      Sorrel: "iP95p4xoKVk53GoZ742B", // Chris
+      Pike: "CwhRBWXzGAHq8TQ4Fs17", // Roger
+    },
+    extras: [
+      "cgSgspJ2msm6clMCkdW9", // Jessica
+      "IKne3meq5aSn9XLyUdCD", // Charlie
+      "FGY2WhTYpPnrIDTdsKH5", // Laura
+      "bIHbv24MWmeRgasZH58o", // Will
+      "pFZP5JQG7iQjIQuC4Bku", // Lily
+      "nPczCjzI2devNBz1zQrb", // Brian
+      "hpp4J3VqNfWAUOO0d1Us", // Bella
+      "iP95p4xoKVk53GoZ742B", // Chris
+      "CwhRBWXzGAHq8TQ4Fs17", // Roger
+      "XrExE9yKIg1WjnnlVkGX", // Matilda
+      "pqHfZKP75CvOlQylNhV4", // Bill
+      "SAz9YHcvj6GT2YYXdXww", // River
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
      VOICE — Small Weather speaks (js/voice.js), same DoD voice (Eric)
      ------------------------------------------------------------------------
      Cocky, calm, a storm god who is also a developer. Lines are short. Each
@@ -1612,9 +1655,9 @@ window.DAY_CONFIG = {
     budget: { people: 260, cars: 64 },
     lowScale: 0.4,
     curve: [
-      [0, 0.03, 0.05], [4, 0.02, 0.04], [5.5, 0.06, 0.14], [6.5, 0.25, 0.4], [7.5, 0.7, 0.85], [8.5, 0.85, 1], [9.5, 0.5, 0.6],
+      [0, 0.03, 0.06], [4, 0.025, 0.06], [5.5, 0.06, 0.14], [6.5, 0.25, 0.4], [7.5, 0.7, 0.85], [8.5, 0.85, 1], [9.5, 0.5, 0.6],
       [11, 0.45, 0.45], [12, 0.92, 0.6], [13.25, 0.95, 0.65], [14.5, 0.5, 0.45], [16, 0.55, 0.6], [17, 0.8, 0.95], [18, 0.85, 1],
-      [19.5, 0.9, 0.6], [21, 0.55, 0.35], [22.5, 0.2, 0.18], [24, 0.03, 0.05],
+      [19.5, 0.9, 0.6], [21, 0.55, 0.35], [22.5, 0.2, 0.18], [24, 0.03, 0.06],
     ],
     phases: [
       [0, "night"], [5.5, "early morning"], [6.5, "morning commute"], [9.5, "mid-morning"], [11.5, "lunch"], [14.5, "afternoon"],

@@ -25,12 +25,13 @@
    ========================================================================== */
 const B = typeof window !== "undefined" ? window.BABYLON : null;
 
-const SIDE = 3.5; // how far from an avenue's centre line the sidewalk walk is
+export const SIDE = 2.6; // how far from a road's centre line people walk: on the sidewalk (2.3 to 3.5), road side of the kerb props
 const LANE = 1.2; // how far from the centre line a car's lane is
 const CYCLE = 36; // signal cycle, seconds
 const STOP = 5.6; // a stop line, metres before the junction centre (front bumper)
 const CAR_LEN = 4.3;
-const PED_Y = 0.06;
+const PED_Y = 0.06; // the sidewalk's top
+const TURN_RATE = 10; // how fast people swing round to a new heading (per second)
 
 function makeRng(seed) {
   let s = seed >>> 0;
@@ -347,6 +348,7 @@ export function installCrowd(world) {
   }
   function spawnWalker(p, site, snap) {
     p.active = true;
+    p.fresh = true; // face the first heading at once
     p.leaving = false;
     p.speed = 1.15 + rng() * 0.5;
     if (snap || !site) {
@@ -386,7 +388,45 @@ export function installCrowd(world) {
     const sig = signalAt(clock, j.offset);
     return (e.kind === "cross-av" ? sig.avenue : sig.cross) === "stop";
   };
+  /* Local fright: a bolt landing, a tornado setting off or a gust near them sends the people within reach running
+     away from it for a few seconds (turning back along their sidewalk if they were walking towards it). */
+  const scares = []; // { x, z, r, until }
+  function scare(x, z, r, secs) {
+    if (!isFinite(x) || !isFinite(z)) return;
+    scares.push({ x, z, r, until: clock + secs });
+    if (scares.length > 8) scares.shift();
+    info.scares = (info.scares || 0) + 1;
+  }
+  function fright(p, dt) {
+    if (p.flee > 0) p.flee -= dt;
+    for (let i = 0; i < scares.length; i++) {
+      const s = scares[i];
+      if (clock > s.until) continue;
+      const dx = p.x - s.x;
+      const dz = p.z - s.z;
+      if (dx * dx + dz * dz > s.r * s.r) continue;
+      if (!(p.flee > 0)) {
+        p.flee = 2.5 + rng() * 1.5;
+        info.fled = (info.fled || 0) + 1;
+        // heading towards it on a plain stretch of sidewalk: turn round
+        const toward = (p.bx - p.ax) * -dx + (p.bz - p.az) * -dz > 0;
+        if (toward && p.state === "walk" && p.edge && p.edge.kind === "walk" && p.from && p.ax === p.from.x && p.az === p.from.z) {
+          const t = p.t;
+          const f = p.from;
+          p.from = p.to;
+          p.to = f;
+          p.dir = -p.dir;
+          p.door = null;
+          setSeg(p, p.bx, p.bz, p.ax, p.az);
+          p.t = 1 - t;
+        }
+      }
+    }
+    return p.flee > 0;
+  }
   function stepPerson(p, dt, run) {
+    if (scares.length && fright(p, dt)) run = true;
+    else if (p.flee > 0) { p.flee -= dt; run = true; }
     // reaction blend: in after its small delay, out fast once the ability weather is gone
     if (rKind) {
       if (p.rdelay > 0) p.rdelay -= dt;
@@ -394,18 +434,20 @@ export function installCrowd(world) {
     } else p.rk = Math.max(0, p.rk - dt / REACT_SEC);
     const rk = p.rk;
     if (rKind === "rain") run = run || rk > 0.5;
-    p.phase += dt * (run ? 11 : 7.5) * (p.speed / 1.3) * (rKind === "sun" ? 1 + rk * 0.3 : 1);
     if (rKind === "lookup" && p.look > 0 && rk > 0.5 && p.state !== "door-in" && p.state !== "door-out") {
       p.look -= dt; // stop and look up at the flash
+      p.phase += dt * 2;
       return;
     }
     if (p.state === "wait") {
       p.wait += dt;
       if (crossOpen(p) || p.wait > 40) { p.state = "walk"; p.wait = 0; }
-      else return;
+      else { p.phase += dt * 2; return; }
     }
     const reactK = rKind === "gale" ? 1 - 0.35 * rk : rKind === "fog" ? 1 - 0.2 * rk : rKind === "sun" ? 1 - 0.4 * rk : 1;
     const sp = p.speed * (run ? 1.9 : 1) * reactK * (p.state === "door-in" || p.state === "door-out" ? 0.8 : 1);
+    // step cadence from the speed they actually move at, so feet keep pace (a run takes longer strides)
+    p.phase += dt * (run ? 11 / 1.9 : 7.5) * (sp / 1.3) * (rKind === "sun" ? 1 + rk * 0.3 : 1);
     p.t += (sp * dt) / p.len;
     if (p.state === "door-out") p.scale = Math.min(1, p.t * 1.8);
     if (p.state === "door-in") p.scale = Math.max(0, 1 - Math.max(0, p.t - 0.35) / 0.65);
@@ -433,7 +475,13 @@ export function installCrowd(world) {
     p.z = lerp(p.az, p.bz, Math.min(1, p.t));
     const dx = p.bx - p.ax;
     const dz = p.bz - p.az;
-    if (dx || dz) p.yaw = Math.atan2(dx, dz);
+    if (dx || dz) {
+      // turn toward the new heading over a few frames, not in one
+      const want = Math.atan2(dx, dz);
+      const d = Math.atan2(Math.sin(want - p.yaw), Math.cos(want - p.yaw));
+      p.yaw += p.fresh ? d : d * Math.min(1, dt * TURN_RATE);
+      p.fresh = false;
+    }
   }
 
   /* ---------------- cars ---------------- */
@@ -738,7 +786,7 @@ export function installCrowd(world) {
       const lean = gale * 0.07; // leaning into the wind
       const hx = looking ? -Math.sin(p.yaw) * 0.07 * rk : 0;
       const hz = looking ? -Math.cos(p.yaw) * 0.07 * rk : 0;
-      put(mLegs, i, p.x, y + 0.4 * h, p.z, p.yaw, p.scale, h);
+      put(mLegs, i, p.x, PED_Y + 0.4 * h, p.z, p.yaw, p.scale, h); // feet stay on the ground; the bob is the upper body
       put(mTorso, i, p.x + Math.sin(p.yaw) * lean, y + 1.1 * h, p.z + Math.cos(p.yaw) * lean, p.yaw + sway, p.scale, h);
       put(mHead, i, p.x + Math.sin(p.yaw) * lean * 1.6 + hx, y + (1.58 + (looking ? 0.05 * rk : 0)) * h, p.z + Math.cos(p.yaw) * lean * 1.6 + hz, p.yaw, p.scale, h);
       if (gale > 0.3) { put(mHand, i, p.x + Math.sin(p.yaw) * lean * 1.6, y + 1.76 * h, p.z + Math.cos(p.yaw) * lean * 1.6, p.yaw, p.scale * 1.1, 1); hats++; }
@@ -825,6 +873,19 @@ export function installCrowd(world) {
       return { people: Math.round(MAXP * d.people), cars: Math.round(MAXC * d.cars), phase: phaseAt(phases, hour) };
     },
   };
+  api.scare = scare;
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("day:power", (e) => {
+      const d = (e && e.detail) || {};
+      const P = window.day && window.day.powers;
+      if (!P || !P.now || !/^(bolt|tornado|gust)$/.test(d.action || "")) return;
+      let n = null;
+      try { n = P.now(); } catch (err) { return; }
+      if (d.action === "bolt" && n.strike) scare(n.strike.x, n.strike.z, 14, 1.5);
+      else if (d.action === "tornado" && n.tornado) scare(n.tornado.x, n.tornado.z, 22, 4);
+      else if (d.action === "gust" && n.aim) scare(n.aim.x, n.aim.z, 9, 1);
+    });
+  }
   world.crowd = api;
   if (window.day) window.day.crowd = api;
   return api;

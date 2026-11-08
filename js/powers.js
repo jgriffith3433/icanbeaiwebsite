@@ -1192,7 +1192,10 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       if (strike && strike.id === th.id) strike.thunder = true;
       flash = Math.max(flash, 0.28);
       shake = Math.max(shake, 0.018 + 0.04 * (1 - Math.min(1, th.dist / 40)));
-      burst(140, 1.35, 0.85, "lowpass");
+      // The recorded thunder (near or far by distance), with the synthesized rumble under it; the rumble alone if the
+      // samples aren't unlocked yet.
+      const sampled = !!(day && day.score && day.score.crack && day.score.crack(th.dist < 22 ? "near" : "far"));
+      burst(140, 1.35, sampled ? 0.4 : 0.85, "lowpass");
       say("thunder", "world", "bolt");
     }
 

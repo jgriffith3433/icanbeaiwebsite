@@ -22,6 +22,11 @@ function copyStatic() {
         if (!fs.existsSync(f)) continue;
         fs.cpSync(f, path.join(outDir, f), { recursive: true });
       }
+      // js/dialogue.js plays only the clips this lists, so a line whose file isn't in the repo never 404s
+      const dlgDir = path.join(outDir, 'audio', 'dialogue');
+      fs.mkdirSync(dlgDir, { recursive: true });
+      const files = fs.existsSync('audio/dialogue') ? fs.readdirSync('audio/dialogue').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/dialogue/' + n) : [];
+      fs.writeFileSync(path.join(dlgDir, 'index.json'), JSON.stringify({ files }) + '\n');
     },
   };
 }

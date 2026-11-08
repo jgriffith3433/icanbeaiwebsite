@@ -580,6 +580,10 @@ export function startScore(dayApi) {
   window.addEventListener("day:voice", () => {
     duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + 2600;
   });
+  // and under the story's and neighbors' spoken lines (js/dialogue.js)
+  window.addEventListener("day:dialogue", () => {
+    duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + 3200;
+  });
 
   // Heroic sting when the player takes him.
   window.addEventListener("day:control", (ev) => {

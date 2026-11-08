@@ -550,6 +550,7 @@ export function installCityscape(w) {
   poolM.alphaMode = B.Engine.ALPHA_ADD;
   poolM.backFaceCulling = false;
   poolM.zOffset = -2;
+  poolM.disableDepthWrite = true; // a light decal: it must not hide the one under it
   const poleMesh = B.MeshBuilder.CreateCylinder("cs-pole", { height: 4.4, diameterTop: 0.09, diameterBottom: 0.14, tessellation: 6 }, scene);
   poleMesh.position.y = 2.2;
   poleMesh.bakeCurrentTransformIntoVertices();

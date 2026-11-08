@@ -19,6 +19,7 @@ export function hourOf(minutes) {
 }
 
 const WALK_M_PER_MIN = 80; // sim metres per sim minute for the walks between stops
+const LEG_SWING = 0.7; // how far their legs swing from the hip, radians
 
 /** Where a neighbor is at hour h: { x, z, moving, inside, yaw }. `stops` are [hour, x, z, "inside"?]. */
 export function placeAt(stops, h) {
@@ -100,6 +101,7 @@ function install() {
         // swing from the hip: move the pivot to the top of the leg
         m.setPivotPoint(new B.Vector3(0, q.size[1] / 2, 0));
         p.__legs.push({ m, dir: q.leg });
+        p.__legLen = Math.max(p.__legLen || 0, q.size[1] * (p.scale || 1));
       }
     });
     p.__root = root;
@@ -349,18 +351,25 @@ function install() {
       p.__pos = pl;
       const root = p.__root;
       root.setEnabled(!pl.inside);
-      root.position.set(pl.x, 0, pl.z);
+      // feet on whatever is under them (the sidewalk is 6 cm up, the lawn 3 cm)
+      if (p.__gx == null || Math.abs(pl.x - p.__gx) > 0.05 || Math.abs(pl.z - p.__gz) > 0.05) {
+        p.__gx = pl.x;
+        p.__gz = pl.z;
+        p.__gy = world.surfaceAt ? world.surfaceAt(pl.x, pl.z) : 0;
+      }
+      root.position.set(pl.x, p.__gy, pl.z);
       if (pl.moving) {
         p.__phase += dt * 9;
         const yaw = pl.yaw != null ? pl.yaw : Math.atan2(pl.x - prevX, pl.z - prevZ);
         p.__yaw += Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw)) * Math.min(1, dt * 8);
-        root.position.y = Math.abs(Math.sin(p.__phase)) * 0.05;
+        // a swung leg is shorter in height, so the hips come down by that much and the leading foot stays on the ground
+        root.position.y = p.__gy - (p.__legLen || 0) * (1 - Math.cos(Math.sin(p.__phase) * LEG_SWING));
       } else if (here && Math.hypot(here.x - pl.x, here.z - pl.z) < 18) {
         const yaw = Math.atan2(here.x - pl.x, here.z - pl.z);
         p.__yaw += Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw)) * Math.min(1, dt * 4);
       }
       root.rotation.y = p.__yaw;
-      p.__legs.forEach((l) => (l.m.rotation.x = pl.moving ? Math.sin(p.__phase) * 0.7 * l.dir : l.m.rotation.x * 0.8));
+      p.__legs.forEach((l) => (l.m.rotation.x = pl.moving ? Math.sin(p.__phase) * LEG_SWING * l.dir : l.m.rotation.x * 0.8));
       stepBeats(p, h, here, nowMs);
 
       // the name tag and bubble above their head

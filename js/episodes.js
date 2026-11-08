@@ -579,7 +579,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (!B || !world || !world.scene) return;
     STALL_AT.forEach(([x, z], i) => {
       const node = new B.TransformNode("ep-stall-" + i, world.scene);
-      node.position.set(x, 0, z);
+      node.position.set(x, world.surfaceAt ? world.surfaceAt(x, z) : 0, z); // on the plaza's paving, not in it
       const parts = [];
       const add = (m) => { m.parent = node; m.isPickable = false; parts.push(m); return m; };
       const table = add(B.MeshBuilder.CreateBox("ep-stall-table-" + i, { width: 2.2, height: 0.85, depth: 1 }, world.scene));
@@ -657,7 +657,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   function spawnGauge(cfgG) {
     if (!B || !world || !world.scene || !cfgG) return;
     const root = new B.TransformNode("ep-gauge", world.scene);
-    root.position.set(cfgG.x, 0, cfgG.z);
+    root.position.set(cfgG.x, world.surfaceAt ? world.surfaceAt(cfgG.x, cfgG.z) : 0, cfgG.z);
     const H = cfgG.h || 10;
     const tube = B.MeshBuilder.CreateBox("ep-gauge-tube", { width: 1.1, height: H, depth: 1.1 }, world.scene);
     tube.parent = root;
