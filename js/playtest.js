@@ -397,6 +397,38 @@ function hudReadable(t) {
   }
 }
 
+/** Walk straight at a ramp's high end from the driveway side, like a real player would. Before the fix he walked in
+ *  under the ramp, where the gap is lower than the capsule, and wedged. He must stop at the ramp's end wall, not be
+ *  under it, and then be able to walk away. */
+async function rampWedgeCheck(t, b) {
+  const C = window.day.control;
+  const s = b.stair;
+  if (!C.place) return;
+  t.scene(`Ramp end of ${b.id}`);
+  C.place(s.x1 + 6, s.z, Math.PI / 2);
+  await sleep(300);
+  const under = (p) => p.x > s.x0 && p.x < s.x1 + 0.1 && Math.abs(p.z - s.z) < s.w / 2 + 0.1 && p.y < b.h - 1.5;
+  // straight along the ramp's line, under where it ends, as far as he will go
+  await goTo(s.x0 - 2, s.z, t, { sprint: true, close: 0.5, progress: 0.7, ms: 12000, stall: 3000 });
+  const p1 = C.state();
+  if (under(p1)) {
+    t.problem("bug", `Walking straight at the ${b.id} ramp's high end took him under it (at ${p1.x.toFixed(1)},${p1.z.toFixed(1)} y ${p1.y.toFixed(2)})`);
+    return;
+  }
+  // and from the side, along the street
+  C.place(s.x1 - 4, s.z + s.w / 2 + 3, Math.PI);
+  await sleep(200);
+  await goTo(s.x1 - 4, s.z, t, { close: 0.5, progress: 0.7, ms: 6000, stall: 2500 });
+  const p2 = C.state();
+  if (under(p2)) {
+    t.problem("bug", `Walking at the ${b.id} ramp from the street side took him under it (at ${p2.x.toFixed(1)},${p2.z.toFixed(1)} y ${p2.y.toFixed(2)})`);
+    return;
+  }
+  const out = await goTo(s.x1 + 5, s.z + s.w / 2 + 3, t, { close: 1, progress: 0.7, ms: 10000, stall: 3000 });
+  if (out) t.event("ramp-wedge-clear", `walking at the ${b.id} ramp's high end stops at its wall (x ${p1.x.toFixed(1)}), not under it, and he walks away`);
+  else t.problem("bug", `He couldn't walk away from the ${b.id} ramp's end (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+}
+
 /** Smoke's last step: take control outside, climb the first rooftop with a stair, throw one bolt (E). */
 async function roofBolt(t) {
   const C = window.day.control;
@@ -440,25 +472,45 @@ async function roofBolt(t) {
   // Climb until a deadline, not a fixed number of tries: on a slow frame rate the sim crawls (0.1 s a frame at most)
   // and the ramp can outlast any one goTo. Each pass carries on from where he stands (onRamp), and only a roof
   // arrival walks him to the middle, so a timed-out pass never drags him sideways into the wall mid-ramp.
+  await rampWedgeCheck(t, b);
   let ok = false;
   // He takes over ~30 m east of the ramp; on a slow bot that walk alone ate the runner's 180 s. Smoke tests the climb
   // and the bolt, not the street walk (the `city` scenario walks it), so stand him at the ramp's foot.
   if (C.place) C.place(s.x0 - 3, s.z + s.w / 2 + 1.5, -Math.PI / 2);
-  const climbUntil = performance.now() + 150000;
-  const f0 = window.day.now().minutes;
-  const t0 = performance.now();
-  while (!ok && performance.now() < climbUntil) {
-    const y0 = C.state().y;
+  // The climb is timed in GAME seconds (day.control.simTime): a slow bot runs the sim behind the wall clock, so a
+  // wall-clock deadline fails a climb that was only slow. The wall cap is a safety net for a frozen page.
+  const CLIMB_SIM_SEC = 150; // game seconds to get up the ramp (it takes ~12 at a walk)
+  const STUCK_SIM_SEC = 12; // no new height for this long, on the ramp or not, is stuck rather than slow
+  const wall0 = performance.now();
+  const sim0 = simNow();
+  t.event("climb-start", `to the ${b.id} roof (y ${C.state().y.toFixed(2)}, roof ${b.h})`);
+  let bestY = C.state().y;
+  let bestAt = sim0;
+  let stuck = false;
+  while (!ok && simNow() - sim0 < CLIMB_SIM_SEC && performance.now() - wall0 < 600000) {
     const reached = (onRamp() || (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000, stall: 5000 })
       && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.75, ms: 8000, stall: 5000 }))))
       && (await goTo(s.x1 - 0.25, s.z, t, { sprint: true, close: 0.35, progress: 0.8, ms: 40000, stall: 5000 }));
     if (reached || C.state().y > b.h - 0.4) {
       await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 20000, stall: 5000 });
       ok = C.state().y > b.h - 0.4;
-    } else if (!onRamp() && C.state().y <= y0 + 0.05 && performance.now() - t0 > 60000) break; // truly stuck, not slow
+    }
+    const y = C.state().y;
+    if (y > bestY + 0.05) {
+      bestY = y;
+      bestAt = simNow();
+    } else if (!ok && simNow() - bestAt > STUCK_SIM_SEC) {
+      stuck = true;
+      break;
+    }
   }
-  t.metric("climbSec", Math.round((performance.now() - t0) / 100) / 10);
-  t.metric("climbSimMin", Math.round((window.day.now().minutes - f0) * 100) / 100);
+  const climbSim = simNow() - sim0;
+  const climbWall = (performance.now() - wall0) / 1000;
+  t.metric("climbSimSec", Math.round(climbSim * 10) / 10);
+  t.metric("climbWallSec", Math.round(climbWall * 10) / 10);
+  if (ok) t.event("climb-done", `up the ${b.id} ramp in ${climbSim.toFixed(1)} game s (${climbWall.toFixed(1)} s wall, ${(climbSim / Math.max(climbWall, 0.001)).toFixed(2)}x real time)`);
+  else if (stuck) t.problem("bug", `He is stuck on the ${b.id} ramp: no height gained in ${STUCK_SIM_SEC} game s (best y ${bestY.toFixed(2)}, at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+  else t.problem("bug", `The ${b.id} climb was slow, not stuck, and ran out of ${CLIMB_SIM_SEC} game s (${climbWall.toFixed(0)} s wall, y ${C.state().y.toFixed(2)} of ${b.h})`);
   const st = C.state();
   const onRoof = ok && st.y > b.h - 0.4;
   if (onRoof) t.event("on-rooftop", `on the ${b.id} roof at y ${st.y.toFixed(2)}`);
@@ -1652,18 +1704,29 @@ function steerKeys(tx, tz, sprint) {
   if (sprint) keys.push("Shift");
   return keys;
 }
-/** Walk him to a point with the keys. False if he gets stuck or falls through. */
+/** Game seconds he has been simulated as the player's (day.control.simTime): the clock a climb is measured in. main.js
+ *  caps a frame at 0.1 s, so on a slow bot the sim runs behind the wall clock and a wall-clock limit fails a walk that
+ *  was only slow. Falls back to wall seconds if the page has no simTime. */
+function simNow() {
+  const C = window.day && window.day.control;
+  return C && C.simTime ? C.simTime() : performance.now() / 1000;
+}
+/** Walk him to a point with the keys. False if he gets stuck (no movement in `stall` game ms) or falls through.
+ *  `ms` and `stall` are GAME time; a wall-clock cap (8x, at least 2 min) is only the safety net for a frozen page. */
 async function goTo(tx, tz, t, opts) {
   opts = opts || {};
   const close = opts.close == null ? 0.7 : opts.close;
-  const limit = opts.ms || 22000;
+  const limit = (opts.ms || 22000) / 1000;
+  const stallLimit = (opts.stall || 2800) / 1000;
   const sprint = !!opts.sprint;
-  const started = performance.now();
+  const wallCap = Math.max(limit * 8000, 120000);
+  const wall0 = performance.now();
+  const started = simNow();
   let stillSince = started;
   let last = window.day.control.state();
   let ticks = 0;
   try {
-    while (performance.now() - started < limit) {
+    while (simNow() - started < limit && performance.now() - wall0 < wallCap) {
       const st = window.day.control.state();
       if (st.y < -0.45) {
         t.problem("bug", `He fell through the world at ${st.x.toFixed(1)},${st.z.toFixed(1)} (y ${st.y.toFixed(2)})`);
@@ -1671,9 +1734,9 @@ async function goTo(tx, tz, t, opts) {
       }
       if (Math.hypot(st.x - tx, st.z - tz) < close) return true;
       if (Math.hypot(st.x - last.x, st.z - last.z) > 0.12) {
-        stillSince = performance.now();
+        stillSince = simNow();
         last = st;
-      } else if (performance.now() - stillSince > (opts.stall || 2800)) return false;
+      } else if (simNow() - stillSince > stallLimit) return false;
       const far = Math.hypot(st.x - tx, st.z - tz);
       setHeld(steerKeys(tx, tz, sprint && far > 2.5));
       if (ticks++ % 6 === 0) t.progress(opts.progress || 0.5);

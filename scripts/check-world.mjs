@@ -274,6 +274,19 @@ roofs.forEach((b) => {
   walkToward(s.x0 - 0.9, s.z, 22);
   ok(ms.y < 0.5, `${b.id}: he didn't walk back down the stair (y ${ms.y.toFixed(2)} at ${ms.x.toFixed(1)},${ms.z.toFixed(1)})`);
 });
+// The wedge under each ramp is closed: walking straight at the high end from the driveway, or at the ramp from the
+// street side, stops at a wall and never takes him in under it (the gap there is lower than the capsule).
+roofs.forEach((b) => {
+  const s = b.stair;
+  const under = () => ms.x > s.x0 && ms.x < s.x1 + 0.1 && Math.abs(ms.z - s.z) < s.w / 2 + 0.1 && ms.y < b.h - 1.5;
+  mover.start(s.x1 + 6, s.z, Math.PI);
+  walkToward(s.x0 - 2, s.z, 14, 0.5);
+  ok(!under(), `${b.id}: walking straight at the ramp's high end took him under it (at ${ms.x.toFixed(1)},${ms.z.toFixed(1)} y ${ms.y.toFixed(2)})`);
+  ok(ms.x > s.x1 - 0.5, `${b.id}: the ramp's end isn't closed (he got to x ${ms.x.toFixed(1)}, end ${s.x1})`);
+  mover.start(s.x1 - 4, s.z + s.w / 2 + 3, 0);
+  walkToward(s.x1 - 4, s.z, 8, 0.5);
+  ok(!under(), `${b.id}: walking at the ramp from the street side took him under it (at ${ms.x.toFixed(1)},${ms.z.toFixed(1)} y ${ms.y.toFixed(2)})`);
+});
 // Storm-riding roof to roof: from the apt roof's east edge, two jumps and hold to glide across the street to the
 // shop, let go over it to drop, hold again just above its roof, and land soft on it without touching the ground.
 const shop = (city.blocks || []).find((b) => b.id === "shop");
