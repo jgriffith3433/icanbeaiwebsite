@@ -6,6 +6,8 @@
    ========================================================================== */
 
 const POWER_GROUPS = new Set(["storm", "bolt", "gust", "tornado"]);
+// The four weather calls speak his weather lines (they skip onWeather's own line, below).
+const CALL_GROUPS = { rain: "weather-rain", gale: "weather-wind", fog: "weather-fog", sunbreak: "weather-clear" };
 
 function cfg() {
   const v = (window.DAY_CONFIG && window.DAY_CONFIG.voice) || {};
@@ -172,9 +174,10 @@ export function startVoice(dayApi) {
   function onPower(e) {
     const d = (e && e.detail) || {};
     const power = d.power || d.action;
-    if (!POWER_GROUPS.has(power)) return;
     if (d.action === "denied") return;
-    say(power, { chance: cfg().powerChance, via: d.via || "power" });
+    const group = POWER_GROUPS.has(power) ? power : CALL_GROUPS[power];
+    if (!group) return;
+    say(group, { chance: cfg().powerChance, via: d.via || "power" });
   }
 
   function onWeather(e) {

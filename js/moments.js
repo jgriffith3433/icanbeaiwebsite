@@ -94,6 +94,10 @@ export function startMoments() {
     if (T.lines.length > 1 && i === lastLine) i = (i + 1) % T.lines.length;
     lastLine = i;
     lineText = T.lines[i];
+    // When his voice just spoke a take-over line (js/voice.js listens to the same event first), the caption is that line,
+    // so what's read and what's heard match.
+    const v = day.voice && day.voice.now && day.voice.now();
+    if (v && v.on && v.last && v.last.group === "episode-open" && performance.now() / 1000 - v.last.at < 0.5) lineText = v.last.text;
     sayEl.textContent = lineText;
     lineUp = true;
     lineAt = performance.now();

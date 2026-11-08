@@ -92,6 +92,15 @@ Every HUD **placement** (position, top/right/bottom/left, transform) is in `css/
   localStorage `icanbe.tutorial` keeps it away. While it's up, the episode offer waits. A bot's tab (`?playtest=`
   other than `first-visit`, or `navigator.webdriver`) never shows it; `day.tutorial.reset()` shows it again.
 
+### Sound for what happens (`js/sfx.js`)
+
+All synthesized in WebAudio, no files, gated on the Sound button: footsteps by stride (wetter in rain), jump, landing
+thump and dust by fall height, let go, updraft, the bolt's crack where it lands, the tornado's travelling roar, every
+episode beat (goal, fail, piece, kick, unlock, score, show cues), a babble per speaker for episode dialogue and
+neighbor bubbles, and city life (birds by day in fair weather, cars passing by the crowd's count, a far siren at
+night). It only listens (`day:*` events and `day.control.state()`); `scripts/check-sfx.mjs` (npm test) checks that
+each of those is heard and that Sound off is silent. New player-facing beats get a sound here and a line in that check.
+
 ### His 3D model
 
 - **The file:** `models/small-weather.glb` (GLB only, under 10 MB; `npm test` checks), named by `day.config.js`
