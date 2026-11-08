@@ -1171,6 +1171,8 @@ async function analytics(options, t) {
 
     // Wait for the batches to go out.
     await t.until(() => ["page_view", "game_ready", "screen", "progress", "feature"].every((n) => sent().some((e) => e.name === n)), 15000, "page_view, progress and feature events to be sent").catch(() => {});
+    // The batches go out every few seconds: the player features (let_go, glide) may sit in the next one.
+    await t.until(() => ["take_control", "let_go", "weather", "power", "glide"].every((f) => sent().some((e) => e.name === "feature" && e.props && e.props.name === f)), 15000, "the player feature events to be sent").catch(() => {});
     showSent();
     for (const n of ["page_view", "session_start", "game_ready", "screen", "progress", "feature"]) {
       if (!sent().some((e) => e.name === n)) t.problem("bug", `No ${n} event went out`);
