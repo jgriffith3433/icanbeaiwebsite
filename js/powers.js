@@ -967,7 +967,12 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     });
   }
 
-  const bar = startAbilityBar(abil, (id) => command(id, "touch"));
+  const bar = startAbilityBar(abil, (id) => {
+    if (command(id, "touch")) return;
+    const why = abil.why(id); // a refused tap says why on the bar itself (the key path says it in the log)
+    if (why === "locked") bar.refuse(line("locked"));
+    else if (why === "energy") bar.refuse(line("dry"));
+  });
 
   function paintMeter() {
     if (!canDom) return;

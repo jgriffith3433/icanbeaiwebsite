@@ -113,9 +113,10 @@ export function createAbilities(opt) {
 }
 
 /** The on-screen row. Returns { paint(visible), el }. No DOM in the tests: it returns a no-op. */
+export const TOUCH_ABILITIES = ["bolt", "rain", "gale", "fog", "sunbreak"]; // the five on a phone; Storm, Gust and Tornado stay on the power pad
 export function startAbilityBar(abilities, onPress) {
   const canDom = typeof document !== "undefined" && document.body && typeof document.body.append === "function" && document.head;
-  if (!canDom) return { paint() {}, el: null };
+  if (!canDom) return { paint() {}, refuse() {}, el: null };
   const style = document.createElement("style");
   style.textContent = `
 .abilitybar{position:fixed;z-index:6;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;font:600 0.74rem/1.15 system-ui,sans-serif;color:#e7eef8}
@@ -137,7 +138,25 @@ export function startAbilityBar(abilities, onPress) {
 .abilitybar .energy{width:100%;min-width:230px}
 .abilitybar .energy .bar{margin-top:3px;height:8px;border-radius:99px;background:rgba(8,12,20,.55);border:1px solid rgba(126,200,255,.45);overflow:hidden}
 .abilitybar .energy .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1a4c7a,#7ec8ff);border-radius:99px}
-html.touch-ui .abilitybar{display:none}
+.abilitybar .refuse{display:none;color:#f0c27a}
+.abilitybar .energy.refused .refuse{display:block}
+.abilitybar .energy.refused .et{display:none}
+/* phone: five tap buttons above the power pad, right-aligned; the stick, jump and pad are untouched */
+html.touch-ui .abilitybar{left:auto;right:max(12px,env(safe-area-inset-right));bottom:max(252px,calc(env(safe-area-inset-bottom) + 240px));transform:none;align-items:stretch;gap:4px;width:calc(5 * var(--abw) + 4 * 5px);--abw:min(54px,calc((100vw - 44px) / 5));font-size:.62rem}
+html.touch-ui .abilitybar .row{gap:5px}
+html.touch-ui .abilitybar .ab{width:var(--abw);height:54px;min-width:44px;min-height:44px;border-radius:10px;gap:0;justify-content:flex-end;padding-bottom:6px}
+html.touch-ui .abilitybar .ab[data-touch="0"]{display:none}
+html.touch-ui .abilitybar .ab .k{display:none}
+html.touch-ui .abilitybar .ab .n{font-size:.6rem;opacity:1;color:#d5e8ff;white-space:nowrap}
+html.touch-ui .abilitybar .ab .c{top:4px;right:5px;font-size:.66rem}
+html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:.95rem;background:rgba(3,6,12,.55)}
+html.touch-ui .abilitybar .energy{min-width:0}
+html.touch-ui .abilitybar .energy .et{font-size:.62rem}
+html.touch-ui.in-control:not(.preview-public) .tutorial{bottom:max(338px,calc(env(safe-area-inset-bottom) + 326px))}
+@media (orientation:landscape) and (max-height:520px){
+html.touch-ui .abilitybar{right:auto;left:max(164px,calc(env(safe-area-inset-left) + 150px));bottom:max(60px,calc(env(safe-area-inset-bottom) + 54px))}
+html.touch-ui.in-control:not(.preview-public) .tutorial{left:max(164px,calc(env(safe-area-inset-left) + 150px));transform:none;bottom:max(146px,calc(env(safe-area-inset-bottom) + 140px))}
+}
 html:not(.preview-public):not(.touch-ui) .abilitybar{bottom:128px}
 html.in-control:not(.preview-public):not(.touch-ui) .control-btn{bottom:232px}
 html.in-control:not(.preview-public):not(.touch-ui) .quality-btn{bottom:238px}
@@ -163,7 +182,7 @@ body:has(.mo-line:not([hidden])) .control-hint,body:has(.tutorial:not([hidden]))
   en.setAttribute("role", "meter");
   en.setAttribute("aria-label", "Energy");
   en.setAttribute("aria-valuemin", "0");
-  en.innerHTML = `<span class="et">Energy</span><div class="bar"><i></i></div>`;
+  en.innerHTML = `<span class="et">Energy</span><span class="refuse" id="ability-refuse" role="status" aria-live="polite"></span><div class="bar"><i></i></div>`;
   const fill = en.querySelector("i");
   el.append(row, en);
   document.body.appendChild(el);
@@ -174,6 +193,7 @@ body:has(.mo-line:not([hidden])) .control-hint,body:has(.tutorial:not([hidden]))
     b.className = "ab";
     b.id = "ability-" + a.id;
     b.dataset.ability = a.id;
+    b.dataset.touch = TOUCH_ABILITIES.includes(a.id) ? "1" : "0";
     b.setAttribute("role", "button");
     b.setAttribute("aria-label", `${a.name}, key ${String(a.key).toUpperCase()}, costs ${a.cost}`);
     b.innerHTML = `<span class="c">${a.cost}</span><span class="k">${String(a.key).toUpperCase()}</span><span class="n">${a.name}</span><span class="sweep"></span><span class="cd"></span>`;
@@ -183,6 +203,16 @@ body:has(.mo-line:not([hidden])) .control-hint,body:has(.tutorial:not([hidden]))
     });
     row.appendChild(b);
     slots[a.id] = { b, sweep: b.querySelector(".sweep"), cd: b.querySelector(".cd") };
+  }
+
+  let refuseTimer = 0;
+  /** A line in the Energy row for a moment (a locked or too-costly tap); it is a timeout, not a poll. */
+  function refuse(text) {
+    const r = en.querySelector(".refuse");
+    r.textContent = text || "";
+    en.classList.toggle("refused", !!text);
+    clearTimeout(refuseTimer);
+    if (text) refuseTimer = setTimeout(() => en.classList.remove("refused"), 1800);
   }
 
   function paint(visible) {
@@ -206,5 +236,5 @@ body:has(.mo-line:not([hidden])) .control-hint,body:has(.tutorial:not([hidden]))
     en.querySelector(".et").textContent = `Energy ${Math.round(s.energy)}`;
     fill.style.width = Math.max(0, Math.min(100, (s.energy / s.max) * 100)) + "%";
   }
-  return { paint, el };
+  return { paint, refuse, el };
 }
