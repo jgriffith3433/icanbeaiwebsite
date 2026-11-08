@@ -52,6 +52,7 @@ export function createMover(world, cfg) {
   const M = Object.assign({}, MOVE_DEFAULTS, cfg.control && cfg.control.move);
   const H = 1.7; // capsule height
   const R = 0.28; // and radius
+  const STEP_DOWN = 0.45; // the deepest drop he steps down without leaving the ground (stairs, ramps, kerbs)
   const walkBackSpeed = Math.max(((cfg.person && cfg.person.walkSpeed) || 1.25) * 1.6, 1.6);
   const GRAV = new B.Vector3(0, -M.gravity, 0);
   const DOWN = new B.Vector3(0, -1, 0);
@@ -149,6 +150,20 @@ export function createMover(world, cfg) {
       support = cc.checkSupport(h, DOWN);
       onGround = support.supportedState === B.CharacterSupportedState.SUPPORTED && s.vy <= 0.05;
     } else onGround = s.y <= guessFloor(s.x, s.z) + 1e-3 && s.vy <= 0.05;
+    // Down a stair or a ramp he walks off a ledge lower than a step every few centimetres: keep his feet on it (it used
+    // to read as a hop and a "fall" pose on 3 frames in 4 of every descent). A real drop, or a jump, still falls.
+    if (cc && !onGround && s.grounded && !jumpPresses && s.vy <= 0.05) {
+      const f = floorAt(s.x, s.z, s.y + 0.3);
+      const drop = s.y - f;
+      if (drop > -0.05 && drop < STEP_DOWN) {
+        s.y = f;
+        s.vy = 0;
+        cc.setPosition(new B.Vector3(s.x, f + H / 2 + 0.01, s.z));
+        support = cc.checkSupport(h, DOWN);
+        onGround = true;
+        s.snaps = (s.snaps || 0) + 1;
+      }
+    }
 
     if (onGround) {
       if (!s.grounded && s.jumps) {
@@ -264,6 +279,8 @@ export function createMover(world, cfg) {
   }
 
   function pickAnim(speed) {
+    // a moment off the ground without a jump (a kerb, the edge of a step) keeps the walk: "fall" only once it's a fall
+    if (!s.grounded && !s.jumps && !s.gliding && s.airTime < 0.15 && (s.anim === "walk" || s.anim === "run" || s.anim === "idle")) return s.anim;
     if (!s.grounded) return s.vy > 0.4 && !s.gliding ? "jump" : s.floating || s.gliding ? "float" : "fall";
     if (speed < 0.25) return "idle";
     return speed > (M.walk + M.sprint) / 2 ? "run" : "walk";
@@ -916,7 +933,10 @@ function install() {
     }
     avatar.place(s.x, s.y, s.z, s.yaw);
     // cast / throw while a power is in his hands (js/powers.js); the walk pose otherwise
-    const posed = day.powers && day.powers.pose ? day.powers.pose() : null;
+    // The cast and throw poses stand still: on the move or in the air he keeps his walk, run, jump or float (a
+    // standing pose sliding along the ground reads as gliding feet).
+    const wantPose = day.powers && day.powers.pose ? day.powers.pose() : null;
+    const posed = wantPose && s.grounded && s.speed < 0.8 ? wantPose : null;
     avatar.play(posed || s.anim, posed ? 1 : s.speed, dt);
     cameraFollow(dt, { x: gp.lx, y: gp.ly });
     return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: posed || s.anim, text };

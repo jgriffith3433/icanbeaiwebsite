@@ -18,6 +18,11 @@ import { clipAvatar } from "./avatar.js";
 
 export const SKIN_CLIPS = ["idle", "walk", "run", "jump", "fall", "float", "cast", "throw", "sit", "type", "phone", "lie", "side", "recline"];
 const LOOPS = ["idle", "walk", "run", "fall", "float", "sit", "type", "phone", "lie", "side", "recline"];
+/* Metres covered per loop of the clip with the stance foot planted, measured on models/small-weather.glb (stance foot
+   speed at 1x times the loop length: walk 0.81 m/s over 1.067 s, run 1.63 m/s over 0.767 s). The playback speed is
+   ground speed over this, so his boots keep pace with the ground. scripts/check-motion.mjs measures it again. */
+export const WALK_STRIDE = 0.86;
+export const RUN_STRIDE = 1.25;
 
 /* How much lightning each clip has while he's the player's (0 on his day) */
 const BOLTS = { cast: 1, throw: 1, float: 0.7, fall: 0.5, jump: 0.5, idle: 0.3, walk: 0.25, run: 0.35 };
@@ -77,7 +82,7 @@ export function makeSkin(B, scene, res, hipsTarget, container) {
     return standAnchor;
   };
 
-  const player = clipAvatar(wrap, groups, { clips: SKIN_CLIPS, loops: LOOPS, walkStride: 1.25, runStride: 2.4 });
+  const player = clipAvatar(wrap, groups, { clips: SKIN_CLIPS, loops: LOOPS, walkStride: WALK_STRIDE, runStride: RUN_STRIDE });
 
   /* Emissive blue jacket seams & boot lights: use the embedded emissiveTexture in the GLB (or a tiny 128x128 fallback).
      Boost emissiveColor above the pipeline's HDR bloomThreshold (0.88) so seams and boots bloom natively without GlowLayer.

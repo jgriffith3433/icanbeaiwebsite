@@ -59,7 +59,7 @@ export function clipAvatar(root, animationGroups, opts = {}) {
       }
       if (g && strideOf[clip] && g.to > g.from) {
         const loopSeconds = (g.to - g.from) / (g.targetedAnimations[0]?.animation.framePerSecond || 30);
-        g.speedRatio = Math.max(0.3, Math.min(3, (speed * loopSeconds) / strideOf[clip]));
+        g.speedRatio = Math.max(0.3, Math.min(3.6, (speed * loopSeconds) / strideOf[clip]));
       }
       const k = 1 - Math.exp(-blend * dt);
       weights.forEach((w, grp) => {
