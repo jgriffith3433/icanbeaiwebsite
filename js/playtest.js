@@ -2359,6 +2359,8 @@ async function weatherAudio(options, t) {
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   await sleep(350);
+  // The sting may be queued while its sample decodes: give it a few seconds.
+  for (let i = 0; i < 20 && S.now().stingAt <= stingBefore; i++) await sleep(150);
   const afterTake = S.now();
   t.event("control-taken", `stingAt ${afterTake.stingAt} (was ${stingBefore}); bed ${afterTake.bed}`);
   if (afterTake.on && afterTake.samples && afterTake.stingAt <= stingBefore) {

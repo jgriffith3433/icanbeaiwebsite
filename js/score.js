@@ -384,12 +384,23 @@ export function startScore(dayApi) {
     if (!soundOn()) return false;
     unlock();
     const c = cfg();
-    const ok = playOneShot(c.sting, c.stingVol);
-    if (ok) {
+    const mark = () => {
       stingAt = (typeof performance !== "undefined" ? performance.now() : Date.now());
       live.stingAt = stingAt;
+    };
+    const ok = playOneShot(c.sting, c.stingVol);
+    if (ok) {
+      mark();
+      return true;
     }
-    return ok;
+    // Sample not decoded yet: play it as soon as it is (if still in time), rather than stay silent.
+    if (!buffers[c.sting] && !missing[c.sting]) {
+      const asked = Date.now();
+      loadUrl(c.sting).then((buf) => {
+        if (buf && Date.now() - asked < 6000 && playOneShot(c.sting, c.stingVol)) mark();
+      });
+    }
+    return false;
   }
 
   /** Short whoosh when he starts riding the wind (js/control.js). */
