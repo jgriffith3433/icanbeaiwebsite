@@ -423,6 +423,8 @@ function install() {
   const hint = document.createElement("p");
   hint.className = "control-hint";
   hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold in the air to glide) · drag to look · hold F for a storm, E lightning, G a gust (and an updraft), T a tornado · 1–7 or hold Q for the weather · Esc to let go";
+  const HINT_KEYS = hint.textContent;
+  const HINT_TOUCH = "Left stick: move · Jump (tap again in the air) · tap Bolt, Rain, Gale, Fog, Sun break, or Storm, Gust, Tornado · drag to look";
   const pad = document.createElement("div");
   pad.className = "touchpad";
   pad.hidden = true;
@@ -445,7 +447,8 @@ function install() {
     document.documentElement.classList.toggle("in-control", mode === "control");
     document.documentElement.classList.toggle("touch-ui", touchMode());
     pad.hidden = !(mode === "control" && touchMode());
-    hint.hidden = !(mode === "control" && !touchMode());
+    hint.textContent = touchMode() ? HINT_TOUCH : HINT_KEYS;
+    hint.hidden = mode !== "control";
   }
   let lastDriving = null;
 

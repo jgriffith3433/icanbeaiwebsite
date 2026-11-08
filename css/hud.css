@@ -141,6 +141,8 @@ html.touch-ui .abilitybar {
   bottom: max(252px, calc(env(safe-area-inset-bottom) + 240px)); transform: none;
 }
 .powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; }
+/* phone: the controls legend sits above the stick, left of the power pad */
+html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 250px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
 html.touch-ui .powerpad { right: max(12px, env(safe-area-inset-right)); bottom: max(150px, calc(env(safe-area-inset-bottom) + 138px)); }
 
 /* ---------- centre cards: tutorial, Episodes HUD, toasts, the take-over line, the episode line ---------- */
@@ -148,7 +150,7 @@ html.touch-ui .powerpad { right: max(12px, env(safe-area-inset-right)); bottom: 
 html.in-control .tutorial { bottom: 232px; }
 .preview-public .tutorial { bottom: max(72px, calc(env(safe-area-inset-bottom) + 62px)); }
 .preview-public.in-control .tutorial { bottom: 116px; }
-html.touch-ui.in-control .tutorial { bottom: max(256px, calc(env(safe-area-inset-bottom) + 244px)); }
+html.touch-ui.in-control .tutorial { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); }
 html.touch-ui.in-control:not(.preview-public) .tutorial { bottom: max(338px, calc(env(safe-area-inset-bottom) + 326px)); }
 /* desktop, in control: top centre (the memory "HUD z-order" convention), clear of the bottom row */
 html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { top: 156px; bottom: auto; }
@@ -167,6 +169,7 @@ html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { 
 .ep-toast { position: fixed; left: 50%; top: max(64px, calc(env(safe-area-inset-top) + 56px)); }
 .nb-toast { position: fixed; left: 50%; top: max(110px, calc(env(safe-area-inset-top) + 100px)); }
 .mo-line { position: fixed; left: 50%; bottom: max(230px, calc(env(safe-area-inset-bottom) + 210px)); transform: translateX(-50%); }
+html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); } /* above the ability bar */
 
 /* ---------- phone landscape (short window): the ability bar and the tutorial sit between the stick and the pad ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
