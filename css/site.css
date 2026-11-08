@@ -526,6 +526,13 @@ html.touch-ui .tools button {
   font-size: 0.78rem;
   white-space: nowrap;
 }
+/* Touch layout on a wide window (tablet, or phone controls forced on a desktop): the tools column and Quality are
+   fixed on the right edge, so the docked Details panel sits left of them instead of under them. */
+@media (min-width: 900px) {
+  html.touch-ui .side {
+    right: calc(max(12px, env(safe-area-inset-right)) + 150px);
+  }
+}
 
 /* ---------- public site & phone control view ---------- */
 .public .errors,
