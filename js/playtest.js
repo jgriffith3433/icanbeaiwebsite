@@ -130,6 +130,69 @@ function stopWatching() {
   unwatch = null;
 }
 
+/* ---------- the status card (#chapter and #where in the Now panel) ---------- */
+// While the pilot steers (taking control, and Walking back) it must read "Your move" / "On foot", never "In the car" or
+// "Drive"; while the day has him driving and nobody steers it reads "In the car"; back on his day it's the day's own.
+const CAR_CARD = /in the car|drive/i;
+const cardNow = () => ({ where: ($("where").textContent || "").trim(), chapter: ($("chapter").textContent || "").trim() });
+const cardClock = () => E().fmtClock(window.day.now().minutes);
+/** A couple of painted frames (the card is written once per frame), but never longer than 250 ms. */
+const paintedFrames = (n = 2) =>
+  Promise.race([
+    new Promise((res) => {
+      let i = 0;
+      const f = () => (++i >= n ? res() : requestAnimationFrame(f));
+      requestAnimationFrame(f);
+    }),
+    sleep(250),
+  ]);
+
+/** Shared check. expected: "foot" (On foot / Your move), "car" (In the car) or "day" (the day's own: not "On foot"
+ *  / "Your move"). Logs a status-card event with the clock time when it matches, a bug when it doesn't. */
+async function checkStatusCard(t, expected, label) {
+  await paintedFrames(2);
+  const c = cardNow();
+  const ok =
+    expected === "foot" ? c.where === "On foot" && c.chapter === "Your move" :
+    expected === "car" ? c.where === "In the car" :
+    c.where !== "On foot" && c.chapter !== "Your move";
+  const word = { foot: "On foot / Your move", car: "In the car", day: "the day's own card" }[expected];
+  const detail = `${label}: ${cardClock()} · card reads "${c.where}" / "${c.chapter}" (expected ${word})`;
+  if (ok) t.event("status-card", detail);
+  else t.problem("bug", `Status card wrong, ${detail}`);
+  return ok;
+}
+
+/** While he's the player's or walking back (any mode but schedule), sample the card every `ms` and report any
+ *  In the car / Drive reading, or anything but On foot / Your move, with the clock time. stop() logs the tally. */
+function watchStatusCard(t, label, ms = 1000) {
+  const C = window.day.control;
+  let n = 0;
+  let prev = null;
+  let bad = 0;
+  const iv = setInterval(() => {
+    const mode = C.mode();
+    const stable = mode === prev; // the sample just after a mode flip may precede the frame that writes the card
+    prev = mode;
+    if (mode === "schedule" || !stable) return;
+    n++;
+    const c = cardNow();
+    const car = CAR_CARD.test(c.where) || CAR_CARD.test(c.chapter);
+    if (car || c.where !== "On foot" || c.chapter !== "Your move") {
+      bad++;
+      if (bad <= 3) t.problem("bug", `${label}: at ${cardClock()} he's ${mode === "control" ? "in control" : "walking back"} but the status card reads "${c.where}" / "${c.chapter}"${car ? " (In the car / Drive while he's the player's)" : ""}`);
+    }
+  }, ms);
+  return {
+    stop() {
+      clearInterval(iv);
+      t.metric(`${label}StatusCardSamples`, n);
+      if (n && !bad) t.event("status-card-sampled", `${label}: ${n} samples, every one On foot / Your move`);
+      else if (!n) t.problem("warning", `${label}: no status-card samples were taken while in control`);
+    },
+  };
+}
+
 /** The engine (Babylon 9, Havok physics and its colliders) and Small Weather's name in the side panel and the log. */
 async function checkFoundation(t) {
   t.scene("Engine and name");
@@ -353,9 +416,11 @@ async function roofBolt(t) {
   await sleep(600);
   t.event("start-at", `${E().fmtClock(outside.start)} outside, to climb a roof`);
   t.scene("Take control");
+  const smokeCard = watchStatusCard(t, "smoke");
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   t.event("control-taken", "Enter");
+  await checkStatusCard(t, "foot", "smoke: right after Take control" + (outside === carSideMoment(day) ? " beside the car" : ""));
   const b = ((cfg.city && cfg.city.blocks) || []).find((x) => x.stair);
   if (!b) {
     t.problem("bug", "The district has no roof with a stair");
@@ -449,7 +514,13 @@ async function roofBolt(t) {
     if (cleared && secs < 10) t.event("weather-cleared", `back to clear ${secs.toFixed(1)} s after the bolt (rain ${WXB.now().rain.toFixed(2)})`);
     else t.problem("bug", "The storm from lightning didn't clear within seconds");
   }
+  // Let go: On foot on every sample while he walks (or catches up) back to his day.
   pressKey("Escape");
+  await t.until(() => C.mode() !== "control", 3000, "letting go");
+  await checkStatusCard(t, "foot", "smoke: right after Let go");
+  await t.until(() => C.mode() === "schedule", 30000, "him back on his day").catch(() => t.problem("polish", "smoke: he wasn't back on his day 30 s after Let go"));
+  smokeCard.stop();
+  if (C.mode() === "schedule") await checkStatusCard(t, "day", "smoke: back on his day");
   t.event(strike && onRoof ? "smoke-pass" : "smoke-fail", "city loaded, Small Weather shown, rooftop, one bolt");
 }
 
@@ -1188,11 +1259,14 @@ async function letGoAndWatch(t, how, label) {
   const fr0 = window.day.now().frame;
   const st0 = C.state();
   t.log(`${label}: letting go at ${st0.x.toFixed(2)},${st0.z.toFixed(2)}; his day says ${fr0.person.x.toFixed(2)},${fr0.person.z.toFixed(2)} (${fr0.room}): "${fr0.action.text}"`);
+  const cardWatch = watchStatusCard(t, `${label} walking back`, 200);
   await how();
   await t.until(() => C.mode() !== "control", 3000, "letting go");
+  await checkStatusCard(t, "foot", `${label}: right after Let go`);
   t.event("let-go", `${label}: his day says ${fr0.room} · "${fr0.action.text}" · ${Math.hypot(st0.x - fr0.person.x, st0.z - fr0.person.z).toFixed(1)} m away`);
   await logHas(t, window.DAY_CONFIG.control.lines.letGo, "Letting go isn't in the action log");
-  await t.until(() => C.mode() === "schedule", 70000, "him to walk back to his day");
+  await t.until(() => C.mode() === "schedule", 70000, "him to walk back to his day").finally(() => cardWatch.stop());
+  await checkStatusCard(t, "day", `${label}: back on his day`);
   await sleep(300);
   stopWatching();
   const backEv = C.log().filter((e) => e.what === "back").pop();
@@ -1225,20 +1299,25 @@ async function control(options, t) {
   const lines = window.DAY_CONFIG.control.lines;
 
   // Setup: a quiet moment at home on the day bar, the clock running at 1×.
+  // Beside his car at home when the day has one (the status card used to say IN THE CAR here); else a quiet moment.
+  // The car-side moment lasts seconds, so take control on the paused bar: taking control plays the clock.
   const day = window.day.today();
-  const a = quietMoment(day);
-  scrubTo(a.start + Math.min(1, (a.end - a.start) / 3));
+  const side = carSideMoment(day);
+  const a = side || quietMoment(day);
+  scrubTo(a.start + Math.min(side ? 0.02 : 1, (a.end - a.start) / 3));
   await sleep(600);
-  clickSpeed(1);
-  t.event("start-at", `${E().fmtClock(a.start)} ${a.block}: "${a.text}" (${a.room})`);
-  await sleep(1500);
+  if (!side) clickSpeed(1);
+  t.event("start-at", `${E().fmtClock(a.start)} ${a.block}: "${a.text}" (${a.room})${side ? " beside the car" : ""}`);
+  if (!side) await sleep(1500);
   t.progress(0.05);
 
   // 1. Take control (Enter).
   t.scene("Taking control");
   const m0 = window.day.now().minutes;
+  const takeCard = watchStatusCard(t, "control");
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  await checkStatusCard(t, "foot", "right after Take control" + (side ? " beside the car" : ""));
   const st = C.state();
   t.event("control-taken", `Enter · at ${st.x.toFixed(2)},${st.z.toFixed(2)} · Havok controller ${st.physics ? "on" : "OFF"} · button "${btn && btn.textContent}"`);
   if (!st.physics) t.problem("bug", "He moves without the Havok character controller (physics off?)");
@@ -1315,6 +1394,7 @@ async function control(options, t) {
 
   // 5. Let go (Esc): he walks back to where his day says, and the day carries on.
   t.scene("Letting go");
+  takeCard.stop();
   await letGoAndWatch(t, () => pressKey("Escape"), "keys");
   t.scene("Back on his day");
   const row0 = $("what").textContent;
@@ -1378,7 +1458,27 @@ async function control(options, t) {
   if (!native) C.touch(false);
   t.scene("Back on his day");
   await sleep(1500);
+  await drivingCard(t);
   t.progress(1);
+}
+
+/** Scrub to a moment the day has him driving, nobody steering: the card says In the car (and the button is locked). */
+async function drivingCard(t) {
+  const C = window.day.control;
+  const day = window.day.today();
+  const drive = day.actions.find((a) => a.inCar && a.car && a.car.path && a.end > a.start);
+  if (!drive) {
+    t.problem("warning", "The day has no driving moment to check the status card against");
+    return;
+  }
+  if (C.mode() !== "schedule") {
+    t.problem("bug", `Nobody should be steering for the driving check, but control is "${C.mode()}"`);
+    return;
+  }
+  t.scene("Driving, nobody steering");
+  scrubTo(drive.start + Math.min(0.3, (drive.end - drive.start) / 3));
+  await t.until(() => window.day.now().frame.person.inCar, 3000, "the day to have him driving");
+  await checkStatusCard(t, "car", "driving, nobody steering");
 }
 
 /* ---------------- model: Small Weather's rigged 3D model, on his day and under control ---------------- */
