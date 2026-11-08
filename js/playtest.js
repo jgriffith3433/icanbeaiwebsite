@@ -360,6 +360,9 @@ async function roofBolt(t) {
   // and the ramp can outlast any one goTo. Each pass carries on from where he stands (onRamp), and only a roof
   // arrival walks him to the middle, so a timed-out pass never drags him sideways into the wall mid-ramp.
   let ok = false;
+  // He takes over ~30 m east of the ramp; on a slow bot that walk alone ate the runner's 180 s. Smoke tests the climb
+  // and the bolt, not the street walk (the `city` scenario walks it), so stand him at the ramp's foot.
+  if (C.place) C.place(s.x0 - 3, s.z + s.w / 2 + 1.5, -Math.PI / 2);
   const climbUntil = performance.now() + 150000;
   const f0 = window.day.now().minutes;
   const t0 = performance.now();
