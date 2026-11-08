@@ -2962,6 +2962,84 @@ async function powers(options, t) {
 /* ---------------- voice: DoD Eric lines on powers, weather, episode open/close ---------------- */
 // Real input: Sound (pointer), Enter, weather keys 1–7 with gaps for cooldown, bolts for chance/cooldown skips,
 // one forced power bark, Esc for the score-card close. Events: voice-play / voice-skip.
+// Spoken dialogue: with Sound on, an episode's opening lines play as their own Hawkes Gen clips (audio/dialogue/*.mp3),
+// not the babble. Checks the build's clip list, that a sample of clips loads and decodes, and that Part 1's opening
+// lines are spoken through day.dialogue (day:dialogue say). Events dialogue-index / dialogue-decode / dialogue-say.
+async function spokenDialogue(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day.dialogue;
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  if (!D || !Ep || !C) return t.problem("bug", "day.dialogue, episodes or Take control isn't installed");
+  const lines = D.lines();
+  await t.until(() => D.now().files > 0, 6000, "audio/dialogue/index.json").catch(() => {});
+  const files = D.now().files;
+  t.event("dialogue-index", `${files} clips for ${lines.length} lines`);
+  if (files < lines.length) t.problem("bug", `Only ${files} of ${lines.length} dialogue lines have a clip in the build, the rest fall back to babble`);
+  t.progress(0.1);
+
+  // A sample of clips must load and decode in this browser.
+  const sample = lines.filter((_, i) => i % 13 === 0);
+  let decoded = 0;
+  for (const L of sample) {
+    const ok = await new Promise((res) => {
+      const a = new Audio();
+      const done = (v) => { a.oncanplaythrough = a.onerror = null; res(v); };
+      a.oncanplaythrough = () => done(a.duration > 0.2);
+      a.onerror = () => done(false);
+      a.preload = "auto";
+      a.src = L.file;
+      a.load();
+      setTimeout(() => done(false), 8000);
+    });
+    if (ok) decoded++;
+    else t.problem("bug", `Dialogue clip ${L.file} (${L.who}: "${L.text}") didn't load or decode`);
+  }
+  t.event("dialogue-decode", `${decoded} of ${sample.length} sampled clips decode`);
+  t.progress(0.35);
+
+  const said = [];
+  const onSay = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "say") { said.push(d); t.event("dialogue-say", `${d.who}: ${d.id}`); }
+  };
+  window.addEventListener("day:dialogue", onSay);
+  try {
+    const sound = $("sound");
+    if (sound && sound.getAttribute("aria-pressed") !== "true") {
+      const r = sound.getBoundingClientRect();
+      sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+      sound.click();
+      await sleep(250);
+    }
+    t.event("sound-on", sound && sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+
+    const day = window.day.today();
+    const outside = carSideMoment(day) || quietMoment(day);
+    scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+    clickSpeed(1);
+    await sleep(600);
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+    const offer = $("episode-offer");
+    if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+    t.progress(0.5);
+
+    t.scene("Part 1 opens, spoken");
+    Ep.start("dry-park", "playtest");
+    await t.until(() => said.length >= 2, 15000, "two spoken opening lines").catch(() => {});
+    t.progress(0.9);
+    if (!said.length) t.problem("bug", "Part 1's opening lines weren't spoken: no day:dialogue say (text and babble only)");
+    else if (said.some((d) => !D.voiced(d.who, (lines.find((L) => L.id === d.id) || {}).text))) t.problem("bug", "A spoken line wasn't marked voiced, so its babble also plays");
+    t.event("dialogue-played", `${D.now().played} lines spoken, last ${(D.now().last || {}).id || "none"}`);
+    await sleep(2500); // a beat for the footage, with the voice audible
+  } finally {
+    window.removeEventListener("day:dialogue", onSay);
+  }
+}
+
 async function voice(options, t) {
   t.scene("Outside");
   checkBasics(t);
@@ -5786,6 +5864,7 @@ installPlaytest({
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
+    { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
@@ -5832,6 +5911,7 @@ installPlaytest({
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "voice") await voice(options, t);
+      else if (id === "spoken-dialogue") await spokenDialogue(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);
       else if (id === "score-ranks") await scoreRanks(options, t);
