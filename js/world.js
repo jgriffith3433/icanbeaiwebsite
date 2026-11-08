@@ -556,6 +556,7 @@
         roomLights.push({ id: r.id, light: L, thing: r.light, building: r.building, level: 0 });
       }
     });
+    let warmGroups = null; // set by warmLights(): the light groups forced on while their shaders compile
     const bedsideFill = new B.PointLight("bedside-fill", V3(-5.15, 1.45, -2.35), scene);
     bedsideFill.diffuse = B.Color3.FromHexString("#ffd296");
     bedsideFill.specular = new B.Color3(0.08, 0.06, 0.04);
@@ -1623,17 +1624,29 @@
         } else {
           rl.light.intensity = rl.level * (0.55 + night * 0.65);
         }
-        const want = rl.light.intensity > 0.01 && Math.abs(px - rl.light.position.x) < 75;
-        if (rl.light.isEnabled() !== want) rl.light.setEnabled(want);
       });
       bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.55 : 0.48);
-      const wantBedside = bedsideFill.intensity > 0.01 && Math.abs(px - bedsideFill.position.x) < 75;
-      if (bedsideFill.isEnabled() !== wantBedside) bedsideFill.setEnabled(wantBedside);
       const officeOn = things.officeLights !== "off" ? 1 : 0;
       const nearOffice = px > 65 || (cam.inited && cam.x > 65);
       officeLights.forEach((L) => {
         L.intensity = officeOn && nearOffice ? 0.12 + night * 0.35 : 0;
-        const want = L.intensity > 0.01;
+      });
+      /* A light switching on or off changes the shader of every mesh it touches, and that recompile is a freeze on a
+         scrub or a jump. So the lights of a building switch as one group (home: rooms + bedside, office: its fixtures),
+         the same few sets every time, and warmLights() compiles those sets behind the loading card. */
+      const groupOn = {};
+      roomLights.forEach((rl) => { if (rl.light.intensity > 0.01 && Math.abs(px - rl.light.position.x) < 75) groupOn[rl.building] = true; });
+      if (bedsideFill.intensity > 0.01 && Math.abs(px - bedsideFill.position.x) < 75) groupOn.home = true;
+      if (officeLights.some((L) => L.intensity > 0.01)) groupOn.office = true;
+      const lightOn = (b) => (warmGroups ? warmGroups.has(b) : !!groupOn[b]);
+      roomLights.forEach((rl) => {
+        const want = lightOn(rl.building) && (!!warmGroups || Math.abs(px - rl.light.position.x) < 75);
+        if (rl.light.isEnabled() !== want) rl.light.setEnabled(want);
+      });
+      const wantBedside = lightOn("home") && (!!warmGroups || Math.abs(px - bedsideFill.position.x) < 75);
+      if (bedsideFill.isEnabled() !== wantBedside) bedsideFill.setEnabled(wantBedside);
+      officeLights.forEach((L) => {
+        const want = lightOn("office");
         if (L.isEnabled() !== want) L.setEnabled(want);
       });
       if (bedLampShade) setEmissive(bedLampShade, "#ffd08a", things.bedroomLamp === "on" ? 1.3 : 0.12 + night * 0.45);
@@ -1748,7 +1761,7 @@
       setEmissive(myCar.hl, "#fff3d0", lights ? 1.6 : 0.05);
       setEmissive(myCar.tl, "#ff2a2a", things.engine === "on" ? (car.moving ? 0.7 : 1.4) : 0.05);
       headSpot.intensity = lights ? 1.6 * Math.max(night, raining || foggy ? 0.55 : 0) : 0;
-      const wantHead = headSpot.intensity > 0.01;
+      const wantHead = warmGroups ? warmGroups.has("car") : headSpot.intensity > 0.01;
       if (headSpot.isEnabled() !== wantHead) headSpot.setEnabled(wantHead);
 
       /* traffic */
@@ -2170,6 +2183,25 @@
         road: roadM,
         bedsideFill,
         bedroomLight: (roomLights.find((rl) => rl.id === "bedroom") || {}).light || null,
+      },
+      /* Compile the shaders of every light set the day switches between (home at night, the office, the car's beam),
+         one set at a time and off the main thread where the browser allows, so a scrub or a jump to night doesn't
+         freeze the page on the first switch. The frame loop applies each set; resolves when done (or after maxMs). */
+      async warmLights(maxMs) {
+        const have = new Set(roomLights.map((rl) => rl.building));
+        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"]].filter((g) => g.every((b) => b === "car" || have.has(b) || (b === "office" && officeLights.length)));
+        const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
+        const t0 = Date.now();
+        try {
+          for (const g of sets) {
+            if (Date.now() - t0 > (maxMs || 8000)) break;
+            warmGroups = new Set(g);
+            await nextFrame();
+            await nextFrame();
+            await scene.whenReadyAsync();
+          }
+        } catch (e) { /* a warm-up is only a head start */ }
+        warmGroups = null;
       },
       enablePhysics,
       /* js/cityscape.js reads the colliders so far (to find free lots) and adds its own before physics is on */

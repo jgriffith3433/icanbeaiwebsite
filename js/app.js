@@ -35,8 +35,8 @@ import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 
 /* The loading card (index.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
 const loading = window.__loading || { set() {}, done() {}, fail() {} };
-const ready = { model: false, frame: false, title: false };
-const maybeDone = () => { if (ready.model && ready.frame && ready.title) loading.done(); };
+const ready = { model: false, frame: false, title: false, lights: false };
+const maybeDone = () => { if (ready.model && ready.frame && ready.title && ready.lights) loading.done(); };
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
@@ -56,6 +56,17 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
 /* Small Weather's 3D model (day.config.js control.model): kick off fetching the GLB and loader chunk early
    in parallel so the model is ready right after the first frame. He is drawn only once it is on (js/world.js
    keeps the box figure hidden): a failed load tries twice more, then he stays hidden, never a stand-in. */
+/* Shader warm-up for the light sets the day switches between, behind the loading card (js/world.js warmLights):
+   the first jump to night or to the office would otherwise freeze the page while they compile. */
+(function warmUp() {
+  const w = window.day && window.day.world && window.day.world();
+  if (!w || !w.warmLights) { ready.lights = true; return; }
+  const go = () => w.warmLights(8000).catch(() => {}).finally(() => { ready.lights = true; maybeDone(); });
+  (function afterFrame() {
+    if (window.day.now && window.day.now().frame) go(); else requestAnimationFrame(afterFrame);
+  })();
+})();
+
 const skinWorld = control.model && window.day && window.day.world();
 if (skinWorld) {
   const w = skinWorld;
