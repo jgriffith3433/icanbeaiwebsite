@@ -2382,6 +2382,7 @@ async function weatherAudio(options, t) {
     ["7", "snow", "Snow"],
   ];
   const beds = {};
+  let stormThunder = null;
   for (let i = 0; i < order.length; i++) {
     const [key, state, label] = order[i];
     const before = S.now();
@@ -2411,6 +2412,7 @@ async function weatherAudio(options, t) {
     await sleep(900);
     const done = S.now();
     beds[state] = done;
+    if (state === "storm") stormThunder = W.now().sound.thunder;
     t.scene(`Music ${label}`);
     t.event(`music-${state}`, `bed ${done.bed} target ${done.target} fade ${done.fade.toFixed(2)} amb rain ${done.amb.rain.toFixed(2)} wind ${done.amb.wind.toFixed(2)} air ${done.amb.air.toFixed(2)} samples ${done.samples}`);
     if (done.target !== want && done.bed !== want) t.problem("bug", `${label} settled on bed ${done.bed}, not ${want}`);
@@ -2437,8 +2439,9 @@ async function weatherAudio(options, t) {
   if (distinct.size < 3) t.problem("bug", `Only ${distinct.size} distinct music beds across clear/rain/storm/fog/snow`);
 
   // Storm thunder level in the weather sound envelope (sample crack is one-shot).
-  if (storm && W.now().sound.thunder < 0.4) t.problem("bug", "Storm has no thunder in the weather sound levels");
-  else if (storm) t.event("thunder-level", `storm thunder ${W.now().sound.thunder.toFixed(2)}`);
+  // Read while the storm was the weather: by now the last key has made it snow, whose thunder is 0.
+  if (storm && stormThunder < 0.4) t.problem("bug", "Storm has no thunder in the weather sound levels");
+  else if (storm) t.event("thunder-level", `storm thunder ${stormThunder.toFixed(2)}`);
 
   t.progress(1);
 }
