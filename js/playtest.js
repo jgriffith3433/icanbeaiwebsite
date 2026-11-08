@@ -4457,6 +4457,36 @@ async function tutorialEpisode(options, t) {
   }
 
   await takeAndAccept();
+  // On a phone the five abilities are tap buttons. A desktop-sized run can ask for them with {"touch":true}
+  // (the named setup shortcut day.control.touch(true), as the first-visit scenario does).
+  if (options && options.touch && !C.state().touch) C.touch(true);
+  await sleep(250);
+  const touch = !!(C.state().touch || document.documentElement.classList.contains("touch-ui"));
+  const tapAbility = (id) => tapEl($("ability-" + id));
+  if (touch) {
+    t.event("touch-layout", `${innerWidth}×${innerHeight}: the five abilities are pressed by pointer taps`);
+    const five = ["bolt", "rain", "gale", "fog", "sunbreak"];
+    const fixed = ["stick", "jump-btn", "powerpad", "episode-hud", "tutorial", "control", "pressure", "weather-btn"];
+    const bad = [];
+    const boxes = five.map((id) => ({ id, el: $("ability-" + id), r: boxOf($("ability-" + id)) }));
+    boxes.forEach((b) => {
+      if (!b.r || b.r.width < 1) { bad.push(`${b.id} isn't on screen`); return; }
+      if (b.r.width < 44 || b.r.height < 44) bad.push(`${b.id} is ${Math.round(b.r.width)}×${Math.round(b.r.height)}`);
+      if (b.r.left < 0 || b.r.top < 0 || b.r.right > innerWidth || b.r.bottom > innerHeight) bad.push(`${b.id} is off screen`);
+      fixed.forEach((fid) => {
+        const el = $(fid);
+        const r = el && !el.hidden && getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden" ? boxOf(el) : null;
+        if (r && boxesOverlap(b.r, r)) bad.push(`${b.id} overlaps #${fid}`);
+      });
+      five.forEach((o) => { const q = boxOf($("ability-" + o)); if (o !== b.id && b.r && q && boxesOverlap(b.r, q)) bad.push(`${b.id} overlaps ${o}`); });
+    });
+    const energyEl = $("energy");
+    const er = boxOf(energyEl);
+    if (!er || er.width < 20 || !/Energy \d+/.test(energyEl.textContent) || !energyEl.querySelector("i").style.width) bad.push("the Energy bar isn't readable on the bar");
+    if (["storm", "gust", "tornado"].some((n) => { const q = boxOf($("ability-" + n)); return q && q.width > 0; })) bad.push("Storm/Gust/Tornado shouldn't be on the touch bar (they're on the power pad)");
+    if (bad.length) bad.forEach((m) => t.problem("bug", `Touch ability bar: ${m}`));
+    else t.event("ability-bar-touch", `${five.length} buttons, ${Math.round(Math.min(...boxes.map((b) => b.r.width)))}×${Math.round(Math.min(...boxes.map((b) => b.r.height)))} px at least, energy ${energyEl.textContent.trim()}, clear of the stick, jump, power pad and the episode card`);
+  }
   const hud = $("episode-hud");
   if (!hud || hud.hidden) t.problem("bug", "The tutorial has no HUD");
   const skipBtn = hud && hud.querySelector(".skip");
@@ -4484,14 +4514,27 @@ async function tutorialEpisode(options, t) {
     if (i === 1) {
       // A locked ability refuses, changes nothing.
       const before = window.powers.now().energy;
-      tapKey("v", 120);
+      if (touch) await tapAbility("gale");
+      else tapKey("v", 120);
       await sleep(300);
       if (window.powers.abilities.get("gale").uses > 0) t.problem("bug", "Gale worked while locked");
-      else t.event("locked-refused", "Gale (V) is refused before it unlocks");
+      else if (touch) {
+        const rf = $("ability-refuse");
+        if (!rf || !rf.textContent) t.problem("bug", "A tap on a locked ability gave no refusal line");
+        else t.event("locked-refused", `Gale (tap) is refused before it unlocks: "${rf.textContent}"`);
+      } else t.event("locked-refused", "Gale (V) is refused before it unlocks");
       void before;
     }
     for (let k = 0; k < 6 && !(Ep.now() && Ep.now().goals[i].done); k++) {
-      await tapKey(keys[id], 140);
+      if (touch) {
+        await tapAbility(id);
+        if (k === 0) {
+          await sleep(150);
+          const b = $("ability-" + id);
+          const cd = b && b.querySelector(".cd");
+          if (b && b.dataset.state === "cooldown" && cd && cd.textContent) t.event("touch-cooldown", `${id}: ${cd.textContent} s on the button, energy ${$("energy").textContent.trim()}`);
+        }
+      } else await tapKey(keys[id], 140);
       await sleep(900);
     }
     if (!(Ep.now() ? Ep.now().goals[i].done : true)) t.problem("bug", `Goal "${goal.label}" never completed`);
