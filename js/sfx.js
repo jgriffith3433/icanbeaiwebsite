@@ -446,12 +446,14 @@
   });
   window.addEventListener("day:story", (e) => {
     const d = e.detail || {};
-    if (d.action === "say" && d.text) S.babble(d.who, d.text);
+    // a line with its own voice clip (js/dialogue.js) isn't babbled over
+    if (d.action === "say" && d.text && !(day.dialogue && day.dialogue.voiced(d.who, d.text))) S.babble(d.who, d.text);
     else if (d.action === "twist") S.rumble();
   });
   window.addEventListener("day:neighbor", (e) => {
     const d = e.detail || {};
     if (d.action === "beat") {
+      if (day.dialogue && day.dialogue.beatVoiced(d.beat)) return;
       let at = { pan: 0, gain: 1 };
       if (d.x != null && d.z != null) at = place(d.x, d.z);
       S.babble(d.who || d.id || d.neighbor, d.text || "neighbor neighbor", at.pan, at.gain);

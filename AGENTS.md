@@ -181,6 +181,14 @@ speed from their measured stride (walk 0.86 m, run 1.25 m: `WALK_STRIDE`/`RUN_ST
 The check fails on a prop foot 3 to 12 cm off the ground, a walker on the grass, his day's feet off the floor,
 or falling/jumping frames walking or running down a rooftop ramp.
 
+## Spoken dialogue (`js/dialogue.js`, `scripts/check-dialogue.mjs`, npm test)
+
+- The story parts' `say` lines and the neighbors' beats are spoken, each speaker in their own ElevenLabs voice (`dialogue.cast` in day.config.js; he is DoD Eric, as in `voice`). A "He" line about him in the third person stays text.
+- Each line's id is `dlg-<who>-<hash of who and text>` and its clip is `audio/dialogue/<id>.mp3`. Change a line's words and it gets a new id, so its old clip simply stops being used.
+- `node scripts/sync-dialogue.mjs` rewrites the `dlg-*` recipes in hawkes.assets.json from the config and `audio/dialogue/index.json` from the clips on disk. Run it after changing lines or adding clips; npm test fails if either is stale.
+- Only clips listed in index.json play (the build rewrites it from disk), only once Sound is on, one at a time. A line without a clip keeps its text and js/sfx.js's babble; a voiced line skips the babble and ducks the music (`day:dialogue`).
+- Clips come from the recipes through Studio's asset pipeline (Hawkes Gen `audio.voice`, about $0.0003 a character, 104 lines about $1.20). Spending Gen credits needs Jaycee's yes.
+
 ## Hawkes Gen art direction (for a later Gen change)
 
 `hawkesgen/presets/icanbe.json` lives in Gen; change it there. Its notes still say "direction undecided" and its style

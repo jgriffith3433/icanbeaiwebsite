@@ -1327,6 +1327,1982 @@
    "files": {
     "sky": "textures/city/sky-night.png"
    }
+  },
+  {
+   "id": "dlg-birdie-1s29egk",
+   "note": "Spoken line (dry-park:start), Birdie: \"There you are. My tomatoes are sulking. The whole lawn is.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "There you are. My tomatoes are sulking. The whole lawn is.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-1s29egk.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-1n4f1q7",
+   "note": "Spoken line (dry-park:start), Birdie: \"A little rain. Not a lot. A little.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "A little rain. Not a lot. A little.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-1n4f1q7.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1b366n7",
+   "note": "Spoken line (dry-park:start), He: \"Rain's the park's. Not the market's.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain's the park's. Not the market's.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1b366n7.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-c0hkng",
+   "note": "Spoken line (dry-park:goal:rain-park), Birdie: \"Look at them drink. Bless you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Look at them drink. Bless you.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-c0hkng.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-cpqck",
+   "note": "Spoken line (dry-park:goal:rain-park), Dex: \"Parcels, produce, everything's gone soft. You can't sell soft.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Parcels, produce, everything's gone soft. You can't sell soft.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-cpqck.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-5aorr7",
+   "note": "Spoken line (dry-park:goal:rain-park), Dex: \"Sun break. Two minutes. Dry the plaza out, then I'll carry the rest.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Sun break. Two minutes. Dry the plaza out, then I'll carry the rest.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-5aorr7.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-23nrii",
+   "note": "Spoken line (dry-park:goal:sun-market), He: \"Sun's here.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Sun's here.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-23nrii.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-gswo21",
+   "note": "Spoken line (dry-park:edgy), Birdie: \"Enough now?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Enough now?",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-gswo21.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-cepz26",
+   "note": "Spoken line (dry-park:kick:flood), Birdie: \"That's plenty. That's — plenty.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That's plenty. That's — plenty.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-cepz26.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1bvd8ju",
+   "note": "Spoken line (dry-park:kick:soak), Dex: \"That's rain. On the produce. On the produce, Small Weather.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That's rain. On the produce. On the produce, Small Weather.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1bvd8ju.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-obuci0",
+   "note": "Spoken line (dry-park:kick:scorch), Dex: \"It's brown behind you. The grass. It's brown.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It's brown behind you. The grass. It's brown.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-obuci0.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-18v5x7z",
+   "note": "Spoken line (dry-park:end:clean), Board: \"Reservoir level: low. Two days. Maybe three.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Reservoir level: low. Two days. Maybe three.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-18v5x7z.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-17ynlh7",
+   "note": "Spoken line (dry-park:end:clean), He: \"Two days.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Two days.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-17ynlh7.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-ce1o62",
+   "note": "Spoken line (dry-park:end:scarred), Board: \"Reservoir level: low. And the sky's been busy.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Reservoir level: low. And the sky's been busy.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-ce1o62.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-hmpoqu",
+   "note": "Spoken line (dry-park:end:scarred), He: \"It cost.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It cost.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-hmpoqu.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-fhaqmh",
+   "note": "Spoken line (lunch:start), Dex: \"Small Weather. That storm isn't anyone's. Not the forecast's, not mine.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather. That storm isn't anyone's. Not the forecast's, not mine.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-fhaqmh.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-12rb2iq",
+   "note": "Spoken line (lunch:start), Dex: \"The plaza, the shop roof, the avenue. People are stuck in all three.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The plaza, the shop roof, the avenue. People are stuck in all three.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-12rb2iq.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1955e2w",
+   "note": "Spoken line (lunch:start), He: \"Plaza first.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Plaza first.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1955e2w.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ybfcn6",
+   "note": "Spoken line (lunch:piece:shelter), He: \"Sun break. Near each one.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Sun break. Near each one.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ybfcn6.mp3"
+   }
+  },
+  {
+   "id": "dlg-odile-1gh4kgi",
+   "note": "Spoken line (lunch:late:shelter), Odile: \"It's coming in sideways! Anyone?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It's coming in sideways! Anyone?",
+      "voice": "cgSgspJ2msm6clMCkdW9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-odile-1gh4kgi.mp3"
+   }
+  },
+  {
+   "id": "dlg-hollis-11vzxlx",
+   "note": "Spoken line (lunch:piece:rescue), Hollis: \"Up here! The ladder's gone and the roof is humming.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Up here! The ladder's gone and the roof is humming.",
+      "voice": "IKne3meq5aSn9XLyUdCD",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-hollis-11vzxlx.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-10dl3qs",
+   "note": "Spoken line (lunch:piece:rescue), He: \"Ground it. Lightning.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Ground it. Lightning.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-10dl3qs.mp3"
+   }
+  },
+  {
+   "id": "dlg-hollis-uv2e97",
+   "note": "Spoken line (lunch:late:rescue), Hollis: \"My hair is standing up. That's not a joke.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "My hair is standing up. That's not a joke.",
+      "voice": "IKne3meq5aSn9XLyUdCD",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-hollis-uv2e97.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-hdx06i",
+   "note": "Spoken line (lunch:twist), Ines: \"That wasn't rain. That was something clearing its throat.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That wasn't rain. That was something clearing its throat.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-hdx06i.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1vxbpif",
+   "note": "Spoken line (lunch:twist), Dex: \"The rain stopped. It went to fog. The avenue's blind, and there's junk in the road.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The rain stopped. It went to fog. The avenue's blind, and there's junk in the road.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1vxbpif.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-m44lwb",
+   "note": "Spoken line (lunch:twist), He: \"It's moving. Not passing.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It's moving. Not passing.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-m44lwb.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-y5e1z4",
+   "note": "Spoken line (lunch:piece:street), He: \"Wind. Make it move.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Wind. Make it move.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-y5e1z4.mp3"
+   }
+  },
+  {
+   "id": "dlg-nell-bgptdf",
+   "note": "Spoken line (lunch:late:street), Nell: \"Cars! I can hear cars!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Cars! I can hear cars!",
+      "voice": "FGY2WhTYpPnrIDTdsKH5",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-nell-bgptdf.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-125docv",
+   "note": "Spoken line (lunch:end:S), Dex: \"Everyone. Every single one. Lunch is on me.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Everyone. Every single one. Lunch is on me.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-125docv.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1pl9cb4",
+   "note": "Spoken line (lunch:end:S), He: \"Lunch.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Lunch.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1pl9cb4.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-jr9u40",
+   "note": "Spoken line (lunch:end:A), Dex: \"Everyone's out. Mostly dry.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Everyone's out. Mostly dry.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-jr9u40.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ky3bc8",
+   "note": "Spoken line (lunch:end:A), He: \"Mostly.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Mostly.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ky3bc8.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-ira753",
+   "note": "Spoken line (lunch:end:B), Dex: \"We got out. Some of us waited a long time.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "We got out. Some of us waited a long time.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-ira753.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-11i0fm4",
+   "note": "Spoken line (lunch:end:C), Dex: \"You got some of us.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "You got some of us.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-11i0fm4.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-ws0kw9",
+   "note": "Spoken line (lunch:end:C), He: \"Not enough.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Not enough.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-ws0kw9.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-duoiv0",
+   "note": "Spoken line (still-blades:start), He: \"Pull request. Push weather.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Pull request. Push weather.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-duoiv0.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-17ib0p3",
+   "note": "Spoken line (still-blades:start), Ines: \"Seventeen blades on this roof. Not one has turned since Tuesday.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Seventeen blades on this roof. Not one has turned since Tuesday.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-17ib0p3.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-npxg7a",
+   "note": "Spoken line (still-blades:goal:ines), Ines: \"A gale. Steady, not a tantrum. They only turn if the wind is kind.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "A gale. Steady, not a tantrum. They only turn if the wind is kind.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-npxg7a.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-10lujdu",
+   "note": "Spoken line (still-blades:goal:ines), He: \"Steady.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Steady.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-10lujdu.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-zcn1sq",
+   "note": "Spoken line (still-blades:goal:turn), Ines: \"They're turning. Do you see how they turn?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're turning. Do you see how they turn?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-zcn1sq.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-mljiif",
+   "note": "Spoken line (still-blades:edgy), Ines: \"Enough now?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Enough now?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-mljiif.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1ohvesg",
+   "note": "Spoken line (still-blades:kick:topple), Dex: \"The stalls! Mind the stalls!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The stalls! Mind the stalls!",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1ohvesg.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1untyxq",
+   "note": "Spoken line (still-blades:kick:overspeed), Ines: \"Too fast. They've shut themselves. Start again, and kinder.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Too fast. They've shut themselves. Start again, and kinder.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1untyxq.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1xqzcit",
+   "note": "Spoken line (still-blades:end:clean), Ines: \"The charts moved. The reservoir isn't just low. Something has been pulling the sky toward it.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The charts moved. The reservoir isn't just low. Something has been pulling the sky toward it.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1xqzcit.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1gciwo7",
+   "note": "Spoken line (still-blades:end:clean), He: \"Pulling.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Pulling.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1gciwo7.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-wxknk",
+   "note": "Spoken line (still-blades:end:clean), Ines: \"Something wants the water gone. Or the weather very much on.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Something wants the water gone. Or the weather very much on.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-wxknk.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-ewqb57",
+   "note": "Spoken line (still-blades:end:clean), Board: \"Reservoir level: critical.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Reservoir level: critical.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-ewqb57.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1rshfav",
+   "note": "Spoken line (still-blades:end:scarred), Ines: \"They turned. Some things in the plaza didn't stay up.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They turned. Some things in the plaza didn't stay up.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1rshfav.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-1yklp18",
+   "note": "Spoken line (commute-home:start), Board: \"Wind advisory. The avenue is closed in several places. Please remain indoors.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Wind advisory. The avenue is closed in several places. Please remain indoors.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-1yklp18.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-bjinte",
+   "note": "Spoken line (commute-home:start), He: \"Home is west along it. Four closures.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Home is west along it. Four closures.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-bjinte.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1dur516",
+   "note": "Spoken line (commute-home:start), He: \"Wind first. Clear the road.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Wind first. Clear the road.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1dur516.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ri2h6l",
+   "note": "Spoken line (commute-home:piece:debris), He: \"Gale. It'll lift it.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Gale. It'll lift it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ri2h6l.mp3"
+   }
+  },
+  {
+   "id": "dlg-marlo-1u6xj1s",
+   "note": "Spoken line (commute-home:hurt:debris), Marlo: \"Rain? It's heavier now. It's heavier!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain? It's heavier now. It's heavier!",
+      "voice": "bIHbv24MWmeRgasZH58o",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-marlo-1u6xj1s.mp3"
+   }
+  },
+  {
+   "id": "dlg-marlo-g1rywl",
+   "note": "Spoken line (commute-home:late:debris), Marlo: \"There's a whole sign on my bonnet. Anyone?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "There's a whole sign on my bonnet. Anyone?",
+      "voice": "bIHbv24MWmeRgasZH58o",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-marlo-g1rywl.mp3"
+   }
+  },
+  {
+   "id": "dlg-tamsin-11mhi6p",
+   "note": "Spoken line (commute-home:piece:underpass), Tamsin: \"The underpass took the car to the doors. The water won't go.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The underpass took the car to the doors. The water won't go.",
+      "voice": "pFZP5JQG7iQjIQuC4Bku",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-tamsin-11mhi6p.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1op5x3z",
+   "note": "Spoken line (commute-home:piece:underpass), He: \"Sun. Dry it, don't add to it.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Sun. Dry it, don't add to it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1op5x3z.mp3"
+   }
+  },
+  {
+   "id": "dlg-tamsin-8m910h",
+   "note": "Spoken line (commute-home:hurt:underpass), Tamsin: \"It's higher! Don't rain on it, please!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It's higher! Don't rain on it, please!",
+      "voice": "pFZP5JQG7iQjIQuC4Bku",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-tamsin-8m910h.mp3"
+   }
+  },
+  {
+   "id": "dlg-wren-o9gltx",
+   "note": "Spoken line (commute-home:late:underpass), Wren: \"It's at the mirrors. The mirrors.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It's at the mirrors. The mirrors.",
+      "voice": "hpp4J3VqNfWAUOO0d1Us",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-wren-o9gltx.mp3"
+   }
+  },
+  {
+   "id": "dlg-hale-11ox5ko",
+   "note": "Spoken line (commute-home:piece:bus), Hale: \"Bus is dead in the road. Flat battery, twelve people on it. Anything with a spark?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Bus is dead in the road. Flat battery, twelve people on it. Anything with a spark?",
+      "voice": "nPczCjzI2devNBz1zQrb",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-hale-11ox5ko.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-atursj",
+   "note": "Spoken line (commute-home:piece:bus), He: \"Lightning. Close, and kind.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Lightning. Close, and kind.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-atursj.mp3"
+   }
+  },
+  {
+   "id": "dlg-odette-9pu6fm",
+   "note": "Spoken line (commute-home:hurt:bus), Odette: \"The shelter's roof! Wind, no! Wind's the problem here!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The shelter's roof! Wind, no! Wind's the problem here!",
+      "voice": "XrExE9yKIg1WjnnlVkGX",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-odette-9pu6fm.mp3"
+   }
+  },
+  {
+   "id": "dlg-odette-omsd53",
+   "note": "Spoken line (commute-home:late:bus), Odette: \"We can see the lightning, we're just not in it.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "We can see the lightning, we're just not in it.",
+      "voice": "XrExE9yKIg1WjnnlVkGX",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-odette-omsd53.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-uqqglg",
+   "note": "Spoken line (commute-home:twist), Board: \"Wind advisory upgraded. Storm cell on the avenue. The bridge will close on high wind.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Wind advisory upgraded. Storm cell on the avenue. The bridge will close on high wind.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-uqqglg.mp3"
+   }
+  },
+  {
+   "id": "dlg-sorrel-1p603pq",
+   "note": "Spoken line (commute-home:piece:bridge), Sorrel: \"The bridge shuts when the wind sensor trips. Still air. We need still air.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The bridge shuts when the wind sensor trips. Still air. We need still air.",
+      "voice": "iP95p4xoKVk53GoZ742B",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-sorrel-1p603pq.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1msyzh9",
+   "note": "Spoken line (commute-home:piece:bridge), He: \"Fog. Heavy, quiet.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Fog. Heavy, quiet.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1msyzh9.mp3"
+   }
+  },
+  {
+   "id": "dlg-sorrel-1w1fw8f",
+   "note": "Spoken line (commute-home:hurt:bridge), Sorrel: \"It tripped! The arm's coming down again!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It tripped! The arm's coming down again!",
+      "voice": "iP95p4xoKVk53GoZ742B",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-sorrel-1w1fw8f.mp3"
+   }
+  },
+  {
+   "id": "dlg-pike-152yde",
+   "note": "Spoken line (commute-home:late:bridge), Pike: \"It's coming down. The arm's coming down.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It's coming down. The arm's coming down.",
+      "voice": "CwhRBWXzGAHq8TQ4Fs17",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-pike-152yde.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-bmx2w1",
+   "note": "Spoken line (commute-home:end:S), Board: \"The avenue is open. No further closures.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The avenue is open. No further closures.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-bmx2w1.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-18qslil",
+   "note": "Spoken line (commute-home:end:S), He: \"Home.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Home.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-18qslil.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-i2sp20",
+   "note": "Spoken line (commute-home:end:A), Board: \"The avenue is open.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The avenue is open.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-i2sp20.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1x0a773",
+   "note": "Spoken line (commute-home:end:A), He: \"Mostly dry.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Mostly dry.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1x0a773.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-1phb70u",
+   "note": "Spoken line (commute-home:end:B), Board: \"The avenue is open. Some delays.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The avenue is open. Some delays.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-1phb70u.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-adaoqo",
+   "note": "Spoken line (commute-home:end:B), He: \"Some.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Some.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-adaoqo.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-16pzg92",
+   "note": "Spoken line (commute-home:end:C), Board: \"The avenue is open. Please do not do that again.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The avenue is open. Please do not do that again.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-16pzg92.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-1rch41p",
+   "note": "Spoken line (low-tank:start), Board: \"Reservoir level: critical. Please. Anyone with weather.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Reservoir level: critical. Please. Anyone with weather.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-1rch41p.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-4thcq8",
+   "note": "Spoken line (low-tank:start), He: \"Weather's here.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Weather's here.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-4thcq8.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1m2a53c",
+   "note": "Spoken line (low-tank:start), Ines: \"Not all at once. Charge the mast first.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Not all at once. Charge the mast first.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1m2a53c.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-kgqpuf",
+   "note": "Spoken line (low-tank:goal:charge), He: \"Down it goes.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Down it goes.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-kgqpuf.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-guc21b",
+   "note": "Spoken line (low-tank:edgy), Ines: \"Enough now? It fills on kind weather.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Enough now? It fills on kind weather.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-guc21b.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-7n9dne",
+   "note": "Spoken line (low-tank:kick:flood), Board: \"Avenue: flooded. Market: closed for the night.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Avenue: flooded. Market: closed for the night.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-7n9dne.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-p27soa",
+   "note": "Spoken line (low-tank:kick:overcast), Board: \"Weather Warning. Please stay indoors.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Weather Warning. Please stay indoors.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-p27soa.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1gey06y",
+   "note": "Spoken line (low-tank:kick:overcast), He: \"It won't stop.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It won't stop.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1gey06y.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-1mzfgav",
+   "note": "Spoken line (low-tank:end:clean), Board: \"Reservoir level: full.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Reservoir level: full.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-1mzfgav.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-15puth0",
+   "note": "Spoken line (low-tank:end:clean), He: \"Quiet.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Quiet.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-15puth0.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-f7wcyr",
+   "note": "Spoken line (low-tank:end:scarred), Board: \"Reservoir level: full. And the sky is not done.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Reservoir level: full. And the sky is not done.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-f7wcyr.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-1u3y1qj",
+   "note": "Spoken line (night:start), Board: \"Plaza assembly. The city has gathered. Please stay behind the cones.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Plaza assembly. The city has gathered. Please stay behind the cones.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-1u3y1qj.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1v4m4q1",
+   "note": "Spoken line (night:start), He: \"They came to look up. Fair enough.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They came to look up. Fair enough.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1v4m4q1.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-jvft3z",
+   "note": "Spoken line (night:start), Ines: \"Whatever you do, do it on time. The sky keeps a beat.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Whatever you do, do it on time. The sky keeps a beat.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-jvft3z.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-1s1s78s",
+   "note": "Spoken line (night:gather), Birdie: \"Front row! My tomatoes get the front row.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Front row! My tomatoes get the front row.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-1s1s78s.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-v8nh5d",
+   "note": "Spoken line (night:act:Neon rain), Dex: \"Mind the puddles. They are about to be very pink.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Mind the puddles. They are about to be very pink.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-v8nh5d.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-hrg0mf",
+   "note": "Spoken line (night:act:Grand finish), He: \"All of it.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "All of it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-hrg0mf.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-2pdnjz",
+   "note": "Spoken line (night:end:S), Ines: \"Every cue. I'll put it in the charts.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Every cue. I'll put it in the charts.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-2pdnjz.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-grv6k2",
+   "note": "Spoken line (night:end:S), He: \"Thank you, everyone.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Thank you, everyone.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-grv6k2.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-1fkchhm",
+   "note": "Spoken line (night:end:A), Birdie: \"Again! Again!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Again! Again!",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-1fkchhm.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-aywrkl",
+   "note": "Spoken line (night:end:B), Dex: \"Some of that was perfect. Some of that was weather.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Some of that was perfect. Some of that was weather.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-aywrkl.mp3"
+   }
+  },
+  {
+   "id": "dlg-board-dnp6nl",
+   "note": "Spoken line (night:end:C), Board: \"The show has ended. Please go home. Thank you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The show has ended. Please go home. Thank you.",
+      "voice": "onwK4e9ZLuTAKqWW03F9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-board-dnp6nl.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-x1jhi4",
+   "note": "Spoken line (neighbor:birdie-ask), Birdie: \"There you are. My tomatoes are sulking. A little rain, if you've got any?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "There you are. My tomatoes are sulking. A little rain, if you've got any?",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-x1jhi4.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-j1jbym",
+   "note": "Spoken line (neighbor:birdie-surprise), Birdie: \"Picked these for you. Don't tell the pigeons.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Picked these for you. Don't tell the pigeons.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-j1jbym.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-91w666",
+   "note": "Spoken line (neighbor:dex-ask), Dex: \"Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-91w666.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1ih7e2",
+   "note": "Spoken line (neighbor:dex-thanks), Dex: \"Dry as a bone. I owe you a delivery.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Dry as a bone. I owe you a delivery.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1ih7e2.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-nof5ak",
+   "note": "Spoken line (neighbor:dex-surprise), Dex: \"Parcel for you. No return address. It hums a bit.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Parcel for you. No return address. It hums a bit.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-nof5ak.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1ivjgni",
+   "note": "Spoken line (neighbor:quill-ask), Ines: \"Thirty nights and no lightning in my lens. One bolt, if you would. Not at me.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Thirty nights and no lightning in my lens. One bolt, if you would. Not at me.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1ivjgni.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1ljbfcs",
+   "note": "Spoken line (neighbor:quill-thanks), Ines: \"Got it. Look at that blue.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Got it. Look at that blue.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1ljbfcs.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1ostxmo",
+   "note": "Spoken line (neighbor:quill-surprise), Ines: \"Look up. My charts and your weather agree: tonight you're the brightest thing out.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Look up. My charts and your weather agree: tonight you're the brightest thing out.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1ostxmo.mp3"
+   }
   }
  ]
 }
