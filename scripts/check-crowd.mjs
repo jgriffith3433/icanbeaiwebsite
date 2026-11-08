@@ -130,6 +130,21 @@ for (let t = 0; t < 60 * 30; t++) { crowd.step(1 / 30); if (t % 30 === 0) stoppe
 ok(stopped > 0, 'no car ever stops at a red light at rush hour');
 ok(Math.max(...crowd.positions().cars.map((c) => c.v)) > 6, 'cars never get up to speed');
 
+// a bolt landing among them sends the nearest running, away from it
+{
+  const ppl = crowd.positions().people;
+  const at = ppl[Math.floor(ppl.length / 2)];
+  const near = (q) => Math.hypot(q.x - at.x, q.z - at.z);
+  const before = ppl.filter((q) => near(q) < 10).map((q) => q.id);
+  const fled0 = crowd.info().fled || 0;
+  crowd.scare(at.x, at.z, 14, 1.5);
+  run(2);
+  ok((crowd.info().fled || 0) > fled0, 'nobody runs from a bolt landing among them');
+  const after = crowd.positions().people.filter((q) => before.includes(q.id));
+  const closer = after.filter((q) => near(q) < 3).length;
+  ok(closer <= Math.ceil(before.length / 3), `${closer} of ${before.length} people ended up next to where the bolt landed`);
+}
+
 // pause freezes it
 mode = 'pause';
 const p1 = JSON.stringify(crowd.positions());

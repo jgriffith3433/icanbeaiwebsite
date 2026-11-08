@@ -386,7 +386,45 @@ export function installCrowd(world) {
     const sig = signalAt(clock, j.offset);
     return (e.kind === "cross-av" ? sig.avenue : sig.cross) === "stop";
   };
+  /* Local fright: a bolt landing, a tornado setting off or a gust near them sends the people within reach running
+     away from it for a few seconds (turning back along their sidewalk if they were walking towards it). */
+  const scares = []; // { x, z, r, until }
+  function scare(x, z, r, secs) {
+    if (!isFinite(x) || !isFinite(z)) return;
+    scares.push({ x, z, r, until: clock + secs });
+    if (scares.length > 8) scares.shift();
+    info.scares = (info.scares || 0) + 1;
+  }
+  function fright(p, dt) {
+    if (p.flee > 0) p.flee -= dt;
+    for (let i = 0; i < scares.length; i++) {
+      const s = scares[i];
+      if (clock > s.until) continue;
+      const dx = p.x - s.x;
+      const dz = p.z - s.z;
+      if (dx * dx + dz * dz > s.r * s.r) continue;
+      if (!(p.flee > 0)) {
+        p.flee = 2.5 + rng() * 1.5;
+        info.fled = (info.fled || 0) + 1;
+        // heading towards it on a plain stretch of sidewalk: turn round
+        const toward = (p.bx - p.ax) * -dx + (p.bz - p.az) * -dz > 0;
+        if (toward && p.state === "walk" && p.edge && p.edge.kind === "walk" && p.from && p.ax === p.from.x && p.az === p.from.z) {
+          const t = p.t;
+          const f = p.from;
+          p.from = p.to;
+          p.to = f;
+          p.dir = -p.dir;
+          p.door = null;
+          setSeg(p, p.bx, p.bz, p.ax, p.az);
+          p.t = 1 - t;
+        }
+      }
+    }
+    return p.flee > 0;
+  }
   function stepPerson(p, dt, run) {
+    if (scares.length && fright(p, dt)) run = true;
+    else if (p.flee > 0) { p.flee -= dt; run = true; }
     // reaction blend: in after its small delay, out fast once the ability weather is gone
     if (rKind) {
       if (p.rdelay > 0) p.rdelay -= dt;
@@ -825,6 +863,19 @@ export function installCrowd(world) {
       return { people: Math.round(MAXP * d.people), cars: Math.round(MAXC * d.cars), phase: phaseAt(phases, hour) };
     },
   };
+  api.scare = scare;
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("day:power", (e) => {
+      const d = (e && e.detail) || {};
+      const P = window.day && window.day.powers;
+      if (!P || !P.now || !/^(bolt|tornado|gust)$/.test(d.action || "")) return;
+      let n = null;
+      try { n = P.now(); } catch (err) { return; }
+      if (d.action === "bolt" && n.strike) scare(n.strike.x, n.strike.z, 14, 1.5);
+      else if (d.action === "tornado" && n.tornado) scare(n.tornado.x, n.tornado.z, 22, 4);
+      else if (d.action === "gust" && n.aim) scare(n.aim.x, n.aim.z, 9, 1);
+    });
+  }
   world.crowd = api;
   if (window.day) window.day.crowd = api;
   return api;
