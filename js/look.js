@@ -166,10 +166,16 @@ function tileBox(mesh, tile) {
   const nrm = mesh.getVerticesData(B.VertexBuffer.NormalKind);
   if (!pos || !nrm || nrm.length !== pos.length) return;
   const uv = new Float32Array((pos.length / 3) * 2);
+  // World-space mapping for unrotated boxes, so two pieces that meet (road pieces, walls) carry one continuous
+  // texture and any leftover overlap shows the same pixels instead of flickering between two.
+  const r = mesh.rotation;
+  const plain = !mesh.rotationQuaternion && !mesh.parent && (!r || (!r.x && !r.y && !r.z));
+  const o = plain ? mesh.position : { x: 0, y: 0, z: 0 };
+  const sc = plain && mesh.scaling ? mesh.scaling : { x: 1, y: 1, z: 1 };
   for (let i = 0, k = 0; i < pos.length; i += 3, k += 2) {
-    const x = pos[i];
-    const y = pos[i + 1];
-    const z = pos[i + 2];
+    const x = pos[i] * sc.x + o.x;
+    const y = pos[i + 1] * sc.y + o.y;
+    const z = pos[i + 2] * sc.z + o.z;
     const ax = Math.abs(nrm[i]);
     const ay = Math.abs(nrm[i + 1]);
     const az = Math.abs(nrm[i + 2]);
@@ -481,7 +487,8 @@ export function installLook(world) {
       skyMat.setVector3("horizonColor", new B.Vector3(0.5, 0.62, 0.74));
       skyMat.setVector3("skyTint", new B.Vector3(0.5, 0.62, 0.74));
       skyMat.setVector4("weather", new B.Vector4(0, 0, 0, 0));
-      dome = B.MeshBuilder.CreateSphere("skyDome", { diameter: 520, segments: 24 }, scene);
+      // Big enough that the farthest skyline towers (about 400 m out) stand in front of it, inside camera.maxZ (600).
+      dome = B.MeshBuilder.CreateSphere("skyDome", { diameter: 1100, segments: 24 }, scene);
       dome.material = skyMat;
       dome.isPickable = false;
       dome.applyFog = false;

@@ -118,6 +118,7 @@ export function createFinale(world, B, cfg) {
       d.isPickable = false;
       d.material = mat("wash" + i, hex[i % hex.length], 1, 0.0, true);
       d.material.alpha = 0;
+      d.material.disableDepthWrite = true; // stacked light washes 2 mm apart: none may hide another
       washes.push({ mesh: d, hex, i, level: 0 });
       track(d);
     });

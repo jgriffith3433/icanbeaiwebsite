@@ -155,6 +155,17 @@ each of those is heard and that Sound off is silent. New player-facing beats get
   (`{ build: 'npm run build', site: 'none', out: { from: 'dist', to: '' } }`): without it the beta site copies the
   source, and the page can't load `@babylonjs/core`. The playtests use `npm run dev`, which works without it.
 
+## Rendering rules (`scripts/check-render.mjs`, npm test)
+
+Jaycee's 3D quality rules, checked on the built world and city under the NullEngine (thin instances included):
+no mesh wound against its normals (inside out; `Part.cyl/ball` in props.js wind like `box()`), no negative scale
+on a mesh or thin instance, no double-sided canvas-textured mesh (a double-sided sign shows its text mirrored),
+no two up-facing surfaces of different materials within 3 mm over the same ground (z-fighting: butt pieces
+together, don't overlap them; light decals use `zOffset` and `disableDepthWrite`), asphalt on top at every
+junction, and the sky dome behind the farthest skyline tower and inside `camera.maxZ`. Road/box UVs are world
+space (`tileBox` in look.js) so pieces that meet carry one texture. The camera's near plane is 0.2 m; under
+control a wall may pull it in to 0.5 m, and he fades below 1 m.
+
 ## Hawkes Gen art direction (for a later Gen change)
 
 `hawkesgen/presets/icanbe.json` lives in Gen; change it there. Its notes still say "direction undecided" and its style

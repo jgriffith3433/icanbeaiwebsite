@@ -457,7 +457,7 @@ function install() {
   function cameraTake() {
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (saved[k] = camera[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => ((saved[k] = kb[k]), (kb[k] = [])));
-    camera.lowerRadiusLimit = 1.2;
+    camera.lowerRadiusLimit = 0.5; // a wall behind him may pull the camera in this close (the wheel stops at 1.5)
     camera.upperRadiusLimit = 16;
     camera.lowerBetaLimit = 0.25;
     camera.upperBetaLimit = 1.62;
@@ -495,7 +495,13 @@ function install() {
       camera.beta = beta;
     }
   }
+  let himVis = 1;
+  function setHimVis(v) {
+    himVis = v;
+    if (world.person) world.person.getChildMeshes(false).forEach((m) => (m.visibility = v));
+  }
   function cameraGive() {
+    if (himVis !== 1) setHimVis(1);
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (camera[k] = saved[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
     glidePull = 0;
@@ -549,10 +555,14 @@ function install() {
       const dir = new B.Vector3(dx, dy, dz);
       const from = t.add(dir.scale(0.45)); // outside his own capsule
       p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay);
-      if (camRay.hasHit) r = Math.max(1.2, B.Vector3.Distance(t, camRay.hitPoint) - 0.3);
+      // Stay in front of the wall, however close that is: a floor of 1.2 m used to put the camera inside or behind it.
+      if (camRay.hasHit) r = Math.max(0.5, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
     }
     camera.radius = r < camera.radius || push.on ? r : damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
+    // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
+    const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5));
+    if (world.person && Math.abs(vis - himVis) > 0.02) setHimVis(vis);
   }
 
   /* ---------- wind trails + whoosh while he glides ---------- */
