@@ -450,6 +450,9 @@
     el.chapter.style.setProperty("--c", ch.color);
     const room = steer ? "On foot" : a.inCar ? "In the car" : (day.rooms[a.room] && day.rooms[a.room].label) || "";
     el.where.textContent = room;
+    el.where.hidden = !room;
+    const wsep = $("where-sep");
+    if (wsep) wsep.hidden = !room;
     const nb = day.blocks.find((b) => b.start > loc.minutes + 1e-6);
     el.next.textContent = nb ? `Next · ${E.fmtClock(nb.start)} · ${nb.title}` : "Next · the alarm";
     renderLog(day, rowIdx, loc.minutes, !!steer);
@@ -469,7 +472,8 @@
         const t = thingEls[k];
         const v = fr.things[k];
         if (v !== t.last) {
-          t.val.textContent = v == null ? "–" : String(v);
+          t.val.textContent = v == null ? "" : String(v);
+          t.chip.hidden = v == null; // a thing with no value yet shows nothing, not a lone dash
           t.chip.classList.toggle("on", v === "on" || v === "ringing" || v === "open" || v === "in hand" || v === "full");
           if (t.last !== undefined && lastMinutes != null && Math.abs(loc.minutes - lastMinutes) < 2) {
             t.chip.classList.remove("changed");

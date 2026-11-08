@@ -19,6 +19,69 @@ function boxOf(el) {
   return r;
 }
 
+
+/* ---------- the HUD check (css/hud.css lays the HUD out; this measures it) ----------
+   checkHud(t, label) measures every visible HUD element's rect and reports any two that intersect as a bug, and any
+   visible placeholder text (a lone dash) as a bug. Called by look, photos, episodes, tutorial-episode and control,
+   at each stage of the run (the label says which). Each distinct finding is reported once per run. */
+const HUD_PARTS = [
+  [".panel.now", "status card"], ["#sound", "Sound"], ["#details", "Details"], [".side", "Details panel"],
+  [".hud.bottom", "timeline"], ["#control", "Take control / Let go"], ["#quality", "Quality"],
+  ["#weather-btn", "Weather"], ["#pressure", "Pressure"], ["#episodes", "Episodes"], ["#neighbors-btn", "Neighbors"],
+  ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .energy", "Energy"],
+  [".powerpad button", "power pad"], [".touchpad .stick", "stick"], [".touchpad .jump", "jump"],
+  [".tutorial", "tutorial card"], [".ep-hud", "episode HUD"], [".control-hint", "controls hint"],
+];
+const hudSeen = new Set();
+function hudVisible(el) {
+  if (!el || el.hidden) return null;
+  for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+    const s = getComputedStyle(n);
+    if (s.display === "none" || s.visibility === "hidden" || parseFloat(s.opacity) < 0.05) return null;
+  }
+  const r = el.getBoundingClientRect();
+  if (r.width < 8 || r.height < 8 || r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return null;
+  return r;
+}
+function hudRects() {
+  const out = [];
+  HUD_PARTS.forEach(([sel, name]) => {
+    document.querySelectorAll(sel).forEach((el, i) => {
+      const r = hudVisible(el);
+      if (r) out.push({ el, r, name: el.id ? "#" + el.id : name + (i ? " " + (i + 1) : "") });
+    });
+  });
+  return out;
+}
+const HUD_PLACEHOLDER = /^[\s–—.…?-]+$/;
+function checkHud(t, label) {
+  const parts = hudRects();
+  const found = [];
+  for (let i = 0; i < parts.length; i++) {
+    for (let j = i + 1; j < parts.length; j++) {
+      const a = parts[i], b = parts[j];
+      if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      if (boxesOverlap(a.r, b.r)) found.push(a.name + " overlaps " + b.name);
+    }
+  }
+  const roots = ["header.hud", ".side", "footer.hud", ".abilitybar", ".pressure", ".tutorial", ".ep-hud", ".powerpad", "#control", "#episodes", "#weather-btn", "#quality"];
+  roots.forEach((sel) => document.querySelectorAll(sel).forEach((root) => {
+    if (!hudVisible(root)) return;
+    [root, ...root.querySelectorAll("*")].forEach((el) => {
+      if (el.children.length || !hudVisible(el)) return;
+      const txt = (el.textContent || "").trim();
+      if (txt && HUD_PLACEHOLDER.test(txt)) found.push('placeholder text "' + txt + '" shows in ' + (el.id ? "#" + el.id : el.tagName.toLowerCase() + (el.className ? "." + String(el.className).split(" ")[0] : "")));
+    });
+  }));
+  const fresh = found.filter((f) => !hudSeen.has(f));
+  fresh.forEach((f) => {
+    hudSeen.add(f);
+    t.problem("bug", "HUD (" + label + ", " + innerWidth + "x" + innerHeight + "): " + f);
+  });
+  if (!found.length) t.event("hud-clear", label + ": " + parts.length + " HUD elements at " + innerWidth + "x" + innerHeight + ", none overlap, no placeholder text");
+  return !found.length;
+}
+
 function world() {
   return window.day && window.day.world();
 }
@@ -128,6 +191,69 @@ let stopRun = () => {};
 function stopWatching() {
   if (unwatch) unwatch();
   unwatch = null;
+}
+
+/* ---------- the status card (#chapter and #where in the Now panel) ---------- */
+// While the pilot steers (taking control, and Walking back) it must read "Your move" / "On foot", never "In the car" or
+// "Drive"; while the day has him driving and nobody steers it reads "In the car"; back on his day it's the day's own.
+const CAR_CARD = /in the car|drive/i;
+const cardNow = () => ({ where: ($("where").textContent || "").trim(), chapter: ($("chapter").textContent || "").trim() });
+const cardClock = () => E().fmtClock(window.day.now().minutes);
+/** A couple of painted frames (the card is written once per frame), but never longer than 250 ms. */
+const paintedFrames = (n = 2) =>
+  Promise.race([
+    new Promise((res) => {
+      let i = 0;
+      const f = () => (++i >= n ? res() : requestAnimationFrame(f));
+      requestAnimationFrame(f);
+    }),
+    sleep(250),
+  ]);
+
+/** Shared check. expected: "foot" (On foot / Your move), "car" (In the car) or "day" (the day's own: not "On foot"
+ *  / "Your move"). Logs a status-card event with the clock time when it matches, a bug when it doesn't. */
+async function checkStatusCard(t, expected, label) {
+  await paintedFrames(2);
+  const c = cardNow();
+  const ok =
+    expected === "foot" ? c.where === "On foot" && c.chapter === "Your move" :
+    expected === "car" ? c.where === "In the car" :
+    c.where !== "On foot" && c.chapter !== "Your move";
+  const word = { foot: "On foot / Your move", car: "In the car", day: "the day's own card" }[expected];
+  const detail = `${label}: ${cardClock()} · card reads "${c.where}" / "${c.chapter}" (expected ${word})`;
+  if (ok) t.event("status-card", detail);
+  else t.problem("bug", `Status card wrong, ${detail}`);
+  return ok;
+}
+
+/** While he's the player's or walking back (any mode but schedule), sample the card every `ms` and report any
+ *  In the car / Drive reading, or anything but On foot / Your move, with the clock time. stop() logs the tally. */
+function watchStatusCard(t, label, ms = 1000) {
+  const C = window.day.control;
+  let n = 0;
+  let prev = null;
+  let bad = 0;
+  const iv = setInterval(() => {
+    const mode = C.mode();
+    const stable = mode === prev; // the sample just after a mode flip may precede the frame that writes the card
+    prev = mode;
+    if (mode === "schedule" || !stable) return;
+    n++;
+    const c = cardNow();
+    const car = CAR_CARD.test(c.where) || CAR_CARD.test(c.chapter);
+    if (car || c.where !== "On foot" || c.chapter !== "Your move") {
+      bad++;
+      if (bad <= 3) t.problem("bug", `${label}: at ${cardClock()} he's ${mode === "control" ? "in control" : "walking back"} but the status card reads "${c.where}" / "${c.chapter}"${car ? " (In the car / Drive while he's the player's)" : ""}`);
+    }
+  }, ms);
+  return {
+    stop() {
+      clearInterval(iv);
+      t.metric(`${label}StatusCardSamples`, n);
+      if (n && !bad) t.event("status-card-sampled", `${label}: ${n} samples, every one On foot / Your move`);
+      else if (!n) t.problem("warning", `${label}: no status-card samples were taken while in control`);
+    },
+  };
 }
 
 /** The engine (Babylon 9, Havok physics and its colliders) and Small Weather's name in the side panel and the log. */
@@ -334,6 +460,38 @@ function hudReadable(t) {
   }
 }
 
+/** Walk straight at a ramp's high end from the driveway side, like a real player would. Before the fix he walked in
+ *  under the ramp, where the gap is lower than the capsule, and wedged. He must stop at the ramp's end wall, not be
+ *  under it, and then be able to walk away. */
+async function rampWedgeCheck(t, b) {
+  const C = window.day.control;
+  const s = b.stair;
+  if (!C.place) return;
+  t.scene(`Ramp end of ${b.id}`);
+  C.place(s.x1 + 6, s.z, Math.PI / 2);
+  await sleep(300);
+  const under = (p) => p.x > s.x0 && p.x < s.x1 + 0.1 && Math.abs(p.z - s.z) < s.w / 2 + 0.1 && p.y < b.h - 1.5;
+  // straight along the ramp's line, under where it ends, as far as he will go
+  await goTo(s.x0 - 2, s.z, t, { sprint: true, close: 0.5, progress: 0.7, ms: 12000, stall: 3000 });
+  const p1 = C.state();
+  if (under(p1)) {
+    t.problem("bug", `Walking straight at the ${b.id} ramp's high end took him under it (at ${p1.x.toFixed(1)},${p1.z.toFixed(1)} y ${p1.y.toFixed(2)})`);
+    return;
+  }
+  // and from the side, along the street
+  C.place(s.x1 - 4, s.z + s.w / 2 + 3, Math.PI);
+  await sleep(200);
+  await goTo(s.x1 - 4, s.z, t, { close: 0.5, progress: 0.7, ms: 6000, stall: 2500 });
+  const p2 = C.state();
+  if (under(p2)) {
+    t.problem("bug", `Walking at the ${b.id} ramp from the street side took him under it (at ${p2.x.toFixed(1)},${p2.z.toFixed(1)} y ${p2.y.toFixed(2)})`);
+    return;
+  }
+  const out = await goTo(s.x1 + 5, s.z + s.w / 2 + 3, t, { close: 1, progress: 0.7, ms: 10000, stall: 3000 });
+  if (out) t.event("ramp-wedge-clear", `walking at the ${b.id} ramp's high end stops at its wall (x ${p1.x.toFixed(1)}), not under it, and he walks away`);
+  else t.problem("bug", `He couldn't walk away from the ${b.id} ramp's end (at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+}
+
 /** Smoke's last step: take control outside, climb the first rooftop with a stair, throw one bolt (E). */
 async function roofBolt(t) {
   const C = window.day.control;
@@ -353,9 +511,11 @@ async function roofBolt(t) {
   await sleep(600);
   t.event("start-at", `${E().fmtClock(outside.start)} outside, to climb a roof`);
   t.scene("Take control");
+  const smokeCard = watchStatusCard(t, "smoke");
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   t.event("control-taken", "Enter");
+  await checkStatusCard(t, "foot", "smoke: right after Take control" + (outside === carSideMoment(day) ? " beside the car" : ""));
   const b = ((cfg.city && cfg.city.blocks) || []).find((x) => x.stair);
   if (!b) {
     t.problem("bug", "The district has no roof with a stair");
@@ -375,25 +535,45 @@ async function roofBolt(t) {
   // Climb until a deadline, not a fixed number of tries: on a slow frame rate the sim crawls (0.1 s a frame at most)
   // and the ramp can outlast any one goTo. Each pass carries on from where he stands (onRamp), and only a roof
   // arrival walks him to the middle, so a timed-out pass never drags him sideways into the wall mid-ramp.
+  await rampWedgeCheck(t, b);
   let ok = false;
   // He takes over ~30 m east of the ramp; on a slow bot that walk alone ate the runner's 180 s. Smoke tests the climb
   // and the bolt, not the street walk (the `city` scenario walks it), so stand him at the ramp's foot.
   if (C.place) C.place(s.x0 - 3, s.z + s.w / 2 + 1.5, -Math.PI / 2);
-  const climbUntil = performance.now() + 150000;
-  const f0 = window.day.now().minutes;
-  const t0 = performance.now();
-  while (!ok && performance.now() < climbUntil) {
-    const y0 = C.state().y;
+  // The climb is timed in GAME seconds (day.control.simTime): a slow bot runs the sim behind the wall clock, so a
+  // wall-clock deadline fails a climb that was only slow. The wall cap is a safety net for a frozen page.
+  const CLIMB_SIM_SEC = 150; // game seconds to get up the ramp (it takes ~12 at a walk)
+  const STUCK_SIM_SEC = 12; // no new height for this long, on the ramp or not, is stuck rather than slow
+  const wall0 = performance.now();
+  const sim0 = simNow();
+  t.event("climb-start", `to the ${b.id} roof (y ${C.state().y.toFixed(2)}, roof ${b.h})`);
+  let bestY = C.state().y;
+  let bestAt = sim0;
+  let stuck = false;
+  while (!ok && simNow() - sim0 < CLIMB_SIM_SEC && performance.now() - wall0 < 600000) {
     const reached = (onRamp() || (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.72, ms: 30000, stall: 5000 })
       && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.75, ms: 8000, stall: 5000 }))))
       && (await goTo(s.x1 - 0.25, s.z, t, { sprint: true, close: 0.35, progress: 0.8, ms: 40000, stall: 5000 }));
     if (reached || C.state().y > b.h - 0.4) {
       await goTo(b.x, b.z, t, { close: 0.8, progress: 0.85, ms: 20000, stall: 5000 });
       ok = C.state().y > b.h - 0.4;
-    } else if (!onRamp() && C.state().y <= y0 + 0.05 && performance.now() - t0 > 60000) break; // truly stuck, not slow
+    }
+    const y = C.state().y;
+    if (y > bestY + 0.05) {
+      bestY = y;
+      bestAt = simNow();
+    } else if (!ok && simNow() - bestAt > STUCK_SIM_SEC) {
+      stuck = true;
+      break;
+    }
   }
-  t.metric("climbSec", Math.round((performance.now() - t0) / 100) / 10);
-  t.metric("climbSimMin", Math.round((window.day.now().minutes - f0) * 100) / 100);
+  const climbSim = simNow() - sim0;
+  const climbWall = (performance.now() - wall0) / 1000;
+  t.metric("climbSimSec", Math.round(climbSim * 10) / 10);
+  t.metric("climbWallSec", Math.round(climbWall * 10) / 10);
+  if (ok) t.event("climb-done", `up the ${b.id} ramp in ${climbSim.toFixed(1)} game s (${climbWall.toFixed(1)} s wall, ${(climbSim / Math.max(climbWall, 0.001)).toFixed(2)}x real time)`);
+  else if (stuck) t.problem("bug", `He is stuck on the ${b.id} ramp: no height gained in ${STUCK_SIM_SEC} game s (best y ${bestY.toFixed(2)}, at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
+  else t.problem("bug", `The ${b.id} climb was slow, not stuck, and ran out of ${CLIMB_SIM_SEC} game s (${climbWall.toFixed(0)} s wall, y ${C.state().y.toFixed(2)} of ${b.h})`);
   const st = C.state();
   const onRoof = ok && st.y > b.h - 0.4;
   if (onRoof) t.event("on-rooftop", `on the ${b.id} roof at y ${st.y.toFixed(2)}`);
@@ -449,7 +629,13 @@ async function roofBolt(t) {
     if (cleared && secs < 10) t.event("weather-cleared", `back to clear ${secs.toFixed(1)} s after the bolt (rain ${WXB.now().rain.toFixed(2)})`);
     else t.problem("bug", "The storm from lightning didn't clear within seconds");
   }
+  // Let go: On foot on every sample while he walks (or catches up) back to his day.
   pressKey("Escape");
+  await t.until(() => C.mode() !== "control", 3000, "letting go");
+  await checkStatusCard(t, "foot", "smoke: right after Let go");
+  await t.until(() => C.mode() === "schedule", 30000, "him back on his day").catch(() => t.problem("polish", "smoke: he wasn't back on his day 30 s after Let go"));
+  smokeCard.stop();
+  if (C.mode() === "schedule") await checkStatusCard(t, "day", "smoke: back on his day");
   t.event(strike && onRoof ? "smoke-pass" : "smoke-fail", "city loaded, Small Weather shown, rooftop, one bolt");
 }
 
@@ -1048,6 +1234,8 @@ async function analytics(options, t) {
 
     // Wait for the batches to go out.
     await t.until(() => ["page_view", "game_ready", "screen", "progress", "feature"].every((n) => sent().some((e) => e.name === n)), 15000, "page_view, progress and feature events to be sent").catch(() => {});
+    // The batches go out every few seconds: the player features (let_go, glide) may sit in the next one.
+    await t.until(() => ["take_control", "let_go", "weather", "power", "glide"].every((f) => sent().some((e) => e.name === "feature" && e.props && e.props.name === f)), 15000, "the player feature events to be sent").catch(() => {});
     showSent();
     for (const n of ["page_view", "session_start", "game_ready", "screen", "progress", "feature"]) {
       if (!sent().some((e) => e.name === n)) t.problem("bug", `No ${n} event went out`);
@@ -1159,6 +1347,14 @@ function quietMoment(day) {
   );
 }
 
+/** The log rebuilds on the next painted frame, so wait for a row (any of `texts`) rather than read it at once. */
+async function logHas(t, texts, problem) {
+  const list = [].concat(texts).filter(Boolean);
+  const has = () => list.some((x) => $("log").textContent.includes(x));
+  await t.until(has, 3000, "the action log row").catch(() => {});
+  if (!has()) t.problem("bug", `${problem} (looked for "${list.join('" or "')}")`);
+}
+
 /** Let go (Esc or the button), then watch him walk back: no teleport, ends where the day says, the log goes on. */
 async function letGoAndWatch(t, how, label) {
   const C = window.day.control;
@@ -1180,23 +1376,29 @@ async function letGoAndWatch(t, how, label) {
   const fr0 = window.day.now().frame;
   const st0 = C.state();
   t.log(`${label}: letting go at ${st0.x.toFixed(2)},${st0.z.toFixed(2)}; his day says ${fr0.person.x.toFixed(2)},${fr0.person.z.toFixed(2)} (${fr0.room}): "${fr0.action.text}"`);
+  const cardWatch = watchStatusCard(t, `${label} walking back`, 200);
   await how();
   await t.until(() => C.mode() !== "control", 3000, "letting go");
+  await checkStatusCard(t, "foot", `${label}: right after Let go`);
   t.event("let-go", `${label}: his day says ${fr0.room} · "${fr0.action.text}" · ${Math.hypot(st0.x - fr0.person.x, st0.z - fr0.person.z).toFixed(1)} m away`);
-  if (!$("log").textContent.includes(window.DAY_CONFIG.control.lines.letGo)) t.problem("bug", "Letting go isn't in the action log");
-  await t.until(() => C.mode() === "schedule", 70000, "him to walk back to his day");
+  await logHas(t, window.DAY_CONFIG.control.lines.letGo, "Letting go isn't in the action log");
+  await t.until(() => C.mode() === "schedule", 70000, "him to walk back to his day").finally(() => cardWatch.stop());
+  await checkStatusCard(t, "day", `${label}: back on his day`);
   await sleep(300);
   stopWatching();
-  const back = C.log().filter((e) => e.what === "back").pop();
+  const backEv = C.log().filter((e) => e.what === "back").pop();
+  const back = backEv && { how: backEv.detail && backEv.detail.how }; // mark(what, detail): the field is under detail
   const fr = window.day.now().frame;
   t.metric(`${label}ReturnFrames`, frames);
   t.metric(`${label}ReturnMaxStep`, Math.round(maxStep * 1000) / 1000);
   if (back && back.how === "walk") t.event("back-on-schedule", `${label}: walked back, now "${fr.action.text}" (${fr.room}), ${off == null ? "?" : off.toFixed(3)} m from where his day puts him`);
-  else t.problem("bug", `${label}: he didn't walk back to his day (${back ? back.how : "no back"})`);
+  else t.problem("bug", `${label}: he didn't walk back to his day (${back ? back.how || "no how" : "no back"}; the day says "${fr.action.text}")`);
   if (maxStep > 0.5) t.problem("bug", `${label}: he jumped ${maxStep.toFixed(2)} m in one frame on the way back (a teleport, not a walk)`);
   if (off != null && off > 0.05) t.problem("bug", `${label}: back on his day, but ${off.toFixed(2)} m from where it puts him`);
   checkFrame(t, fr);
-  if (!$("log").textContent.includes(window.DAY_CONFIG.control.lines.back)) t.problem("bug", "Being back on his day isn't in the action log");
+  // He may have caught up in a fade (catchUp line) instead of walking: either way the log says he's back.
+  const L = window.DAY_CONFIG.control.lines;
+  await logHas(t, [L.back, L.catchUp], "Being back on his day isn't in the action log");
 }
 
 async function control(options, t) {
@@ -1214,25 +1416,32 @@ async function control(options, t) {
   const lines = window.DAY_CONFIG.control.lines;
 
   // Setup: a quiet moment at home on the day bar, the clock running at 1×.
+  // Beside his car at home when the day has one (the status card used to say IN THE CAR here); else a quiet moment.
+  // The car-side moment lasts seconds, so take control on the paused bar: taking control plays the clock.
   const day = window.day.today();
-  const a = quietMoment(day);
-  scrubTo(a.start + Math.min(1, (a.end - a.start) / 3));
+  const side = carSideMoment(day);
+  const a = side || quietMoment(day);
+  scrubTo(a.start + Math.min(side ? 0.02 : 1, (a.end - a.start) / 3));
   await sleep(600);
-  clickSpeed(1);
-  t.event("start-at", `${E().fmtClock(a.start)} ${a.block}: "${a.text}" (${a.room})`);
-  await sleep(1500);
+  if (!side) clickSpeed(1);
+  t.event("start-at", `${E().fmtClock(a.start)} ${a.block}: "${a.text}" (${a.room})${side ? " beside the car" : ""}`);
+  if (!side) await sleep(1500);
   t.progress(0.05);
 
   // 1. Take control (Enter).
   t.scene("Taking control");
   const m0 = window.day.now().minutes;
+  const takeCard = watchStatusCard(t, "control");
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  await checkStatusCard(t, "foot", "right after Take control" + (side ? " beside the car" : ""));
+  await sleep(300);
+  checkHud(t, "control: on foot");
   const st = C.state();
   t.event("control-taken", `Enter · at ${st.x.toFixed(2)},${st.z.toFixed(2)} · Havok controller ${st.physics ? "on" : "OFF"} · button "${btn && btn.textContent}"`);
   if (!st.physics) t.problem("bug", "He moves without the Havok character controller (physics off?)");
   if (btn && btn.textContent !== "Let go") t.problem("bug", `The button says "${btn.textContent}" while he's the player's, not "Let go"`);
-  if (!$("log").textContent.includes(lines.take)) t.problem("bug", "Taking control isn't in the action log");
+  await logHas(t, lines.take, "Taking control isn't in the action log");
   await sleep(1200);
   t.progress(0.12);
 
@@ -1304,6 +1513,7 @@ async function control(options, t) {
 
   // 5. Let go (Esc): he walks back to where his day says, and the day carries on.
   t.scene("Letting go");
+  takeCard.stop();
   await letGoAndWatch(t, () => pressKey("Escape"), "keys");
   t.scene("Back on his day");
   const row0 = $("what").textContent;
@@ -1359,6 +1569,7 @@ async function control(options, t) {
   await t.until(() => C.state().flights > tf0, 8000, "him to land after the touch jumps");
   const tfl = C.state().lastFlight || { jumps: 0 };
   t.event("touch-jump", `the jump button: ${tfl.jumps} jumps, ${tfl.height} m`);
+  checkHud(t, "control: phone controls");
   if (tfl.jumps < 2) t.problem("bug", `The touch jump button gave ${tfl.jumps} jumps for three taps`);
   t.progress(0.85);
 
@@ -1367,7 +1578,27 @@ async function control(options, t) {
   if (!native) C.touch(false);
   t.scene("Back on his day");
   await sleep(1500);
+  await drivingCard(t);
   t.progress(1);
+}
+
+/** Scrub to a moment the day has him driving, nobody steering: the card says In the car (and the button is locked). */
+async function drivingCard(t) {
+  const C = window.day.control;
+  const day = window.day.today();
+  const drive = day.actions.find((a) => a.inCar && a.car && a.car.path && a.end > a.start);
+  if (!drive) {
+    t.problem("warning", "The day has no driving moment to check the status card against");
+    return;
+  }
+  if (C.mode() !== "schedule") {
+    t.problem("bug", `Nobody should be steering for the driving check, but control is "${C.mode()}"`);
+    return;
+  }
+  t.scene("Driving, nobody steering");
+  scrubTo(drive.start + Math.min(0.3, (drive.end - drive.start) / 3));
+  await t.until(() => window.day.now().frame.person.inCar, 3000, "the day to have him driving");
+  await checkStatusCard(t, "car", "driving, nobody steering");
 }
 
 /* ---------------- model: Small Weather's rigged 3D model, on his day and under control ---------------- */
@@ -1541,18 +1772,29 @@ function steerKeys(tx, tz, sprint) {
   if (sprint) keys.push("Shift");
   return keys;
 }
-/** Walk him to a point with the keys. False if he gets stuck or falls through. */
+/** Game seconds he has been simulated as the player's (day.control.simTime): the clock a climb is measured in. main.js
+ *  caps a frame at 0.1 s, so on a slow bot the sim runs behind the wall clock and a wall-clock limit fails a walk that
+ *  was only slow. Falls back to wall seconds if the page has no simTime. */
+function simNow() {
+  const C = window.day && window.day.control;
+  return C && C.simTime ? C.simTime() : performance.now() / 1000;
+}
+/** Walk him to a point with the keys. False if he gets stuck (no movement in `stall` game ms) or falls through.
+ *  `ms` and `stall` are GAME time; a wall-clock cap (8x, at least 2 min) is only the safety net for a frozen page. */
 async function goTo(tx, tz, t, opts) {
   opts = opts || {};
   const close = opts.close == null ? 0.7 : opts.close;
-  const limit = opts.ms || 22000;
+  const limit = (opts.ms || 22000) / 1000;
+  const stallLimit = (opts.stall || 2800) / 1000;
   const sprint = !!opts.sprint;
-  const started = performance.now();
+  const wallCap = Math.max(limit * 8000, 120000);
+  const wall0 = performance.now();
+  const started = simNow();
   let stillSince = started;
   let last = window.day.control.state();
   let ticks = 0;
   try {
-    while (performance.now() - started < limit) {
+    while (simNow() - started < limit && performance.now() - wall0 < wallCap) {
       const st = window.day.control.state();
       if (st.y < -0.45) {
         t.problem("bug", `He fell through the world at ${st.x.toFixed(1)},${st.z.toFixed(1)} (y ${st.y.toFixed(2)})`);
@@ -1560,9 +1802,9 @@ async function goTo(tx, tz, t, opts) {
       }
       if (Math.hypot(st.x - tx, st.z - tz) < close) return true;
       if (Math.hypot(st.x - last.x, st.z - last.z) > 0.12) {
-        stillSince = performance.now();
+        stillSince = simNow();
         last = st;
-      } else if (performance.now() - stillSince > (opts.stall || 2800)) return false;
+      } else if (simNow() - stillSince > stallLimit) return false;
       const far = Math.hypot(st.x - tx, st.z - tz);
       setHeld(steerKeys(tx, tz, sprint && far > 2.5));
       if (ticks++ % 6 === 0) t.progress(opts.progress || 0.5);
@@ -1764,6 +2006,7 @@ async function look(options, t) {
       const sky = info.sky || {};
       t.event(eventName, `${sceneName}: source ${info.source}, ${info.pbr} PBR, ${info.textured} textured, ${info.neon} neon, exposure ${info.exposure.toFixed(2)}, sky ${sky.day.toFixed(2)}/${sky.dusk.toFixed(2)}/${sky.night.toFixed(2)}, neon ${info.neonLevel.toFixed(2)}`);
       if (info.pbr < 4 || info.textured < 4) t.problem("bug", "The city surfaces are still flat colours");
+      checkHud(t, "look: " + sceneName);
       return info;
     });
   }
@@ -1804,6 +2047,7 @@ async function look(options, t) {
   const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
   t.metric("frameMsLow", Math.round(avg * 10) / 10);
   t.metric("qualityScaling", low.scaling);
+  checkHud(t, "look: quality low");
   t.event("quality-low", `low: bloom off, shadows off, samples ${low.samples}, scaling ${low.scaling}, ${avg.toFixed(1)} ms a frame over ${samples.length} frames`);
   if (samples.length && avg > 40) t.problem("warning", `Low quality averaged ${avg.toFixed(1)} ms a frame`);
   t.progress(1);
@@ -1849,6 +2093,7 @@ async function photos(options, t) {
     const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
     const fps = avg ? 1000 / avg : 0;
     fpsAll.push(fps);
+    checkHud(t, "photos: " + name);
     const i = cs.info();
     const st = C.state();
     t.event(eventName, `${name} at ${st.x.toFixed(0)},${st.z.toFixed(0)}: ${fps.toFixed(0)} fps, windows ${i.lit.windows.toFixed(2)}, shops ${i.lit.shops.toFixed(2)}, lamps ${i.lit.lamps.toFixed(2)}, ${i.fillers} fillers`);
@@ -1887,6 +2132,8 @@ async function photos(options, t) {
   t.event("photo-fps", `${fpsAll.length} photos: ${avg.toFixed(0)} fps on average, ${min.toFixed(0)} at the worst`);
   if (min < 10) t.problem("bug", `A photo ran at ${min.toFixed(1)} fps`);
   else if (avg < 20) t.problem("warning", `The photos averaged ${avg.toFixed(1)} fps`);
+  // A phone run also times the three moments on low quality (city, storm, finale).
+  if (innerWidth <= 700 || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)) await phoneFps(t);
   t.progress(1);
 }
 
@@ -2348,6 +2595,8 @@ async function weatherAudio(options, t) {
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   await sleep(350);
+  // The sting may be queued while its sample decodes: give it a few seconds.
+  for (let i = 0; i < 20 && S.now().stingAt <= stingBefore; i++) await sleep(150);
   const afterTake = S.now();
   t.event("control-taken", `stingAt ${afterTake.stingAt} (was ${stingBefore}); bed ${afterTake.bed}`);
   if (afterTake.on && afterTake.samples && afterTake.stingAt <= stingBefore) {
@@ -2371,6 +2620,7 @@ async function weatherAudio(options, t) {
     ["7", "snow", "Snow"],
   ];
   const beds = {};
+  let stormThunder = null;
   for (let i = 0; i < order.length; i++) {
     const [key, state, label] = order[i];
     const before = S.now();
@@ -2400,6 +2650,7 @@ async function weatherAudio(options, t) {
     await sleep(900);
     const done = S.now();
     beds[state] = done;
+    if (state === "storm") stormThunder = W.now().sound.thunder;
     t.scene(`Music ${label}`);
     t.event(`music-${state}`, `bed ${done.bed} target ${done.target} fade ${done.fade.toFixed(2)} amb rain ${done.amb.rain.toFixed(2)} wind ${done.amb.wind.toFixed(2)} air ${done.amb.air.toFixed(2)} samples ${done.samples}`);
     if (done.target !== want && done.bed !== want) t.problem("bug", `${label} settled on bed ${done.bed}, not ${want}`);
@@ -2426,8 +2677,9 @@ async function weatherAudio(options, t) {
   if (distinct.size < 3) t.problem("bug", `Only ${distinct.size} distinct music beds across clear/rain/storm/fog/snow`);
 
   // Storm thunder level in the weather sound envelope (sample crack is one-shot).
-  if (storm && W.now().sound.thunder < 0.4) t.problem("bug", "Storm has no thunder in the weather sound levels");
-  else if (storm) t.event("thunder-level", `storm thunder ${W.now().sound.thunder.toFixed(2)}`);
+  // Read while the storm was the weather: by now the last key has made it snow, whose thunder is 0.
+  if (storm && stormThunder < 0.4) t.problem("bug", "Storm has no thunder in the weather sound levels");
+  else if (storm) t.event("thunder-level", `storm thunder ${stormThunder.toFixed(2)}`);
 
   t.progress(1);
 }
@@ -3244,6 +3496,8 @@ async function episodes(options, t) {
     const hud = $("episode-hud");
     if (!hud || hud.hidden) t.problem("bug", `Episode HUD hidden for ${id}`);
     else t.event("episode-hud", `${id}: ${Ep.now().goals.length} goals`);
+    await sleep(400);
+    checkHud(t, "episodes: " + id);
     t.progress(0.15 + i * 0.12);
 
     if (id === "morning") {
@@ -3690,6 +3944,8 @@ async function storyParts(options, t) {
 // rank), one that plays all three set pieces through the twist (high rank). Events: lunch-* with the dialogue, each help
 // and its points, the twist, and the rank cards side by side.
 async function lunchRescue(options, t) {
+  // A setup that can't be reached is a failed run, never 'done': the harness reports 'done' when the bot just returns.
+  const bail = (msg) => { t.problem("bug", msg); t.finish("fail"); };
   t.scene("Home");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
@@ -3697,10 +3953,10 @@ async function lunchRescue(options, t) {
   const Ep = window.episodes || window.day.episodes;
   const C = window.day.control;
   const P = window.powers || window.day.powers;
-  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  if (!Ep || !C || !P) return bail("episodes, powers or Take control isn't installed");
   const cfg = window.DAY_CONFIG;
   const ep = ((cfg.episodes && cfg.episodes.list) || []).find((e) => e.id === "lunch");
-  if (!ep || !ep.pieces || ep.pieces.length < 3) return t.problem("bug", "The lunch episode has no set pieces");
+  if (!ep || !ep.pieces || ep.pieces.length < 3) return bail("The lunch episode has no set pieces");
   const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
   const heard = [];
   const onStory = (e) => {
@@ -3721,7 +3977,7 @@ async function lunchRescue(options, t) {
 
   const day = window.day.today();
   const outside = carSideMoment(day);
-  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  if (!outside) return bail("No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
   await sleep(600);
@@ -3758,8 +4014,18 @@ async function lunchRescue(options, t) {
 
   /* ---- run 1: one person helped, then let go ---- */
   t.scene("Rooftop storm: one helped");
+  // He is already the player's here, so the episode doesn't jump the clock: put it at the lunch storm's own time.
+  window.day.jump(ep.clock || "12:20");
+  await sleep(500);
   Ep.start("lunch", "playtest");
   await t.until(() => Ep.now() && Ep.now().id === "lunch", 3000, "the lunch episode running");
+  // The scene must really be the lunch storm: the clock at 12:15 to 12:30 and the stranded people in the world.
+  const mins = window.day.now().minutes;
+  const lunchAt = window.DayEngine.parseClock(ep.clock || "12:20", window.day.today().dayStart);
+  if (Math.abs(mins - lunchAt) > 8) return bail(`The lunch episode isn't at lunch: the clock is ${window.DayEngine.fmtClock(mins, true)}, not about ${ep.clock}`);
+  const stranded = (Ep.now().rescue && Ep.now().rescue.people) || [];
+  if (!stranded.length) return bail("The lunch storm has no stranded people in the world");
+  t.event("lunch-stranded", `${stranded.length} at the lunch storm: ${stranded.map((p) => `${p.id} (${Math.round(p.x)}, ${Math.round(p.z)})`).join(", ")}`);
   if (!$("episode-hud") || $("episode-hud").hidden) t.problem("bug", "The episode HUD isn't up for the lunch episode");
   await sleep(3000);
   t.event("lunch-opening", `"${lastSay()}" · HUD: ${($("episode-hud").textContent || "").replace(/\s+/g, " ").slice(0, 160)}`);
@@ -4122,17 +4388,19 @@ async function storyEnding(options, t) {
 // Run 1 plays every cue on the beat; run 2 presses only Lightning, late. Events: show-opening / show-gather / show-begin / show-act /
 // show-cue / show-miss / show-off / show-stage / show-over / show-card / show-closing / show-compare; metrics showPoints*, showAurora, showBursts.
 async function lightShow(options, t) {
-  t.scene("Outside, before the show");
+  // A setup that can't be reached is a failed run, never 'done': the harness reports 'done' when the bot just returns.
+  const bail = (msg) => { t.problem("bug", msg); t.finish("fail"); };
+  t.scene("Setup");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
   const Ep = window.episodes || window.day.episodes;
   const C = window.day.control;
   const P = window.powers || window.day.powers;
-  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  if (!Ep || !C || !P) return bail("episodes, powers or Take control isn't installed");
   const cfg = window.DAY_CONFIG;
   const ep = ((cfg.episodes && cfg.episodes.list) || []).find((e) => e.id === "night");
-  if (!ep || !ep.finale) return t.problem("bug", "The finale isn't in the episode list");
+  if (!ep || !ep.finale) return bail("The finale isn't in the episode list");
   const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
   try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
   // The three parts played clean, Fair Weather (setup): what the closing card ties together.
@@ -4144,8 +4412,9 @@ async function lightShow(options, t) {
   } catch (err) { /* ignore */ }
 
   const day = window.day.today();
-  const outside = carSideMoment(day);
-  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  const outside = carSideMoment(day) ||
+    day.actions.find((a) => !a.inCar && !a.path && a.end > a.start && !(window.DAY_CONFIG.rooms || {})[a.room]);
+  if (!outside) return bail("No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
   await sleep(600);
@@ -4153,8 +4422,15 @@ async function lightShow(options, t) {
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   const offer = $("episode-offer");
   if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+  // Confirm he is really outdoors before the scene is named: he takes control where the day had him.
+  const here = C.state();
+  if (Math.hypot(here.x - outside.x, here.z - outside.z) > 8) return bail(`Not at the outdoor moment after Take control: he is at ${Math.round(here.x)}, ${Math.round(here.z)}, not near ${Math.round(outside.x)}, ${Math.round(outside.z)}`);
+  t.scene("Outside, before the show");
   scrubTo(22 * 60 + 5);
   await sleep(500);
+  const mins = window.day.now().minutes;
+  const showAt = window.DayEngine.parseClock("22:05", window.day.today().dayStart);
+  if (Math.abs(mins - showAt) > 10) return bail(`The clock isn't at the show: ${window.DayEngine.fmtClock(mins, true)}, not about 22:05`);
 
   const events = [];
   const onEp = (e) => {
@@ -4319,6 +4595,36 @@ async function tutorialEpisode(options, t) {
   }
 
   await takeAndAccept();
+  // On a phone the five abilities are tap buttons. A desktop-sized run can ask for them with {"touch":true}
+  // (the named setup shortcut day.control.touch(true), as the first-visit scenario does).
+  if (options && options.touch && !C.state().touch) C.touch(true);
+  await sleep(250);
+  const touch = !!(C.state().touch || document.documentElement.classList.contains("touch-ui"));
+  const tapAbility = (id) => tapEl($("ability-" + id));
+  if (touch) {
+    t.event("touch-layout", `${innerWidth}×${innerHeight}: the five abilities are pressed by pointer taps`);
+    const five = ["bolt", "rain", "gale", "fog", "sunbreak"];
+    const fixed = ["stick", "jump-btn", "powerpad", "episode-hud", "tutorial", "control", "pressure", "weather-btn"];
+    const bad = [];
+    const boxes = five.map((id) => ({ id, el: $("ability-" + id), r: boxOf($("ability-" + id)) }));
+    boxes.forEach((b) => {
+      if (!b.r || b.r.width < 1) { bad.push(`${b.id} isn't on screen`); return; }
+      if (b.r.width < 44 || b.r.height < 44) bad.push(`${b.id} is ${Math.round(b.r.width)}×${Math.round(b.r.height)}`);
+      if (b.r.left < 0 || b.r.top < 0 || b.r.right > innerWidth || b.r.bottom > innerHeight) bad.push(`${b.id} is off screen`);
+      fixed.forEach((fid) => {
+        const el = $(fid);
+        const r = el && !el.hidden && getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden" ? boxOf(el) : null;
+        if (r && boxesOverlap(b.r, r)) bad.push(`${b.id} overlaps #${fid}`);
+      });
+      five.forEach((o) => { const q = boxOf($("ability-" + o)); if (o !== b.id && b.r && q && boxesOverlap(b.r, q)) bad.push(`${b.id} overlaps ${o}`); });
+    });
+    const energyEl = $("energy");
+    const er = boxOf(energyEl);
+    if (!er || er.width < 20 || !/Energy \d+/.test(energyEl.textContent) || !energyEl.querySelector("i").style.width) bad.push("the Energy bar isn't readable on the bar");
+    if (["storm", "gust", "tornado"].some((n) => { const q = boxOf($("ability-" + n)); return q && q.width > 0; })) bad.push("Storm/Gust/Tornado shouldn't be on the touch bar (they're on the power pad)");
+    if (bad.length) bad.forEach((m) => t.problem("bug", `Touch ability bar: ${m}`));
+    else t.event("ability-bar-touch", `${five.length} buttons, ${Math.round(Math.min(...boxes.map((b) => b.r.width)))}×${Math.round(Math.min(...boxes.map((b) => b.r.height)))} px at least, energy ${energyEl.textContent.trim()}, clear of the stick, jump, power pad and the episode card`);
+  }
   const hud = $("episode-hud");
   if (!hud || hud.hidden) t.problem("bug", "The tutorial has no HUD");
   const skipBtn = hud && hud.querySelector(".skip");
@@ -4343,17 +4649,31 @@ async function tutorialEpisode(options, t) {
     const prompt = Ep.now() && Ep.now().prompt;
     if (!prompt) t.problem("bug", `No prompt for ${id}`);
     else t.event("tutorial-prompt", `${id}: ${prompt}`);
+    checkHud(t, "tutorial-episode: " + id + (touch ? " (touch)" : ""));
     if (i === 1) {
       // A locked ability refuses, changes nothing.
       const before = window.powers.now().energy;
-      tapKey("v", 120);
+      if (touch) await tapAbility("gale");
+      else tapKey("v", 120);
       await sleep(300);
       if (window.powers.abilities.get("gale").uses > 0) t.problem("bug", "Gale worked while locked");
-      else t.event("locked-refused", "Gale (V) is refused before it unlocks");
+      else if (touch) {
+        const rf = $("ability-refuse");
+        if (!rf || !rf.textContent) t.problem("bug", "A tap on a locked ability gave no refusal line");
+        else t.event("locked-refused", `Gale (tap) is refused before it unlocks: "${rf.textContent}"`);
+      } else t.event("locked-refused", "Gale (V) is refused before it unlocks");
       void before;
     }
     for (let k = 0; k < 6 && !(Ep.now() && Ep.now().goals[i].done); k++) {
-      await tapKey(keys[id], 140);
+      if (touch) {
+        await tapAbility(id);
+        if (k === 0) {
+          await sleep(150);
+          const b = $("ability-" + id);
+          const cd = b && b.querySelector(".cd");
+          if (b && b.dataset.state === "cooldown" && cd && cd.textContent) t.event("touch-cooldown", `${id}: ${cd.textContent} s on the button, energy ${$("energy").textContent.trim()}`);
+        }
+      } else await tapKey(keys[id], 140);
       await sleep(900);
     }
     if (!(Ep.now() ? Ep.now().goals[i].done : true)) t.problem("bug", `Goal "${goal.label}" never completed`);
@@ -4377,6 +4697,382 @@ async function tutorialEpisode(options, t) {
   else if (A().now().abilities.some((a) => a.locked)) t.problem("bug", "Skip left abilities locked");
   else t.event("tutorial-skipped", "Skip ends it and opens every ability");
   pressKey("Escape");
+  t.progress(1);
+}
+
+/* ---------------- phone frame rate: city, storm and finale on low quality ---------------- */
+// Frame times come from requestAnimationFrame (the same clock as the contract's fps meter in hawkes-playtest.js,
+// which isn't exported), counted per second: the average of those seconds and the worst second. Quality is forced to
+// low first, the way a phone runs. Setup shortcuts: the day bar to noon and to 22:05, the storm set by the weather
+// API each second (a gust of Lightning by the ability bar), the finale started from the Episodes API; he walks to the
+// plaza with real input. A moment whose average is under 30 files a bug naming it.
+const PHONE_FPS_MIN = 30;
+function fpsWindow(ms, each) {
+  return new Promise((resolve) => {
+    const sec = [];
+    let frames = 0, last = performance.now(), n = 0;
+    const t0 = last;
+    const tick = (now) => {
+      frames++;
+      n++;
+      if (now - last >= 1000) {
+        sec.push((frames * 1000) / (now - last));
+        frames = 0;
+        last = now;
+      }
+      if (each) each(now - t0);
+      if (now - t0 < ms) requestAnimationFrame(tick);
+      else {
+        if (!sec.length) sec.push((frames * 1000) / Math.max(1, now - t0));
+        resolve({ avg: sec.reduce((a, b) => a + b, 0) / sec.length, min: Math.min(...sec), seconds: sec.length, frames: n });
+      }
+    };
+    requestAnimationFrame(tick);
+  });
+}
+async function phoneFps(t) {
+  const C = window.day.control;
+  const Ep = window.episodes || window.day.episodes;
+  const P = window.powers || window.day.powers;
+  const look = window.day.look;
+  if (!C || !Ep || !P || !look) {
+    t.problem("bug", "Phone fps: Take control, episodes, powers or the look module isn't installed");
+    return;
+  }
+  const prevQ = look.quality();
+  look.quality("low");
+  t.scene("Phone fps: low quality");
+  t.event("phone-fps-quality", `quality forced to low (was ${prevQ}) at ${innerWidth}×${innerHeight}`);
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const outside = carSideMoment(day);
+  if (!outside) {
+    t.problem("bug", "Phone fps: no moment beside the car to stand in the street");
+    return;
+  }
+  if (C.mode() === "control") pressKey("Escape");
+  await sleep(300);
+  scrubTo(12 * 60);
+  clickSpeed(1);
+  await sleep(600);
+  const rec = {};
+  const report = (key, label, r) => {
+    rec[key] = r;
+    t.metric(`phoneFps${key}Avg`, Math.round(r.avg * 10) / 10);
+    t.metric(`phoneFps${key}Min`, Math.round(r.min * 10) / 10);
+    t.event(`phone-fps-${key.toLowerCase()}`, `${label}: ${r.avg.toFixed(1)} fps on average, ${r.min.toFixed(1)} at the worst second (${r.frames} frames in ${r.seconds} s), quality ${look.quality()}`);
+    if (r.avg < PHONE_FPS_MIN) t.problem("bug", `Phone fps: ${label} averaged ${r.avg.toFixed(1)} fps on low quality, under ${PHONE_FPS_MIN}`);
+  };
+  // 1. The city at noon, walking the avenue.
+  t.scene("Phone fps: the city at noon");
+  if (C.mode() !== "control") {
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 4000, "Take control for the phone fps");
+  }
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+  const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
+  await goTo(C.state().x, sideZ, t, { sprint: true, ms: 12000, close: 1.5 });
+  const crowd = window.day.crowd && window.day.crowd.info();
+  if (crowd) t.event("phone-fps-crowd", `${crowd.people} people and ${crowd.cars} cars at noon on low`);
+  const walk = (async () => {
+    for (let i = 0; i < 3; i++) await goTo(C.state().x + (i % 2 ? -12 : 12), sideZ, t, { sprint: true, ms: 5000, close: 1.5 });
+  })();
+  report("City", "the city at noon on the avenue", await fpsWindow(8000));
+  await walk.catch(() => {});
+  // 2. A storm with rain and lightning.
+  t.scene("Phone fps: the storm");
+  const W = window.weather;
+  const bolt = (P.abilities && P.abilities.get && P.abilities.get("bolt")) ? "bolt" : "lightning";
+  let nextBolt = 0;
+  report("Storm", "a storm with rain and lightning", await fpsWindow(9000, (ms) => {
+    if (W && W.set && Math.floor(ms / 800) !== Math.floor((ms - 17) / 800)) W.set("storm", 1, "power");
+    if (ms >= nextBolt) { nextBolt = ms + 3000; try { P.command(bolt, "playtest"); } catch (e) { /* cooldown or energy */ } }
+  }));
+  const wx = W && W.now && W.now();
+  if (wx && wx.state !== "storm" && wx.state !== "rain") t.problem("warning", `Phone fps: the storm window ended on ${wx.state}`);
+  // 3. The light-show finale, from the plaza.
+  t.scene("Phone fps: the finale");
+  scrubTo(22 * 60 + 5);
+  await sleep(500);
+  Ep.start("night", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "night" && Ep.show(), 4000, "the Light show running");
+  for (let k = 0; k < 16; k++) {
+    const s = C.state();
+    if (Math.abs(s.x - 117) < 1.6) break;
+    await goTo(s.x + Math.max(-22, Math.min(22, 117 - s.x)), sideZ, t, { sprint: true, ms: 14000, close: 1.2 });
+  }
+  await goTo(117, 27.5, t, { ms: 9000, close: 1.4 });
+  await t.until(() => Ep.show() && Ep.show().started, 6000, "the show to begin").catch(() => {});
+  const cues = (Ep.show() || { cues: [] }).cues;
+  let ci = 0;
+  const keyFor = (power) => String((P.abilities.get(power) || {}).key || "").toLowerCase();
+  report("Finale", "the light-show finale", await fpsWindow(10000, () => {
+    const s = Ep.show();
+    if (!s || !s.started) return;
+    while (ci < cues.length && s.t >= cues[ci].at - 0.04) { pressKey(keyFor(cues[ci].power)); ci++; }
+  }));
+  const st = Ep.stage && Ep.stage();
+  if (st) t.event("phone-fps-stage", `${st.gathered} of ${st.spectators} in place, beams ${st.beams}, ${st.particles} sparks, ${ci} cues pressed`);
+  const worst = Object.entries(rec).sort((a, b) => a[1].avg - b[1].avg)[0];
+  if (worst) t.event("phone-fps-worst", `${worst[0]}: ${worst[1].avg.toFixed(1)} fps on average`);
+  if (C.mode() === "control") pressKey("Escape");
+  look.quality(prevQ);
+}
+
+/* ---------------- phone: the whole game by touch, at whatever size it's given ---------------- */
+// Every control is pressed by a pointer tap (pointerType "touch") and measured first: at least 44 px each way and on
+// screen. Order: the first-visit card (start, Skip), take control by the button, the offered tutorial episode (start,
+// Skip), the stick, jump, the five abilities and a power pad button, the Episodes menu (open, close, open, pick an
+// episode, its card), the day timeline dragged by touch, Let go. {"orientation":"landscape"} asks for a landscape
+// window: a page can't turn the device, so it tries window.resizeTo and says plainly if it ran portrait only.
+async function phone(options, t) {
+  t.scene("Phone setup");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const C = window.day.control;
+  const T = window.day.tutorial;
+  const Ep = window.episodes || window.day.episodes;
+  if (!C || !T || !Ep) {
+    t.problem("bug", "There's no Take control, first-visit card or episodes API");
+    return;
+  }
+  const cfg = window.DAY_CONFIG.episodes;
+  const want = options && options.orientation === "landscape" ? "landscape" : "portrait";
+  if (want === "landscape" && innerHeight > innerWidth) {
+    const w0 = innerWidth, h0 = innerHeight;
+    try { window.resizeTo(h0, w0); } catch (e) { /* not allowed in this window */ }
+    await sleep(600);
+    if (innerHeight > innerWidth) {
+      t.event("orientation", `asked for landscape but the window is ${innerWidth}×${innerHeight} and can't be resized from the page: this run is portrait only`);
+    } else t.event("orientation", `window turned to landscape: ${w0}×${h0} → ${innerWidth}×${innerHeight}`);
+  } else {
+    t.event("orientation", `${innerWidth > innerHeight ? "landscape" : "portrait"} ${innerWidth}×${innerHeight}${want === "landscape" && innerWidth > innerHeight ? " (landscape asked for, and the window is)" : ""}`);
+  }
+  const native = C.state().touch;
+  if (!native) C.touch(true);
+  t.event("touch-layout", native ? `phone-sized window ${innerWidth}×${innerHeight}` : `phone controls on a ${innerWidth}×${innerHeight} window (setup shortcut)`);
+  const quiet = quietMoment(window.day.today());
+  if (quiet) {
+    scrubTo(quiet.start + Math.min(0.4, (quiet.end - quiet.start) / 3));
+    await sleep(400);
+  }
+  clickSpeed(1);
+  try { localStorage.removeItem(cfg.tutorialKey || "icanbe.episodes.tutorial"); } catch (e) { /* private mode */ }
+
+  const tapped = new Set();
+  /** A tap through the page's own pointer handlers, after checking the control is a usable touch target. */
+  async function tap(el, name) {
+    if (!el) {
+      t.problem("bug", `Phone: ${name} isn't in the page`);
+      return false;
+    }
+    const r = hudVisible(el);
+    if (!r) {
+      t.problem("bug", `Phone: ${name} isn't on screen at ${innerWidth}×${innerHeight}`);
+      return false;
+    }
+    const full = el.getBoundingClientRect();
+    if (full.width < 43.5 || full.height < 43.5) t.problem("bug", `Phone: ${name} is ${Math.round(full.width)}×${Math.round(full.height)} px, under 44 at ${innerWidth}×${innerHeight}`);
+    if (full.left < -1 || full.top < -1 || full.right > innerWidth + 1 || full.bottom > innerHeight + 1) t.problem("bug", `Phone: ${name} is off screen at ${innerWidth}×${innerHeight}`);
+    tapped.add(name);
+    await tapEl(el);
+    el.click();
+    await sleep(150);
+    return true;
+  }
+  const taken = () => C.mode() === "control";
+  const Pw = () => window.powers || window.day.powers;
+  const uses = (id) => {
+    const a = Pw() && Pw().abilities && Pw().abilities.get(id);
+    return a ? a.uses : 0;
+  };
+
+  // 1. The first-visit card: start it, then Skip.
+  t.scene("First-visit card");
+  T.reset();
+  await t.until(() => T.blocking() && $("tutorial-skip"), 3000, "the first-visit card");
+  t.event("tutorial-shown", `step ${T.now().step}`);
+  checkHud(t, "phone: first-visit card");
+  if (boxOf($("tutorial-take"))) await tap($("tutorial-take"), "Take control (card)");
+  else await tap($("control"), "Take control");
+  await t.until(taken, 4000, "Take control by tap");
+  t.event("take-control-tap", "he's the player's by a tap");
+  await sleep(500);
+  await tap($("tutorial-skip"), "Skip (first-visit card)");
+  await sleep(250);
+  if (T.blocking()) t.problem("bug", "Skip on the first-visit card didn't hide it");
+  else t.event("tutorial-card-skipped", "the card's Skip, by tap");
+  t.progress(0.12);
+
+  // 2. The tutorial episode: offered on a new player's first take control, started and skipped by tap.
+  t.scene("Tutorial episode");
+  const offer = $("episode-offer");
+  await t.until(() => offer && !offer.hidden, 4000, "the tutorial offer").catch(() => {});
+  if (offer && !offer.hidden) {
+    checkHud(t, "phone: episode offer");
+    await tap(offer.querySelector("button.accept"), "Start (episode offer)");
+    await t.until(() => Ep.now() && Ep.now().id === "tutorial", 4000, "the tutorial running");
+    t.event("tutorial-started", "Learn the weather, started by tap");
+    await sleep(400);
+    checkHud(t, "phone: tutorial episode");
+    const hudSkip = $("episode-hud") && $("episode-hud").querySelector(".skip");
+    await tap(hudSkip, "Skip (tutorial episode)");
+    await sleep(300);
+    if (Ep.now()) t.problem("bug", "Skip didn't end the tutorial episode");
+    else t.event("tutorial-skipped", "Learn the weather skipped by tap; every ability is open");
+  } else {
+    t.problem("bug", "Taking control on a fresh visit didn't offer the tutorial episode");
+  }
+  t.progress(0.25);
+
+  // 3. The stick and jump.
+  t.scene("Stick and jump");
+  if (!taken()) await tap($("control"), "Take control");
+  await t.until(taken, 4000, "him to be the player's");
+  const stickEl = $("stick");
+  const jumpEl = $("jump-btn");
+  const sr = boxOf(stickEl);
+  if (!sr || !boxOf(jumpEl)) {
+    t.problem("bug", "The touch stick and jump button aren't on screen");
+    return;
+  }
+  [[stickEl, "stick"], [jumpEl, "jump"]].forEach(([el, name]) => {
+    const r = el.getBoundingClientRect();
+    if (r.width < 43.5 || r.height < 43.5) t.problem("bug", `Phone: ${name} is ${Math.round(r.width)}×${Math.round(r.height)} px, under 44`);
+    if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) t.problem("bug", `Phone: ${name} is off screen`);
+    tapped.add(name);
+  });
+  const cx = sr.left + sr.width / 2;
+  const cy = sr.top + sr.height / 2;
+  const mv = await measure(async () => {
+    for (const [dx, dy, ms] of [[0, -32, 1000], [34, 0, 800], [0, 60, 800], [-60, 0, 800]]) {
+      touchOn(stickEl, "pointerdown", cx, cy);
+      for (let i = 1; i <= 4; i++) {
+        touchOn(stickEl, "pointermove", cx + (dx * i) / 4, cy + (dy * i) / 4);
+        await sleep(40);
+      }
+      await sleep(ms);
+      touchOn(stickEl, "pointerup", cx + dx, cy + dy);
+      await sleep(150);
+    }
+  });
+  t.event("stick-move", `the stick moved him ${mv.path} m, up to ${mv.peak} m/s`);
+  if (mv.path < 1.5) t.problem("bug", `The touch stick moved him only ${mv.path} m`);
+  const f0 = C.state().flights;
+  await tapEl(jumpEl);
+  await sleep(450);
+  await tapEl(jumpEl);
+  await t.until(() => C.state().flights > f0, 8000, "him to land");
+  const fl = C.state().lastFlight || { jumps: 0 };
+  t.event("jump-tap", `jump button: ${fl.jumps} jumps in the flight`);
+  if (fl.jumps < 2) t.problem("bug", `Two taps on Jump gave ${fl.jumps} jump(s)`);
+  checkHud(t, "phone: on foot");
+  t.progress(0.4);
+
+  // 4. The five abilities and a power, each by tap.
+  t.scene("Abilities");
+  const done = [];
+  for (const id of ["bolt", "rain", "gale", "fog", "sunbreak"]) {
+    const el = $("ability-" + id);
+    const before = uses(id);
+    let ok = false;
+    for (let k = 0; k < 10 && !ok; k++) {
+      await tap(el, "ability " + id);
+      await sleep(500);
+      ok = uses(id) > before;
+      if (!ok) await sleep(1200); // Energy or cooldown: wait, as a player would
+    }
+    if (ok) {
+      done.push(id);
+      t.event("ability-tap-" + id, `${id} by tap, energy ${(($("energy") || {}).textContent || "").trim()}`);
+    } else t.problem("bug", `Tapping ${id} never used it`);
+    await sleep(600);
+  }
+  checkHud(t, "phone: abilities");
+  const padId = ["power-gust", "power-storm", "power-tornado"].find((id) => boxOf($(id))) || "power-gust";
+  const pid = padId.replace("power-", "");
+  const pBefore = uses(pid);
+  let padOk = false;
+  for (let k = 0; k < 10 && !padOk; k++) {
+    await tap($(padId), "power pad " + pid);
+    await sleep(500);
+    padOk = uses(pid) > pBefore || (window.day.powers && window.day.powers.now().abilities || []).some((a) => a.id === pid && (a.cooldown > 0 || a.uses > pBefore));
+    if (!padOk) await sleep(1200);
+  }
+  if (padOk) t.event("power-tap", `${pid} from the power pad by tap`);
+  else t.problem("bug", `The power pad's ${pid} never fired by tap`);
+  if (done.length === 5) t.event("abilities-tapped", "Lightning, Rain, Gale, Fog and Sun break all used by tap");
+  t.progress(0.6);
+
+  // 5. The Episodes menu and an episode card.
+  t.scene("Episodes menu");
+  const menu = $("episode-menu");
+  await tap($("episodes"), "Episodes");
+  await sleep(250);
+  if (!menu || menu.hidden) t.problem("bug", "The Episodes button didn't open the menu");
+  else {
+    t.event("episodes-open", `${menu.querySelectorAll(".ep-row").length} rows`);
+    await tap(menu.querySelector(".close"), "Close (Episodes menu)");
+    await sleep(250);
+    if (!menu.hidden) t.problem("bug", "Close didn't shut the Episodes menu");
+    else t.event("episodes-closed", "Close, by tap");
+  }
+  await tap($("episodes"), "Episodes");
+  await sleep(250);
+  const row = [...document.querySelectorAll("#episode-menu .ep-row")].find((b) => !b.disabled && b.id !== "ep-row-tutorial" && !b.classList.contains("chal"));
+  if (!row) t.problem("bug", "The Episodes menu has no episode to start");
+  else {
+    await tap(row, "episode " + row.id.replace("ep-row-", ""));
+    await t.until(() => Ep.now() || (offer && !offer.hidden), 5000, "an episode card").catch(() => {});
+    await sleep(500);
+    if (offer && !offer.hidden) {
+      await tap(offer.querySelector(".decline"), "Not now (episode offer)");
+      t.event("episode-card", "the offer card, dismissed by tap");
+    } else if (Ep.now()) {
+      const h = $("episode-hud");
+      t.event("episode-card", `${Ep.now().id}: the goals card shows${h && !h.hidden ? "" : " (no HUD)"}`);
+      checkHud(t, "phone: episode card");
+    } else t.problem("bug", "Picking an episode from the menu showed no card");
+  }
+  t.progress(0.75);
+
+  // 6. The day timeline, dragged by touch.
+  t.scene("Timeline");
+  const scrub = $("scrub");
+  const m0 = window.day.now().minutes;
+  const sb = scrub && scrub.getBoundingClientRect();
+  if (!sb || sb.height < 43.5) t.problem("bug", `Phone: the timeline's drag strip is ${sb ? Math.round(sb.height) : 0} px tall, under 44`);
+  if (sb && (sb.left < -1 || sb.right > innerWidth + 1 || sb.bottom > innerHeight + 1)) t.problem("bug", "Phone: the timeline is off screen");
+  tapped.add("timeline");
+  const y = sb.top + sb.height / 2;
+  const min = Number(scrub.min), max = Number(scrub.max);
+  const target = Math.min(max - 5, m0 + 180);
+  touchOn(scrub, "pointerdown", sb.left + 20, y, 11);
+  for (let i = 1; i <= 6; i++) {
+    scrub.value = String(m0 + ((target - m0) * i) / 6);
+    scrub.dispatchEvent(new Event("input", { bubbles: true }));
+    touchOn(scrub, "pointermove", sb.left + 20 + ((sb.width - 40) * i) / 6, y, 11);
+    await sleep(60);
+  }
+  touchOn(scrub, "pointerup", sb.right - 20, y, 11);
+  window.dispatchEvent(new Event("pointerup"));
+  await sleep(500);
+  const m1 = window.day.now().minutes;
+  if (Math.abs(m1 - m0) < 30 || m1 < min) t.problem("bug", `Dragging the timeline by touch moved the clock ${Math.round(m1 - m0)} min (wanted about 180)`);
+  else t.event("timeline-drag", `the day bar dragged by touch: ${E().fmtClock(m0)} → ${E().fmtClock(m1)}`);
+  t.progress(0.9);
+
+  // 7. Let go, then the verdict on every tapped control.
+  t.scene("Letting go");
+  if (taken()) await tap($("control"), "Let go");
+  await t.until(() => !taken(), 3000, "Let go by tap").catch(() => {});
+  checkHud(t, "phone: end");
+  t.event("phone-taps", `${tapped.size} controls tapped at ${innerWidth}×${innerHeight}: ${[...tapped].join(", ")}`);
+  t.metric("phoneControlsTapped", tapped.size);
+  if (!native) C.touch(false);
+  t.progress(0.92);
+  await phoneFps(t);
   t.progress(1);
 }
 
@@ -4620,6 +5316,38 @@ async function titleScenario(options, t) {
   // already open, bring it back (setup) so the run starts where a player's does.
   const first = T.now().showing;
   if (!first) T.show("playtest");
+
+  // The loading card (index.html): it showed from the first paint, it goes when the title is ready, and no HUD field is a dash.
+  const L = window.__loading;
+  if (!L) t.problem("blocker", "The loading card script (window.__loading) isn't in index.html");
+  else {
+    const card = $("loading");
+    const seen = L.log().some((e) => e.action === "show");
+    const prog = L.log().filter((e) => e.action === "progress").map((e) => `${e.part} ${Math.round(e.frac * 100)}%`);
+    t.event("loading-card", `${seen ? "showed from the first paint" : "never showed"}; progress from load events: ${prog.join(", ") || "none seen"}`);
+    if (!seen) t.problem("bug", "The loading card never showed");
+    if (L.state() === "loading" && boxOf(card)) {
+      const r = card.querySelector(".card").getBoundingClientRect();
+      t.event("loading-up", `card ${Math.round(r.width)}x${Math.round(r.height)} in ${innerWidth}x${innerHeight}, bar ${L.pct()}%`);
+      if (r.left < 0 || r.top < 0 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) t.problem("bug", `The loading card doesn't fit the screen (${innerWidth}x${innerHeight})`);
+    }
+    await t.until(() => L.state() !== "loading", 30000, "the loading card to finish").catch(() => {});
+    await sleep(700);
+    if (L.state() === "failed") t.problem("blocker", "The loading card shows the retry message: the game didn't load");
+    const gone = !card || card.hidden || !boxOf(card);
+    t.event("loading-gone", `state ${L.state()}, card ${gone ? "gone" : "still on screen"}, title ${T.now().showing ? "up" : "not up"}`);
+    if (!gone) t.problem("bug", "The loading card is still on screen after the title is ready");
+    if (document.documentElement.classList.contains("loading")) t.problem("bug", "html.loading is still set (the HUD stays hidden)");
+    if (!L.log().some((e) => e.action === "done")) t.problem("bug", "The loading card never reported done");
+    const dashes = ["chapter", "where", "time", "ampm", "what", "next", "date", "count"]
+      .map((id) => $(id)).filter((e) => e && !e.hidden && HUD_PLACEHOLDER.test((e.textContent || "").trim()) && (e.textContent || "").trim() !== "");
+    const empty = ["chapter", "time", "what"].filter((id) => !(($(id) || {}).textContent || "").trim());
+    if (dashes.length) t.problem("bug", `HUD fields show a placeholder dash: ${dashes.map((e) => "#" + e.id).join(", ")}`);
+    if (empty.length) t.problem("bug", `HUD fields are empty once the title is up: ${empty.map((x) => "#" + x).join(", ")}`);
+    const bad = [...document.querySelectorAll(".hud, .side")].flatMap((r) => [...r.querySelectorAll("*")]).filter((e) => !e.children.length && !e.hidden && /^[\s–—]+$/.test(e.textContent || "") && (e.textContent || "").length);
+    if (bad.length) t.problem("bug", `A dash shows in the HUD: ${bad.map((e) => e.id || e.className || e.tagName).join(", ")}`);
+    if (!dashes.length && !bad.length && !empty.length) t.event("loading-hud-clear", "no HUD field is empty or a dash once the title is up");
+  }
   await sleep(300);
   const el = $("title");
   const play = $("title-play");
@@ -4978,6 +5706,7 @@ installPlaytest({
     { id: "lunch-rescue", title: "Rooftop storm (lunch): a surprise storm strands people in the plaza, on the shop roof and in the avenue; helping them with Sun break, Lightning and Gale changes the score and the S-C rank; the twist turns the rain to fog; an ending line per rank", seconds: 300, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the plaza cafe, the shop and the avenue, X, E, V, Esc. Run 1 helps one person and lets go (low rank); run 2 plays all three set pieces. Events lunch-opening / lunch-piece / lunch-help / lunch-score / lunch-twist / lunch-sky / lunch-goal / lunch-card / lunch-rank / lunch-say." },
     { id: "hurricane-drive", title: "Hurricane drive (commute home): four closures on the way home (fallen sign, flooded underpass, dead bus, closing bridge); the right ability at each helps, the wrong one hurts (rain on the debris, gale at the bus); a storm twist; an ending line and an S-C rank on the score card", seconds: 360, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift along the avenue, R then V at the fallen sign, V, X, E and C at the four set pieces, Esc. Run 1 uses rain on the debris (hurt) then a gale and lets go (low rank); run 2 plays all four set pieces right and gets home. Events drive-opening / drive-piece / drive-hurt / drive-help / drive-twist / drive-sky / drive-goal / drive-card / drive-rank / drive-say." },
     { id: "light-show", title: "Light show finale: the city gathers on the plaza, he calls Lightning, Rain, Fog, Gale and Sun break on their cues; beams, fireworks, neon pools and an aurora answer; the score depends on timing and variety; the closing card ties the day's stories together", seconds: 330, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors and then to 22:05 (setup), Enter, the episode started by its API (setup), the story arc seeded in localStorage (setup). Real keys: WASD with Shift to the plaza, then E / R / C / V / X pressed on each cue as the HUD counts down. Run 1 hits every cue on the beat with all five effects; run 2 presses only Lightning, 0.7 s late. Events show-opening / show-hud / show-gather / show-begin / show-act / show-cue / show-miss / show-off / show-stage / show-over / show-card / show-closing / show-compare; metrics showAurora, showBursts, showPointsOnBeat, showPointsSloppy." },
+    { id: "phone", title: "Phone: the game by touch only, in portrait or landscape: take control, stick, jump, the five abilities and a power by tap, the Episodes menu and an episode card, the first-visit card and the tutorial episode (start and Skip), the day timeline dragged; every tapped control at least 44 px and on screen, HUD overlap checked", seconds: 240, tags: ["phone", "smoke-phone", "control", "tutorial"], description: "Day bar to a quiet moment at home (setup); day.control.touch(true) on a desktop-sized window (setup). Every press is a pointer tap measured first (44 px, on screen). Option {\"orientation\":\"landscape\"} turns a portrait window to landscape if the page can resize it, else the orientation event says it ran portrait only. Events touch-layout / orientation / take-control-tap / tutorial-card-skipped / tutorial-started / tutorial-skipped / stick-move / jump-tap / ability-tap-<id> / power-tap / episodes-open / episodes-closed / episode-card / timeline-drag / hud-clear / phone-taps." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
@@ -4985,7 +5714,7 @@ installPlaytest({
     const errFrom = consoleErrors.length;
     try {
       if (id !== "title" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
-      if (id !== "smoke" && id !== "first-visit" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
+      if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
       if (id === "barks") await barksScenario(options, t);
@@ -5021,6 +5750,7 @@ installPlaytest({
       else if (id === "hurricane-drive") await hurricaneDrive(options, t);
       else if (id === "light-show") await lightShow(options, t);
       else if (id === "first-visit") await firstVisit(options, t);
+      else if (id === "phone") await phone(options, t);
       else if (id === "tutorial-episode") await tutorialEpisode(options, t);
       reportConsole(t, errFrom);
     } finally {

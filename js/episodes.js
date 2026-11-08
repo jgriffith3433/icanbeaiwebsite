@@ -355,14 +355,11 @@ function install() {
   /* ---- DOM (styles stay here so we don't fight css/site.css / the art pass) ---- */
   const style = document.createElement("style");
   style.textContent = `
-.ep-btn{position:fixed;z-index:7;left:18px;bottom:118px;appearance:none;border:1px solid rgba(246,241,232,.22);background:rgba(14,16,22,.62);color:#f6f1e8;border-radius:14px;padding:10px 16px;font:600 0.84rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(12px)}
+.ep-btn{z-index:7;appearance:none;border:1px solid rgba(246,241,232,.22);background:rgba(14,16,22,.62);color:#f6f1e8;border-radius:14px;padding:10px 16px;font:600 0.84rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(12px)}
 .ep-btn:hover{background:rgba(240,194,122,.16)}
-.preview-public .ep-btn{bottom:78px}
-@media (max-width:700px){.ep-btn{left:auto;right:max(12px,env(safe-area-inset-right));top:calc(max(12px,env(safe-area-inset-top)) + 150px);bottom:auto;transform:none;display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-size:0.78rem;white-space:nowrap}.preview-public .ep-btn{top:calc(max(12px,env(safe-area-inset-top)) + 50px);bottom:auto}.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%)}}
-html.touch-ui .ep-btn{left:auto;right:max(12px,env(safe-area-inset-right));top:calc(max(12px,env(safe-area-inset-top)) + 150px);bottom:auto;transform:none;display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-size:0.78rem;white-space:nowrap}
-html.touch-ui.preview-public .ep-btn{top:calc(max(12px,env(safe-area-inset-top)) + 50px);bottom:auto}
-html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%)}
-.ep-hud{position:fixed;z-index:7;right:18px;top:88px;width:min(280px,calc(100vw - 36px));pointer-events:none;font:600 0.78rem/1.35 Outfit,system-ui,sans-serif;color:#e7eef8}
+@media (max-width:700px){.ep-btn{display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-size:0.78rem;white-space:nowrap}}
+html.touch-ui .ep-btn{display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-size:0.78rem;white-space:nowrap}
+.ep-hud{z-index:7;width:min(280px,calc(100vw - 36px));pointer-events:none;font:600 0.78rem/1.35 Outfit,system-ui,sans-serif;color:#e7eef8}
 .ep-hud[hidden]{display:none}
 .ep-hud .ep-card{pointer-events:auto;background:rgba(10,14,22,.72);border:1px solid rgba(126,200,255,.35);border-radius:16px;padding:12px 14px;backdrop-filter:blur(14px)}
 .ep-hud h3{margin:0 0 4px;font-size:0.95rem;letter-spacing:.02em}
@@ -381,6 +378,7 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-hud .prompt{margin:8px 0 0;color:#f0c27a}
 .ep-hud .skip{margin-top:8px;appearance:none;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.8rem Outfit,system-ui,sans-serif;cursor:pointer}
 .ep-hud .skip:hover{background:rgba(240,194,122,.14)}
+html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-width:44px}
 .ep-hud li.failed{color:#e58a7a;text-decoration:line-through}
 .ep-hud .strain{margin-top:8px;color:#9fd4ff}
 .ep-hud .strain.over{color:#e58a7a}
@@ -391,16 +389,15 @@ html.touch-ui.in-control .ep-btn{left:50%;right:auto;top:auto;bottom:max(8px,env
 .ep-hud .rankline b{font-size:1.15rem;color:#f6f1e8}
 .ep-hud .pieceline{margin-top:6px;color:#9fd4ff}
 .ep-hud .pieceline.late{color:#e58a7a}
-@media (min-width:900px){html:has(.side:not([hidden])) .ep-hud{right:calc(var(--gutter,18px) + 330px + 12px)}}
 .ep-panel .rank{margin:6px 0 0;font:800 4rem/1 Outfit,system-ui,sans-serif;letter-spacing:.02em;color:#f0c27a}
 .ep-panel .rank.r-S{color:#ffe08a;text-shadow:0 0 22px rgba(255,224,138,.6)}.ep-panel .rank.r-A{color:#8dceb0}.ep-panel .rank.r-B{color:#9fd4ff}.ep-panel .rank.r-C{color:#e58a7a}
 .ep-panel .rankdetail{font-size:.9rem;color:rgba(246,241,232,.75);margin:2px 0 8px}
-.ep-say{position:fixed;z-index:22;left:50%;bottom:max(96px,calc(env(safe-area-inset-bottom) + 88px));transform:translate(-50%,8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:min(520px,calc(100vw - 28px));padding:10px 16px;border-radius:14px;background:#f6f1e8;color:#1a1c22;font:600 0.9rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.ep-say{z-index:22;transform:translate(-50%,8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:min(520px,calc(100vw - 28px));padding:10px 16px;border-radius:14px;background:#f6f1e8;color:#1a1c22;font:600 0.9rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.45)}
 .ep-say.on{opacity:1;transform:translate(-50%,0)}
 .ep-say b{display:block;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#7a5a1a;margin-bottom:2px}
 .ep-panel .strainline{font-size:.9rem;color:#9fd4ff;margin:0 0 10px}
 .ep-score.scarred .forecast,.ep-score.scarred .strainline{color:#e58a7a}
-.ep-toast{position:fixed;z-index:9;left:50%;top:max(64px,calc(env(safe-area-inset-top) + 56px));transform:translate(-50%,-8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(14,16,22,.9);border:1px solid #f0c27a;color:#f6f1e8;font:600 0.95rem Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap;max-width:calc(100vw - 24px)}
+.ep-toast{z-index:9;transform:translate(-50%,-8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(14,16,22,.9);border:1px solid #f0c27a;color:#f6f1e8;font:600 0.95rem Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap;max-width:calc(100vw - 24px)}
 .ep-toast.on{opacity:1;transform:translate(-50%,0)}
 .ep-offer,.ep-score,.ep-menu,.ep-ending{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
 body:has(.ep-offer:not([hidden])) .mo-line,body:has(.ep-offer:not([hidden])) .control-hint{visibility:hidden}
