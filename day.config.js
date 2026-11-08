@@ -132,7 +132,7 @@ window.DAY_CONFIG = {
   control: {
     lines: {
       take: "You take over. His day keeps going without him.",
-      steering: ["You have him.", "He goes where you go.", "His day is still running, somewhere else."],
+      steering: ["You have him.", "He goes where you go."],
       letGo: "You let go. He walks back to his day.",
       back: "Back where his day says. He carries on.",
       catchUp: "His day is too far off to walk. He catches up with it.",
