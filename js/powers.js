@@ -458,9 +458,14 @@ export function startPowers(world, dayApi) {
   }
 
   /* ---- calls ---- */
+  const refuseLogged = {};
   function refuse(power, via) {
     blocked = { power, pressure: Math.round(gauge.now().value), at: age, reason: lastWhy };
-    note(line(lastWhy === "cooldown" ? "cooling" : lastWhy === "locked" ? "locked" : "dry"));
+    // A cooldown is already on the ability bar: no log row. Other refusals log at most once per 3 s per reason.
+    if (lastWhy !== "cooldown" && (refuseLogged[lastWhy] === undefined || age - refuseLogged[lastWhy] > 3)) {
+      refuseLogged[lastWhy] = age;
+      note(line(lastWhy === "locked" ? "locked" : "dry"));
+    }
     say("denied", via, power);
     return false;
   }
