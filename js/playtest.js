@@ -3706,6 +3706,8 @@ async function storyParts(options, t) {
 // rank), one that plays all three set pieces through the twist (high rank). Events: lunch-* with the dialogue, each help
 // and its points, the twist, and the rank cards side by side.
 async function lunchRescue(options, t) {
+  // A setup that can't be reached is a failed run, never 'done': the harness reports 'done' when the bot just returns.
+  const bail = (msg) => { t.problem("bug", msg); t.finish("fail"); };
   t.scene("Home");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
@@ -3713,10 +3715,10 @@ async function lunchRescue(options, t) {
   const Ep = window.episodes || window.day.episodes;
   const C = window.day.control;
   const P = window.powers || window.day.powers;
-  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  if (!Ep || !C || !P) return bail("episodes, powers or Take control isn't installed");
   const cfg = window.DAY_CONFIG;
   const ep = ((cfg.episodes && cfg.episodes.list) || []).find((e) => e.id === "lunch");
-  if (!ep || !ep.pieces || ep.pieces.length < 3) return t.problem("bug", "The lunch episode has no set pieces");
+  if (!ep || !ep.pieces || ep.pieces.length < 3) return bail("The lunch episode has no set pieces");
   const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
   const heard = [];
   const onStory = (e) => {
@@ -3737,7 +3739,7 @@ async function lunchRescue(options, t) {
 
   const day = window.day.today();
   const outside = carSideMoment(day);
-  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  if (!outside) return bail("No moment outdoors to take control");
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
   await sleep(600);
@@ -3774,8 +3776,18 @@ async function lunchRescue(options, t) {
 
   /* ---- run 1: one person helped, then let go ---- */
   t.scene("Rooftop storm: one helped");
+  // He is already the player's here, so the episode doesn't jump the clock: put it at the lunch storm's own time.
+  window.day.jump(ep.clock || "12:20");
+  await sleep(500);
   Ep.start("lunch", "playtest");
   await t.until(() => Ep.now() && Ep.now().id === "lunch", 3000, "the lunch episode running");
+  // The scene must really be the lunch storm: the clock at 12:15 to 12:30 and the stranded people in the world.
+  const mins = window.day.now().minutes;
+  const lunchAt = window.DayEngine.parseClock(ep.clock || "12:20", window.day.today().dayStart);
+  if (Math.abs(mins - lunchAt) > 8) return bail(`The lunch episode isn't at lunch: the clock is ${window.DayEngine.fmtClock(mins, true)}, not about ${ep.clock}`);
+  const stranded = (Ep.now().rescue && Ep.now().rescue.people) || [];
+  if (!stranded.length) return bail("The lunch storm has no stranded people in the world");
+  t.event("lunch-stranded", `${stranded.length} at the lunch storm: ${stranded.map((p) => `${p.id} (${Math.round(p.x)}, ${Math.round(p.z)})`).join(", ")}`);
   if (!$("episode-hud") || $("episode-hud").hidden) t.problem("bug", "The episode HUD isn't up for the lunch episode");
   await sleep(3000);
   t.event("lunch-opening", `"${lastSay()}" · HUD: ${($("episode-hud").textContent || "").replace(/\s+/g, " ").slice(0, 160)}`);
