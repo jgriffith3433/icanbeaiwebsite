@@ -25,7 +25,7 @@ const root = new URL('../', import.meta.url);
 Object.assign(globalThis, { window: globalThis, BABYLON, document, devicePixelRatio: 1, ...events });
 for (const f of ['day.config.js', 'js/schedule.js', 'js/world.js']) await import(new URL(f, root).href);
 core.Logger.LogLevels = core.Logger.NoneLogLevel; // NullEngine can't instance; the sim still runs
-const { densityAt, signalAt, installCrowd } = await import(new URL('js/crowd.js', root).href);
+const { densityAt, signalAt, installCrowd, SIDE } = await import(new URL('js/crowd.js', root).href);
 const cfg = globalThis.DAY_CONFIG;
 const day = globalThis.DayEngine.build(cfg, '2026-10-19');
 const world = globalThis.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
@@ -90,10 +90,10 @@ let offGrid = 0;
 const avZ = [cfg.street.z, ...cfg.city.avenues.map((a) => a.z)];
 const crX = cfg.city.crosses.map((c) => c.x);
 crowd.positions().people.forEach((p) => {
-  const onAv = avZ.some((z) => Math.abs(Math.abs(p.z - z) - 3.5) < 0.3) || (p.state !== 'door-in' && p.state !== 'door-out' ? false : true);
-  const onCr = crX.some((x) => Math.abs(Math.abs(p.x - x) - 3.5) < 0.3);
-  const crossing = avZ.some((z) => Math.abs(p.z - z) < 3.6) && crX.some((x) => Math.abs(Math.abs(p.x - x) - 3.5) < 0.3);
-  const crossing2 = crX.some((x) => Math.abs(p.x - x) < 3.6) && avZ.some((z) => Math.abs(Math.abs(p.z - z) - 3.5) < 0.3);
+  const onAv = avZ.some((z) => Math.abs(Math.abs(p.z - z) - SIDE) < 0.3) || (p.state !== 'door-in' && p.state !== 'door-out' ? false : true);
+  const onCr = crX.some((x) => Math.abs(Math.abs(p.x - x) - SIDE) < 0.3);
+  const crossing = avZ.some((z) => Math.abs(p.z - z) < SIDE + 0.1) && crX.some((x) => Math.abs(Math.abs(p.x - x) - SIDE) < 0.3);
+  const crossing2 = crX.some((x) => Math.abs(p.x - x) < SIDE + 0.1) && avZ.some((z) => Math.abs(Math.abs(p.z - z) - SIDE) < 0.3);
   if (!(onAv || onCr || crossing || crossing2)) offGrid++;
 });
 ok(offGrid === 0, `${offGrid} people are off the sidewalks and crosswalks`);

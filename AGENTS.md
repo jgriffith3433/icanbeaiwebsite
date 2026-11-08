@@ -166,6 +166,21 @@ junction, and the sky dome behind the farthest skyline tower and inside `camera.
 space (`tileBox` in look.js) so pieces that meet carry one texture. The camera's near plane is 0.2 m; under
 control a wall may pull it in to 0.5 m, and he fades below 1 m.
 
+## Grounding and motion rules (`scripts/check-ground.mjs`, npm test)
+
+Feet go on what's under them, never on y = 0 by habit. Ground heights: road 0.04, sidewalk 0.06 (RZ and every
+road +-2.3 to 3.5, with an L of sidewalk at each junction corner), park lawn 0.03, plaza paving 0.07, room
+floors 0.1. Kerb props are built with `G` (props.js) set to the surface they stand on, and bus stop slabs fit
+the sidewalk's 1.2 m. Code-placed people and things use `world.surfaceAt(x, z)` (no physics needed); his day
+uses the colliders (`groundAt`) for stand and walk poses. Crowd people walk 2.6 m from a road's centre, their
+legs don't bob (only body and head), they turn at 10/s and step at a cadence from the speed they move at.
+Neighbours drop their hips by the swung leg's lift so the leading foot stays down. Under control he follows
+ramps, stairs and kerbs down up to 0.45 m (`STEP_DOWN`, control.js) instead of falling, keeps walk/run for
+the first 0.15 s off the ground, casts only standing (grounded, under 0.8 m/s), and the clips play at a
+speed from their measured stride (walk 0.86 m, run 1.25 m: `WALK_STRIDE`/`RUN_STRIDE`, small-weather.js).
+The check fails on a prop foot 3 to 12 cm off the ground, a walker on the grass, his day's feet off the floor,
+or falling/jumping frames walking or running down a rooftop ramp.
+
 ## Hawkes Gen art direction (for a later Gen change)
 
 `hawkesgen/presets/icanbe.json` lives in Gen; change it there. Its notes still say "direction undecided" and its style

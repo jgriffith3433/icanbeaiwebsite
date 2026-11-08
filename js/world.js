@@ -10,6 +10,8 @@
   const PI = Math.PI;
   const V3 = (x, y, z) => new B.Vector3(x, y, z);
   const FLOOR = 0.1;
+  const SIDEWALK_Y = 0.06; // layWalk: the sidewalks' top
+  const STREET_WALK = 2.6; // the street people's line, from the road's centre (sidewalks run 2.3 to 3.5)
 
   function damp(cur, target, dt, speed) {
     return cur + (target - cur) * (1 - Math.exp(-speed * dt));
@@ -227,6 +229,25 @@
       gaps(c.from, c.to, avenueZs, 3.8).forEach(([a0, b0], k) => {
         layWalk("crossW" + i + "_" + k, b0 - a0, c.x - 2.9, (a0 + b0) / 2, false);
         layWalk("crossE" + i + "_" + k, b0 - a0, c.x + 2.9, (a0 + b0) / 2, false);
+      });
+    });
+
+    /* The sidewalks stop 3.8 m short of a junction's centre both ways, which left each corner unpaved (grass where people
+       turn the corner). An L of sidewalk fills each one, edge to edge with the walks beside it. */
+    (city.crosses || []).forEach((c, i) => {
+      avenueZs.forEach((az, j) => {
+        if (az < c.from || az > c.to) return;
+        [-1, 1].forEach((sx) =>
+          [-1, 1].forEach((sz) => {
+            const tag = "corner" + i + "_" + j + (sx > 0 ? "e" : "w") + (sz > 0 ? "n" : "s");
+            const a = box(tag + "a", 1.5, 0.06, 1.2, c.x + sx * 3.05, 0.03, az + sz * 2.9, curbM, null, false);
+            const b = box(tag + "b", 1.2, 0.06, 0.3, c.x + sx * 2.9, 0.03, az + sz * 3.65, curbM, null, false);
+            [a, b].forEach((m) => {
+              m.receiveShadows = true;
+              streetMeshes.push(m);
+            });
+          })
+        );
       });
     });
 
@@ -1150,7 +1171,7 @@
       streetFolk.push({
         person: p,
         umbrella: umb,
-        lane: side ? RZ + 4.4 : RZ - 4.4,
+        lane: side ? RZ + STREET_WALK : RZ - STREET_WALK, // on the sidewalk, road side of the kerb props
         dir: side ? -1 : 1,
         speed: 1.1 + (i % 3) * 0.25,
         offset: i * 211 + 40,
@@ -1766,7 +1787,7 @@
         const tooClose = Math.hypot(x - car.x, f.lane - car.z) < 6 || Math.hypot(x - pp.x, f.lane - pp.z) < 2.2;
         f.person.root.setEnabled(!tooClose);
         if (tooClose) return;
-        f.person.root.position.set(x, 1.01, f.lane);
+        f.person.root.position.set(x, POSE.walk.y - FLOOR + SIDEWALK_Y, f.lane); // feet on the sidewalk
         f.person.root.rotation.y = f.dir > 0 ? PI / 2 : -PI / 2;
         f.umbrellaOn = raining;
         f.umbrella.setEnabled(raining);
@@ -1799,7 +1820,10 @@
       } else {
         if (me.root.parent) me.root.parent = null;
         const spec = POSE[pp.pose] || POSE.stand;
-        me.root.position.set(pp.x, spec.y, pp.z);
+        // standing or walking, his feet go on whatever is under him (a room's floor, the sidewalk, the road, the lawn);
+        // the poses' heights assume a room's floor
+        const gy = spec === POSE.stand || spec === POSE.walk ? feetGround(pp.x, pp.z) : null;
+        me.root.position.set(pp.x, gy == null ? spec.y : spec.y - FLOOR + gy, pp.z);
         if (state.yaw == null || snap) state.yaw = pp.yaw;
         state.yaw = dampAngle(state.yaw, pp.yaw, dt, pp.walking ? 12 : 7);
         me.root.rotation.y = state.yaw;
@@ -2023,6 +2047,49 @@
       return { y: rayHit.hitPoint.y, body: rayHit.body && rayHit.body.transformNode ? rayHit.body.transformNode.name : "" };
     }
 
+    /* The top of the flat ground at (x, z), without physics: the roads, the sidewalks, the low slabs others added as
+       solids (the plaza's paving, the park lawn) and the two buildings' floors. 0 on the open ground. For people and
+       stalls placed by code (neighbours, the finale's crowd, market stalls), so feet stand on what's there. */
+    let flats = null;
+    function surfaceAt(x, z) {
+      if (!flats) {
+        flats = [];
+        streetMeshes.forEach((m) => {
+          m.computeWorldMatrix(true);
+          const bb = m.getBoundingInfo().boundingBox;
+          flats.push([bb.minimumWorld.x, bb.minimumWorld.z, bb.maximumWorld.x, bb.maximumWorld.z, bb.maximumWorld.y]);
+        });
+        solids.forEach((o) => {
+          if (o.h > 0.12 || o.yaw || o.roll || o.y - o.h / 2 > 0.02) return;
+          flats.push([o.x - o.w / 2, o.z - o.d / 2, o.x + o.w / 2, o.z + o.d / 2, o.y + o.h / 2]);
+        });
+        ["home", "office"].forEach((k) => {
+          const b = cfg.buildings[k];
+          if (!b || !b.bounds) return;
+          const o = b.origin || [0, 0];
+          flats.push([b.bounds[0] + o[0], b.bounds[1] + o[1], b.bounds[2] + o[0], b.bounds[3] + o[1], FLOOR]);
+        });
+      }
+      let top = 0;
+      for (let i = 0; i < flats.length; i++) {
+        const r = flats[i];
+        if (x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3] && r[4] > top) top = r[4];
+      }
+      return top;
+    }
+
+    /* The floor under his feet for the day's poses: a short ray down from knee height (so a desk or a bench beside him
+       doesn't count), cached while he stays put. null without physics, or with nothing low enough under him. */
+    const feetCache = { x: NaN, z: NaN, y: null };
+    function feetGround(x, z) {
+      if (Math.abs(x - feetCache.x) < 0.05 && Math.abs(z - feetCache.z) < 0.05) return feetCache.y;
+      const g = physics ? groundAt(x, z, 0.5) : null;
+      feetCache.x = x;
+      feetCache.z = z;
+      feetCache.y = g ? (g.y < 0.4 ? g.y : null) : surfaceAt(x, z);
+      return feetCache.y;
+    }
+
     let crowdRef = null; // js/crowd.js sets it: the district's people and cars
 
     /** What the street is doing for the weather (playtest / console). */
@@ -2107,7 +2174,11 @@
       enablePhysics,
       /* js/cityscape.js reads the colliders so far (to find free lots) and adds its own before physics is on */
       solids,
-      addSolids: (list) => list.forEach((o) => solids.push(o)),
+      addSolids: (list) => {
+        list.forEach((o) => solids.push(o));
+        flats = null;
+      },
+      surfaceAt,
       clearRadius,
       groundAt,
       physics: () => physics,

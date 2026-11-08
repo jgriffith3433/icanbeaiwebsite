@@ -30,6 +30,10 @@ function makeRng(seed) {
 
 const hex = (h) => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
 
+const SIDEWALK_TOP = 0.06; // world.js layWalk: 0.06 tall from the ground
+const LAWN_TOP = 0.03; // the park lawn below
+const PLAZA_TOP = 0.07; // the plaza's paving below
+
 /* Where the plaza and the landmarks stand. cityscape.js keeps its filler buildings off these. */
 export function reserved(cfg) {
   void cfg;
@@ -52,15 +56,15 @@ class Part {
     this.nrm = [];
     this.col = [];
     this.idx = [];
-    this.f = { ox: 0, oz: 0, c: 1, s: 0 };
+    this.f = { ox: 0, oz: 0, oy: 0, c: 1, s: 0 };
   }
-  frame(ox, oz, yaw) {
-    this.f = { ox, oz, c: Math.cos(yaw || 0), s: Math.sin(yaw || 0) };
+  frame(ox, oz, yaw, oy) {
+    this.f = { ox, oz, oy: oy || 0, c: Math.cos(yaw || 0), s: Math.sin(yaw || 0) };
     return this;
   }
   w(x, y, z) {
     const f = this.f;
-    return [f.ox + x * f.c + z * f.s, y, f.oz - x * f.s + z * f.c];
+    return [f.ox + x * f.c + z * f.s, y + (f.oy || 0), f.oz - x * f.s + z * f.c];
   }
   wn(x, y, z) {
     const f = this.f;
@@ -187,65 +191,68 @@ export function installProps(ctx) {
   const GLOBE = hex("#fff1c9");
 
   /* ---------------- single props, in a local frame whose +z faces the road ---------------- */
+  // G: the height of the surface they stand on (the sidewalk's top on the kerbs, the plaza's paving, the lawn), so they
+  // stand on it instead of 6-7 cm sunk into it.
+  let G = 0;
   function tree(x, z, s) {
-    solid.frame(x, z, 0);
+    solid.frame(x, z, 0, G);
     solid.cyl(0, 0, 0, 0.17 * s, 0.11 * s, 2.1 * s, 6, hex("#5a4230"));
     const lc = LEAF[Math.floor(rng() * LEAF.length)];
     solid.ball(0, 3.0 * s, 0, 1.5 * s, 0.85, lc, 7);
     solid.ball(0.5 * s, 2.5 * s, 0.3 * s, 1.0 * s, 0.8, lc.map((v) => v * 0.9), 6);
-    colliders.push({ x, y: 1, z, w: 0.4, h: 2, d: 0.4 });
+    colliders.push({ x, y: G + 1, z, w: 0.4, h: 2, d: 0.4 });
     stats.trees++;
   }
   function bench(x, z, yaw, solidToo) {
-    solid.frame(x, z, yaw);
+    solid.frame(x, z, yaw, G);
     solid.box(0, 0.42, 0, 1.6, 0.07, 0.46, WOOD);
     solid.box(0, 0.72, -0.2, 1.6, 0.34, 0.06, WOOD);
     solid.box(-0.7, 0, 0, 0.07, 0.42, 0.4, DARK);
     solid.box(0.7, 0, 0, 0.07, 0.42, 0.4, DARK);
     if (solidToo !== false) {
       const f = solid.f;
-      colliders.push({ x, y: 0.4, z, w: Math.abs(1.6 * f.c) + Math.abs(0.5 * f.s), h: 0.8, d: Math.abs(0.5 * f.c) + Math.abs(1.6 * f.s) });
+      colliders.push({ x, y: G + 0.4, z, w: Math.abs(1.6 * f.c) + Math.abs(0.5 * f.s), h: 0.8, d: Math.abs(0.5 * f.c) + Math.abs(1.6 * f.s) });
     }
     stats.benches++;
   }
   function hydrant(x, z, yaw) {
-    solid.frame(x, z, yaw);
+    solid.frame(x, z, yaw, G);
     solid.cyl(0, 0, 0, 0.17, 0.15, 0.62, 8, RED);
     solid.cyl(0, 0.62, 0, 0.19, 0.1, 0.14, 8, RED);
     solid.box(0.22, 0.34, 0, 0.16, 0.12, 0.12, RED);
     solid.box(-0.22, 0.34, 0, 0.16, 0.12, 0.12, RED);
     solid.box(0, 0.32, 0.2, 0.14, 0.14, 0.14, hex("#d8c25a"));
-    colliders.push({ x, y: 0.4, z, w: 0.4, h: 0.8, d: 0.4 });
+    colliders.push({ x, y: G + 0.4, z, w: 0.4, h: 0.8, d: 0.4 });
     stats.hydrants++;
   }
   function bin(x, z, yaw) {
-    solid.frame(x, z, yaw);
+    solid.frame(x, z, yaw, G);
     solid.cyl(0, 0, 0, 0.27, 0.3, 0.85, 8, GREEN);
     solid.cyl(0, 0.85, 0, 0.32, 0.32, 0.06, 8, DARK);
-    colliders.push({ x, y: 0.45, z, w: 0.6, h: 0.9, d: 0.6 });
+    colliders.push({ x, y: G + 0.45, z, w: 0.6, h: 0.9, d: 0.6 });
     stats.bins++;
   }
   function busStop(x, z, yaw) {
-    solid.frame(x, z, yaw);
-    solid.box(0, 0, 0, 3.2, 0.05, 1.3, hex("#555b62")); // base slab
+    solid.frame(x, z, yaw, G);
+    solid.box(0, 0, 0, 3.2, 0.05, 1.15, hex("#555b62")); // base slab, inside the sidewalk's 1.2 m
     [-1.55, 1.55].forEach((px) => solid.box(px, 0.05, -0.5, 0.08, 2.4, 0.08, METAL));
     solid.box(0, 2.42, -0.1, 3.4, 0.1, 1.5, hex("#2c333c")); // roof
     solid.box(0, 0.5, -0.56, 0.1, 0.1, 0.1, DARK);
     solid.box(0, 0.5, -0.4, 2.4, 0.07, 0.4, WOOD); // seat
-    warm.frame(x, z, yaw);
+    warm.frame(x, z, yaw, G);
     warm.box(0, 0.8, -0.58, 3.0, 1.5, 0.05, hex("#bfe3ff")); // lit ad panel / glass back
     // the stop sign on its own pole, at the kerb end
     solid.box(1.9, 0, 0.1, 0.07, 3.0, 0.07, METAL);
     warm.box(1.9, 2.55, 0.1, 0.56, 0.56, 0.06, hex("#3ecbff"));
-    colliders.push({ x: x + solid.f.s * 0, z, y: 1.2, w: Math.abs(3.2 * solid.f.c) + 1.3 * Math.abs(solid.f.s), h: 2.4, d: Math.abs(1.3 * solid.f.c) + 3.2 * Math.abs(solid.f.s) });
+    colliders.push({ x, z, y: G + 1.2, w: Math.abs(3.2 * solid.f.c) + 1.15 * Math.abs(solid.f.s), h: 2.4, d: Math.abs(1.15 * solid.f.c) + 3.2 * Math.abs(solid.f.s) });
     stats.busStops++;
   }
   function lampGlobe(x, z, h) {
-    solid.frame(x, z, 0);
+    solid.frame(x, z, 0, G);
     solid.cyl(0, 0, 0, 0.09, 0.07, h, 6, DARK);
-    warm.frame(x, z, 0);
+    warm.frame(x, z, 0, G);
     warm.ball(0, h + 0.2, 0, 0.26, 1, GLOBE, 6);
-    colliders.push({ x, y: h / 2, z, w: 0.22, h, d: 0.22 });
+    colliders.push({ x, y: G + h / 2, z, w: 0.22, h, d: 0.22 });
     return [x, z];
   }
 
@@ -255,6 +262,7 @@ export function installProps(ctx) {
   const nearJ = (v, lines, pad) => lines.some((l) => Math.abs(v - l) < pad);
   const lampNear = (x, z) => lampSpots.some((p) => Math.abs(p[0] - x) < 1.6 && Math.abs(p[1] - z) < 1.6);
   let ci = 0;
+  G = SIDEWALK_TOP;
   roads.forEach((r) => {
     const step = r.main ? 13 : 11;
     for (let t = r.from + 9; t < r.to - 6; t += step) {
@@ -262,7 +270,7 @@ export function installProps(ctx) {
       const inter = r.along === "x" ? nearJ(t, crossXs, 9) : nearJ(t, allZ, 9);
       if (inter) continue;
       const s = ci % 2 ? 1 : -1;
-      const off = (kind === "tree" ? 3.2 : 3.0) * s;
+      const off = (kind === "tree" ? 3.2 : kind === "bus" ? 2.9 : 3.0) * s; // a bus stop's slab fills the sidewalk's width
       const x = r.along === "x" ? t : r.c + off;
       const z = r.along === "x" ? r.c + off : t;
       const yaw = r.along === "x" ? (s > 0 ? Math.PI : 0) : -s * (Math.PI / 2);
@@ -275,6 +283,8 @@ export function installProps(ctx) {
       else if (kind === "bus" && r.along === "x") busStop(x, z, yaw);
     }
   });
+
+  G = 0;
 
   /* ---------------- shop signs and neon ---------------- */
   const signMats = SIGNS.map((sg, i) => {
@@ -369,6 +379,8 @@ export function installProps(ctx) {
     const p = city.park;
     const cx = (p.x0 + p.x1) / 2;
     flat.box(cx, 0.005, (p.z0 + p.z1) / 2, p.x1 - p.x0 - 1, 0.025, p.z1 - p.z0 - 1, hex("#33543a")); // lawn
+    // the lawn is something to stand on: he and the park's props stand on its top, not 3 cm into it
+    colliders.push({ x: cx, y: LAWN_TOP / 2, z: (p.z0 + p.z1) / 2, w: p.x1 - p.x0 - 1, h: LAWN_TOP, d: p.z1 - p.z0 - 1 });
     const pond = { x: 15, z: 60, r: 5 };
     flat.frame(0, 0, 0);
     flat.cyl(pond.x, 0.03, pond.z, pond.r + 0.45, pond.r + 0.45, 0.04, 14, hex("#6b6a62")); // stone rim
@@ -376,28 +388,31 @@ export function installProps(ctx) {
     // bandstand
     const bx = -18;
     const bz = 41;
-    solid.frame(0, 0, 0);
+    solid.frame(0, 0, 0, LAWN_TOP); // on the lawn, not 3 cm into it
     solid.cyl(bx, 0, bz, 3.2, 3.2, 0.3, 10, hex("#8a8174"));
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;
       solid.box(bx + Math.cos(a) * 2.7, 0.3, bz + Math.sin(a) * 2.7, 0.14, 2.6, 0.14, CREAM);
     }
     solid.cyl(bx, 2.9, bz, 3.4, 0.2, 1.3, 10, hex("#a24a3d"));
-    colliders.push({ x: bx, y: 0.15, z: bz, w: 5.6, h: 0.3, d: 5.6 });
+    colliders.push({ x: bx, y: LAWN_TOP + 0.15, z: bz, w: 5.6, h: 0.3, d: 5.6 });
     // string lights round the eaves
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2;
-      warm.frame(0, 0, 0);
+      warm.frame(0, 0, 0, LAWN_TOP);
       warm.ball(bx + Math.cos(a) * 3.2, 2.85, bz + Math.sin(a) * 3.2, 0.1, 1, i % 2 ? hex("#ffd98a") : hex("#ff9ac1"), 4);
     }
+    solid.frame(0, 0, 0);
+    warm.frame(0, 0, 0);
     // flowerbeds
     [[-11, 24, "#d85a7a"], [-5, 24, "#e6b84a"], [-11, 64, "#9a6ad8"], [-5, 64, "#e6b84a"], [4, 45, "#d85a7a"]].forEach(([x, z, c]) => {
       if (!clearIn(x, z, 0.8)) return;
-      solid.box(x, 0, z, 2.6, 0.22, 1.3, hex("#5b4636"));
-      for (let k = 0; k < 7; k++) solid.ball(x - 1.1 + k * 0.37, 0.3, z + ((k % 2) - 0.5) * 0.5, 0.17, 1, hex(c), 4);
+      solid.box(x, LAWN_TOP, z, 2.6, 0.22, 1.3, hex("#5b4636"));
+      for (let k = 0; k < 7; k++) solid.ball(x - 1.1 + k * 0.37, LAWN_TOP + 0.3, z + ((k % 2) - 0.5) * 0.5, 0.17, 1, hex(c), 4);
       stats.planters++;
     });
-    // lamps and benches along the path (x = -8)
+    // lamps and benches along the path (x = -8), on the lawn
+    G = LAWN_TOP;
     for (let z = p.z0 + 5; z < p.z1 - 3; z += 9) {
       if (clearIn(-6.4, z, 0.3)) {
         lampGlobe(-6.4, z, 3.3);
@@ -406,6 +421,7 @@ export function installProps(ctx) {
       }
       if (clearIn(-9.8, z + 4.5, 0.9)) bench(-9.8, z + 4.5, Math.PI / 2 + Math.PI);
     }
+    G = 0;
     flat.frame(0, 0, 0);
   }
 
@@ -420,8 +436,11 @@ export function installProps(ctx) {
     for (let i = 0; i < 6; i++) for (let j = 0; j < 5; j++) {
       const w = (pl.x1 - pl.x0) / 6;
       const d = (pl.z1 - pl.z0) / 5;
-      flat.box(pl.x0 + w * (i + 0.5), 0.0, pl.z0 + d * (j + 0.5), w - 0.1, 0.07, d - 0.1, (i + j) % 2 ? tileA : tileB);
+      flat.box(pl.x0 + w * (i + 0.5), 0.0, pl.z0 + d * (j + 0.5), w - 0.1, PLAZA_TOP, d - 0.1, (i + j) % 2 ? tileA : tileB);
     }
+    // the paving is something to stand on: he, Dex, the stalls and the spectators stand on it, not 7 cm into it
+    colliders.push({ x: pcx, y: PLAZA_TOP / 2, z: pcz, w: pl.x1 - pl.x0, h: PLAZA_TOP, d: pl.z1 - pl.z0 });
+    G = PLAZA_TOP;
     // fountain at the plaza's heart
     const fx = pcx;
     const fz = pl.z0 + 6.5;
@@ -478,6 +497,7 @@ export function installProps(ctx) {
       colliders.push({ x, y: 0.5, z, w: 1.6, h: 1, d: 1.6 });
       stats.planters++;
     });
+    G = 0;
   }
 
   /* ---------------- landmark 2: the Needle ---------------- */

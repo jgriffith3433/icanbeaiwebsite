@@ -86,7 +86,7 @@ export function createFinale(world, B, cfg) {
       arms.parent = root; arms.position.y = h * 0.5; arms.isPickable = false;
       arms.material = body.material;
       root.position.set(from.x, 0, from.z);
-      spectators.push({ root, head, arms, home, from, delay: 0.3 + rand() * (F.gatherSec || 6), walk: 0, phase: rand() * 6.28, hop: 0, h });
+      spectators.push({ root, body, head, arms, home, from, delay: 0.3 + rand() * (F.gatherSec || 6), walk: 0, phase: rand() * 6.28, hop: 0, h });
     }
   }
 
@@ -278,10 +278,20 @@ export function createFinale(world, B, cfg) {
         s.root.rotation.y = face;
         s.hop = Math.max(0, s.hop - dt * 1.6);
         const hopY = Math.abs(Math.sin(s.hop * 6.28)) * s.hop * 0.7;
-        const bob = e < 1 ? Math.abs(Math.sin(t * 8 + s.phase)) * 0.06 : Math.sin(t * 2 + s.phase) * 0.02;
-        s.root.position.y = bob + hopY;
+        // feet on the plaza's paving; the walk's bob and the idle sway move the body and head, not the feet
+        const gx = s.root.position.x;
+        const gz = s.root.position.z;
+        if (s.gx == null || Math.abs(gx - s.gx) > 0.05 || Math.abs(gz - s.gz) > 0.05) {
+          s.gx = gx;
+          s.gz = gz;
+          s.gy = world.surfaceAt ? world.surfaceAt(gx, gz) : 0;
+        }
+        const bob = e < 1 ? Math.abs(Math.sin(t * 8 + s.phase)) * 0.06 : (1 + Math.sin(t * 2 + s.phase)) * 0.01;
+        s.root.position.y = s.gy + hopY;
+        s.body.position.y = s.h * 0.31 + bob;
+        s.head.position.y = s.h * 0.62 + 0.18 + bob;
         s.head.rotation.x = e >= 1 ? -0.55 - Math.min(0.35, state.cheer * 0.2) : 0; // looking up
-        s.arms.position.y = s.h * 0.5 + (state.cheer > 0.3 && e >= 1 ? 0.5 + Math.sin(t * 9 + s.phase) * 0.12 : 0);
+        s.arms.position.y = s.h * 0.5 + bob + (state.cheer > 0.3 && e >= 1 ? 0.5 + Math.sin(t * 9 + s.phase) * 0.12 : 0);
         s.arms.rotation.z = state.cheer > 0.3 && e >= 1 ? Math.sin(t * 9 + s.phase) * 0.5 : 0;
       });
       state.gathered = there;
