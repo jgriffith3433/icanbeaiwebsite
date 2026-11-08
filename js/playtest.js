@@ -657,6 +657,8 @@ async function weatherAbilities(options, t) {
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   t.event("control-taken", "Enter, so his abilities work");
   const ids = ["rain", "gale", "fog", "sunbreak", "bolt"];
+  // The bar's slots are built on the first frame painted under control, so wait for them.
+  await t.until(() => ids.every((id) => document.getElementById("ability-" + id)), 4000, "the ability bar slots").catch(() => {});
   const bar = P.now().abilities;
   const keys = ids.map((id) => {
     const a = bar.find((x) => x.id === id);
