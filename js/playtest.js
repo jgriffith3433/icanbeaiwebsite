@@ -597,6 +597,19 @@ async function roofBolt(t) {
     else t.event("speed-buttons-clear", "every speed button (incl. 300x, 1200x) is clear of the ability bar");
     if (!bad.length) t.event("ability-bar-clear", `bar at y ${Math.round(bar.top)}-${Math.round(bar.bottom)} clear of the day timeline and Let go`);
   }
+  {
+    // control mode: no Privacy/version text under Let go, and the aim ring stays clear of it
+    const tags = [".privacy-tag", ".version-tag"].map((q) => document.querySelector(q)).filter((e) => e && e.offsetParent);
+    if (tags.length) t.problem("bug", "The Privacy/version footer still shows in control mode");
+    else t.event("footer-hidden", "Privacy and version text hidden while he's the player's");
+    const ret = document.getElementById("power-reticle");
+    const lg = document.getElementById("control") || document.querySelector(".control-btn");
+    if (ret && !ret.hidden && lg) {
+      const a = ret.getBoundingClientRect(), b = lg.getBoundingClientRect();
+      if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) t.problem("bug", "The aim ring sits under the Let go button");
+      else t.event("reticle-clear", `aim ring at y ${Math.round(a.top)} clear of Let go (bottom ${Math.round(b.bottom)})`);
+    }
+  }
   const e0 = P.now().energy;
   const WXB = window.weather || window.day.weather;
   if (WXB && WXB.now().state === "clear" && WXB.now().rain < 0.05) t.event("calm-before", "clear, no rain, before the bolt");

@@ -1004,8 +1004,21 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
         return;
       }
       reticle.hidden = false;
-      reticle.style.left = rect.left + (v.x / rw) * rect.width + "px";
-      reticle.style.top = rect.top + (v.y / rh) * rect.height + "px";
+      let rx = rect.left + (v.x / rw) * rect.width;
+      let ry = rect.top + (v.y / rh) * rect.height;
+      // keep the ring between the HUD rows: never under Let go (top centre), Quality or the screen edge
+      const keep = 12;
+      rx = Math.max(rect.left + keep, Math.min(rect.right - keep, rx));
+      ry = Math.max(rect.top + keep, Math.min(rect.bottom - keep, ry));
+      for (const id of ["control", "quality"]) {
+        const el = document.getElementById(id) || document.querySelector(id === "control" ? ".control-btn" : ".quality-btn");
+        if (!el || el.hidden) continue;
+        const b = el.getBoundingClientRect();
+        if (!b.width || b.top > rect.top + rect.height * 0.4) continue;
+        if (rx > b.left - keep && rx < b.right + keep && ry < b.bottom + keep) ry = b.bottom + keep;
+      }
+      reticle.style.left = rx + "px";
+      reticle.style.top = ry + "px";
     } catch (err) {
       reticle.hidden = true;
     }
