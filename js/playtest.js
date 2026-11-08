@@ -535,7 +535,6 @@ async function roofBolt(t) {
   // Climb until a deadline, not a fixed number of tries: on a slow frame rate the sim crawls (0.1 s a frame at most)
   // and the ramp can outlast any one goTo. Each pass carries on from where he stands (onRamp), and only a roof
   // arrival walks him to the middle, so a timed-out pass never drags him sideways into the wall mid-ramp.
-  await rampWedgeCheck(t, b);
   let ok = false;
   // He takes over ~30 m east of the ramp; on a slow bot that walk alone ate the runner's 180 s. Smoke tests the climb
   // and the bolt, not the street walk (the `city` scenario walks it), so stand him at the ramp's foot.
@@ -571,6 +570,7 @@ async function roofBolt(t) {
   const climbWall = (performance.now() - wall0) / 1000;
   t.metric("climbSimSec", Math.round(climbSim * 10) / 10);
   t.metric("climbWallSec", Math.round(climbWall * 10) / 10);
+  if (ok && climbSim > 30) t.problem("polish", `The ${b.id} climb took ${climbSim.toFixed(0)} game s (it takes ~12 at a walk)`);
   if (ok) t.event("climb-done", `up the ${b.id} ramp in ${climbSim.toFixed(1)} game s (${climbWall.toFixed(1)} s wall, ${(climbSim / Math.max(climbWall, 0.001)).toFixed(2)}x real time)`);
   else if (stuck) t.problem("bug", `He is stuck on the ${b.id} ramp: no height gained in ${STUCK_SIM_SEC} game s (best y ${bestY.toFixed(2)}, at ${C.state().x.toFixed(1)},${C.state().z.toFixed(1)})`);
   else t.problem("bug", `The ${b.id} climb was slow, not stuck, and ran out of ${CLIMB_SIM_SEC} game s (${climbWall.toFixed(0)} s wall, y ${C.state().y.toFixed(2)} of ${b.h})`);
@@ -629,6 +629,9 @@ async function roofBolt(t) {
     if (cleared && secs < 10) t.event("weather-cleared", `back to clear ${secs.toFixed(1)} s after the bolt (rain ${WXB.now().rain.toFixed(2)})`);
     else t.problem("bug", "The storm from lightning didn't clear within seconds");
   }
+  // The wedge check walks him around the ramp for a while, so it runs after the roof moment, not between
+  // Take control and "on-rooftop" (that gap is what the review reads as the climb time).
+  await rampWedgeCheck(t, b);
   // Let go: On foot on every sample while he walks (or catches up) back to his day.
   pressKey("Escape");
   await t.until(() => C.mode() !== "control", 3000, "letting go");
