@@ -188,6 +188,7 @@ or falling/jumping frames walking or running down a rooftop ramp.
 - `node scripts/sync-dialogue.mjs` rewrites the `dlg-*` recipes in hawkes.assets.json from the config and `audio/dialogue/index.json` from the clips on disk. Run it after changing lines or adding clips; npm test fails if either is stale.
 - Only clips listed in index.json play (the build rewrites it from disk), only once Sound is on, one at a time. A line without a clip keeps its text and js/sfx.js's babble; a voiced line skips the babble and ducks the music (`day:dialogue`).
 - Clips come from the recipes through Studio's asset pipeline (Hawkes Gen `audio.voice`, about $0.0003 a character, 104 lines about $1.20). Spending Gen credits needs Jaycee's yes.
+- All 104 clips are in (Nov 8 2026, imported free from the Gen jobs that made them with `studio_gen_import`; Studio's `studio_make_assets` with `only` would generate and charge again). Playtest: `spoken-dialogue` (every line has a clip, sampled clips decode, Part 1's opening lines are spoken with Sound on).
 
 ## Hawkes Gen art direction (for a later Gen change)
 
