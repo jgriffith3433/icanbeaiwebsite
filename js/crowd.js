@@ -609,6 +609,17 @@ export function installCrowd(world) {
       // drove off the end of the map
       for (let k = l.cars.length - 1; k >= 0; k--) if (l.cars[k].s > l.len) dropCar(l.cars[k]);
     }
+    // his own car drives by the day's script and the crowd can't brake for it from behind (or give up after
+    // `stuck`): a crowd car that ends up on top of it is taken off the road instead of drawn through it
+    if (obstacles.length && world.car && world.car.isEnabled && world.car.isEnabled()) {
+      const mx = world.car.position.x, mz = world.car.position.z;
+      for (let li = 0; li < lanes.length; li++) {
+        const cs = lanes[li].cars;
+        for (let k = cs.length - 1; k >= 0; k--) {
+          if (Math.hypot(cs[k].x - mx, cs[k].z - mz) < CAR_LEN * 0.8) dropCar(cs[k]);
+        }
+      }
+    }
   }
 
   /* ---------------- per frame ---------------- */
