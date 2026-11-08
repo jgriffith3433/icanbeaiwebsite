@@ -28,7 +28,7 @@ export function startMoments() {
 
   const style = document.createElement("style");
   style.textContent = `
-.mo-line{position:fixed;left:50%;bottom:max(230px,calc(env(safe-area-inset-bottom) + 210px));transform:translateX(-50%);z-index:37;display:flex;align-items:center;gap:14px;max-width:min(92vw,34em);padding:12px 14px 12px 22px;border-radius:999px;background:rgba(10,13,22,.62);border:1px solid rgba(126,200,255,.35);backdrop-filter:blur(10px);color:#f6f1e8;font:600 clamp(1.05rem,2.6vw,1.45rem)/1.25 Fraunces,Georgia,serif;text-shadow:0 2px 14px rgba(0,0,0,.6);opacity:1;transition:opacity .45s ease}
+.mo-line{z-index:37;display:flex;align-items:center;gap:14px;max-width:min(92vw,34em);padding:12px 14px 12px 22px;border-radius:999px;background:rgba(10,13,22,.62);border:1px solid rgba(126,200,255,.35);backdrop-filter:blur(10px);color:#f6f1e8;font:600 clamp(1.05rem,2.6vw,1.45rem)/1.25 Fraunces,Georgia,serif;text-shadow:0 2px 14px rgba(0,0,0,.6);opacity:1;transition:opacity .45s ease}
 .mo-line[hidden]{display:none}
 .mo-line.leaving{opacity:0;pointer-events:none}
 .mo-line b{font:600 .7rem/1 Outfit,system-ui,sans-serif;letter-spacing:.28em;text-transform:uppercase;color:#7ec8ff}

@@ -119,7 +119,7 @@ export function startAbilityBar(abilities, onPress) {
   if (!canDom) return { paint() {}, refuse() {}, el: null };
   const style = document.createElement("style");
   style.textContent = `
-.abilitybar{position:fixed;z-index:6;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;font:600 0.74rem/1.15 system-ui,sans-serif;color:#e7eef8}
+.abilitybar{z-index:6;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;font:600 0.74rem/1.15 system-ui,sans-serif;color:#e7eef8}
 .abilitybar[hidden]{display:none}
 .abilitybar .row{display:flex;gap:8px}
 .abilitybar .ab{position:relative;width:64px;height:64px;box-sizing:border-box;border-radius:12px;border:1px solid rgba(126,200,255,.55);background:rgba(10,14,22,.62);overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;pointer-events:auto;cursor:pointer;touch-action:none}
@@ -142,7 +142,7 @@ export function startAbilityBar(abilities, onPress) {
 .abilitybar .energy.refused .refuse{display:block}
 .abilitybar .energy.refused .et{display:none}
 /* phone: five tap buttons above the power pad, right-aligned; the stick, jump and pad are untouched */
-html.touch-ui .abilitybar{left:auto;right:max(12px,env(safe-area-inset-right));bottom:max(252px,calc(env(safe-area-inset-bottom) + 240px));transform:none;align-items:stretch;gap:4px;width:calc(5 * var(--abw) + 4 * 5px);--abw:min(54px,calc((100vw - 44px) / 5));font-size:.62rem}
+html.touch-ui .abilitybar{align-items:stretch;gap:4px;width:calc(5 * var(--abw) + 4 * 5px);--abw:min(54px,calc((100vw - 44px) / 5));font-size:.62rem}
 html.touch-ui .abilitybar .row{gap:5px}
 html.touch-ui .abilitybar .ab{width:var(--abw);height:54px;min-width:44px;min-height:44px;border-radius:10px;gap:0;justify-content:flex-end;padding-bottom:6px}
 html.touch-ui .abilitybar .ab[data-touch="0"]{display:none}
@@ -152,19 +152,9 @@ html.touch-ui .abilitybar .ab .c{top:4px;right:5px;font-size:.66rem}
 html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:.95rem;background:rgba(3,6,12,.55)}
 html.touch-ui .abilitybar .energy{min-width:0}
 html.touch-ui .abilitybar .energy .et{font-size:.62rem}
-html.touch-ui.in-control:not(.preview-public) .tutorial{bottom:max(338px,calc(env(safe-area-inset-bottom) + 326px))}
 @media (orientation:landscape) and (max-height:520px){
-html.touch-ui .abilitybar{right:auto;left:max(164px,calc(env(safe-area-inset-left) + 150px));bottom:max(60px,calc(env(safe-area-inset-bottom) + 54px))}
-html.touch-ui.in-control:not(.preview-public) .tutorial{left:max(164px,calc(env(safe-area-inset-left) + 150px));transform:none;bottom:max(146px,calc(env(safe-area-inset-bottom) + 140px))}
 }
-html:not(.preview-public):not(.touch-ui) .abilitybar{bottom:128px}
-html.in-control:not(.preview-public):not(.touch-ui) .control-btn{bottom:232px}
-html.in-control:not(.preview-public):not(.touch-ui) .quality-btn{bottom:238px}
-html.in-control:not(.preview-public):not(.touch-ui) .control-hint{bottom:278px}
-html.in-control:not(.preview-public):not(.touch-ui) .tutorial{bottom:314px}
-html.in-control:not(.preview-public):not(.touch-ui) .side{max-height:calc(100vh - 78px - 240px)}
 html.in-control:not(.preview-public):not(.touch-ui) .side .log{max-height:22vh}
-html.in-control:not(.preview-public):not(.touch-ui) .pressure{bottom:250px}
 body:has(.mo-line:not([hidden])) .control-hint,body:has(.tutorial:not([hidden])) .control-hint{visibility:hidden}
 `;
   document.head.appendChild(style);

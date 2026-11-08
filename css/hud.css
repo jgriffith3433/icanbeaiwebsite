@@ -1,0 +1,178 @@
+/* ==========================================================================
+   The HUD layout: every placement rule in one file (J, "the HUD is placed with hand-tuned pixel offsets").
+
+   Look (colour, type, borders) stays with each piece (css/site.css, the <style> in each js module).
+   WHERE it sits is only here: position, top/right/bottom/left, transform and the tokens below.
+   A module that adds a HUD element adds its placement here, under the region it belongs to, never a
+   `bottom: 214px` of its own. Loaded after css/site.css (index.html), before the modules' own <style>s,
+   so those must not set a placement property (npm test checks: scripts/check-hud.mjs).
+
+   Regions (desktop, then phone portrait, then phone landscape; `html.touch-ui` is a phone or touch controls):
+
+     top bar        .hud.top (status card left, Sound/Details right); phone: status card + tools column
+     side panel     .side, right, under the top bar, above the bottom ability row
+     timeline       .hud.bottom, owns the bottom 118px (desktop). Nothing else sits in it.
+     left stack     bottom-left, one step per item, bottom-up: Episodes, Neighbors, weather, Pressure
+     bottom row     the ability bar (--row-a), centred; Let go, Quality and the hint stack above it
+     right controls phone: the tools, Quality and Episodes column top-right; stick, power pad, jump bottom
+     centre cards   tutorial card, Episodes HUD (right, left of the side panel), toasts, the take-over line
+     bubbles        .nb-layer (z 9), above the tutorial card (z 8)
+
+   Phone = `html.touch-ui` (set by js/control.js for a coarse pointer or a window <= 700px wide), or the
+   max-width:700px media query for a narrow desktop window.
+   ========================================================================== */
+
+:root {
+  /* edges, with the safe areas */
+  --safe-l: max(var(--gutter, 18px), env(safe-area-inset-left));
+  --safe-r: max(var(--gutter, 18px), env(safe-area-inset-right));
+  --safe-t: max(12px, env(safe-area-inset-top));
+  --safe-b: max(16px, env(safe-area-inset-bottom));
+  /* the timeline's top edge (desktop): nothing but the timeline is under this line */
+  --tl: 118px;
+  /* bottom row: the ability bar, and the line above it where Let go, Quality, the hint and the tutorial stack */
+  --row-a: calc(var(--tl) + 10px);
+  --row-a-h: 104px;
+  --above-a: calc(var(--row-a) + var(--row-a-h));
+  /* left stack, bottom-up: one step per item */
+  --l1: var(--tl);
+  --l2: calc(var(--l1) + 46px);
+  --l3: calc(var(--l2) + 42px);
+  --l4: calc(var(--l3) + 44px);
+  /* the side panel */
+  --side-top: 78px;
+  --side-w: 330px;
+  /* phone: the right column (tools, Quality, Episodes) */
+  --tr-quality: calc(var(--safe-t) + 100px);
+  --tr-ep: calc(var(--safe-t) + 150px);
+}
+
+/* ---------- side panel ---------- */
+.side {
+  position: fixed;
+  top: var(--side-top);
+  right: var(--gutter);
+  width: var(--side-w);
+  max-height: calc(100vh - var(--side-top) - 150px);
+}
+html.in-control:not(.preview-public):not(.touch-ui) .side { max-height: calc(100vh - var(--side-top) - 240px); }
+@media (max-width: 899px) {
+  .side { left: var(--gutter); right: var(--gutter); width: auto; top: auto; bottom: 150px; max-height: 46vh; }
+}
+@media (max-width: 700px) {
+  .side { bottom: 140px; }
+}
+/* touch layout on a wide window: the docked Details panel sits left of the fixed tools column */
+@media (min-width: 900px) {
+  html.touch-ui .side { right: calc(max(12px, env(safe-area-inset-right)) + 150px); }
+}
+
+/* ---------- top bar: phone ---------- */
+@media (max-width: 700px) {
+  .top { flex-direction: column; gap: 8px; }
+  .tools { position: fixed; top: var(--safe-t); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
+}
+html.touch-ui .tools { position: fixed; top: var(--safe-t); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
+
+/* ---------- Let go / Take control (centre, above the bottom row) ---------- */
+.control-btn { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tl) + 32px); }
+html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(--above-a); }
+.preview-public .control-btn { bottom: var(--safe-b); }
+@media (max-width: 700px) {
+  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
+}
+html.touch-ui.in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
+
+/* ---------- Quality ---------- */
+.quality-btn { position: fixed; left: calc(50% + 108px); bottom: calc(var(--tl) + 38px); }
+html.in-control:not(.preview-public):not(.touch-ui) .quality-btn { bottom: calc(var(--above-a) + 6px); }
+.preview-public .quality-btn { bottom: 40px; }
+@media (max-width: 700px) {
+  .quality-btn { left: auto; right: max(12px, env(safe-area-inset-right)); bottom: auto; top: var(--tr-quality); }
+  .in-control .quality-btn, .preview-public .quality-btn { top: var(--safe-t); }
+}
+html.touch-ui .quality-btn { left: auto; right: max(12px, env(safe-area-inset-right)); bottom: auto; top: var(--tr-quality); }
+html.touch-ui.in-control .quality-btn, html.touch-ui.preview-public .quality-btn { top: var(--safe-t); }
+
+/* ---------- the controls hint ---------- */
+.control-hint {
+  position: fixed;
+  left: calc((100vw - var(--side-w) - 2 * var(--gutter)) / 2);
+  transform: translateX(-50%);
+  bottom: calc(var(--tl) + 78px);
+  max-width: min(640px, calc(100vw - var(--side-w) - 3 * var(--gutter) - 24px));
+}
+html.in-control:not(.preview-public):not(.touch-ui) .control-hint { bottom: calc(var(--above-a) + 46px); }
+.preview-public .control-hint { bottom: 80px; left: 50%; max-width: min(640px, calc(100vw - 2 * var(--gutter))); }
+
+/* ---------- the stick and the jump button ---------- */
+.touchpad { position: fixed; inset: auto 0 150px 0; }
+.preview-public .touchpad, html.touch-ui.in-control .touchpad { bottom: var(--safe-b); }
+
+/* ---------- left stack (desktop): Episodes, Neighbors, weather, Pressure ---------- */
+.ep-btn { position: fixed; left: 18px; bottom: var(--l1); }
+.preview-public .ep-btn { bottom: 78px; }
+.nb-btn { position: fixed; left: 18px; bottom: var(--l2); }
+.nb-panel { position: fixed; left: 18px; bottom: calc(var(--l2) + 46px); }
+.weather-btn, #weather-chip { position: fixed; top: auto; bottom: var(--l3); left: var(--gutter); }
+.preview-public .weather-btn, .preview-public #weather-chip { bottom: 132px; top: auto; }
+.pressure { position: fixed; left: 18px; bottom: var(--l4); }
+.preview-public .pressure { bottom: 176px; }
+
+/* ---------- phone: top-left (weather, Pressure), top-right (Quality, Episodes), bottom (Episodes in control) ---------- */
+html.touch-ui .weather-btn, html.touch-ui #weather-chip { top: var(--safe-t); bottom: auto; left: max(12px, env(safe-area-inset-left)); }
+html.touch-ui .pressure, html.touch-ui.public .pressure, html.touch-ui.preview-public .pressure {
+  left: max(12px, env(safe-area-inset-left)); right: auto; bottom: auto; top: max(78px, calc(env(safe-area-inset-top) + 72px));
+}
+@media (max-width: 700px) {
+  .ep-btn { left: auto; right: max(12px, env(safe-area-inset-right)); top: var(--tr-ep); bottom: auto; transform: none; }
+  .preview-public .ep-btn { top: calc(var(--safe-t) + 50px); bottom: auto; }
+  .in-control .ep-btn { left: 50%; right: auto; top: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); }
+}
+html.touch-ui .ep-btn { left: auto; right: max(12px, env(safe-area-inset-right)); top: var(--tr-ep); bottom: auto; transform: none; }
+html.touch-ui.preview-public .ep-btn { top: calc(var(--safe-t) + 50px); bottom: auto; }
+html.touch-ui.in-control .ep-btn { left: 50%; right: auto; top: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); }
+
+/* ---------- bottom row: the ability bar, the power pad ---------- */
+.abilitybar { position: fixed; left: 50%; bottom: var(--safe-b); transform: translateX(-50%); }
+html:not(.preview-public):not(.touch-ui) .abilitybar { bottom: var(--row-a); }
+html.touch-ui .abilitybar {
+  left: auto; right: max(12px, env(safe-area-inset-right));
+  bottom: max(252px, calc(env(safe-area-inset-bottom) + 240px)); transform: none;
+}
+.powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; }
+html.touch-ui .powerpad { right: max(12px, env(safe-area-inset-right)); bottom: max(150px, calc(env(safe-area-inset-bottom) + 138px)); }
+
+/* ---------- centre cards: tutorial, Episodes HUD, toasts, the take-over line, the episode line ---------- */
+.tutorial { position: fixed; left: 50%; transform: translateX(-50%); bottom: 202px; top: auto; }
+html.in-control .tutorial { bottom: 232px; }
+.preview-public .tutorial { bottom: max(72px, calc(env(safe-area-inset-bottom) + 62px)); }
+.preview-public.in-control .tutorial { bottom: 116px; }
+html.touch-ui.in-control .tutorial { bottom: max(256px, calc(env(safe-area-inset-bottom) + 244px)); }
+html.touch-ui.in-control:not(.preview-public) .tutorial { bottom: max(338px, calc(env(safe-area-inset-bottom) + 326px)); }
+/* desktop, in control: top centre (the memory "HUD z-order" convention), clear of the bottom row */
+html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { top: 156px; bottom: auto; }
+
+.ep-hud { position: fixed; right: 18px; top: 88px; }
+@media (min-width: 900px) { html:has(.side:not([hidden])) .ep-hud { right: calc(var(--gutter, 18px) + var(--side-w) + 12px); } }
+/* phone portrait: under the weather chip and Pressure (top-left column), right-aligned, never taller than the room above the ability row */
+@media (max-width: 700px) {
+  .ep-hud { right: max(12px, env(safe-area-inset-right)); top: max(132px, calc(env(safe-area-inset-top) + 126px)); width: min(280px, calc(100vw - 24px)); max-height: calc(100vh - 132px - 470px); overflow: hidden; }
+}
+/* phone landscape: top centre, between the left column and the right controls, above the ability bar */
+@media (orientation: landscape) and (max-height: 520px) {
+  html.touch-ui .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: calc(var(--safe-t) + 50px); width: min(260px, 34vw); max-height: calc(100vh - var(--safe-t) - 50px - 160px); overflow: hidden; }
+}
+.ep-say { position: fixed; left: 50%; bottom: max(96px, calc(env(safe-area-inset-bottom) + 88px)); }
+.ep-toast { position: fixed; left: 50%; top: max(64px, calc(env(safe-area-inset-top) + 56px)); }
+.nb-toast { position: fixed; left: 50%; top: max(110px, calc(env(safe-area-inset-top) + 100px)); }
+.mo-line { position: fixed; left: 50%; bottom: max(230px, calc(env(safe-area-inset-bottom) + 210px)); transform: translateX(-50%); }
+
+/* ---------- phone landscape (short window): the ability bar and the tutorial sit between the stick and the pad ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  html.touch-ui .abilitybar { right: auto; left: max(164px, calc(env(safe-area-inset-left) + 150px)); bottom: max(60px, calc(env(safe-area-inset-bottom) + 54px)); }
+  html.touch-ui.in-control:not(.preview-public) .tutorial { left: max(164px, calc(env(safe-area-inset-left) + 150px)); transform: none; bottom: max(146px, calc(env(safe-area-inset-bottom) + 140px)); }
+}
+
+/* ---------- bubbles ---------- */
+.nb-layer { position: fixed; inset: 0; }

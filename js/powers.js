@@ -897,22 +897,21 @@ export function startPowers(world, dayApi) {
   if (canDom) {
     const style = document.createElement("style");
     style.textContent = `
-.pressure{position:fixed;z-index:6;left:18px;bottom:250px;width:228px;pointer-events:none;font:600 0.78rem/1.2 system-ui,sans-serif;color:#e7eef8}
+.pressure{z-index:6;width:228px;pointer-events:none;font:600 0.78rem/1.2 system-ui,sans-serif;color:#e7eef8}
 .pressure[hidden]{display:none}
 .pressure .bar{margin-top:4px;height:8px;border-radius:99px;background:rgba(8,12,20,.55);border:1px solid rgba(126,200,255,.45);overflow:hidden}
 .pressure .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1a4c7a,#7ec8ff);border-radius:99px}
 .pressure.dry .bar i{background:#c4554a}
 .power-reticle{position:fixed;z-index:5;width:16px;height:16px;margin:-8px 0 0 -8px;border:2px solid #9fd4ff;border-radius:50%;box-shadow:0 0 8px rgba(80,160,255,.8);pointer-events:none}
 .power-reticle[hidden]{display:none}
-.powerpad{position:fixed;z-index:6;right:max(18px,env(safe-area-inset-right));bottom:268px;display:grid;grid-template-columns:1fr 1fr;gap:8px;width:168px}
+.powerpad{z-index:6;display:grid;grid-template-columns:1fr 1fr;gap:8px;width:168px}
 .powerpad[hidden]{display:none}
 .powerpad button{appearance:none;border:1px solid rgba(126,200,255,.55);background:rgba(10,14,22,.55);color:#d5e8ff;border-radius:12px;padding:10px 6px;font:600 0.78rem system-ui,sans-serif;touch-action:none}
 .powerpad button.held{background:#7ec8ff;color:#102033}
-.preview-public .pressure{bottom:176px}
-html.touch-ui .pressure,html.touch-ui.public .pressure,html.touch-ui.preview-public .pressure{left:max(12px,env(safe-area-inset-left));right:auto;bottom:auto;top:max(78px,calc(env(safe-area-inset-top) + 72px));width:min(148px,40vw);min-height:44px;box-sizing:border-box;padding:6px 10px;border-radius:12px;background:rgba(10,14,22,.55);display:flex;flex-direction:column;justify-content:center}
+html.touch-ui .pressure,html.touch-ui.public .pressure,html.touch-ui.preview-public .pressure{width:min(148px,40vw);min-height:44px;box-sizing:border-box;padding:6px 10px;border-radius:12px;background:rgba(10,14,22,.55);display:flex;flex-direction:column;justify-content:center}
 html.touch-ui .pressure[hidden]{display:none}
 html.touch-ui.in-control .side{display:none}
-html.touch-ui .powerpad{right:max(12px,env(safe-area-inset-right));bottom:max(150px,calc(env(safe-area-inset-bottom) + 138px));width:148px;gap:6px}
+html.touch-ui .powerpad{width:148px;gap:6px}
 html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
 `;
     document.head.appendChild(style);
