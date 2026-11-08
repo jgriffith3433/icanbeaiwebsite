@@ -929,6 +929,8 @@ function install() {
     move: mover.move,
     /** Game seconds simulated while he's the player's (sum of the control steps' dt). */
     simTime: () => simT,
+    /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */
+    avatar: () => avatar,
     // Playtest hook: stand him at x,z (street level) while he's the player's, so a scenario needn't walk a slow bot there.
     place: (x, z, yaw) => (mode === "control" ? mover.start(x, z, yaw == null ? s.yaw : yaw) : null),
     ride: RIDE,
