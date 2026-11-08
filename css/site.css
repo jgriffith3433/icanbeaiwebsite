@@ -551,6 +551,8 @@ html.touch-ui.in-control .side { display: none !important; }
 html:not(.public):not(.preview-public) .version-tag { display: none; }
 /* on a phone while he's the player's the corners belong to the controls: hide the footer tags (they sat on Let go) */
 html.touch-ui.in-control .version-tag { display: none; }
+/* in control on any screen: the corner tags sit under Let go and the HUD rows */
+html.in-control .version-tag, html.in-control .privacy-tag { display: none !important; }
 
 /* ---------- privacy: anonymous viewing statistics (privacy.html), the other corner ---------- */
 .privacy-tag {
