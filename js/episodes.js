@@ -378,6 +378,7 @@ html.touch-ui .ep-btn{display:inline-flex;align-items:center;justify-content:cen
 .ep-hud .prompt{margin:8px 0 0;color:#f0c27a}
 .ep-hud .skip{margin-top:8px;appearance:none;min-height:36px;padding:6px 14px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.8rem Outfit,system-ui,sans-serif;cursor:pointer}
 .ep-hud .skip:hover{background:rgba(240,194,122,.14)}
+html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-width:44px}
 .ep-hud li.failed{color:#e58a7a;text-decoration:line-through}
 .ep-hud .strain{margin-top:8px;color:#9fd4ff}
 .ep-hud .strain.over{color:#e58a7a}

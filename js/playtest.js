@@ -4698,6 +4698,260 @@ async function tutorialEpisode(options, t) {
   t.progress(1);
 }
 
+/* ---------------- phone: the whole game by touch, at whatever size it's given ---------------- */
+// Every control is pressed by a pointer tap (pointerType "touch") and measured first: at least 44 px each way and on
+// screen. Order: the first-visit card (start, Skip), take control by the button, the offered tutorial episode (start,
+// Skip), the stick, jump, the five abilities and a power pad button, the Episodes menu (open, close, open, pick an
+// episode, its card), the day timeline dragged by touch, Let go. {"orientation":"landscape"} asks for a landscape
+// window: a page can't turn the device, so it tries window.resizeTo and says plainly if it ran portrait only.
+async function phone(options, t) {
+  t.scene("Phone setup");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const C = window.day.control;
+  const T = window.day.tutorial;
+  const Ep = window.episodes || window.day.episodes;
+  if (!C || !T || !Ep) {
+    t.problem("bug", "There's no Take control, first-visit card or episodes API");
+    return;
+  }
+  const cfg = window.DAY_CONFIG.episodes;
+  const want = options && options.orientation === "landscape" ? "landscape" : "portrait";
+  if (want === "landscape" && innerHeight > innerWidth) {
+    const w0 = innerWidth, h0 = innerHeight;
+    try { window.resizeTo(h0, w0); } catch (e) { /* not allowed in this window */ }
+    await sleep(600);
+    if (innerHeight > innerWidth) {
+      t.event("orientation", `asked for landscape but the window is ${innerWidth}×${innerHeight} and can't be resized from the page: this run is portrait only`);
+    } else t.event("orientation", `window turned to landscape: ${w0}×${h0} → ${innerWidth}×${innerHeight}`);
+  } else {
+    t.event("orientation", `${innerWidth > innerHeight ? "landscape" : "portrait"} ${innerWidth}×${innerHeight}${want === "landscape" && innerWidth > innerHeight ? " (landscape asked for, and the window is)" : ""}`);
+  }
+  const native = C.state().touch;
+  if (!native) C.touch(true);
+  t.event("touch-layout", native ? `phone-sized window ${innerWidth}×${innerHeight}` : `phone controls on a ${innerWidth}×${innerHeight} window (setup shortcut)`);
+  const quiet = quietMoment(window.day.today());
+  if (quiet) {
+    scrubTo(quiet.start + Math.min(0.4, (quiet.end - quiet.start) / 3));
+    await sleep(400);
+  }
+  clickSpeed(1);
+  try { localStorage.removeItem(cfg.tutorialKey || "icanbe.episodes.tutorial"); } catch (e) { /* private mode */ }
+
+  const tapped = new Set();
+  /** A tap through the page's own pointer handlers, after checking the control is a usable touch target. */
+  async function tap(el, name) {
+    if (!el) {
+      t.problem("bug", `Phone: ${name} isn't in the page`);
+      return false;
+    }
+    const r = hudVisible(el);
+    if (!r) {
+      t.problem("bug", `Phone: ${name} isn't on screen at ${innerWidth}×${innerHeight}`);
+      return false;
+    }
+    const full = el.getBoundingClientRect();
+    if (full.width < 43.5 || full.height < 43.5) t.problem("bug", `Phone: ${name} is ${Math.round(full.width)}×${Math.round(full.height)} px, under 44 at ${innerWidth}×${innerHeight}`);
+    if (full.left < -1 || full.top < -1 || full.right > innerWidth + 1 || full.bottom > innerHeight + 1) t.problem("bug", `Phone: ${name} is off screen at ${innerWidth}×${innerHeight}`);
+    tapped.add(name);
+    await tapEl(el);
+    el.click();
+    await sleep(150);
+    return true;
+  }
+  const taken = () => C.mode() === "control";
+  const Pw = () => window.powers || window.day.powers;
+  const uses = (id) => {
+    const a = Pw() && Pw().abilities && Pw().abilities.get(id);
+    return a ? a.uses : 0;
+  };
+
+  // 1. The first-visit card: start it, then Skip.
+  t.scene("First-visit card");
+  T.reset();
+  await t.until(() => T.blocking() && $("tutorial-skip"), 3000, "the first-visit card");
+  t.event("tutorial-shown", `step ${T.now().step}`);
+  checkHud(t, "phone: first-visit card");
+  if (boxOf($("tutorial-take"))) await tap($("tutorial-take"), "Take control (card)");
+  else await tap($("control"), "Take control");
+  await t.until(taken, 4000, "Take control by tap");
+  t.event("take-control-tap", "he's the player's by a tap");
+  await sleep(500);
+  await tap($("tutorial-skip"), "Skip (first-visit card)");
+  await sleep(250);
+  if (T.blocking()) t.problem("bug", "Skip on the first-visit card didn't hide it");
+  else t.event("tutorial-card-skipped", "the card's Skip, by tap");
+  t.progress(0.12);
+
+  // 2. The tutorial episode: offered on a new player's first take control, started and skipped by tap.
+  t.scene("Tutorial episode");
+  const offer = $("episode-offer");
+  await t.until(() => offer && !offer.hidden, 4000, "the tutorial offer").catch(() => {});
+  if (offer && !offer.hidden) {
+    checkHud(t, "phone: episode offer");
+    await tap(offer.querySelector("button.accept"), "Start (episode offer)");
+    await t.until(() => Ep.now() && Ep.now().id === "tutorial", 4000, "the tutorial running");
+    t.event("tutorial-started", "Learn the weather, started by tap");
+    await sleep(400);
+    checkHud(t, "phone: tutorial episode");
+    const hudSkip = $("episode-hud") && $("episode-hud").querySelector(".skip");
+    await tap(hudSkip, "Skip (tutorial episode)");
+    await sleep(300);
+    if (Ep.now()) t.problem("bug", "Skip didn't end the tutorial episode");
+    else t.event("tutorial-skipped", "Learn the weather skipped by tap; every ability is open");
+  } else {
+    t.problem("bug", "Taking control on a fresh visit didn't offer the tutorial episode");
+  }
+  t.progress(0.25);
+
+  // 3. The stick and jump.
+  t.scene("Stick and jump");
+  if (!taken()) await tap($("control"), "Take control");
+  await t.until(taken, 4000, "him to be the player's");
+  const stickEl = $("stick");
+  const jumpEl = $("jump-btn");
+  const sr = boxOf(stickEl);
+  if (!sr || !boxOf(jumpEl)) {
+    t.problem("bug", "The touch stick and jump button aren't on screen");
+    return;
+  }
+  [[stickEl, "stick"], [jumpEl, "jump"]].forEach(([el, name]) => {
+    const r = el.getBoundingClientRect();
+    if (r.width < 43.5 || r.height < 43.5) t.problem("bug", `Phone: ${name} is ${Math.round(r.width)}×${Math.round(r.height)} px, under 44`);
+    if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) t.problem("bug", `Phone: ${name} is off screen`);
+    tapped.add(name);
+  });
+  const cx = sr.left + sr.width / 2;
+  const cy = sr.top + sr.height / 2;
+  const mv = await measure(async () => {
+    for (const [dx, dy, ms] of [[0, -32, 1000], [34, 0, 800], [0, 60, 800], [-60, 0, 800]]) {
+      touchOn(stickEl, "pointerdown", cx, cy);
+      for (let i = 1; i <= 4; i++) {
+        touchOn(stickEl, "pointermove", cx + (dx * i) / 4, cy + (dy * i) / 4);
+        await sleep(40);
+      }
+      await sleep(ms);
+      touchOn(stickEl, "pointerup", cx + dx, cy + dy);
+      await sleep(150);
+    }
+  });
+  t.event("stick-move", `the stick moved him ${mv.path} m, up to ${mv.peak} m/s`);
+  if (mv.path < 1.5) t.problem("bug", `The touch stick moved him only ${mv.path} m`);
+  const f0 = C.state().flights;
+  await tapEl(jumpEl);
+  await sleep(450);
+  await tapEl(jumpEl);
+  await t.until(() => C.state().flights > f0, 8000, "him to land");
+  const fl = C.state().lastFlight || { jumps: 0 };
+  t.event("jump-tap", `jump button: ${fl.jumps} jumps in the flight`);
+  if (fl.jumps < 2) t.problem("bug", `Two taps on Jump gave ${fl.jumps} jump(s)`);
+  checkHud(t, "phone: on foot");
+  t.progress(0.4);
+
+  // 4. The five abilities and a power, each by tap.
+  t.scene("Abilities");
+  const done = [];
+  for (const id of ["bolt", "rain", "gale", "fog", "sunbreak"]) {
+    const el = $("ability-" + id);
+    const before = uses(id);
+    let ok = false;
+    for (let k = 0; k < 10 && !ok; k++) {
+      await tap(el, "ability " + id);
+      await sleep(500);
+      ok = uses(id) > before;
+      if (!ok) await sleep(1200); // Energy or cooldown: wait, as a player would
+    }
+    if (ok) {
+      done.push(id);
+      t.event("ability-tap-" + id, `${id} by tap, energy ${(($("energy") || {}).textContent || "").trim()}`);
+    } else t.problem("bug", `Tapping ${id} never used it`);
+    await sleep(600);
+  }
+  checkHud(t, "phone: abilities");
+  const padId = ["power-gust", "power-storm", "power-tornado"].find((id) => boxOf($(id))) || "power-gust";
+  const pid = padId.replace("power-", "");
+  const pBefore = uses(pid);
+  let padOk = false;
+  for (let k = 0; k < 10 && !padOk; k++) {
+    await tap($(padId), "power pad " + pid);
+    await sleep(500);
+    padOk = uses(pid) > pBefore || (window.day.powers && window.day.powers.now().abilities || []).some((a) => a.id === pid && (a.cooldown > 0 || a.uses > pBefore));
+    if (!padOk) await sleep(1200);
+  }
+  if (padOk) t.event("power-tap", `${pid} from the power pad by tap`);
+  else t.problem("bug", `The power pad's ${pid} never fired by tap`);
+  if (done.length === 5) t.event("abilities-tapped", "Lightning, Rain, Gale, Fog and Sun break all used by tap");
+  t.progress(0.6);
+
+  // 5. The Episodes menu and an episode card.
+  t.scene("Episodes menu");
+  const menu = $("episode-menu");
+  await tap($("episodes"), "Episodes");
+  await sleep(250);
+  if (!menu || menu.hidden) t.problem("bug", "The Episodes button didn't open the menu");
+  else {
+    t.event("episodes-open", `${menu.querySelectorAll(".ep-row").length} rows`);
+    await tap(menu.querySelector(".close"), "Close (Episodes menu)");
+    await sleep(250);
+    if (!menu.hidden) t.problem("bug", "Close didn't shut the Episodes menu");
+    else t.event("episodes-closed", "Close, by tap");
+  }
+  await tap($("episodes"), "Episodes");
+  await sleep(250);
+  const row = [...document.querySelectorAll("#episode-menu .ep-row")].find((b) => !b.disabled && b.id !== "ep-row-tutorial" && !b.classList.contains("chal"));
+  if (!row) t.problem("bug", "The Episodes menu has no episode to start");
+  else {
+    await tap(row, "episode " + row.id.replace("ep-row-", ""));
+    await t.until(() => Ep.now() || (offer && !offer.hidden), 5000, "an episode card").catch(() => {});
+    await sleep(500);
+    if (offer && !offer.hidden) {
+      await tap(offer.querySelector(".decline"), "Not now (episode offer)");
+      t.event("episode-card", "the offer card, dismissed by tap");
+    } else if (Ep.now()) {
+      const h = $("episode-hud");
+      t.event("episode-card", `${Ep.now().id}: the goals card shows${h && !h.hidden ? "" : " (no HUD)"}`);
+      checkHud(t, "phone: episode card");
+    } else t.problem("bug", "Picking an episode from the menu showed no card");
+  }
+  t.progress(0.75);
+
+  // 6. The day timeline, dragged by touch.
+  t.scene("Timeline");
+  const scrub = $("scrub");
+  const m0 = window.day.now().minutes;
+  const sb = scrub && scrub.getBoundingClientRect();
+  if (!sb || sb.height < 43.5) t.problem("bug", `Phone: the timeline's drag strip is ${sb ? Math.round(sb.height) : 0} px tall, under 44`);
+  if (sb && (sb.left < -1 || sb.right > innerWidth + 1 || sb.bottom > innerHeight + 1)) t.problem("bug", "Phone: the timeline is off screen");
+  tapped.add("timeline");
+  const y = sb.top + sb.height / 2;
+  const min = Number(scrub.min), max = Number(scrub.max);
+  const target = Math.min(max - 5, m0 + 180);
+  touchOn(scrub, "pointerdown", sb.left + 20, y, 11);
+  for (let i = 1; i <= 6; i++) {
+    scrub.value = String(m0 + ((target - m0) * i) / 6);
+    scrub.dispatchEvent(new Event("input", { bubbles: true }));
+    touchOn(scrub, "pointermove", sb.left + 20 + ((sb.width - 40) * i) / 6, y, 11);
+    await sleep(60);
+  }
+  touchOn(scrub, "pointerup", sb.right - 20, y, 11);
+  window.dispatchEvent(new Event("pointerup"));
+  await sleep(500);
+  const m1 = window.day.now().minutes;
+  if (Math.abs(m1 - m0) < 30 || m1 < min) t.problem("bug", `Dragging the timeline by touch moved the clock ${Math.round(m1 - m0)} min (wanted about 180)`);
+  else t.event("timeline-drag", `the day bar dragged by touch: ${E().fmtClock(m0)} → ${E().fmtClock(m1)}`);
+  t.progress(0.9);
+
+  // 7. Let go, then the verdict on every tapped control.
+  t.scene("Letting go");
+  if (taken()) await tap($("control"), "Let go");
+  await t.until(() => !taken(), 3000, "Let go by tap").catch(() => {});
+  checkHud(t, "phone: end");
+  t.event("phone-taps", `${tapped.size} controls tapped at ${innerWidth}×${innerHeight}: ${[...tapped].join(", ")}`);
+  t.metric("phoneControlsTapped", tapped.size);
+  if (!native) C.touch(false);
+  t.progress(1);
+}
+
 /* ---------------- first visit: the tutorial, then every phone control, then the player events ---------------- */
 function boxesOverlap(a, b) {
   const pad = 2;
@@ -5328,6 +5582,7 @@ installPlaytest({
     { id: "lunch-rescue", title: "Rooftop storm (lunch): a surprise storm strands people in the plaza, on the shop roof and in the avenue; helping them with Sun break, Lightning and Gale changes the score and the S-C rank; the twist turns the rain to fog; an ending line per rank", seconds: 300, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the plaza cafe, the shop and the avenue, X, E, V, Esc. Run 1 helps one person and lets go (low rank); run 2 plays all three set pieces. Events lunch-opening / lunch-piece / lunch-help / lunch-score / lunch-twist / lunch-sky / lunch-goal / lunch-card / lunch-rank / lunch-say." },
     { id: "hurricane-drive", title: "Hurricane drive (commute home): four closures on the way home (fallen sign, flooded underpass, dead bus, closing bridge); the right ability at each helps, the wrong one hurts (rain on the debris, gale at the bus); a storm twist; an ending line and an S-C rank on the score card", seconds: 360, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift along the avenue, R then V at the fallen sign, V, X, E and C at the four set pieces, Esc. Run 1 uses rain on the debris (hurt) then a gale and lets go (low rank); run 2 plays all four set pieces right and gets home. Events drive-opening / drive-piece / drive-hurt / drive-help / drive-twist / drive-sky / drive-goal / drive-card / drive-rank / drive-say." },
     { id: "light-show", title: "Light show finale: the city gathers on the plaza, he calls Lightning, Rain, Fog, Gale and Sun break on their cues; beams, fireworks, neon pools and an aurora answer; the score depends on timing and variety; the closing card ties the day's stories together", seconds: 330, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors and then to 22:05 (setup), Enter, the episode started by its API (setup), the story arc seeded in localStorage (setup). Real keys: WASD with Shift to the plaza, then E / R / C / V / X pressed on each cue as the HUD counts down. Run 1 hits every cue on the beat with all five effects; run 2 presses only Lightning, 0.7 s late. Events show-opening / show-hud / show-gather / show-begin / show-act / show-cue / show-miss / show-off / show-stage / show-over / show-card / show-closing / show-compare; metrics showAurora, showBursts, showPointsOnBeat, showPointsSloppy." },
+    { id: "phone", title: "Phone: the game by touch only, in portrait or landscape: take control, stick, jump, the five abilities and a power by tap, the Episodes menu and an episode card, the first-visit card and the tutorial episode (start and Skip), the day timeline dragged; every tapped control at least 44 px and on screen, HUD overlap checked", seconds: 150, tags: ["phone", "smoke-phone", "control", "tutorial"], description: "Day bar to a quiet moment at home (setup); day.control.touch(true) on a desktop-sized window (setup). Every press is a pointer tap measured first (44 px, on screen). Option {\"orientation\":\"landscape\"} turns a portrait window to landscape if the page can resize it, else the orientation event says it ran portrait only. Events touch-layout / orientation / take-control-tap / tutorial-card-skipped / tutorial-started / tutorial-skipped / stick-move / jump-tap / ability-tap-<id> / power-tap / episodes-open / episodes-closed / episode-card / timeline-drag / hud-clear / phone-taps." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
@@ -5335,7 +5590,7 @@ installPlaytest({
     const errFrom = consoleErrors.length;
     try {
       if (id !== "title" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
-      if (id !== "smoke" && id !== "first-visit" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
+      if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
       if (id === "barks") await barksScenario(options, t);
@@ -5371,6 +5626,7 @@ installPlaytest({
       else if (id === "hurricane-drive") await hurricaneDrive(options, t);
       else if (id === "light-show") await lightShow(options, t);
       else if (id === "first-visit") await firstVisit(options, t);
+      else if (id === "phone") await phone(options, t);
       else if (id === "tutorial-episode") await tutorialEpisode(options, t);
       reportConsole(t, errFrom);
     } finally {
