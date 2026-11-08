@@ -52,8 +52,9 @@ export function startBarks() {
 
   function say(kind, key, text) {
     day.note(text);
-    const d = { kind, key, text };
-    log.push(Object.assign({ key: day.now().key, minutes: day.now().minutes }, d));
+    const n = day.now();
+    const d = { kind, key, text, minutes: n.minutes };
+    log.push(d);
     if (log.length > 200) log.shift();
     if (window.dispatchEvent && typeof window.CustomEvent === "function") {
       window.dispatchEvent(new window.CustomEvent("day:bark", { detail: d }));
