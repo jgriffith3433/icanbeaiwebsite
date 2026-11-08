@@ -31,8 +31,22 @@ import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause pe
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 
+/* The loading card (index.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
+const loading = window.__loading || { set() {}, done() {}, fail() {} };
+const ready = { model: false, frame: false, title: false };
+const maybeDone = () => { if (ready.model && ready.frame && ready.title) loading.done(); };
+loading.set("scripts", 1); // this module has run: every import above is in
+(function waitFrame() {
+  const d = window.day;
+  if (d && d.now && d.now().frame) { loading.set("frame", 1); ready.frame = true; maybeDone(); return; }
+  requestAnimationFrame(waitFrame); // per frame until the first one, then it stops: no timers, no fetches
+})();
+// title.js has already run (it is the last import): the title is built and, for a player, showing.
+if (window.day && window.day.title) { ready.title = true; loading.set("title", 1); }
+
 const control = (window.DAY_CONFIG && window.DAY_CONFIG.control) || {};
 const status = { babylon: window.BABYLON.Engine.Version, physics: "loading", model: control.model ? "loading" : "figure" };
+if (!control.model) { ready.model = true; loading.set("model", 1); }
 window.day && (window.day.engineInfo = () => ({ ...status }));
 const perfWorld = window.day && window.day.world && window.day.world();
 if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: "icanbe" });
@@ -43,8 +57,27 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
 const skinWorld = control.model && window.day && window.day.world();
 if (skinWorld) {
   const w = skinWorld;
+  // Streams the GLB so the loading card's bar follows the bytes (Content-Length), not a guess.
+  const readBody = async (r) => {
+    const total = Number(r.headers.get("content-length")) || 0;
+    if (!r.body || !r.body.getReader) return r.arrayBuffer();
+    const reader = r.body.getReader();
+    const chunks = [];
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      got += value.length;
+      if (total) loading.set("model", Math.min(0.9, (got / total) * 0.9)); // the last 10% is turning it into a skin
+    }
+    const out = new Uint8Array(got);
+    let at = 0;
+    chunks.forEach((c) => { out.set(c, at); at += c.length; });
+    return out.buffer;
+  };
   const fetchBytes = () => (typeof fetch === "function"
-    ? fetch(control.model, { cache: "no-cache" }).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)
+    ? fetch(control.model, { cache: "no-cache" }).then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
     : Promise.resolve(null));
   const firstBytesP = fetchBytes();
   const firstModuleP = import("./small-weather.js");
@@ -67,12 +100,16 @@ if (skinWorld) {
     .then((skin) => {
       w.setSkin(skin);
       Object.assign(status, { model: "small-weather", clips: skin.clips });
+      ready.model = true;
+      loading.set("model", 1);
+      maybeDone();
       console.info(`[world] Small Weather's model: ${skin.clips.length} clips (${skin.clips.join(" ")})`);
     })
     .catch((err) => {
       w.setSkin(null); // he stays hidden: Small Weather or nothing, never the box figure
       Object.assign(status, { model: "none", modelError: String((err && err.message) || err) });
       console.error("[world] Small Weather's model didn't load:", err);
+      loading.fail(String((err && err.message) || err), "Small Weather");
     })
     .finally(() => window.dispatchEvent(new CustomEvent("day:model", { detail: { ...status } })));
 }
