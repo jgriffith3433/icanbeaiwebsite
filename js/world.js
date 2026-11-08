@@ -1885,7 +1885,29 @@
       }
       cam.wasInCar = !!pp.inCar;
       cam.user = Math.max(0, cam.user - dt);
-      camera.target.set(cam.x, cam.y, cam.z);
+      /* the side panel (log, body) covers the right of the screen: aim a little to its right so he sits in the
+         free part of the view, not under the panel. Only a docked panel on a wide screen counts. */
+      const rw = engine.getRenderWidth();
+      let insetGoal = 0;
+      if (!pp.inCar && rw > 0 && (cam.insetAt == null || t - cam.insetAt > 0.5 || snap)) {
+        cam.insetAt = t;
+        const side = typeof document !== "undefined" && document.querySelector && document.querySelector(".side");
+        const r = side && !side.hidden && side.offsetParent !== null ? side.getBoundingClientRect() : null;
+        const cssW = (typeof window !== "undefined" && window.innerWidth) || rw;
+        cam.insetPx = r && r.width > 0 && r.left > cssW * 0.5 ? (cssW - r.left) / cssW : 0; // share of the width
+      }
+      if (!pp.inCar) insetGoal = cam.insetPx || 0;
+      cam.inset = snap || cam.inset == null ? insetGoal : damp(cam.inset, insetGoal, dt, 2.6);
+      let ox = 0;
+      let oz = 0;
+      if (cam.inset > 0.001) {
+        /* half the panel's share of the width, in metres at the target's distance, along the screen's right */
+        const half = shot.radius * Math.tan((camera.fov || 0.8) / 2) * aspect;
+        const off = half * cam.inset;
+        ox = -Math.sin(cam.alpha) * off;
+        oz = Math.cos(cam.alpha) * off;
+      }
+      camera.target.set(cam.x + ox, cam.y, cam.z + oz);
       /* keep an automatic camera inside the cutaway, never behind a side wall */
       const rm = !pp.inCar && rooms[fr.room];
       const bd = rm && cfg.buildings[rm.building];

@@ -68,7 +68,23 @@ function personOnScreen() {
   const w = world();
   if (!w || !w.person || !w.scene.activeCamera) return false;
   const planes = window.BABYLON.Frustum.GetPlanes(w.scene.getTransformMatrix());
-  return w.person.getChildMeshes().some((m) => m.isEnabled() && m.isVisible && m.isInFrustum(planes));
+  if (!w.person.getChildMeshes().some((m) => m.isEnabled() && m.isVisible && m.isInFrustum(planes))) return false;
+  /* in the frustum is not enough: he must not sit under a panel (the log, the clock card) */
+  const B = window.BABYLON;
+  const rw = w.engine.getRenderWidth();
+  const rh = w.engine.getRenderHeight();
+  const c = w.person.getAbsolutePosition().clone();
+  c.y += 0.9;
+  const v = B.Vector3.Project(c, B.Matrix.Identity(), w.scene.getTransformMatrix(), w.scene.activeCamera.viewport.toGlobal(rw, rh));
+  if (v.z < 0 || v.z > 1) return false;
+  const px = (v.x / rw) * window.innerWidth;
+  const py = (v.y / rh) * window.innerHeight;
+  return ![".side", "h1.time"].some((sel) => {
+    const el = sel === "h1.time" ? document.querySelector(sel)?.parentElement : document.querySelector(sel);
+    if (!el || el.hidden || el.offsetParent === null) return false;
+    const r = el.getBoundingClientRect();
+    return px >= r.left && px <= r.right && py >= r.top && py <= r.bottom;
+  });
 }
 
 /** Where the player's car is on screen: {x, y} as 0-1 of the width and height, or null if behind the camera. */
