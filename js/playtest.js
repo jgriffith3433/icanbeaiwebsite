@@ -4938,6 +4938,38 @@ async function titleScenario(options, t) {
   // already open, bring it back (setup) so the run starts where a player's does.
   const first = T.now().showing;
   if (!first) T.show("playtest");
+
+  // The loading card (index.html): it showed from the first paint, it goes when the title is ready, and no HUD field is a dash.
+  const L = window.__loading;
+  if (!L) t.problem("blocker", "The loading card script (window.__loading) isn't in index.html");
+  else {
+    const card = $("loading");
+    const seen = L.log().some((e) => e.action === "show");
+    const prog = L.log().filter((e) => e.action === "progress").map((e) => `${e.part} ${Math.round(e.frac * 100)}%`);
+    t.event("loading-card", `${seen ? "showed from the first paint" : "never showed"}; progress from load events: ${prog.join(", ") || "none seen"}`);
+    if (!seen) t.problem("bug", "The loading card never showed");
+    if (L.state() === "loading" && boxOf(card)) {
+      const r = card.querySelector(".card").getBoundingClientRect();
+      t.event("loading-up", `card ${Math.round(r.width)}x${Math.round(r.height)} in ${innerWidth}x${innerHeight}, bar ${L.pct()}%`);
+      if (r.left < 0 || r.top < 0 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) t.problem("bug", `The loading card doesn't fit the screen (${innerWidth}x${innerHeight})`);
+    }
+    await t.until(() => L.state() !== "loading", 30000, "the loading card to finish").catch(() => {});
+    await sleep(700);
+    if (L.state() === "failed") t.problem("blocker", "The loading card shows the retry message: the game didn't load");
+    const gone = !card || card.hidden || !boxOf(card);
+    t.event("loading-gone", `state ${L.state()}, card ${gone ? "gone" : "still on screen"}, title ${T.now().showing ? "up" : "not up"}`);
+    if (!gone) t.problem("bug", "The loading card is still on screen after the title is ready");
+    if (document.documentElement.classList.contains("loading")) t.problem("bug", "html.loading is still set (the HUD stays hidden)");
+    if (!L.log().some((e) => e.action === "done")) t.problem("bug", "The loading card never reported done");
+    const dashes = ["chapter", "where", "time", "ampm", "what", "next", "date", "count"]
+      .map((id) => $(id)).filter((e) => e && !e.hidden && HUD_PLACEHOLDER.test((e.textContent || "").trim()) && (e.textContent || "").trim() !== "");
+    const empty = ["chapter", "time", "what"].filter((id) => !(($(id) || {}).textContent || "").trim());
+    if (dashes.length) t.problem("bug", `HUD fields show a placeholder dash: ${dashes.map((e) => "#" + e.id).join(", ")}`);
+    if (empty.length) t.problem("bug", `HUD fields are empty once the title is up: ${empty.map((x) => "#" + x).join(", ")}`);
+    const bad = [...document.querySelectorAll(".hud, .side")].flatMap((r) => [...r.querySelectorAll("*")]).filter((e) => !e.children.length && !e.hidden && /^[\s–—]+$/.test(e.textContent || "") && (e.textContent || "").length);
+    if (bad.length) t.problem("bug", `A dash shows in the HUD: ${bad.map((e) => e.id || e.className || e.tagName).join(", ")}`);
+    if (!dashes.length && !bad.length && !empty.length) t.event("loading-hud-clear", "no HUD field is empty or a dash once the title is up");
+  }
   await sleep(300);
   const el = $("title");
   const play = $("title-play");
