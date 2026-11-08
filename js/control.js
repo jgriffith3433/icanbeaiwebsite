@@ -464,6 +464,7 @@ function install() {
   let lastRadius = null;
   let glidePull = 0;
   const camRay = new B.PhysicsRaycastResult();
+  const CAM_LIFT = 1.4; // least height of the camera over the surface under it
   const RIDE = Object.assign({
     cameraPull: 3.4,
     whoosh: "audio/sfx/glide-whoosh.mp3",
@@ -561,6 +562,27 @@ function install() {
       r += push.extra * (1 - e);
       camera.fov = push.baseFov + push.fov * (1 - e);
       if (k >= 1) pushEnd();
+    }
+    /* Low over a slope or roof (the ramp up a block, the parapets): a camera skimming the slab shows only dark planes.
+       Look down from where the surface under it is at least CAM_LIFT below: lift the pitch (smoothly) until it is. */
+    const pl = world.physics && world.physics();
+    if (pl && !push.on) {
+      const pitchFor = (beta) => {
+        const sb = Math.sin(beta);
+        const cx = t.x + Math.cos(camera.alpha) * sb * r;
+        const cy = t.y + Math.cos(beta) * r;
+        const cz = t.z + Math.sin(camera.alpha) * sb * r;
+        pl.plugin.raycast(new B.Vector3(cx, cy + 0.5, cz), new B.Vector3(cx, cy - CAM_LIFT - 0.5, cz), camRay);
+        return camRay.hasHit ? camRay.hitPoint.y : null;
+      };
+      let lift = camera.beta;
+      for (let i = 0; i < 6; i++) {
+        const gy = pitchFor(lift);
+        const cy = t.y + Math.cos(lift) * r;
+        if (gy == null || cy - gy >= CAM_LIFT || lift <= camera.lowerBetaLimit + 0.01) break;
+        lift = Math.max(camera.lowerBetaLimit, lift - 0.14);
+      }
+      if (lift < camera.beta) camera.beta = damp(camera.beta, lift, dt, 6);
     }
     const dx = Math.cos(camera.alpha) * Math.sin(camera.beta);
     const dy = Math.cos(camera.beta);
