@@ -2132,6 +2132,8 @@ async function photos(options, t) {
   t.event("photo-fps", `${fpsAll.length} photos: ${avg.toFixed(0)} fps on average, ${min.toFixed(0)} at the worst`);
   if (min < 10) t.problem("bug", `A photo ran at ${min.toFixed(1)} fps`);
   else if (avg < 20) t.problem("warning", `The photos averaged ${avg.toFixed(1)} fps`);
+  // A phone run also times the three moments on low quality (city, storm, finale).
+  if (innerWidth <= 700 || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)) await phoneFps(t);
   t.progress(1);
 }
 
@@ -4698,6 +4700,126 @@ async function tutorialEpisode(options, t) {
   t.progress(1);
 }
 
+/* ---------------- phone frame rate: city, storm and finale on low quality ---------------- */
+// Frame times come from requestAnimationFrame (the same clock as the contract's fps meter in hawkes-playtest.js,
+// which isn't exported), counted per second: the average of those seconds and the worst second. Quality is forced to
+// low first, the way a phone runs. Setup shortcuts: the day bar to noon and to 22:05, the storm set by the weather
+// API each second (a gust of Lightning by the ability bar), the finale started from the Episodes API; he walks to the
+// plaza with real input. A moment whose average is under 30 files a bug naming it.
+const PHONE_FPS_MIN = 30;
+function fpsWindow(ms, each) {
+  return new Promise((resolve) => {
+    const sec = [];
+    let frames = 0, last = performance.now(), n = 0;
+    const t0 = last;
+    const tick = (now) => {
+      frames++;
+      n++;
+      if (now - last >= 1000) {
+        sec.push((frames * 1000) / (now - last));
+        frames = 0;
+        last = now;
+      }
+      if (each) each(now - t0);
+      if (now - t0 < ms) requestAnimationFrame(tick);
+      else {
+        if (!sec.length) sec.push((frames * 1000) / Math.max(1, now - t0));
+        resolve({ avg: sec.reduce((a, b) => a + b, 0) / sec.length, min: Math.min(...sec), seconds: sec.length, frames: n });
+      }
+    };
+    requestAnimationFrame(tick);
+  });
+}
+async function phoneFps(t) {
+  const C = window.day.control;
+  const Ep = window.episodes || window.day.episodes;
+  const P = window.powers || window.day.powers;
+  const look = window.day.look;
+  if (!C || !Ep || !P || !look) {
+    t.problem("bug", "Phone fps: Take control, episodes, powers or the look module isn't installed");
+    return;
+  }
+  const prevQ = look.quality();
+  look.quality("low");
+  t.scene("Phone fps: low quality");
+  t.event("phone-fps-quality", `quality forced to low (was ${prevQ}) at ${innerWidth}×${innerHeight}`);
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const outside = carSideMoment(day);
+  if (!outside) {
+    t.problem("bug", "Phone fps: no moment beside the car to stand in the street");
+    return;
+  }
+  if (C.mode() === "control") pressKey("Escape");
+  await sleep(300);
+  scrubTo(12 * 60);
+  clickSpeed(1);
+  await sleep(600);
+  const rec = {};
+  const report = (key, label, r) => {
+    rec[key] = r;
+    t.metric(`phoneFps${key}Avg`, Math.round(r.avg * 10) / 10);
+    t.metric(`phoneFps${key}Min`, Math.round(r.min * 10) / 10);
+    t.event(`phone-fps-${key.toLowerCase()}`, `${label}: ${r.avg.toFixed(1)} fps on average, ${r.min.toFixed(1)} at the worst second (${r.frames} frames in ${r.seconds} s), quality ${look.quality()}`);
+    if (r.avg < PHONE_FPS_MIN) t.problem("bug", `Phone fps: ${label} averaged ${r.avg.toFixed(1)} fps on low quality, under ${PHONE_FPS_MIN}`);
+  };
+  // 1. The city at noon, walking the avenue.
+  t.scene("Phone fps: the city at noon");
+  if (C.mode() !== "control") {
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 4000, "Take control for the phone fps");
+  }
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+  const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
+  await goTo(C.state().x, sideZ, t, { sprint: true, ms: 12000, close: 1.5 });
+  const crowd = window.day.crowd && window.day.crowd.info();
+  if (crowd) t.event("phone-fps-crowd", `${crowd.people} people and ${crowd.cars} cars at noon on low`);
+  const walk = (async () => {
+    for (let i = 0; i < 3; i++) await goTo(C.state().x + (i % 2 ? -12 : 12), sideZ, t, { sprint: true, ms: 5000, close: 1.5 });
+  })();
+  report("City", "the city at noon on the avenue", await fpsWindow(8000));
+  await walk.catch(() => {});
+  // 2. A storm with rain and lightning.
+  t.scene("Phone fps: the storm");
+  const W = window.weather;
+  const bolt = (P.abilities && P.abilities.get && P.abilities.get("bolt")) ? "bolt" : "lightning";
+  let nextBolt = 0;
+  report("Storm", "a storm with rain and lightning", await fpsWindow(9000, (ms) => {
+    if (W && W.set && Math.floor(ms / 800) !== Math.floor((ms - 17) / 800)) W.set("storm", 1, "power");
+    if (ms >= nextBolt) { nextBolt = ms + 3000; try { P.command(bolt, "playtest"); } catch (e) { /* cooldown or energy */ } }
+  }));
+  const wx = W && W.now && W.now();
+  if (wx && wx.state !== "storm" && wx.state !== "rain") t.problem("warning", `Phone fps: the storm window ended on ${wx.state}`);
+  // 3. The light-show finale, from the plaza.
+  t.scene("Phone fps: the finale");
+  scrubTo(22 * 60 + 5);
+  await sleep(500);
+  Ep.start("night", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "night" && Ep.show(), 4000, "the Light show running");
+  for (let k = 0; k < 16; k++) {
+    const s = C.state();
+    if (Math.abs(s.x - 117) < 1.6) break;
+    await goTo(s.x + Math.max(-22, Math.min(22, 117 - s.x)), sideZ, t, { sprint: true, ms: 14000, close: 1.2 });
+  }
+  await goTo(117, 27.5, t, { ms: 9000, close: 1.4 });
+  await t.until(() => Ep.show() && Ep.show().started, 6000, "the show to begin").catch(() => {});
+  const cues = (Ep.show() || { cues: [] }).cues;
+  let ci = 0;
+  const keyFor = (power) => String((P.abilities.get(power) || {}).key || "").toLowerCase();
+  report("Finale", "the light-show finale", await fpsWindow(10000, () => {
+    const s = Ep.show();
+    if (!s || !s.started) return;
+    while (ci < cues.length && s.t >= cues[ci].at - 0.04) { pressKey(keyFor(cues[ci].power)); ci++; }
+  }));
+  const st = Ep.stage && Ep.stage();
+  if (st) t.event("phone-fps-stage", `${st.gathered} of ${st.spectators} in place, beams ${st.beams}, ${st.particles} sparks, ${ci} cues pressed`);
+  const worst = Object.entries(rec).sort((a, b) => a[1].avg - b[1].avg)[0];
+  if (worst) t.event("phone-fps-worst", `${worst[0]}: ${worst[1].avg.toFixed(1)} fps on average`);
+  if (C.mode() === "control") pressKey("Escape");
+  look.quality(prevQ);
+}
+
 /* ---------------- phone: the whole game by touch, at whatever size it's given ---------------- */
 // Every control is pressed by a pointer tap (pointerType "touch") and measured first: at least 44 px each way and on
 // screen. Order: the first-visit card (start, Skip), take control by the button, the offered tutorial episode (start,
@@ -4949,6 +5071,8 @@ async function phone(options, t) {
   t.event("phone-taps", `${tapped.size} controls tapped at ${innerWidth}×${innerHeight}: ${[...tapped].join(", ")}`);
   t.metric("phoneControlsTapped", tapped.size);
   if (!native) C.touch(false);
+  t.progress(0.92);
+  await phoneFps(t);
   t.progress(1);
 }
 
@@ -5582,7 +5706,7 @@ installPlaytest({
     { id: "lunch-rescue", title: "Rooftop storm (lunch): a surprise storm strands people in the plaza, on the shop roof and in the avenue; helping them with Sun break, Lightning and Gale changes the score and the S-C rank; the twist turns the rain to fog; an ending line per rank", seconds: 300, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the plaza cafe, the shop and the avenue, X, E, V, Esc. Run 1 helps one person and lets go (low rank); run 2 plays all three set pieces. Events lunch-opening / lunch-piece / lunch-help / lunch-score / lunch-twist / lunch-sky / lunch-goal / lunch-card / lunch-rank / lunch-say." },
     { id: "hurricane-drive", title: "Hurricane drive (commute home): four closures on the way home (fallen sign, flooded underpass, dead bus, closing bridge); the right ability at each helps, the wrong one hurts (rain on the debris, gale at the bus); a storm twist; an ending line and an S-C rank on the score card", seconds: 360, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift along the avenue, R then V at the fallen sign, V, X, E and C at the four set pieces, Esc. Run 1 uses rain on the debris (hurt) then a gale and lets go (low rank); run 2 plays all four set pieces right and gets home. Events drive-opening / drive-piece / drive-hurt / drive-help / drive-twist / drive-sky / drive-goal / drive-card / drive-rank / drive-say." },
     { id: "light-show", title: "Light show finale: the city gathers on the plaza, he calls Lightning, Rain, Fog, Gale and Sun break on their cues; beams, fireworks, neon pools and an aurora answer; the score depends on timing and variety; the closing card ties the day's stories together", seconds: 330, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors and then to 22:05 (setup), Enter, the episode started by its API (setup), the story arc seeded in localStorage (setup). Real keys: WASD with Shift to the plaza, then E / R / C / V / X pressed on each cue as the HUD counts down. Run 1 hits every cue on the beat with all five effects; run 2 presses only Lightning, 0.7 s late. Events show-opening / show-hud / show-gather / show-begin / show-act / show-cue / show-miss / show-off / show-stage / show-over / show-card / show-closing / show-compare; metrics showAurora, showBursts, showPointsOnBeat, showPointsSloppy." },
-    { id: "phone", title: "Phone: the game by touch only, in portrait or landscape: take control, stick, jump, the five abilities and a power by tap, the Episodes menu and an episode card, the first-visit card and the tutorial episode (start and Skip), the day timeline dragged; every tapped control at least 44 px and on screen, HUD overlap checked", seconds: 150, tags: ["phone", "smoke-phone", "control", "tutorial"], description: "Day bar to a quiet moment at home (setup); day.control.touch(true) on a desktop-sized window (setup). Every press is a pointer tap measured first (44 px, on screen). Option {\"orientation\":\"landscape\"} turns a portrait window to landscape if the page can resize it, else the orientation event says it ran portrait only. Events touch-layout / orientation / take-control-tap / tutorial-card-skipped / tutorial-started / tutorial-skipped / stick-move / jump-tap / ability-tap-<id> / power-tap / episodes-open / episodes-closed / episode-card / timeline-drag / hud-clear / phone-taps." },
+    { id: "phone", title: "Phone: the game by touch only, in portrait or landscape: take control, stick, jump, the five abilities and a power by tap, the Episodes menu and an episode card, the first-visit card and the tutorial episode (start and Skip), the day timeline dragged; every tapped control at least 44 px and on screen, HUD overlap checked", seconds: 240, tags: ["phone", "smoke-phone", "control", "tutorial"], description: "Day bar to a quiet moment at home (setup); day.control.touch(true) on a desktop-sized window (setup). Every press is a pointer tap measured first (44 px, on screen). Option {\"orientation\":\"landscape\"} turns a portrait window to landscape if the page can resize it, else the orientation event says it ran portrait only. Events touch-layout / orientation / take-control-tap / tutorial-card-skipped / tutorial-started / tutorial-skipped / stick-move / jump-tap / ability-tap-<id> / power-tap / episodes-open / episodes-closed / episode-card / timeline-drag / hud-clear / phone-taps." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
   isReady: () => !!(window.day && window.day.now().frame),
