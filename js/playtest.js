@@ -1159,6 +1159,14 @@ function quietMoment(day) {
   );
 }
 
+/** The log rebuilds on the next painted frame, so wait for a row (any of `texts`) rather than read it at once. */
+async function logHas(t, texts, problem) {
+  const list = [].concat(texts).filter(Boolean);
+  const has = () => list.some((x) => $("log").textContent.includes(x));
+  await t.until(has, 3000, "the action log row").catch(() => {});
+  if (!has()) t.problem("bug", `${problem} (looked for "${list.join('" or "')}")`);
+}
+
 /** Let go (Esc or the button), then watch him walk back: no teleport, ends where the day says, the log goes on. */
 async function letGoAndWatch(t, how, label) {
   const C = window.day.control;
@@ -1183,20 +1191,23 @@ async function letGoAndWatch(t, how, label) {
   await how();
   await t.until(() => C.mode() !== "control", 3000, "letting go");
   t.event("let-go", `${label}: his day says ${fr0.room} · "${fr0.action.text}" · ${Math.hypot(st0.x - fr0.person.x, st0.z - fr0.person.z).toFixed(1)} m away`);
-  if (!$("log").textContent.includes(window.DAY_CONFIG.control.lines.letGo)) t.problem("bug", "Letting go isn't in the action log");
+  await logHas(t, window.DAY_CONFIG.control.lines.letGo, "Letting go isn't in the action log");
   await t.until(() => C.mode() === "schedule", 70000, "him to walk back to his day");
   await sleep(300);
   stopWatching();
-  const back = C.log().filter((e) => e.what === "back").pop();
+  const backEv = C.log().filter((e) => e.what === "back").pop();
+  const back = backEv && { how: backEv.detail && backEv.detail.how }; // mark(what, detail): the field is under detail
   const fr = window.day.now().frame;
   t.metric(`${label}ReturnFrames`, frames);
   t.metric(`${label}ReturnMaxStep`, Math.round(maxStep * 1000) / 1000);
   if (back && back.how === "walk") t.event("back-on-schedule", `${label}: walked back, now "${fr.action.text}" (${fr.room}), ${off == null ? "?" : off.toFixed(3)} m from where his day puts him`);
-  else t.problem("bug", `${label}: he didn't walk back to his day (${back ? back.how : "no back"})`);
+  else t.problem("bug", `${label}: he didn't walk back to his day (${back ? back.how || "no how" : "no back"}; the day says "${fr.action.text}")`);
   if (maxStep > 0.5) t.problem("bug", `${label}: he jumped ${maxStep.toFixed(2)} m in one frame on the way back (a teleport, not a walk)`);
   if (off != null && off > 0.05) t.problem("bug", `${label}: back on his day, but ${off.toFixed(2)} m from where it puts him`);
   checkFrame(t, fr);
-  if (!$("log").textContent.includes(window.DAY_CONFIG.control.lines.back)) t.problem("bug", "Being back on his day isn't in the action log");
+  // He may have caught up in a fade (catchUp line) instead of walking: either way the log says he's back.
+  const L = window.DAY_CONFIG.control.lines;
+  await logHas(t, [L.back, L.catchUp], "Being back on his day isn't in the action log");
 }
 
 async function control(options, t) {
@@ -1232,7 +1243,7 @@ async function control(options, t) {
   t.event("control-taken", `Enter · at ${st.x.toFixed(2)},${st.z.toFixed(2)} · Havok controller ${st.physics ? "on" : "OFF"} · button "${btn && btn.textContent}"`);
   if (!st.physics) t.problem("bug", "He moves without the Havok character controller (physics off?)");
   if (btn && btn.textContent !== "Let go") t.problem("bug", `The button says "${btn.textContent}" while he's the player's, not "Let go"`);
-  if (!$("log").textContent.includes(lines.take)) t.problem("bug", "Taking control isn't in the action log");
+  await logHas(t, lines.take, "Taking control isn't in the action log");
   await sleep(1200);
   t.progress(0.12);
 
