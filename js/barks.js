@@ -18,7 +18,9 @@ export function startBarks() {
   const was = Object.create(null); // need -> was it over its line last tick
   let prevMin = null;
   let prevKey = null;
-  let prevWeather = null;
+  // The sky starts calm and clear and the forecast fires no "day:weather" event, so the first event a page
+  // sees (Rain, key 3) is a real change from clear, not the page's first state.
+  let prevWeather = "clear";
   let queued = null; // { state, at }
   const weatherAt = Object.create(null);
 
@@ -50,8 +52,9 @@ export function startBarks() {
 
   function say(kind, key, text) {
     day.note(text);
-    const d = { kind, key, text };
-    log.push(Object.assign({ key: day.now().key, minutes: day.now().minutes }, d));
+    const n = day.now();
+    const d = { kind, key, text, minutes: n.minutes };
+    log.push(d);
     if (log.length > 200) log.shift();
     if (window.dispatchEvent && typeof window.CustomEvent === "function") {
       window.dispatchEvent(new window.CustomEvent("day:bark", { detail: d }));

@@ -445,9 +445,10 @@
     el.what.classList.toggle("steered", !!steer);
     el.prog.style.width = (Math.max(0, Math.min(1, (loc.minutes - row.start) / Math.max(1e-6, row.end - row.start))) * 100).toFixed(1) + "%";
     const ch = (cfg.chapters || {})[a.chapter] || { label: a.chapter, color: "#888" };
-    el.chapter.textContent = ch.label;
+    // while he's the player's he's on foot, whatever the day's own car is doing: don't say DRIVE / IN THE CAR
+    el.chapter.textContent = steer ? "Your move" : ch.label;
     el.chapter.style.setProperty("--c", ch.color);
-    const room = a.inCar ? "In the car" : (day.rooms[a.room] && day.rooms[a.room].label) || "";
+    const room = steer ? "On foot" : a.inCar ? "In the car" : (day.rooms[a.room] && day.rooms[a.room].label) || "";
     el.where.textContent = room;
     const nb = day.blocks.find((b) => b.start > loc.minutes + 1e-6);
     el.next.textContent = nb ? `Next · ${E.fmtClock(nb.start)} · ${nb.title}` : "Next · the alarm";

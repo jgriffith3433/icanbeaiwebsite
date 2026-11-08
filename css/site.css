@@ -578,12 +578,8 @@ html.touch-ui.in-control .side { display: none !important; }
 }
 .version-tag:hover, .version-tag:focus-visible { opacity: 1; }
 html:not(.public):not(.preview-public) .version-tag { display: none; }
-html.touch-ui.in-control .version-tag {
-  right: auto;
-  left: calc(50% + 8px);
-  bottom: auto;
-  top: max(46px, calc(env(safe-area-inset-top) + 40px));
-}
+/* on a phone while he's the player's the corners belong to the controls: hide the footer tags (they sat on Let go) */
+html.touch-ui.in-control .version-tag { display: none; }
 
 /* ---------- privacy: anonymous viewing statistics (privacy.html), the other corner ---------- */
 .privacy-tag {
@@ -599,11 +595,7 @@ html.touch-ui.in-control .version-tag {
 }
 .privacy-tag:hover, .privacy-tag:focus-visible { opacity: 1; }
 html:not(.public):not(.preview-public) .privacy-tag { display: none; }
-html.touch-ui.in-control .privacy-tag {
-  left: calc(50% - 78px);
-  bottom: auto;
-  top: max(46px, calc(env(safe-area-inset-top) + 40px));
-}
+html.touch-ui.in-control .privacy-tag { display: none; }
 .foot a { color: inherit; }
 
 /* ---------- taking control (js/control.js): also on the public site ---------- */

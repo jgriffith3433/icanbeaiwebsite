@@ -68,7 +68,23 @@ function personOnScreen() {
   const w = world();
   if (!w || !w.person || !w.scene.activeCamera) return false;
   const planes = window.BABYLON.Frustum.GetPlanes(w.scene.getTransformMatrix());
-  return w.person.getChildMeshes().some((m) => m.isEnabled() && m.isVisible && m.isInFrustum(planes));
+  if (!w.person.getChildMeshes().some((m) => m.isEnabled() && m.isVisible && m.isInFrustum(planes))) return false;
+  /* in the frustum is not enough: he must not sit under a panel (the log, the clock card) */
+  const B = window.BABYLON;
+  const rw = w.engine.getRenderWidth();
+  const rh = w.engine.getRenderHeight();
+  const c = w.person.getAbsolutePosition().clone();
+  c.y += 0.9;
+  const v = B.Vector3.Project(c, B.Matrix.Identity(), w.scene.getTransformMatrix(), w.scene.activeCamera.viewport.toGlobal(rw, rh));
+  if (v.z < 0 || v.z > 1) return false;
+  const px = (v.x / rw) * window.innerWidth;
+  const py = (v.y / rh) * window.innerHeight;
+  return ![".side", "h1.time"].some((sel) => {
+    const el = sel === "h1.time" ? document.querySelector(sel)?.parentElement : document.querySelector(sel);
+    if (!el || el.hidden || el.offsetParent === null) return false;
+    const r = el.getBoundingClientRect();
+    return px >= r.left && px <= r.right && py >= r.top && py <= r.bottom;
+  });
 }
 
 /** Where the player's car is on screen: {x, y} as 0-1 of the width and height, or null if behind the camera. */
@@ -360,6 +376,9 @@ async function roofBolt(t) {
   // and the ramp can outlast any one goTo. Each pass carries on from where he stands (onRamp), and only a roof
   // arrival walks him to the middle, so a timed-out pass never drags him sideways into the wall mid-ramp.
   let ok = false;
+  // He takes over ~30 m east of the ramp; on a slow bot that walk alone ate the runner's 180 s. Smoke tests the climb
+  // and the bolt, not the street walk (the `city` scenario walks it), so stand him at the ramp's foot.
+  if (C.place) C.place(s.x0 - 3, s.z + s.w / 2 + 1.5, -Math.PI / 2);
   const climbUntil = performance.now() + 150000;
   const f0 = window.day.now().minutes;
   const t0 = performance.now();
@@ -654,6 +673,8 @@ async function weatherAbilities(options, t) {
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   t.event("control-taken", "Enter, so his abilities work");
   const ids = ["rain", "gale", "fog", "sunbreak", "bolt"];
+  // The bar's slots are built on the first frame painted under control, so wait for them.
+  await t.until(() => ids.every((id) => document.getElementById("ability-" + id)), 4000, "the ability bar slots").catch(() => {});
   const bar = P.now().abilities;
   const keys = ids.map((id) => {
     const a = bar.find((x) => x.id === id);
@@ -1052,7 +1073,7 @@ async function analytics(options, t) {
       return;
     }
     t.scene("The question");
-    t.event("feedback-prompt", `shown after ${window.day.analytics.watched()} s: "What would you want this to be?"`);
+    t.event("feedback-prompt", `shown after ${window.day.analytics.watched()} s: "Are you enjoying this so far?"`);
     await sleep(5000); // long enough to read in the footage
     const close = card().shadowRoot && card().shadowRoot.querySelector(".ha-x");
     if (!close) t.problem("bug", "The feedback question has no close button");

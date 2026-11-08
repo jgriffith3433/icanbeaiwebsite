@@ -302,7 +302,7 @@
     askDue = "the end of the day";
   }
 
-  // The direction of I Can Be is open, so the comment is the point: thumbs, then "anything goes".
+  // Thumbs answer a yes/no question, so that is what is asked; the optional comment keeps the direction open.
   const ASK_ID = "direction";
   let asked = false;
   function ask(context) {
@@ -310,14 +310,25 @@
     asked = true;
     const p = A.ask({
       id: ASK_ID,
-      question: "What would you want this to be?",
+      question: "Are you enjoying this so far?",
       context,
       comment: true,
-      placeholder: "Anything goes. A screensaver, a game, a story, something else…",
+      placeholder: "What would you want this to be? A screensaver, a game, a story, something else…",
       thanks: "Thank you. We read every one.",
       theme: { background: "rgba(14, 16, 22, 0.94)", color: "#f6f1e8", accent: "#f0c27a", font: 'Outfit, "Segoe UI", system-ui, sans-serif', radius: "18px" },
     });
-    if (!document.querySelector(`[data-hawkes-ask="${ASK_ID}"]`)) return; // asked already this session, or closed in the last 7 days
+    const host = document.querySelector(`[data-hawkes-ask="${ASK_ID}"]`);
+    if (!host) return; // asked already this session, or closed in the last 7 days
+    // The SDK focuses the first thumb, so Enter/Space would vote: hand focus back to the page.
+    const inCard = host.shadowRoot && host.shadowRoot.activeElement;
+    if (inCard && inCard.blur) inCard.blur();
+    // The card is the SDK's, fixed bottom right: lift it clear of the day bar (a transformed host is the card's containing block).
+    if (!document.getElementById("ask-lift")) {
+      const st = document.createElement("style");
+      st.id = "ask-lift";
+      st.textContent = `[data-hawkes-ask="${ASK_ID}"]{position:fixed;right:0;bottom:132px;width:0;height:0;transform:translateZ(0)}`;
+      document.head.appendChild(st);
+    }
     A.track("feedback_prompt", { action: "shown", context });
     p.then(safe((answer) => A.track("feedback_prompt", { action: answer ? "answered" : "dismissed", context, commented: !!(answer && answer.text) })));
   }

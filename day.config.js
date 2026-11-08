@@ -132,7 +132,7 @@ window.DAY_CONFIG = {
   control: {
     lines: {
       take: "You take over. His day keeps going without him.",
-      steering: ["You have him.", "He goes where you go.", "His day is still running, somewhere else."],
+      steering: ["You have him.", "He goes where you go."],
       letGo: "You let go. He walks back to his day.",
       back: "Back where his day says. He carries on.",
       catchUp: "His day is too far off to walk. He catches up with it.",
@@ -1588,7 +1588,7 @@ window.DAY_CONFIG = {
       { x: 168, from: -48, to: 90 },
     ],
     blocks: [
-      { id: "apt", x: -24, z: 0.5, w: 16, d: 12, h: 6.16, color: "#46525f", stair: { x0: -31, x1: -17, z: 7.2, w: 1.45 } },
+      { id: "apt", x: -24, z: 0.5, w: 16, d: 12, h: 6.16, color: "#46525f", stair: { x0: -28.5, x1: -17, z: 7.2, w: 1.45 } },
       { id: "shop", x: 50, z: 0.5, w: 16, d: 12, h: 3.3, color: "#5a4550", stair: { x0: 43, x1: 50.5, z: 7.2, w: 1.45 } },
       { id: "annex", x: 157, z: 0.5, w: 16, d: 12, h: 5.72, color: "#3c4a58", stair: { x0: 150, x1: 163, z: 7.2, w: 1.45 } },
       { id: "row-west", x: -24, z: -20, w: 18, d: 10, h: 5, color: "#4c433e" },

@@ -197,7 +197,7 @@ keys, the canvas and `day.watch()`, and it never changes the day.
 - Custom: `watch_time` {minutes} at 1, 3, 5, 10, 20, 30, 60… minutes on screen. Watching needs no input, so the SDK's
   active time undercounts it: use this for "how long people watch". `day_end` when the clock rolls into the next day
   while playing or live. `feedback_prompt` {action: shown, answered or dismissed, context, commented}.
-- The question: `ask({ id: "direction", question: "What would you want this to be?" })`, thumbs then an optional
+- The question: `ask({ id: "direction", question: "Are you enjoying this so far?" })`, thumbs then an optional
   comment, styled like the panels. It comes after 3 minutes on screen (`ASK_AFTER`) or at `day_end`, only after 4 s
   without input, at most once a session, and not for 7 days after a close (the SDK).
 
