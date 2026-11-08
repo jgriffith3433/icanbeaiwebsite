@@ -96,7 +96,7 @@ class Part {
       const p = (r, a, y) => [x + Math.cos(a) * r, y, z + Math.sin(a) * r];
       const slope = (r0 - r1) / (h || 1);
       const n = [Math.cos(am), slope, Math.sin(am)];
-      this.quad(p(r0, a1, y0), p(r0, a0, y0), p(r1, a0, y0 + h), p(r1, a1, y0 + h), n, col);
+      this.quad(p(r0, a0, y0), p(r0, a1, y0), p(r1, a1, y0 + h), p(r1, a0, y0 + h), n, col); // wound like box(): faces out
       if (cap !== false && r1 > 0.001) {
         const top = this.pos.length / 3;
         const c = this.w(x, y0 + h, z);
@@ -110,7 +110,7 @@ class Part {
           this.nrm.push(up[0], up[1], up[2]);
           this.col.push(col[0], col[1], col[2], 1);
         });
-        this.idx.push(top, top + 2, top + 1);
+        this.idx.push(top, top + 1, top + 2); // the cap faces up (it was culled from above)
       }
     }
     return this;
@@ -128,7 +128,7 @@ class Part {
         const P = (t, a) => [x + Math.cos(a) * Math.sin(t) * r, y + Math.cos(t) * r * sy, z + Math.sin(a) * Math.sin(t) * r];
         const am = (a0 + a1) / 2;
         const tm = (t0 + t1) / 2;
-        this.quad(P(t0, a0), P(t0, a1), P(t1, a1), P(t1, a0), [Math.cos(am) * Math.sin(tm), Math.cos(tm), Math.sin(am) * Math.sin(tm)], col);
+        this.quad(P(t0, a1), P(t0, a0), P(t1, a0), P(t1, a1), [Math.cos(am) * Math.sin(tm), Math.cos(tm), Math.sin(am) * Math.sin(tm)], col);
       }
     }
     return this;
@@ -301,11 +301,13 @@ export function installProps(ctx) {
     m.emissiveTexture = canvasTexture("sign-lit-" + sg.word, 512, 128, draw(true));
     m.emissiveColor = new B.Color3(0.3, 0.3, 0.3);
     m.specularColor = new B.Color3(0, 0, 0);
-    m.backFaceCulling = false;
+    // One-sided: a double-sided plane's back copy carries the same UVs (mirrored text) and, drawn second at the same
+    // depth, won from the front. The back faces the wall 8 cm behind it, so nobody sees it.
+    m.backFaceCulling = true;
     return m;
   });
   const signPlane = SIGNS.map((sg, i) => {
-    const p = B.MeshBuilder.CreatePlane("sign-" + sg.word, { width: 1, height: 0.25, sideOrientation: B.Mesh.DOUBLESIDE }, scene);
+    const p = B.MeshBuilder.CreatePlane("sign-" + sg.word, { width: 1, height: 0.25 }, scene);
     p.material = signMats[i];
     p.isPickable = false;
     return p;
@@ -324,6 +326,7 @@ export function installProps(ctx) {
     m.alphaMode = B.Engine.ALPHA_ADD;
     m.backFaceCulling = false;
     m.zOffset = -2;
+    m.disableDepthWrite = true; // a light decal: it must not hide the one under it
     const g = B.MeshBuilder.CreateGround("spill-" + color, { width: 6, height: 4 }, scene);
     g.position.y = 0.064;
     g.bakeCurrentTransformIntoVertices();

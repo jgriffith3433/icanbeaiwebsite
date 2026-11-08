@@ -123,7 +123,7 @@
     camera.wheelDeltaPercentage = 0.012; // zoom in proportion to distance; smooth on trackpads
     camera.pinchPrecision = 60;
     camera.panningSensibility = 0;
-    camera.minZ = 0.1;
+    camera.minZ = 0.2; // twice the depth precision of 0.1 (the camera never comes closer than 0.5 m to him)
     camera.maxZ = 600;
     camera.fov = 0.78;
     camera.attachControl(canvas, false); // false = the camera takes the wheel/pinch, the page doesn't
@@ -210,17 +210,20 @@
       layWalk("walkN" + k, b - a, (a + b) / 2, RZ + 2.9, true);
     });
     const dash = box("dash", 1.6, 0.012, 0.12, 0, 0.05, RZ, mat("#e8e1cf", { emissive: "#2a281f" }), null, false);
-    for (let x = street.from; x < street.to; x += 6) dash.thinInstanceAdd(B.Matrix.Translation(x, 0, 0));
+    // no centre dashes through the junctions (they ran through the crosswalk stripes at the same height)
+    for (let x = street.from; x < street.to; x += 6) if (!crossXs.some((c) => Math.abs(x - c) < 5.5)) dash.thinInstanceAdd(B.Matrix.Translation(x, 0, 0));
     (city.avenues || []).forEach((a, i) => {
       if (Math.abs(a.z - RZ) < 1) return;
-      gaps(a.from, a.to, crossXs, 2).forEach(([a0, b0], k) => layRoad("ave" + i + "r" + k, b0 - a0, (a0 + b0) / 2, a.z, true));
+      // One piece end to end (the junctions included); the cross streets stop at its edge (2.2 m = half its width), so
+      // no junction is left without asphalt and no two road pieces overlap (z-fighting).
+      layRoad("ave" + i + "r0", a.to - a.from, (a.from + a.to) / 2, a.z, true);
       gaps(a.from, a.to, crossXs, 3.8).forEach(([a0, b0], k) => {
         layWalk("aveS" + i + "_" + k, b0 - a0, (a0 + b0) / 2, a.z - 2.9, true);
         layWalk("aveN" + i + "_" + k, b0 - a0, (a0 + b0) / 2, a.z + 2.9, true);
       });
     });
     (city.crosses || []).forEach((c, i) => {
-      gaps(c.from, c.to, avenueZs, 2).forEach(([a0, b0], k) => layRoad("cross" + i + "r" + k, b0 - a0, c.x, (a0 + b0) / 2, false));
+      gaps(c.from, c.to, avenueZs.concat([RZ]), 2.2).forEach(([a0, b0], k) => layRoad("cross" + i + "r" + k, b0 - a0, c.x, (a0 + b0) / 2, false));
       gaps(c.from, c.to, avenueZs, 3.8).forEach(([a0, b0], k) => {
         layWalk("crossW" + i + "_" + k, b0 - a0, c.x - 2.9, (a0 + b0) / 2, false);
         layWalk("crossE" + i + "_" + k, b0 - a0, c.x + 2.9, (a0 + b0) / 2, false);
@@ -238,7 +241,8 @@
       const lot = box("lot", 20, 0.03, RZ - 2.2 - 4.7, officeO[0] + 9, 0.025, (4.7 + RZ - 2.2) / 2, mat("#4a4d52"), null, false);
       lot.receiveShadows = true;
       const lineM = mat("#dcd6c8");
-      for (let i = -3; i <= 4; i++) box("pline" + i, 0.08, 0.012, 4.2, pw.x + i * 2.6 - 1.3, 0.05, 7.8, lineM, null, false);
+      // The lines end at the lot's edge, short of the sidewalk (they used to run 4 mm under its top: depth fighting far off).
+      for (let i = -3; i <= 4; i++) box("pline" + i, 0.08, 0.012, 3.4, pw.x + i * 2.6 - 1.3, 0.05, 7.4, lineM, null, false);
     }
 
     /* Room to plant a lamp or a tree: not in a building, on a stair, in his yard, or on the check's open grass. */
@@ -340,14 +344,15 @@
       const z0 = b.z - b.d / 2;
       const z1 = b.z + b.d / 2;
       lip(b.id + "ps", b.w + t, t, b.x, py, z0 + t / 2, ph);
-      lip(b.id + "pw", t, b.d, x0 + t / 2, py, b.z, ph);
-      lip(b.id + "pe", t, b.d, x1 - t / 2, py, b.z, ph);
+      // The side and back pieces butt against the front one instead of overlapping it (coplanar corners flicker).
+      lip(b.id + "pw", t, b.d - t, x0 + t / 2, py, b.z + t / 2, ph);
+      lip(b.id + "pe", t, b.d - t, x1 - t / 2, py, b.z + t / 2, ph);
       if (b.stair) {
         const s0 = b.stair.x0 - 0.8;
         const s1 = b.stair.x1 + 0.8;
-        if (s0 - x0 > 0.4) lip(b.id + "pn1", s0 - x0, t, (x0 + s0) / 2, py, z1 - t / 2, ph);
-        if (x1 - s1 > 0.4) lip(b.id + "pn2", x1 - s1, t, (s1 + x1) / 2, py, z1 - t / 2, ph);
-      } else lip(b.id + "pn", b.w, t, b.x, py, z1 - t / 2, ph);
+        if (s0 - x0 - t > 0.4) lip(b.id + "pn1", s0 - x0 - t, t, (x0 + t + s0) / 2, py, z1 - t / 2, ph);
+        if (x1 - t - s1 > 0.4) lip(b.id + "pn2", x1 - t - s1, t, (s1 + x1 - t) / 2, py, z1 - t / 2, ph);
+      } else lip(b.id + "pn", b.w - 2 * t, t, b.x, py, z1 - t / 2, ph);
       const floors = Math.max(1, Math.floor((b.h - 0.8) / 3));
       for (let f = 0; f < floors; f++) {
         const wy = 1.7 + f * 3;
