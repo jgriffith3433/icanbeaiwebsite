@@ -1692,7 +1692,7 @@ window.DAY_CONFIG = {
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
         parts: [
-          { shape: "box", size: [0.2, 0.55, 0.22], pos: [-0.12, 0.28, 0], color: "#4a5a3a", leg: -1 },
+          { shape: "box", size: [0.2, 0.55, 0.22], pos: [-0.12, 0.28, 0], color: "#a5b27a", leg: -1 },
           { shape: "box", size: [0.2, 0.55, 0.22], pos: [0.12, 0.28, 0], color: "#4a5a3a", leg: 1 },
           { shape: "box", size: [0.5, 0.7, 0.34], pos: [0, 0.9, 0], color: "#f2c230" },
           { shape: "sphere", size: [0.36, 0.36, 0.36], pos: [0, 1.43, 0], color: "#e0b794" },
