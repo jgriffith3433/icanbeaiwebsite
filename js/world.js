@@ -1618,7 +1618,7 @@
         rl.level = snap ? on : damp(rl.level, on, dt, 10);
         if (rl.id === "bedroom") {
           B.Color3.LerpToRef(C("#b8cff2"), C("#ffd9a8"), rl.level, rl.light.diffuse);
-          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.46;
+          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.95; // lamp off at night: the bed and the sleeper must still read
         } else if (rl.id === "living") {
           B.Color3.LerpToRef(C("#c4d4f0"), C("#ffd9a8"), rl.level, rl.light.diffuse);
           rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.34;
@@ -1626,7 +1626,7 @@
           rl.light.intensity = rl.level * (0.55 + night * 0.65);
         }
       });
-      bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.55 : 0.48);
+      bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.7 : 0.85);
       const officeOn = things.officeLights !== "off" ? 1 : 0;
       const nearOffice = px > 65 || (cam.inited && cam.x > 65);
       officeLights.forEach((L) => {
