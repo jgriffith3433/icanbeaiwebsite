@@ -546,9 +546,31 @@ export function installProps(ctx) {
   const GREY = [hex("#7b848d"), hex("#6a7078"), hex("#8a8f94")];
   function acUnit(x, y, z, yaw) {
     roof.frame(x, z, yaw);
-    roof.box(0, y, 0, 1.5, 0.9, 1.1, GREY[Math.floor(rng() * GREY.length)]);
-    roof.cyl(-0.35, y + 0.9, 0, 0.36, 0.36, 0.06, 8, DARK);
-    roof.box(0.45, y + 0.2, 0.56, 0.4, 0.4, 0.04, DARK);
+    const body = GREY[Math.floor(rng() * GREY.length)];
+    const trim = [body[0] * 0.7, body[1] * 0.7, body[2] * 0.7];
+    const pipe = hex("#b07a4f");
+    roof.box(0, y, 0, 1.5, 0.08, 1.1, trim); // plinth the same footprint, so the collider stays right
+    roof.box(0, y + 0.08, 0, 1.46, 0.78, 1.06, body); // casing, set in 2 cm so the plinth and lid read as parts
+    roof.box(0, y + 0.86, 0, 1.5, 0.04, 1.1, trim); // lid
+    // fan well on the lid: four raised walls round a dark floor, with a grille across it
+    roof.box(-0.35, y + 0.9, 0.36, 0.8, 0.07, 0.05, trim);
+    roof.box(-0.35, y + 0.9, -0.36, 0.8, 0.07, 0.05, trim);
+    roof.box(-0.73, y + 0.9, 0, 0.05, 0.07, 0.67, trim);
+    roof.box(0.03, y + 0.9, 0, 0.05, 0.07, 0.67, trim);
+    roof.cyl(-0.35, y + 0.9, 0, 0.3, 0.3, 0.01, 8, DARK);
+    roof.box(-0.35, y + 0.93, 0, 0.7, 0.015, 0.03, trim);
+    roof.box(-0.35, y + 0.93, 0, 0.03, 0.015, 0.6, trim);
+    // louvres on both long faces and the front
+    for (let i = 0; i < 5; i++) {
+      const ly = y + 0.2 + i * 0.1;
+      roof.box(-0.2, ly, 0.54, 0.8, 0.04, 0.03, DARK);
+      roof.box(-0.2, ly, -0.54, 0.8, 0.04, 0.03, DARK);
+    }
+    // service panel with its handle, and a copper line out of the side
+    roof.box(0.5, y + 0.2, 0.54, 0.38, 0.4, 0.03, trim);
+    roof.box(0.5, y + 0.4, 0.56, 0.1, 0.03, 0.02, DARK);
+    roof.box(0.76, y + 0.3, -0.2, 0.08, 0.04, 0.04, pipe);
+    roof.box(0.8, y + 0.08, -0.2, 0.04, 0.26, 0.04, pipe);
     stats.roofUnits++;
   }
   function waterTank(x, y, z) {
