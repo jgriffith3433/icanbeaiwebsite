@@ -966,7 +966,7 @@ function install() {
   // Game seconds he has really been simulated as the player's (each control step's dt, which main.js caps at 0.1 s a
   // frame): the clock a playtest measures a climb in, so a slow browser doesn't read as a stuck one.
   let simT = 0;
-  day.pilot((fr, dt) => {
+  const pilotFrame = (fr, dt) => {
     lastFrame = fr;
     const driving = !!(fr && fr.person.inCar);
     if (driving !== lastDriving) {
@@ -1032,6 +1032,27 @@ function install() {
     avatar.play(posed || s.anim, posed ? 1 : s.speed, dt);
     cameraFollow(dt, { x: gp.lx, y: gp.ly });
     return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: posed || s.anim, text };
+  };
+  /* main.js runs this inside the render loop: a throw here stops the loop, so the clock freezes and the HUD is left in
+     control mode for good. Give the day back to him instead (the error is still raised, on its own turn, so the
+     playtest and the console see it) and the page keeps running. */
+  day.pilot((fr, dt) => {
+    try {
+      return pilotFrame(fr, dt);
+    } catch (err) {
+      setTimeout(() => {
+        throw err;
+      });
+      if (mode !== "schedule") {
+        mode = "schedule";
+        try {
+          backOnDay("catch-up");
+        } catch (e2) {
+          syncUi();
+        }
+      }
+      return null;
+    }
   });
 
   syncUi();
