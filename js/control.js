@@ -1024,7 +1024,9 @@ function install() {
       const up = Math.max(mover.floorAt(s.x + fx, s.z + fz, s.y + 0.5), mover.floorAt(s.x - fx, s.z - fz, s.y + 0.5)) - s.y;
       lift = Math.min(0.14 + (reach - 0.3), Math.max(0, up));
     }
-    s.slopeLift = (s.slopeLift || 0) + (lift - (s.slopeLift || 0)) * Math.min(1, dt * 14);
+    // up fast (landing on a ramp: the uphill foot must not sink for the frames it takes to ease in), down slowly
+    const cur = s.slopeLift || 0;
+    s.slopeLift = cur + (lift - cur) * Math.min(1, dt * (lift > cur ? 40 : 14));
     avatar.place(s.x, s.y + s.slopeLift, s.z, s.yaw);
     // cast / throw while a power is in his hands (js/powers.js); the walk pose otherwise
     // The cast and throw poses stand still: on the move or in the air he keeps his walk, run, jump or float (a
