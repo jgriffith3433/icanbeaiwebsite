@@ -351,6 +351,8 @@ export function createMover(world, cfg) {
     walkBackSpeed,
     route: () => route,
     hasPhysics: () => !!cc,
+    /** Height of the first surface straight down from (x, fromY, z), not counting him. */
+    floorAt,
     /** Raycast query for anything that isn't him: his own capsule is a body too, and the camera's rays must not hit it. */
     rayQuery: () => (cc ? { ignoreBody: cc._body } : undefined),
     /** Replace ambient + lasting columns. Player gusts use spawnUpdraft. */
@@ -1014,10 +1016,10 @@ function install() {
     /* On a slope the capsule's base sits on the surface under his middle, so the uphill foot (a stride ahead or behind)
        is inside the slab: lift the figure by how much higher the ground is a foot-length either side, eased in and out. */
     let lift = 0;
-    if (s.grounded && physics()) {
+    if (s.grounded && mover.hasPhysics()) {
       const fx = Math.sin(s.yaw) * 0.3;
       const fz = Math.cos(s.yaw) * 0.3;
-      const up = Math.max(floorAt(s.x + fx, s.z + fz, s.y + 0.5), floorAt(s.x - fx, s.z - fz, s.y + 0.5)) - s.y;
+      const up = Math.max(mover.floorAt(s.x + fx, s.z + fz, s.y + 0.5), mover.floorAt(s.x - fx, s.z - fz, s.y + 0.5)) - s.y;
       lift = Math.min(0.14, Math.max(0, up));
     }
     s.slopeLift = (s.slopeLift || 0) + (lift - (s.slopeLift || 0)) * Math.min(1, dt * 14);
