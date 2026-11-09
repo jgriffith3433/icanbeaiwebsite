@@ -608,7 +608,7 @@ export function installLook(world) {
     }
     const wet = override && override.wet != null ? override.wet : 0;
     const low = quality === "low";
-    const ibl = 0.28 + w.day * 0.34;
+    const ibl = 0.4 + w.day * 0.26 + (override && override.cover != null ? override.cover * 0.12 : 0); // night/storm floor: dark asphalt must still read
     if (Math.abs(wet - lastWet) > 0.01 || Math.abs(ibl - lastIbl) > 0.01 || low !== lastLow) {
       lastWet = wet;
       lastIbl = ibl;
