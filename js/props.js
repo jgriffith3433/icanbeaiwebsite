@@ -620,7 +620,14 @@ export function installProps(ctx) {
   warmMat.maxSimultaneousLights = 2;
   const meshes = [];
   if (!solid.empty) meshes.push(solid.mesh("props-solid", solidMat, scene));
-  if (!roof.empty) meshes.push(roof.mesh("props-roof", solidMat, scene));
+  if (!roof.empty) {
+    /* Rooftop units are grey boxes lit only by the weak dusk/night hemisphere light, so they read as flat black
+       cuboids next to the PBR roofs. Their own material adds an ambient fill (scene.ambientColor x this x the vertex
+       colour), so they stay a dark grey with visible form at any hour. */
+    const roofMat = solidMat.clone("props-roof-mat");
+    roofMat.ambientColor = new B.Color3(3, 3, 3);
+    meshes.push(roof.mesh("props-roof", roofMat, scene));
+  }
   if (!flat.empty) {
     const fm = flat.mesh("props-flat", solidMat, scene);
     fm.receiveShadows = true;
