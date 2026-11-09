@@ -684,18 +684,18 @@
     let nightPhone = null;
     if (spots.bed) {
       const n = anchor("bed", 0, 0);
-      box("bedframe", 1.75, 0.32, 2.2, 0, 0.26, -0.25, wood, n);
+      box("bedframe", 1.75, 0.305, 2.2, 0, 0.2675, -0.25, wood, n);
       box("mattress", 1.6, 0.2, 2.05, 0, 0.52, -0.25, linen, n).receiveShadows = true;
-      box("headboard", 1.75, 1.0, 0.1, 0, 0.6, -1.33, woodDark, n);
+      box("headboard", 1.79, 0.985, 0.1, 0, 0.6075, -1.33, woodDark, n);
       box("pillow", 0.65, 0.13, 0.36, -0.3, 0.68, -1.0, white, n);
       box("pillow2", 0.65, 0.13, 0.36, 0.38, 0.68, -1.02, white, n);
       quiltUp = box("quilt", 1.66, 0.12, 1.62, 0, 0.9, 0.36, mat("#3d4f68"), n);
       quiltDown = box("quiltdown", 1.66, 0.14, 0.45, 0, 0.66, 0.66, mat("#3d4f68"), n);
-      box("bedrug", 2.6, 0.015, 1.4, 0, FLOOR + 0.008, 1.3, mat("#8d4e45"), n, false).receiveShadows = true;
+      box("bedrug", 2.6, 0.015, 1.1, 0, FLOOR + 0.008, 1.45, mat("#8d4e45"), n, false).receiveShadows = true;
       const ns = new B.TransformNode("ns", scene);
       ns.parent = n;
       ns.position.set(-1.25, 0, -1.0);
-      box("nstand", 0.48, 0.55, 0.42, 0, 0.32, 0, woodLight, ns);
+      box("nstand", 0.48, 0.5, 0.42, 0, 0.35, 0, woodLight, ns);
       const am = glowMat("#1c1f22");
       alarmFace = am;
       box("clock", 0.2, 0.1, 0.1, 0.08, 0.65, 0.05, dark, ns);
@@ -709,7 +709,7 @@
       nightPhone = box("nphone", 0.08, 0.015, 0.15, 0.1, 0.6, -0.12, dark, ns);
       const tvN = anchor("bed", 2.95, 0, PI);
       if (tvN) {
-        box("dresser", 1.2, 0.75, 0.45, 0, 0.42, 0, woodLight, tvN);
+        box("dresser", 1.2, 0.74, 0.45, 0, 0.47, 0, woodLight, tvN);
         const sm = glowMat("#111418");
         box("btv", 0.95, 0.56, 0.05, 0, 1.12, 0.05, dark, tvN);
         glowing(box("btvface", 0.88, 0.5, 0.01, 0, 1.12, 0.08, sm, tvN, false));
