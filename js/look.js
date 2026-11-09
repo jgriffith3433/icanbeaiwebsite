@@ -357,6 +357,9 @@ export function installLook(world) {
   const neonMats = [];
   const neonHex = ["#3ecbff", "#ff4d8d", "#8eb6ff"];
   blocks.forEach((b, i) => {
+    /* Not on a block with a roof ramp: the ramp climbs the north face where the bar hangs, so the bar read as a teal slab
+       floating beside (and cutting into) the ramp. */
+    if (b.stair) return;
     const faceZ = b.z + b.d / 2 + 0.045;
     const y = Math.min(Math.max(2.4, b.h * 0.55), b.h - 0.8);
     const mat = new B.StandardMaterial("neon-" + b.id, scene);
