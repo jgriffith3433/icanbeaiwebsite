@@ -351,6 +351,10 @@ export function createMover(world, cfg) {
     walkBackSpeed,
     route: () => route,
     hasPhysics: () => !!cc,
+    /** Height of the first surface straight down from (x, fromY, z), not counting him. */
+    floorAt,
+    /** Raycast query for anything that isn't him: his own capsule is a body too, and the camera's rays must not hit it. */
+    rayQuery: () => (cc ? { ignoreBody: cc._body } : undefined),
     /** Replace ambient + lasting columns. Player gusts use spawnUpdraft. */
     setUpdrafts(list) {
       updrafts = (list || []).map((u) => ({
@@ -423,6 +427,8 @@ function install() {
   const hint = document.createElement("p");
   hint.className = "control-hint";
   hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold in the air to glide) · drag to look · hold F for a storm, E lightning, G a gust (and an updraft), T a tornado · 1–7 or hold Q for the weather · Esc to let go";
+  const HINT_KEYS = hint.textContent;
+  const HINT_TOUCH = "Left stick: move · Jump (tap again in the air) · tap Bolt, Rain, Gale, Fog, Sun break, or Storm, Gust, Tornado · drag to look";
   const pad = document.createElement("div");
   pad.className = "touchpad";
   pad.hidden = true;
@@ -445,7 +451,8 @@ function install() {
     document.documentElement.classList.toggle("in-control", mode === "control");
     document.documentElement.classList.toggle("touch-ui", touchMode());
     pad.hidden = !(mode === "control" && touchMode());
-    hint.hidden = !(mode === "control" && !touchMode());
+    hint.textContent = touchMode() ? HINT_TOUCH : HINT_KEYS;
+    hint.hidden = mode !== "control";
   }
   let lastDriving = null;
 
@@ -464,6 +471,7 @@ function install() {
   let lastRadius = null;
   let glidePull = 0;
   const camRay = new B.PhysicsRaycastResult();
+  const CAM_LIFT = 1.4; // least height of the camera over the surface under it
   const RIDE = Object.assign({
     cameraPull: 3.4,
     whoosh: "audio/sfx/glide-whoosh.mp3",
@@ -474,7 +482,7 @@ function install() {
   function cameraTake() {
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (saved[k] = camera[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => ((saved[k] = kb[k]), (kb[k] = [])));
-    camera.lowerRadiusLimit = 0.5; // a wall behind him may pull the camera in this close (the wheel stops at 1.5)
+    camera.lowerRadiusLimit = 0.2; // a wall behind him may pull the camera in this close, inside his own head (the wheel stops at 1.5)
     camera.upperRadiusLimit = 16;
     camera.lowerBetaLimit = 0.25;
     camera.upperBetaLimit = 1.62;
@@ -502,10 +510,24 @@ function install() {
     }
     const beta = 1.1;
     let best = null;
+    const pl = world.physics && world.physics();
+    // Distance to anything solid along a ray, ramps and lips included (clearRadius only knows the big boxes): the stair's
+    // slab beside the street is a dark plane the shot would otherwise be framed against.
+    const hitDist = (dx, dy, dz, max) => {
+      if (!pl) return max;
+      const o = new B.Vector3(x, 1.35, z);
+      pl.plugin.raycast(o, o.add(new B.Vector3(dx, dy, dz).scale(max)), camRay, mover.rayQuery());
+      return camRay.hasHit ? B.Vector3.Distance(o, camRay.hitPoint) : max;
+    };
     [0.5, Math.PI - 0.5, 0, Math.PI, 1.5708 + 0.9, 1.5708 - 0.9].forEach((a) => {
       const sb = Math.sin(beta);
-      const clear = world.clearRadius ? world.clearRadius(x, 1.35, z, Math.cos(a) * sb, Math.cos(beta), Math.sin(a) * sb, wantRadius, 0.6) : wantRadius;
-      if (!best || clear > best.clear + 0.3) best = { a, clear };
+      let clear = world.clearRadius ? world.clearRadius(x, 1.35, z, Math.cos(a) * sb, Math.cos(beta), Math.sin(a) * sb, wantRadius, 0.6) : wantRadius;
+      clear = Math.min(clear, hitDist(Math.cos(a) * sb, Math.cos(beta), Math.sin(a) * sb, wantRadius + 0.3) - 0.35);
+      // What the shot looks at behind him: a facade a few metres back fills the frame with one dark slab, so open street wins among the clear sides.
+      let behind = world.clearRadius ? world.clearRadius(x, 1.35, z, -Math.cos(a), 0, -Math.sin(a), 14, 0.6) : 14;
+      behind = Math.min(behind, hitDist(-Math.cos(a), 0, -Math.sin(a), 14));
+      const score = Math.min(clear, wantRadius) * 4 + Math.min(behind, 14);
+      if (!best || score > best.score + 0.3) best = { a, clear, score };
     });
     if (best) {
       camera.alpha = best.a;
@@ -562,6 +584,61 @@ function install() {
       camera.fov = push.baseFov + push.fov * (1 - e);
       if (k >= 1) pushEnd();
     }
+    /* Low over a slope or roof (the ramp up a block, the parapets): a camera skimming the slab shows only dark planes.
+       Look down from where the surface under it is at least CAM_LIFT below: lift the pitch (smoothly) until it is. */
+    const pl = world.physics && world.physics();
+    if (pl && !push.on) {
+      const pitchFor = (beta) => {
+        const sb = Math.sin(beta);
+        const cx = t.x + Math.cos(camera.alpha) * sb * r;
+        const cy = t.y + Math.cos(beta) * r;
+        const cz = t.z + Math.sin(camera.alpha) * sb * r;
+        pl.plugin.raycast(new B.Vector3(cx, cy + 0.5, cz), new B.Vector3(cx, cy - CAM_LIFT - 0.5, cz), camRay, mover.rayQuery());
+        return camRay.hasHit ? camRay.hitPoint.y : null;
+      };
+      let lift = camera.beta;
+      for (let i = 0; i < 6; i++) {
+        const gy = pitchFor(lift);
+        const cy = t.y + Math.cos(lift) * r;
+        if (gy == null || cy - gy >= CAM_LIFT || lift <= camera.lowerBetaLimit + 0.01) break;
+        lift = Math.max(camera.lowerBetaLimit, lift - 0.14);
+      }
+      if (lift < camera.beta) {
+        // damped, and never more than 0.1 rad a frame: on a slow frame (dt up to 0.1 s) the damping alone swung the camera metres
+        const nb = damp(camera.beta, lift, dt, 6);
+        camera.beta = Math.max(nb, camera.beta - 0.1, lift);
+      }
+    }
+    /* Walking at a wall with the camera on its far side squeezes the camera in to his head (a wall in front of him, the
+       camera behind the wall). Swing the orbit round, at a capped rate, to the nearest heading with room, as a
+       third-person camera does, rather than only pulling in. Not while the player is turning the camera themselves. */
+    if (world.clearRadius && !push.on && Math.abs(look.x) < 0.05) {
+      const want = Math.min(r, 3.5);
+      const sb0 = Math.sin(camera.beta);
+      const plr = world.physics && world.physics();
+      // The big boxes (clearRadius) don't know the ramp's slab, its end wall or the lips: ask the colliders too, so walking at
+      // the ramp's end swings the camera round to open street instead of squeezing it into his head against the slab.
+      const room = (a) => {
+        const ca = Math.cos(a) * sb0, cb = Math.cos(camera.beta), sa = Math.sin(a) * sb0;
+        let rm = world.clearRadius(t.x, t.y, t.z, ca, cb, sa, want, 0.6);
+        if (plr) {
+          const o = new B.Vector3(t.x, t.y, t.z);
+          plr.plugin.raycast(o.add(new B.Vector3(ca, cb, sa).scale(0.05)), o.add(new B.Vector3(ca, cb, sa).scale(want + 0.3)), camRay, mover.rayQuery());
+          if (camRay.hasHit) rm = Math.min(rm, B.Vector3.Distance(o, camRay.hitPoint) - 0.35);
+        }
+        return rm;
+      };
+      if (room(camera.alpha) < want - 0.3) {
+        let pick = null;
+        for (let k = 1; k <= 12 && pick == null; k++) {
+          for (const sg of [1, -1]) {
+            const a = camera.alpha + sg * k * 0.2618;
+            if (room(a) >= want - 0.05) { pick = a; break; }
+          }
+        }
+        if (pick != null) camera.alpha += Math.max(-2.2 * dt, Math.min(2.2 * dt, pick - camera.alpha));
+      }
+    }
     const dx = Math.cos(camera.alpha) * Math.sin(camera.beta);
     const dy = Math.cos(camera.beta);
     const dz = Math.sin(camera.alpha) * Math.sin(camera.beta);
@@ -570,15 +647,20 @@ function install() {
     const p = world.physics && world.physics();
     if (p) {
       const dir = new B.Vector3(dx, dy, dz);
-      const from = t.add(dir.scale(0.45)); // outside his own capsule
-      p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay);
+      const from = t.add(dir.scale(0.05)); // from him: starting further out missed a wall closer than that (flush against the ramp's end) and put the camera behind it
+      // not his own capsule: with the target trailing him at a sprint the ray started behind it, hit it, and pulled the camera into his head
+      p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay, mover.rayQuery());
       // Stay in front of the wall, however close that is: a floor of 1.2 m used to put the camera inside or behind it.
-      if (camRay.hasHit) r = Math.max(0.5, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
+      if (camRay.hasHit) r = Math.max(0.2, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
     }
-    camera.radius = r < camera.radius || push.on ? r : damp(camera.radius, r, dt, 3);
+    /* Pull in fast but never in one jump: a thin edge (the ramp's end, a parapet) entering the ray used to cut the
+       radius by metres in a single frame, a visible camera snap. 45 m/s still beats a walking pace by far; a slow frame (dt up to 0.1 s) is capped at 1.5 m so it stays under the feel sensor's 3 m. */
+    if (push.on) camera.radius = r;
+    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(1.5, Math.max(0.35, 45 * dt)));
+    else camera.radius = damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
-    const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5));
+    const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5)); // 0.15 at 0.5 m and closer
     if (world.person && Math.abs(vis - himVis) > 0.02) setHimVis(vis);
   }
 
@@ -884,7 +966,7 @@ function install() {
   // Game seconds he has really been simulated as the player's (each control step's dt, which main.js caps at 0.1 s a
   // frame): the clock a playtest measures a climb in, so a slow browser doesn't read as a stuck one.
   let simT = 0;
-  day.pilot((fr, dt) => {
+  const pilotFrame = (fr, dt) => {
     lastFrame = fr;
     const driving = !!(fr && fr.person.inCar);
     if (driving !== lastDriving) {
@@ -931,7 +1013,19 @@ function install() {
       world.avatar.show(false);
       avatar.show(true);
     }
-    avatar.place(s.x, s.y, s.z, s.yaw);
+    /* On a slope the capsule's base sits on the surface under his middle, so the uphill foot (a stride ahead or behind)
+       is inside the slab: lift the figure by how much higher the ground is a foot-length either side, eased in and out. */
+    let lift = 0;
+    if (s.grounded && mover.hasPhysics()) {
+      // the stride grows with speed (a run's foot lands ~0.5 m ahead), so look further and allow a bigger lift
+      const reach = 0.3 + Math.min(0.25, s.speed * 0.05);
+      const fx = Math.sin(s.yaw) * reach;
+      const fz = Math.cos(s.yaw) * reach;
+      const up = Math.max(mover.floorAt(s.x + fx, s.z + fz, s.y + 0.5), mover.floorAt(s.x - fx, s.z - fz, s.y + 0.5)) - s.y;
+      lift = Math.min(0.14 + (reach - 0.3), Math.max(0, up));
+    }
+    s.slopeLift = (s.slopeLift || 0) + (lift - (s.slopeLift || 0)) * Math.min(1, dt * 14);
+    avatar.place(s.x, s.y + s.slopeLift, s.z, s.yaw);
     // cast / throw while a power is in his hands (js/powers.js); the walk pose otherwise
     // The cast and throw poses stand still: on the move or in the air he keeps his walk, run, jump or float (a
     // standing pose sliding along the ground reads as gliding feet).
@@ -940,6 +1034,27 @@ function install() {
     avatar.play(posed || s.anim, posed ? 1 : s.speed, dt);
     cameraFollow(dt, { x: gp.lx, y: gp.ly });
     return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: posed || s.anim, text };
+  };
+  /* main.js runs this inside the render loop: a throw here stops the loop, so the clock freezes and the HUD is left in
+     control mode for good. Give the day back to him instead (the error is still raised, on its own turn, so the
+     playtest and the console see it) and the page keeps running. */
+  day.pilot((fr, dt) => {
+    try {
+      return pilotFrame(fr, dt);
+    } catch (err) {
+      setTimeout(() => {
+        throw err;
+      });
+      if (mode !== "schedule") {
+        mode = "schedule";
+        try {
+          backOnDay("catch-up");
+        } catch (e2) {
+          syncUi();
+        }
+      }
+      return null;
+    }
   });
 
   syncUi();
@@ -962,7 +1077,17 @@ function install() {
     /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */
     avatar: () => avatar,
     // Playtest hook: stand him at x,z (street level) while he's the player's, so a scenario needn't walk a slow bot there.
-    place: (x, z, yaw) => (mode === "control" ? mover.start(x, z, yaw == null ? s.yaw : yaw) : null),
+    place: (x, z, yaw) => {
+      if (mode !== "control") return null;
+      const r = mover.start(x, z, yaw == null ? s.yaw : yaw);
+      // A placement is a cut, not a walk: the camera's target would glide metres to him (a visible camera jump) and could be left
+      // facing the wall he now stands at. Snap it to him, frame the side with the most room, and tell the playtest it was intended.
+      camera.target.set(s.x, s.y + 1.35, s.z);
+      frameOutdoors({}, { x: s.x, z: s.z });
+      lastRadius = null;
+      try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
+      return r;
+    },
     ride: RIDE,
     log: () => log.slice(),
     take: () => take("console"),

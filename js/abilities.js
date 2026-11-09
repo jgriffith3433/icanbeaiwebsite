@@ -155,7 +155,7 @@ html.touch-ui .abilitybar .energy .et{font-size:.62rem}
 @media (orientation:landscape) and (max-height:520px){
 }
 html.in-control:not(.preview-public):not(.touch-ui) .side .log{max-height:22vh}
-body:has(.mo-line:not([hidden])) .control-hint,body:has(.tutorial:not([hidden])) .control-hint{visibility:hidden}
+html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.touch-ui):not(.in-control) body:has(.tutorial:not([hidden])) .control-hint{visibility:hidden}
 `;
   document.head.appendChild(style);
   const el = document.createElement("div");

@@ -1482,7 +1482,7 @@ window.DAY_CONFIG = {
       camera: { alpha: 1.35, beta: 1.0, radius: 11 },
       spots: {
         frontDoorOut: [1.0, 5.3, 180],
-        carSideHome: [-0.3, 7.3, 270],
+        carSideHome: [0.4, 7.3, 270],
         mailbox: [3.6, 10.2, 0],
       },
     },
@@ -1519,7 +1519,7 @@ window.DAY_CONFIG = {
       camera: { alpha: 1.3, beta: 1.05, radius: 10 },
       spots: {
         entranceOut: [8, 5.4, 180],
-        carSideWork: [6.65, 7.6, 270],
+        carSideWork: [7.4, 7.6, 270],
       },
     },
     corridor: {
@@ -1692,13 +1692,15 @@ window.DAY_CONFIG = {
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
         parts: [
-          { shape: "box", size: [0.2, 0.55, 0.22], pos: [-0.12, 0.28, 0], color: "#4a5a3a", leg: -1 },
+          { shape: "box", size: [0.2, 0.55, 0.22], pos: [-0.12, 0.28, 0], color: "#a5b27a", leg: -1 },
           { shape: "box", size: [0.2, 0.55, 0.22], pos: [0.12, 0.28, 0], color: "#4a5a3a", leg: 1 },
           { shape: "box", size: [0.5, 0.7, 0.34], pos: [0, 0.9, 0], color: "#f2c230" },
-          { shape: "sphere", size: [0.3, 0.3, 0.3], pos: [0, 1.4, 0], color: "#d9b08c" },
-          { shape: "cyl", size: [0.82, 0.06, 0.82], pos: [0, 1.56, 0], color: "#c9a85a" },
-          { shape: "cyl", size: [0.34, 0.16, 0.34], pos: [0, 1.64, 0], color: "#c9a85a" },
-          { shape: "box", size: [0.2, 0.17, 0.14], pos: [0.36, 0.7, 0.14], color: "#4f9a5b" },
+          { shape: "box", size: [0.12, 0.6, 0.14], pos: [-0.31, 0.9, 0], color: "#f2c230" },
+          { shape: "box", size: [0.12, 0.6, 0.14], pos: [0.31, 0.9, 0], color: "#f2c230" },
+          { shape: "sphere", size: [0.36, 0.36, 0.36], pos: [0, 1.4, 0], color: "#e0b794" },
+          { shape: "cyl", size: [0.64, 0.04, 0.64], pos: [0, 1.57, 0], color: "#c9a85a" },
+          { shape: "cyl", size: [0.3, 0.14, 0.3], pos: [0, 1.66, 0], color: "#c9a85a" },
+          { shape: "box", size: [0.2, 0.17, 0.14], pos: [0.47, 0.62, 0], color: "#4f9a5b" },
         ],
         stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
         beats: [

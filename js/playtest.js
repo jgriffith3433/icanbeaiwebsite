@@ -597,6 +597,19 @@ async function roofBolt(t) {
     else t.event("speed-buttons-clear", "every speed button (incl. 300x, 1200x) is clear of the ability bar");
     if (!bad.length) t.event("ability-bar-clear", `bar at y ${Math.round(bar.top)}-${Math.round(bar.bottom)} clear of the day timeline and Let go`);
   }
+  {
+    // control mode: no Privacy/version text under Let go, and the aim ring stays clear of it
+    const tags = [".privacy-tag", ".version-tag"].map((q) => document.querySelector(q)).filter((e) => e && e.offsetParent);
+    if (tags.length) t.problem("bug", "The Privacy/version footer still shows in control mode");
+    else t.event("footer-hidden", "Privacy and version text hidden while he's the player's");
+    const ret = document.getElementById("power-reticle");
+    const lg = document.getElementById("control") || document.querySelector(".control-btn");
+    if (ret && !ret.hidden && lg) {
+      const a = ret.getBoundingClientRect(), b = lg.getBoundingClientRect();
+      if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top) t.problem("bug", "The aim ring sits under the Let go button");
+      else t.event("reticle-clear", `aim ring at y ${Math.round(a.top)} clear of Let go (bottom ${Math.round(b.bottom)})`);
+    }
+  }
   const e0 = P.now().energy;
   const WXB = window.weather || window.day.weather;
   if (WXB && WXB.now().state === "clear" && WXB.now().rain < 0.05) t.event("calm-before", "clear, no rain, before the bolt");
@@ -2962,6 +2975,84 @@ async function powers(options, t) {
 /* ---------------- voice: DoD Eric lines on powers, weather, episode open/close ---------------- */
 // Real input: Sound (pointer), Enter, weather keys 1–7 with gaps for cooldown, bolts for chance/cooldown skips,
 // one forced power bark, Esc for the score-card close. Events: voice-play / voice-skip.
+// Spoken dialogue: with Sound on, an episode's opening lines play as their own Hawkes Gen clips (audio/dialogue/*.mp3),
+// not the babble. Checks the build's clip list, that a sample of clips loads and decodes, and that Part 1's opening
+// lines are spoken through day.dialogue (day:dialogue say). Events dialogue-index / dialogue-decode / dialogue-say.
+async function spokenDialogue(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day.dialogue;
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  if (!D || !Ep || !C) return t.problem("bug", "day.dialogue, episodes or Take control isn't installed");
+  const lines = D.lines();
+  await t.until(() => D.now().files > 0, 6000, "audio/dialogue/index.json").catch(() => {});
+  const files = D.now().files;
+  t.event("dialogue-index", `${files} clips for ${lines.length} lines`);
+  if (files < lines.length) t.problem("bug", `Only ${files} of ${lines.length} dialogue lines have a clip in the build, the rest fall back to babble`);
+  t.progress(0.1);
+
+  // A sample of clips must load and decode in this browser.
+  const sample = lines.filter((_, i) => i % 13 === 0);
+  let decoded = 0;
+  for (const L of sample) {
+    const ok = await new Promise((res) => {
+      const a = new Audio();
+      const done = (v) => { a.oncanplaythrough = a.onerror = null; res(v); };
+      a.oncanplaythrough = () => done(a.duration > 0.2);
+      a.onerror = () => done(false);
+      a.preload = "auto";
+      a.src = L.file;
+      a.load();
+      setTimeout(() => done(false), 8000);
+    });
+    if (ok) decoded++;
+    else t.problem("bug", `Dialogue clip ${L.file} (${L.who}: "${L.text}") didn't load or decode`);
+  }
+  t.event("dialogue-decode", `${decoded} of ${sample.length} sampled clips decode`);
+  t.progress(0.35);
+
+  const said = [];
+  const onSay = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "say") { said.push(d); t.event("dialogue-say", `${d.who}: ${d.id}`); }
+  };
+  window.addEventListener("day:dialogue", onSay);
+  try {
+    const sound = $("sound");
+    if (sound && sound.getAttribute("aria-pressed") !== "true") {
+      const r = sound.getBoundingClientRect();
+      sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+      sound.click();
+      await sleep(250);
+    }
+    t.event("sound-on", sound && sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+
+    const day = window.day.today();
+    const outside = carSideMoment(day) || quietMoment(day);
+    scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+    clickSpeed(1);
+    await sleep(600);
+    pressKey("Enter");
+    await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+    const offer = $("episode-offer");
+    if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+    t.progress(0.5);
+
+    t.scene("Part 1 opens, spoken");
+    Ep.start("dry-park", "playtest");
+    await t.until(() => said.length >= 2, 15000, "two spoken opening lines").catch(() => {});
+    t.progress(0.9);
+    if (!said.length) t.problem("bug", "Part 1's opening lines weren't spoken: no day:dialogue say (text and babble only)");
+    else if (said.some((d) => !D.voiced(d.who, (lines.find((L) => L.id === d.id) || {}).text))) t.problem("bug", "A spoken line wasn't marked voiced, so its babble also plays");
+    t.event("dialogue-played", `${D.now().played} lines spoken, last ${(D.now().last || {}).id || "none"}`);
+    await sleep(2500); // a beat for the footage, with the voice audible
+  } finally {
+    window.removeEventListener("day:dialogue", onSay);
+  }
+}
+
 async function voice(options, t) {
   t.scene("Outside");
   checkBasics(t);
@@ -5724,9 +5815,30 @@ async function spotProbe(options, t, spot) {
    camera cuts room to room by design) only frame hitches are watched. */
 const feelControl = () => (window.day && window.day.control && window.day.control.mode() === "control" ? window.day.control : null);
 
+/* Why the sensor was silent: the city's shells and merged buildings are isPickable = false (so taps and the pointer pick
+   skip them), and the sensor's camera and floor rays only hit pickable meshes, so the camera could sit inside a roof
+   unseen. At the start of a run (a bot's tab only) the big, non-instanced ones, and the flat ground, are made pickable. */
+function sensorScene() {
+  const w = window.day && window.day.world && window.day.world();
+  const scene = w && w.scene;
+  if (!scene) return undefined;
+  let n = 0;
+  for (const m of scene.meshes) {
+    if (m.isPickable !== false || m.thinInstanceCount || !m.getTotalVertices || !m.getTotalVertices()) continue;
+    // The ground plane is flat (no height), so the size test below skips it: with it unpickable the floor ray found
+    // nothing under him in the street, and any float or fall of 2 s off a roof read as "fell out of the world".
+    if (m.name === "ground") { m.isPickable = true; n++; continue; }
+    const e = m.getBoundingInfo().boundingBox.extendSizeWorld;
+    if (e.y * 2 >= 2 && (e.x > 1 || e.z > 1)) { m.isPickable = true; n++; }
+  }
+  window.__feelPickable = n;
+  return scene;
+}
+
 installPlaytest({
   product: "icanbe",
   feel: {
+    get scene() { return sensorScene(); },
     active: () => !!feelControl(),
     player: () => {
       const C = feelControl();
@@ -5768,6 +5880,7 @@ installPlaytest({
     { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
+    { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
@@ -5781,11 +5894,17 @@ installPlaytest({
     { id: "phone", title: "Phone: the game by touch only, in portrait or landscape: take control, stick, jump, the five abilities and a power by tap, the Episodes menu and an episode card, the first-visit card and the tutorial episode (start and Skip), the day timeline dragged; every tapped control at least 44 px and on screen, HUD overlap checked", seconds: 240, tags: ["phone", "smoke-phone", "control", "tutorial"], description: "Day bar to a quiet moment at home (setup); day.control.touch(true) on a desktop-sized window (setup). Every press is a pointer tap measured first (44 px, on screen). Option {\"orientation\":\"landscape\"} turns a portrait window to landscape if the page can resize it, else the orientation event says it ran portrait only. Events touch-layout / orientation / take-control-tap / tutorial-card-skipped / tutorial-started / tutorial-skipped / stick-move / jump-tap / ability-tap-<id> / power-tap / episodes-open / episodes-closed / episode-card / timeline-drag / hud-clear / phone-taps." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
-  isReady: () => !!(window.day && window.day.now().frame),
+  /* Ready = a frame is drawn AND the loading card has let go of the page (index.html window.__loading). While the card is up
+     html.loading hides the whole HUD, so a run that started on the first frame saw the day bar, #what, #sound and #details
+     as "hidden in Live mode" and screenshots of a full loading bar. A failed load counts (the run then reports it). */
+  isReady: () => !!(window.day && window.day.now().frame && !(window.__loading && window.__loading.state() === "loading")),
   async start(id, options, t) {
     const errFrom = consoleErrors.length;
+    // control.js's place() (a setup teleport that snaps the camera) tells the feel sensor it was an intended cut through
+    // window.hawkesPlaytest.cut; the contract's api has none (cut lives on `t`), so every placement counted as a camera snap.
+    if (window.hawkesPlaytest && !window.hawkesPlaytest.cut) window.hawkesPlaytest.cut = (s) => t.cut(s);
     try {
-      if (id !== "title" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (id !== "title"&& window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
@@ -5814,6 +5933,7 @@ installPlaytest({
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "voice") await voice(options, t);
+      else if (id === "spoken-dialogue") await spokenDialogue(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);
       else if (id === "score-ranks") await scoreRanks(options, t);

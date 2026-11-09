@@ -35,8 +35,8 @@ import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 
 /* The loading card (index.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
 const loading = window.__loading || { set() {}, done() {}, fail() {} };
-const ready = { model: false, frame: false, title: false };
-const maybeDone = () => { if (ready.model && ready.frame && ready.title) loading.done(); };
+const ready = { model: false, frame: false, title: false, lights: false };
+const maybeDone = () => { if (ready.model && ready.frame && ready.title && ready.lights) loading.done(); };
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
@@ -56,6 +56,28 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
 /* Small Weather's 3D model (day.config.js control.model): kick off fetching the GLB and loader chunk early
    in parallel so the model is ready right after the first frame. He is drawn only once it is on (js/world.js
    keeps the box figure hidden): a failed load tries twice more, then he stays hidden, never a stand-in. */
+/* Shader warm-up for the light sets the day switches between, behind the loading card (js/world.js warmLights):
+   the first jump to night or to the office would otherwise freeze the page while they compile. */
+(function warmUp() {
+  const w = window.day && window.day.world && window.day.world();
+  if (!w || !w.warmLights) { ready.lights = true; return; }
+  /* Runs once his model is on (or has failed): his skinned PBR shader is one of the ones that recompiles per light set,
+     so warming before he joins the scene left that compile for the first night or office jump. */
+  /* The warm-up is a head start, never a reason to keep the card up: world.warmLights keeps its own 8 s budget and carries on
+     behind the title once the card is gone; this cap (2.5 s) is the gate's own, so whatever that promise does (a compile that never settles on a slow or software GL), the
+     card goes once the model, the frame and the title are in. */
+  const go = () => {
+    const t0 = Date.now();
+    const lightsDone = (how) => { if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
+    const cap = setTimeout(() => lightsDone("the 2.5 s cap"), 2500); // a slow GL compiles for 8 s: the card must not sit at a full bar for that
+    w.warmLights(8000).catch(() => {}).finally(() => { clearTimeout(cap); lightsDone("the warm-up"); });
+  };
+  window.__warmLights = () => (function afterFrame() {
+    if (window.day.now && window.day.now().frame) go(); else requestAnimationFrame(afterFrame);
+  })();
+  if (!(window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.model)) window.__warmLights();
+})();
+
 const skinWorld = control.model && window.day && window.day.world();
 if (skinWorld) {
   const w = skinWorld;
@@ -105,9 +127,11 @@ if (skinWorld) {
       ready.model = true;
       loading.set("model", 1);
       maybeDone();
+      if (window.__warmLights) window.__warmLights();
       console.info(`[world] Small Weather's model: ${skin.clips.length} clips (${skin.clips.join(" ")})`);
     })
     .catch((err) => {
+      if (window.__warmLights) window.__warmLights();
       w.setSkin(null); // he stays hidden: Small Weather or nothing, never the box figure
       Object.assign(status, { model: "none", modelError: String((err && err.message) || err) });
       console.error("[world] Small Weather's model didn't load:", err);

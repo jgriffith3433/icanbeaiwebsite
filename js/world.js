@@ -344,7 +344,7 @@
        onto the roof. A ramp, not a stack of steps: the controller treats a sharp riser as a
        wall once the capsule's curve meets it, and a slope under 30° stays walkable. */
     const trimM = mat("#2c333c");
-    const stepM = mat("#4a514c");
+    const stepM = mat("#566059", { emissive: "#0d100e" }); // the faint emissive keeps the ramp readable at night, when only the hemi light reaches it
     const winM = glowMat("#1a2838");
     const blockWin = box("bwin", 1.15, 1.25, 0.06, 0, 0, 0, winM, null, false);
     glowing(blockWin);
@@ -398,7 +398,7 @@
       /* Close the wedge under the ramp: its high end and its street side are walls, so nobody walks in under the
          ramp where the gap is lower than the capsule and gets stuck. The side is stepped to follow the underside
          (always a little below it, so it never touches the walkable slope). */
-      const wallM = mat("#2f3538");
+      const wallM = mat("#4a5459", { emissive: "#0e1215" }); // lighter than before: at night the end and side walls read as a black slab beside the ramp
       const endH = Math.max(0.5, b.h - 0.35);
       box(b.id + "rampend", 0.3, endH, s.w + 0.4, s.x1 + 0.15, endH / 2, s.z, wallM, null, false);
       solids.push({ x: s.x1 + 0.15, y: endH / 2, z: s.z, w: 0.3, h: endH, d: s.w + 0.4 });
@@ -408,8 +408,58 @@
         const under = (xa - s.x0) * Math.tan(theta) - thick / Math.cos(theta);
         const h = under - 0.06;
         if (h < 0.1) continue;
-        box(b.id + "rampside" + xa, xb - xa, h, 0.24, (xa + xb) / 2, h / 2, sideZ, wallM, null, false);
         solids.push({ x: (xa + xb) / 2, y: h / 2, z: sideZ, w: xb - xa, h, d: 0.24 });
+      }
+      /* What he sees is one wedge that follows the ramp's underside (2 cm below it, flush to its side), not the collider's
+         steps: the steps stood apart from the slope and read as slabs floating beside it. */
+      const slope = Math.tan(theta);
+      const underAt = (x) => (x - s.x0) * slope - thick / Math.cos(theta) - 0.02;
+      const xc = s.x0 + (thick / Math.cos(theta) + 0.02) / slope; // where the underside leaves the ground
+      const topY = underAt(s.x1);
+      if (topY > 0.1) {
+        const zA = s.z + s.w / 2;
+        const zB = zA + 0.24;
+        const tri = [[xc, 0], [s.x1, 0], [s.x1, topY]];
+        const P = [];
+        const idx = [];
+        const quad = (a, b, c, d) => { // a..d are 3D points, listed around the face
+          const o = P.length / 3;
+          [a, b, c, d].forEach((q) => P.push(q[0], q[1], q[2]));
+          idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+        };
+        const tri3 = (a, b, c) => {
+          const o = P.length / 3;
+          [a, b, c].forEach((q) => P.push(q[0], q[1], q[2]));
+          idx.push(o, o + 1, o + 2);
+        };
+        const [t0, t1, t2] = tri;
+        tri3([t0[0], t0[1], zA], [t1[0], t1[1], zA], [t2[0], t2[1], zA]);
+        tri3([t0[0], t0[1], zB], [t1[0], t1[1], zB], [t2[0], t2[1], zB]);
+        quad([t0[0], 0, zA], [t1[0], 0, zA], [t1[0], 0, zB], [t0[0], 0, zB]);
+        quad([t1[0], 0, zA], [t2[0], t2[1], zA], [t2[0], t2[1], zB], [t1[0], 0, zB]);
+        quad([t2[0], t2[1], zA], [t0[0], 0, zA], [t0[0], 0, zB], [t2[0], t2[1], zB]);
+        // wind every triangle so its normal points away from the middle of the wedge
+        const cx0 = (t0[0] + t1[0] + t2[0]) / 3, cy0 = topY / 3, cz0 = (zA + zB) / 2;
+        for (let i = 0; i < idx.length; i += 3) {
+          const a = idx[i] * 3, b = idx[i + 1] * 3, c = idx[i + 2] * 3;
+          const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2];
+          const vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+          const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+          const dot = nx * (P[a] - cx0) + ny * (P[a + 1] - cy0) + nz * (P[a + 2] - cz0);
+          // Babylon is left-handed: a face is front-facing when its triangle runs clockwise seen from outside, i.e. the cross product points inward
+          if (dot > 0) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
+        }
+        const N = [];
+        B.VertexData.ComputeNormals(P, idx, N);
+        const wedge = new B.Mesh(b.id + "rampside0", scene);
+        const vd = new B.VertexData();
+        vd.positions = P;
+        vd.indices = idx;
+        vd.normals = N;
+        vd.applyToMesh(wedge);
+        wedge.material = wallM;
+        wedge.isPickable = false;
+        wedge.receiveShadows = true;
       }
       const mark = new B.TransformNode("at-roof-" + b.id, scene);
       mark.position.set(b.x, b.h, b.z);
@@ -481,6 +531,9 @@
       return g;
     }
 
+    /* interior (opaque) walls: one that stands between the camera and what it looks at fades out, so a wall on the
+       camera's side never fills the view (see cutawayWalls in the camera follow) */
+    const innerWalls = [];
     Object.entries(cfg.buildings || {}).forEach(([bid, b]) => {
       if (!b.bounds) return;
       trackMeshes(bid, () => {
@@ -503,9 +556,15 @@
         right.receiveShadows = true;
         const trimM = mat(bid === "office" ? "#59636e" : "#8d5a45");
         box(bid + "-crown", W + 0.3, 0.14, 0.3, x0 + W / 2, H + 0.07, z0, trimM);
-        box(bid + "-crownL", 0.3, 0.14, D, x0, H + 0.07, z0 + D / 2, trimM);
-        box(bid + "-crownR", 0.3, 0.14, D, x1, H + 0.07, z0 + D / 2, trimM);
+        const crownL = box(bid + "-crownL", 0.3, 0.14, D, x0, H + 0.07, z0 + D / 2, trimM);
+        const crownR = box(bid + "-crownR", 0.3, 0.14, D, x1, H + 0.07, z0 + D / 2, trimM);
+        /* the side walls run toward the camera: seen from above they fill a bottom corner, so they fade like the interior ones */
+        innerWalls.push({ mesh: left, extra: [crownL], x0, z0, x1: x0, z1 });
+        innerWalls.push({ mesh: right, extra: [crownR], x0: x1, z0, x1, z1 });
         box(bid + "-base", W, 0.12, 0.05, x0 + W / 2, FLOOR + 0.06, z0 + 0.1, trimM, null, false);
+        /* the open front of the cutaway: a trimmed post where each side wall ends, so the cut isn't a raw edge */
+        box(bid + "-postL", 0.3, H, 0.3, x0, H / 2, z1, trimM);
+        box(bid + "-postR", 0.3, H, 0.3, x1, H / 2, z1, trimM);
         (b.walls || []).forEach((w, i) => {
           const glass = w[4] === "glass";
           const wx0 = w[0] + o[0];
@@ -518,6 +577,7 @@
           const mesh = box(bid + "-wall" + i, len, wallH, glass ? 0.04 : 0.12, (wx0 + wx1) / 2, wallH / 2 + FLOOR, (wz0 + wz1) / 2, m, null, !glass);
           mesh.rotation.y = -Math.atan2(wz1 - wz0, wx1 - wx0);
           mesh.receiveShadows = !glass;
+          if (!glass) innerWalls.push({ mesh, x0: wx0, z0: wz0, x1: wx1, z1: wz1 });
           if (glass) {
             const fm = mat("#59636e");
             const top = box(bid + "-wallt" + i, len, 0.06, 0.08, (wx0 + wx1) / 2, wallH + FLOOR, (wz0 + wz1) / 2, fm);
@@ -556,6 +616,8 @@
         roomLights.push({ id: r.id, light: L, thing: r.light, building: r.building, level: 0 });
       }
     });
+    let warmInfo = null; // what ended the last warmLights(): { how: done|budget, ms, sets }
+    let warmGroups = null; // set by warmLights(): the light groups forced on while their shaders compile
     const bedsideFill = new B.PointLight("bedside-fill", V3(-5.15, 1.45, -2.35), scene);
     bedsideFill.diffuse = B.Color3.FromHexString("#ffd296");
     bedsideFill.specular = new B.Color3(0.08, 0.06, 0.04);
@@ -1004,6 +1066,21 @@
       const cabinMesh = box("cabin", 1.6, 0.55, 2.1, 0, 1.08, -0.25, glass, root);
       const roofMesh = box("roof", 1.5, 0.08, 1.9, 0, 1.38, -0.3, body, root);
       box("pillarF", 1.6, 0.5, 0.08, 0, 1.08, 0.78, body, root);
+      /* shape: a lighter bumper line, a sloped hood and boot, a grille, side mirrors and window pillars, so the
+         parked and passing cars read as cars and not black boxes */
+      const trimC = mat("#59636e", { spec: 0.3 });
+      box("bumperF", 1.82, 0.16, 0.14, 0, 0.42, 2.08, trimC, root);
+      box("bumperB", 1.82, 0.16, 0.14, 0, 0.42, -2.08, trimC, root);
+      box("grille", 0.9, 0.18, 0.04, 0, 0.58, 2.07, black, root, false);
+      const hood = box("hood", 1.7, 0.1, 0.9, 0, 0.88, 1.5, body, root);
+      hood.rotation.x = 0.16;
+      const boot = box("boot", 1.7, 0.1, 0.7, 0, 0.9, -1.58, body, root);
+      boot.rotation.x = -0.12;
+      [-1, 1].forEach((sd, i) => {
+        box("mirror" + i, 0.14, 0.1, 0.18, sd * 0.94, 1.12, 0.7, body, root, false);
+        box("pillarB" + i, 0.07, 0.52, 0.1, sd * 0.8, 1.08, -1.25, body, root, false);
+        box("sill" + i, 0.05, 0.12, 3.2, sd * 0.9, 0.34, 0, trimC, root, false);
+      });
       const wheels = [];
       [[-0.85, 1.3], [0.85, 1.3], [-0.85, -1.35], [0.85, -1.35]].forEach((p, i) => {
         const axle = new B.TransformNode("axle" + i, scene);
@@ -1590,9 +1667,9 @@
       sun.direction.set(-Math.cos(ang) * 0.7, -Math.max(0.3, elev), -0.55);
       sun.intensity = hour > SR - 0.3 && hour < SS + 0.3 ? 0.18 + elev * 0.54 : 0.02;
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
-      hemi.intensity = 0.22 + day * 0.5; // the shaded faces of the city's buildings must still read in the morning
+      hemi.intensity = 0.34 + day * 0.4; // dusk/night floor: the street and people must stay readable; the shaded faces of the city's buildings must still read in the morning
       B.Color3.LerpToRef(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
-      B.Color3.LerpToRef(C("#12151e"), C("#3a362c"), day, hemi.groundColor);
+      B.Color3.LerpToRef(C("#262c3c"), C("#3a362c"), day, hemi.groundColor);
       if (!scene.metadata || !scene.metadata.dayLook) {
         const ipc = pipeline.imageProcessing && pipeline.imageProcessing.imageProcessingConfiguration;
         if (ipc) ipc._exposure = 0.84 + day * 0.1;
@@ -1616,24 +1693,36 @@
         rl.level = snap ? on : damp(rl.level, on, dt, 10);
         if (rl.id === "bedroom") {
           B.Color3.LerpToRef(C("#b8cff2"), C("#ffd9a8"), rl.level, rl.light.diffuse);
-          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.46;
+          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.95; // lamp off at night: the bed and the sleeper must still read
         } else if (rl.id === "living") {
           B.Color3.LerpToRef(C("#c4d4f0"), C("#ffd9a8"), rl.level, rl.light.diffuse);
           rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.34;
         } else {
           rl.light.intensity = rl.level * (0.55 + night * 0.65);
         }
-        const want = rl.light.intensity > 0.01 && Math.abs(px - rl.light.position.x) < 75;
-        if (rl.light.isEnabled() !== want) rl.light.setEnabled(want);
       });
-      bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.55 : 0.48);
-      const wantBedside = bedsideFill.intensity > 0.01 && Math.abs(px - bedsideFill.position.x) < 75;
-      if (bedsideFill.isEnabled() !== wantBedside) bedsideFill.setEnabled(wantBedside);
+      bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.7 : 0.85);
       const officeOn = things.officeLights !== "off" ? 1 : 0;
       const nearOffice = px > 65 || (cam.inited && cam.x > 65);
       officeLights.forEach((L) => {
         L.intensity = officeOn && nearOffice ? 0.12 + night * 0.35 : 0;
-        const want = L.intensity > 0.01;
+      });
+      /* A light switching on or off changes the shader of every mesh it touches, and that recompile is a freeze on a
+         scrub or a jump. So the lights of a building switch as one group (home: rooms + bedside, office: its fixtures),
+         the same few sets every time, and warmLights() compiles those sets behind the loading card. */
+      const groupOn = {};
+      roomLights.forEach((rl) => { if (rl.light.intensity > 0.01 && Math.abs(px - rl.light.position.x) < 75) groupOn[rl.building] = true; });
+      if (bedsideFill.intensity > 0.01 && Math.abs(px - bedsideFill.position.x) < 75) groupOn.home = true;
+      if (officeLights.some((L) => L.intensity > 0.01)) groupOn.office = true;
+      const lightOn = (b) => (warmGroups ? warmGroups.has(b) : !!groupOn[b]);
+      roomLights.forEach((rl) => {
+        const want = lightOn(rl.building) && (!!warmGroups || Math.abs(px - rl.light.position.x) < 75);
+        if (rl.light.isEnabled() !== want) rl.light.setEnabled(want);
+      });
+      const wantBedside = lightOn("home") && (!!warmGroups || Math.abs(px - bedsideFill.position.x) < 75);
+      if (bedsideFill.isEnabled() !== wantBedside) bedsideFill.setEnabled(wantBedside);
+      officeLights.forEach((L) => {
+        const want = lightOn("office");
         if (L.isEnabled() !== want) L.setEnabled(want);
       });
       if (bedLampShade) setEmissive(bedLampShade, "#ffd08a", things.bedroomLamp === "on" ? 1.3 : 0.12 + night * 0.45);
@@ -1748,7 +1837,7 @@
       setEmissive(myCar.hl, "#fff3d0", lights ? 1.6 : 0.05);
       setEmissive(myCar.tl, "#ff2a2a", things.engine === "on" ? (car.moving ? 0.7 : 1.4) : 0.05);
       headSpot.intensity = lights ? 1.6 * Math.max(night, raining || foggy ? 0.55 : 0) : 0;
-      const wantHead = headSpot.intensity > 0.01;
+      const wantHead = warmGroups ? warmGroups.has("car") : headSpot.intensity > 0.01;
       if (headSpot.isEnabled() !== wantHead) headSpot.setEnabled(wantHead);
 
       /* traffic */
@@ -1985,7 +2074,71 @@
           if (r < camera.radius) camera.radius = r;
         }
       }
+      cutawayWalls(!pp.inCar && !!bd);
       sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
+    }
+
+    /* an interior wall crossing the line from the camera to its target (seen from above) is drawn faint: the
+       cutaway never has a wall in front of the room. Colliders stay; only how it looks changes. */
+    function cutawayWalls(on) {
+      if (!innerWalls.length) return;
+      const tg = camera.target;
+      const sb = Math.sin(camera.beta);
+      const cx = tg.x + camera.radius * Math.cos(camera.alpha) * sb;
+      const cz = tg.z + camera.radius * Math.sin(camera.alpha) * sb;
+      const now = typeof performance !== "undefined" ? performance.now() : 0;
+      for (const w of innerWalls) {
+        let hide = false;
+        let near = false;
+        /* a wall that was hidden a moment ago stays hidden while the camera is only just clear of the tests below
+           (margin `mg`) and for 0.7 s after: a camera that drifts on the edge of a threshold, or is turned by hand
+           (the input moves it after this runs), must not flash a solid slab across the view for a frame or two */
+        const held = w.hiddenAt != null && now - w.hiddenAt < 700;
+        const mg = held ? 1.5 : 0;
+        if (on) {
+          /* a wall right under the camera (it sits above the room) fills a corner of the view even when it isn't on the sight line */
+          const ex0 = w.x1 - w.x0;
+          const ez0 = w.z1 - w.z0;
+          const l2 = ex0 * ex0 + ez0 * ez0 || 1;
+          const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
+          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2 + mg) hide = near = true;
+        }
+        if (on && !hide) {
+          /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
+             the near edge of the room even when the sight line misses it */
+          const vx = cx - tg.x;
+          const vz = cz - tg.z;
+          const vl = Math.hypot(vx, vz) || 1;
+          const d0 = ((w.x0 - tg.x) * vx + (w.z0 - tg.z) * vz) / vl;
+          const d1 = ((w.x1 - tg.x) * vx + (w.z1 - tg.z) * vz) / vl;
+          if (Math.min(d0, d1) > 0.3 - mg) hide = near = true;
+          /* a partition that runs toward the camera (one end behind the target, the other well in front of it) shows
+             as a big grey wedge down the side of the view even though the sight line misses it */
+          else if (Math.max(d0, d1) > 2 - mg) hide = near = true;
+        }
+        if (on && !hide) {
+          const ex = w.x1 - w.x0;
+          const ez = w.z1 - w.z0;
+          const sc = ex * (cz - w.z0) - ez * (cx - w.x0);
+          const st = ex * (tg.z - w.z0) - ez * (tg.x - w.x0);
+          if (sc * st < 0) {
+            /* the camera and the target are on opposite sides: does the sight line cross the wall's span? */
+            const dx = tg.x - cx;
+            const dz = tg.z - cz;
+            const den = dx * ez - dz * ex;
+            if (Math.abs(den) > 1e-6) {
+              const u = ((w.x0 - cx) * dz - (w.z0 - cz) * dx) / den;
+              hide = u > -0.15 - mg * 0.1 && u < 1.15 + mg * 0.1;
+            }
+          }
+        }
+        /* a wall beside or under the camera is gone, not ghosted: even at 12% its dark slab fills the corner of a night view */
+        if (hide) w.hiddenAt = now;
+        else if (on && held) hide = near = true;
+        const v = hide ? (near ? 0 : 0.12) : 1;
+        if (w.mesh.visibility !== v) w.mesh.visibility = v;
+        if (w.extra) for (const e of w.extra) if (e.visibility !== v) e.visibility = v;
+      }
     }
 
     /* ---------------- physics (Havok) ---------------- */
@@ -2171,6 +2324,65 @@
         bedsideFill,
         bedroomLight: (roomLights.find((rl) => rl.id === "bedroom") || {}).light || null,
       },
+      /* Compile the shaders of every light set the day switches between (home at night, the office, the car's beam),
+         one set at a time and off the main thread where the browser allows, so a scrub or a jump to night doesn't
+         freeze the page on the first switch. The frame loop applies each set; resolves when done (or after maxMs). */
+      async warmLights(maxMs) {
+        const have = new Set(roomLights.map((rl) => rl.building));
+        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"]].filter((g) => g.every((b) => b === "car" || have.has(b) || (b === "office" && officeLights.length)));
+        const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
+        const t0 = Date.now(), budget = maxMs || 8000;
+        /* maxMs is a real deadline: a shader compile or whenReadyAsync that never settles (a slow or software GL, a lost
+           context) used to hang this promise, so the loading card (js/app.js waits for it) stayed up for good. Each wait
+           gives up when the budget is spent; the warm-up is only a head start. */
+        const within = (p, ms) => new Promise((res) => {
+          const timer = setTimeout(() => res(false), Math.max(0, ms));
+          Promise.resolve(p).then(() => { clearTimeout(timer); res(true); }, () => { clearTimeout(timer); res(true); });
+        });
+        const info = warmInfo = { how: null, ms: 0, sets: [] };
+        const meshesReady = async (ms) => {
+          const end = Date.now() + Math.max(0, ms);
+          for (;;) {
+            let all = true;
+            for (const m of scene.meshes) {
+              if (m.subMeshes && m.subMeshes.length && m.isEnabled() && !m.isReady(true)) all = false;
+            }
+            if (all) return true;
+            if (Date.now() >= end) return false;
+            await nextFrame();
+          }
+        };
+        try {
+          /* Materials of meshes outside the first view (the city the title orbits over, the skin once on) would
+             otherwise compile the frame they first come into view. One mesh per material, in the current light set. */
+          const seen = new Set();
+          for (const m of scene.meshes) {
+            const mat = m.material;
+            if (!mat || seen.has(mat) || !m.getTotalVertices || !m.getTotalVertices() || !mat.forceCompilationAsync) continue;
+            seen.add(mat);
+            if (Date.now() - t0 > budget / 2) break;
+            if (!(await within(mat.forceCompilationAsync(m), budget / 2 - (Date.now() - t0)))) break;
+          }
+          for (const g of sets) {
+            if (Date.now() - t0 > budget) break;
+            warmGroups = new Set(g);
+            await nextFrame();
+            await nextFrame();
+            /* Wait for the meshes' shaders in this light set, not scene.whenReadyAsync(): that also waits on pending data,
+               every particle system and layer, and any one of those can stay "not ready" for good (the card sat on
+               "Lighting the street…" for the full cap). Same per-mesh check Scene.isReady makes, nothing else. */
+            const ok = await meshesReady(budget - (Date.now() - t0));
+            info.sets.push({ set: g.join("+"), ms: Date.now() - t0, ok });
+            if (!ok) { info.how = "budget"; break; }
+          }
+        } catch (e) { /* a warm-up is only a head start */ }
+        warmGroups = null;
+        info.ms = Date.now() - t0;
+        if (!info.how) info.how = "done";
+        try { console.info(`[world] shader warm-up ended: ${info.how} after ${info.ms} ms (${info.sets.map((x) => `${x.set} ${x.ms}${x.ok ? "" : "!"}`).join(", ")})`); } catch (e) { /* no console */ }
+        return info;
+      },
+      warmInfo: () => warmInfo,
       enablePhysics,
       /* js/cityscape.js reads the colliders so far (to find free lots) and adds its own before physics is on */
       solids,

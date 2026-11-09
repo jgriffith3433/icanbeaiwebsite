@@ -371,6 +371,7 @@ export function startWeather(world, dayApi) {
     mixed: new B.Color3(),
     fog: new B.Color3(),
     white: new B.Color3(1, 1, 1),
+    hemiFill: new B.Color3(0.62, 0.7, 0.88),
     diff: new B.Color3(),
   };
   const puddles = [];
@@ -885,9 +886,15 @@ export function startWeather(world, dayApi) {
         sun.diffuse.b += (0.55 - sun.diffuse.b) * sunK * 0.6;
       }
     }
-    if (hemi) hemi.intensity = Math.max(0.16, hemi.intensity * L.hemi * (1 + sunK * 0.2));
+    if (hemi) {
+      // floor: a dusk storm must leave the street, ramp and people readable, not black. Dark asphalt and lawn
+      // (albedo ~0.1) at 0.5 of a blue-grey light came out near black, so the floor is higher and the fill lifts toward a soft grey-blue.
+      hemi.intensity = Math.max(0.85 + 0.2 * L.cover, hemi.intensity * L.hemi * (1 + sunK * 0.2));
+      if (hemi.diffuse) B.Color3.LerpToRef(hemi.diffuse, scratch.hemiFill, 0.45 * L.cover, hemi.diffuse);
+      if (hemi.groundColor) B.Color3.LerpToRef(hemi.groundColor, scratch.hemiFill, 0.2 * L.cover, hemi.groundColor);
+    }
     const baseExp = stage.lastSun ? 0.86 + 0.12 * stage.lastSun.day : 0.92;
-    const targetExp = Math.min(1.08, Math.max(0.76, baseExp * (0.88 + 0.12 * L.exposure) * (1 + flash * 0.85)));
+    const targetExp = Math.min(1.08, Math.max(0.86, baseExp * (0.88 + 0.12 * L.exposure) * (1 + flash * 0.85)));
     if (world.look && world.look.setSky) {
       world.look.setSky({
         clearColor: scratch.mixed,
@@ -922,7 +929,7 @@ export function startWeather(world, dayApi) {
           else roadMat.albedoColor.copyFrom(scratch.diff);
           roadMat.roughness = Math.max(0.18, (dryRough == null ? 0.84 : dryRough) - wetR * 0.58);
           if (roadMat.clearCoat) {
-            const wantCoat = wetR > 0.06 && !low;
+            const wantCoat = !low; // intensity carries the wetness; toggling isEnabled recompiles the road shader mid-play
             if (roadMat.clearCoat.isEnabled !== wantCoat) roadMat.clearCoat.isEnabled = wantCoat;
             roadMat.clearCoat.intensity = wetR * 0.62;
             roadMat.clearCoat.roughness = 0.12 + (1 - wetR) * 0.18;

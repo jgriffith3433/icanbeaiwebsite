@@ -290,7 +290,9 @@ export function installLook(world) {
     m.directIntensity = 1.0;
     m.environmentIntensity = 0.45;
     if (opt.wet) {
-      m.clearCoat.isEnabled = false;
+      /* Enabled from the start (intensity 0 = no visible coat): flipping it on when the first rain came recompiled every
+         wet material's shader in one frame (a 250+ ms hitch on the first bolt). Low quality turns it off in applyQuality. */
+      m.clearCoat.isEnabled = true;
       m.clearCoat.intensity = 0;
       m.clearCoat.roughness = 0.18;
     }
@@ -314,7 +316,7 @@ export function installLook(world) {
     if (tile) tileBox(mesh, tile);
   }
   const roadName = (n) => n === "road" || n === "lot" || /^ave\d+r\d+$/.test(n) || /^cross\d+r\d+$/.test(n);
-  const walkName = (n) => n === "driveway" || n === "parkpath" || /^walk[SN]\d+$/.test(n) || /^ave[SN]\d+_\d+$/.test(n) || /^cross[WE]\d+_\d+$/.test(n) || /ramp$/.test(n);
+  const walkName = (n) => n === "driveway" || n === "parkpath" || /^walk[SN]\d+$/.test(n) || /^ave[SN]\d+_\d+$/.test(n) || /^cross[WE]\d+_\d+$/.test(n) || /ramp$/.test(n) || /ramp(end|side-?[\d.]+)$/.test(n); // the ramp and its closed-off end and side walls (plain flat grey otherwise: read as black slabs)
   scene.meshes.forEach((mesh) => {
     const n = mesh.name || "";
     if (n === "ground") dress(mesh, mats.ground, 4);
@@ -355,6 +357,9 @@ export function installLook(world) {
   const neonMats = [];
   const neonHex = ["#3ecbff", "#ff4d8d", "#8eb6ff"];
   blocks.forEach((b, i) => {
+    /* Not on a block with a roof ramp: the ramp climbs the north face where the bar hangs, so the bar read as a teal slab
+       floating beside (and cutting into) the ramp. */
+    if (b.stair) return;
     const faceZ = b.z + b.d / 2 + 0.045;
     const y = Math.min(Math.max(2.4, b.h * 0.55), b.h - 0.8);
     const mat = new B.StandardMaterial("neon-" + b.id, scene);
@@ -543,7 +548,7 @@ export function installLook(world) {
     surfaces.forEach((m) => {
       if (m.metadata && m.metadata.wet && m.clearCoat) {
         const wet = (override && override.wet != null) ? override.wet : 0;
-        const want = !low && wet > 0.06;
+        const want = !low; // not wet-dependent: toggling it recompiles the shader mid-play
         if (m.clearCoat.isEnabled !== want) m.clearCoat.isEnabled = want;
       }
     });
@@ -608,7 +613,7 @@ export function installLook(world) {
     }
     const wet = override && override.wet != null ? override.wet : 0;
     const low = quality === "low";
-    const ibl = 0.28 + w.day * 0.34;
+    const ibl = 0.4 + w.day * 0.26 + (override && override.cover != null ? override.cover * 0.12 : 0); // night/storm floor: dark asphalt must still read
     if (Math.abs(wet - lastWet) > 0.01 || Math.abs(ibl - lastIbl) > 0.01 || low !== lastLow) {
       lastWet = wet;
       lastIbl = ibl;
@@ -620,7 +625,7 @@ export function installLook(world) {
           const dryRough = meta.dryRough != null ? meta.dryRough : 0.85;
           m.roughness = Math.max(0.22, dryRough - wet * 0.52);
           if (m.clearCoat) {
-            const wantCoat = !low && wet > 0.06;
+            const wantCoat = !low; // always on at high quality (intensity carries the wetness): no mid-play recompile
             if (m.clearCoat.isEnabled !== wantCoat) m.clearCoat.isEnabled = wantCoat;
             m.clearCoat.intensity = wet * (meta.maxCoat || 0.42);
             m.clearCoat.roughness = 0.14 + (1 - wet) * 0.16;
