@@ -2018,6 +2018,14 @@
       for (const w of innerWalls) {
         let hide = false;
         if (on) {
+          /* a wall right under the camera (it sits above the room) fills a corner of the view even when it isn't on the sight line */
+          const ex0 = w.x1 - w.x0;
+          const ez0 = w.z1 - w.z0;
+          const l2 = ex0 * ex0 + ez0 * ez0 || 1;
+          const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
+          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 2.6) hide = true;
+        }
+        if (on && !hide) {
           const ex = w.x1 - w.x0;
           const ez = w.z1 - w.z0;
           const sc = ex * (cz - w.z0) - ez * (cx - w.x0);
