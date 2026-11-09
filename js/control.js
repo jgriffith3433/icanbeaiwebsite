@@ -585,7 +585,11 @@ function install() {
         if (gy == null || cy - gy >= CAM_LIFT || lift <= camera.lowerBetaLimit + 0.01) break;
         lift = Math.max(camera.lowerBetaLimit, lift - 0.14);
       }
-      if (lift < camera.beta) camera.beta = damp(camera.beta, lift, dt, 6);
+      if (lift < camera.beta) {
+        // damped, and never more than 0.1 rad a frame: on a slow frame (dt up to 0.1 s) the damping alone swung the camera metres
+        const nb = damp(camera.beta, lift, dt, 6);
+        camera.beta = Math.max(nb, camera.beta - 0.1, lift);
+      }
     }
     const dx = Math.cos(camera.alpha) * Math.sin(camera.beta);
     const dy = Math.cos(camera.beta);
@@ -601,9 +605,9 @@ function install() {
       if (camRay.hasHit) r = Math.max(0.5, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
     }
     /* Pull in fast but never in one jump: a thin edge (the ramp's end, a parapet) entering the ray used to cut the
-       radius by metres in a single frame, a visible camera snap. 45 m/s still beats a walking pace by far. */
+       radius by metres in a single frame, a visible camera snap. 45 m/s still beats a walking pace by far; a slow frame (dt up to 0.1 s) is capped at 1.5 m so it stays under the feel sensor's 3 m. */
     if (push.on) camera.radius = r;
-    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.max(0.35, 45 * dt));
+    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(1.5, Math.max(0.35, 45 * dt)));
     else camera.radius = damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
