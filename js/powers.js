@@ -263,9 +263,28 @@ export function startPowers(world, dayApi) {
   impact.isPickable = false;
   impact.setEnabled(false);
   const scorchMat = new B.StandardMaterial("power-scorch", scene);
-  scorchMat.diffuseColor = new B.Color3(0.08, 0.07, 0.06);
+  /* A soft burn mark, not a hard black disc: a radial alpha fade (dark centre, feathered edge), blended over the ground
+     with a depth offset so it never z-fights, and faded out over its last seconds (mesh.visibility). */
+  const scorchTex = new B.DynamicTexture("power-scorch-tex", { width: 128, height: 128 }, scene, true);
+  {
+    const c = scorchTex.getContext();
+    const g = c.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, "rgba(20,17,14,0.62)");
+    g.addColorStop(0.45, "rgba(24,20,16,0.4)");
+    g.addColorStop(1, "rgba(24,20,16,0)");
+    c.fillStyle = g;
+    c.fillRect(0, 0, 128, 128);
+    scorchTex.hasAlpha = true;
+    scorchTex.update();
+  }
+  scorchMat.diffuseTexture = scorchTex;
+  scorchMat.useAlphaFromDiffuseTexture = true;
+  scorchMat.transparencyMode = B.Material.MATERIAL_ALPHABLEND;
+  scorchMat.disableLighting = true;
+  scorchMat.emissiveColor = new B.Color3(1, 1, 1);
   scorchMat.specularColor = new B.Color3(0, 0, 0);
-  scorchMat.emissiveColor = new B.Color3(0.02, 0.015, 0.01);
+  scorchMat.disableDepthWrite = true;
+  scorchMat.zOffset = -2;
   const scorches = [];
   const flashLight = new B.PointLight("strike-flash", B.Vector3.Zero(), scene);
   flashLight.diffuse = new B.Color3(0.75, 0.86, 1);
@@ -320,7 +339,7 @@ export function startPowers(world, dayApi) {
   const warmProbe = (mesh, mat) => { mesh.material = mat; mesh.isPickable = false; mesh.setEnabled(false); return mesh; };
   const warmList = [
     [boltParts[0], boltMat], [cloud, cloudMat], [gustMesh, gustMat], [funnelBits[0], funMat],
-    [warmProbe(B.MeshBuilder.CreateCylinder("scorch-probe", { diameter: 1.7, height: 0.03, tessellation: 12 }, scene), scorchMat), scorchMat],
+    [warmProbe(B.MeshBuilder.CreateDisc("scorch-probe", { radius: 1.1, tessellation: 24 }, scene), scorchMat), scorchMat],
     [warmProbe(B.MeshBuilder.CreateBox("blackout-probe", { size: 1 }, scene), blackoutMat), blackoutMat],
   ];
   setTimeout(() => {
@@ -517,7 +536,8 @@ export function startPowers(world, dayApi) {
     showBolt(aim);
     const wxb = wx();
     if (wxb && wxb.set) wxb.set("storm", 0.85, "power"); // the strike brings a storm; js/weather.js eases it out
-    const scorch = B.MeshBuilder.CreateCylinder("scorch", { diameter: 1.7, height: 0.03, tessellation: 12 }, scene);
+    const scorch = B.MeshBuilder.CreateDisc("scorch", { radius: 1.1, tessellation: 24 }, scene);
+    scorch.rotation.x = Math.PI / 2; // lies flat, face up
     scorch.position.set(aim.x, aim.y + 0.02, aim.z);
     scorch.material = scorchMat;
     scorch.isPickable = false;
@@ -1287,7 +1307,7 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       if (age > scorches[i].until) {
         scorches[i].mesh.dispose();
         scorches.splice(i, 1);
-      }
+      } else scorches[i].mesh.visibility = Math.min(1, (scorches[i].until - age) / 4);
     }
 
     const cam = world.camera;
