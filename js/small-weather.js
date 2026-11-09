@@ -123,6 +123,21 @@ export function makeSkin(B, scene, res, hipsTarget, container) {
   const nodes = res.transformNodes || [];
   const bolts = armLightning(B, scene, nodes);
 
+  /* A soft fill on him alone (the city's lamps and sky go dark at dusk and in a storm, and the navy jacket drew a black
+     silhouette): a cool light over his shoulder that touches only his own meshes, strongest when the sky light is low. */
+  const fill = new B.PointLight("small-weather-fill", new B.Vector3(0.3, 1.2, -1.2), scene);
+  fill.parent = wrap;
+  fill.diffuse = new B.Color3(0.62, 0.74, 1);
+  fill.specular = new B.Color3(0, 0, 0);
+  fill.range = 9;
+  fill.includedOnlyMeshes = meshes.slice();
+  const skyLight = scene.getLightByName("sky");
+  const updateFill = () => {
+    const sky = skyLight ? Math.min(1, Math.max(0, (skyLight.intensity - 0.16) / 0.56)) : 0.5;
+    fill.intensity = 1.5 * (1 - sky) + 0.25;
+  };
+  updateFill();
+
   let offset = standAnchor;
   let clip = "idle";
   wrap.position.y = -offset;
@@ -137,6 +152,7 @@ export function makeSkin(B, scene, res, hipsTarget, container) {
     /* clip, ground speed (m/s), dt; mine: the player has him (the lightning shows) */
     play(c, speed, dt, mine) {
       clip = named(c) ? c : "idle";
+      updateFill();
       player.play(clip, speed, dt);
       offset = clipAnchor(clip);
       wrap.position.y = -offset;
