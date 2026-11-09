@@ -2044,6 +2044,16 @@
           if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 2.6) hide = true;
         }
         if (on && !hide) {
+          /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
+             the near edge of the room even when the sight line misses it */
+          const vx = cx - tg.x;
+          const vz = cz - tg.z;
+          const vl = Math.hypot(vx, vz) || 1;
+          const d0 = ((w.x0 - tg.x) * vx + (w.z0 - tg.z) * vz) / vl;
+          const d1 = ((w.x1 - tg.x) * vx + (w.z1 - tg.z) * vz) / vl;
+          if (Math.min(d0, d1) > 0.3) hide = true;
+        }
+        if (on && !hide) {
           const ex = w.x1 - w.x0;
           const ez = w.z1 - w.z0;
           const sc = ex * (cz - w.z0) - ez * (cx - w.x0);
