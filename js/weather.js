@@ -929,7 +929,7 @@ export function startWeather(world, dayApi) {
           else roadMat.albedoColor.copyFrom(scratch.diff);
           roadMat.roughness = Math.max(0.18, (dryRough == null ? 0.84 : dryRough) - wetR * 0.58);
           if (roadMat.clearCoat) {
-            const wantCoat = wetR > 0.06 && !low;
+            const wantCoat = !low; // intensity carries the wetness; toggling isEnabled recompiles the road shader mid-play
             if (roadMat.clearCoat.isEnabled !== wantCoat) roadMat.clearCoat.isEnabled = wantCoat;
             roadMat.clearCoat.intensity = wetR * 0.62;
             roadMat.clearCoat.roughness = 0.12 + (1 - wetR) * 0.18;

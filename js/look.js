@@ -290,7 +290,9 @@ export function installLook(world) {
     m.directIntensity = 1.0;
     m.environmentIntensity = 0.45;
     if (opt.wet) {
-      m.clearCoat.isEnabled = false;
+      /* Enabled from the start (intensity 0 = no visible coat): flipping it on when the first rain came recompiled every
+         wet material's shader in one frame (a 250+ ms hitch on the first bolt). Low quality turns it off in applyQuality. */
+      m.clearCoat.isEnabled = true;
       m.clearCoat.intensity = 0;
       m.clearCoat.roughness = 0.18;
     }
@@ -543,7 +545,7 @@ export function installLook(world) {
     surfaces.forEach((m) => {
       if (m.metadata && m.metadata.wet && m.clearCoat) {
         const wet = (override && override.wet != null) ? override.wet : 0;
-        const want = !low && wet > 0.06;
+        const want = !low; // not wet-dependent: toggling it recompiles the shader mid-play
         if (m.clearCoat.isEnabled !== want) m.clearCoat.isEnabled = want;
       }
     });
@@ -620,7 +622,7 @@ export function installLook(world) {
           const dryRough = meta.dryRough != null ? meta.dryRough : 0.85;
           m.roughness = Math.max(0.22, dryRough - wet * 0.52);
           if (m.clearCoat) {
-            const wantCoat = !low && wet > 0.06;
+            const wantCoat = !low; // always on at high quality (intensity carries the wetness): no mid-play recompile
             if (m.clearCoat.isEnabled !== wantCoat) m.clearCoat.isEnabled = wantCoat;
             m.clearCoat.intensity = wet * (meta.maxCoat || 0.42);
             m.clearCoat.roughness = 0.14 + (1 - wet) * 0.16;
