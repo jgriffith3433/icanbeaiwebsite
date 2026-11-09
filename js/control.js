@@ -613,7 +613,19 @@ function install() {
     if (world.clearRadius && !push.on && Math.abs(look.x) < 0.05) {
       const want = Math.min(r, 3.5);
       const sb0 = Math.sin(camera.beta);
-      const room = (a) => world.clearRadius(t.x, t.y, t.z, Math.cos(a) * sb0, Math.cos(camera.beta), Math.sin(a) * sb0, want, 0.6);
+      const plr = world.physics && world.physics();
+      // The big boxes (clearRadius) don't know the ramp's slab, its end wall or the lips: ask the colliders too, so walking at
+      // the ramp's end swings the camera round to open street instead of squeezing it into his head against the slab.
+      const room = (a) => {
+        const ca = Math.cos(a) * sb0, cb = Math.cos(camera.beta), sa = Math.sin(a) * sb0;
+        let rm = world.clearRadius(t.x, t.y, t.z, ca, cb, sa, want, 0.6);
+        if (plr) {
+          const o = new B.Vector3(t.x, t.y, t.z);
+          plr.plugin.raycast(o.add(new B.Vector3(ca, cb, sa).scale(0.05)), o.add(new B.Vector3(ca, cb, sa).scale(want + 0.3)), camRay, mover.rayQuery());
+          if (camRay.hasHit) rm = Math.min(rm, B.Vector3.Distance(o, camRay.hitPoint) - 0.35);
+        }
+        return rm;
+      };
       if (room(camera.alpha) < want - 0.3) {
         let pick = null;
         for (let k = 1; k <= 12 && pick == null; k++) {
