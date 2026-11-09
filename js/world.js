@@ -509,6 +509,9 @@
         box(bid + "-crownL", 0.3, 0.14, D, x0, H + 0.07, z0 + D / 2, trimM);
         box(bid + "-crownR", 0.3, 0.14, D, x1, H + 0.07, z0 + D / 2, trimM);
         box(bid + "-base", W, 0.12, 0.05, x0 + W / 2, FLOOR + 0.06, z0 + 0.1, trimM, null, false);
+        /* the open front of the cutaway: a trimmed post where each side wall ends, so the cut isn't a raw edge */
+        box(bid + "-postL", 0.3, H, 0.3, x0, H / 2, z1, trimM);
+        box(bid + "-postR", 0.3, H, 0.3, x1, H / 2, z1, trimM);
         (b.walls || []).forEach((w, i) => {
           const glass = w[4] === "glass";
           const wx0 = w[0] + o[0];
@@ -1010,6 +1013,21 @@
       const cabinMesh = box("cabin", 1.6, 0.55, 2.1, 0, 1.08, -0.25, glass, root);
       const roofMesh = box("roof", 1.5, 0.08, 1.9, 0, 1.38, -0.3, body, root);
       box("pillarF", 1.6, 0.5, 0.08, 0, 1.08, 0.78, body, root);
+      /* shape: a lighter bumper line, a sloped hood and boot, a grille, side mirrors and window pillars, so the
+         parked and passing cars read as cars and not black boxes */
+      const trimC = mat("#59636e", { spec: 0.3 });
+      box("bumperF", 1.82, 0.16, 0.14, 0, 0.42, 2.08, trimC, root);
+      box("bumperB", 1.82, 0.16, 0.14, 0, 0.42, -2.08, trimC, root);
+      box("grille", 0.9, 0.18, 0.04, 0, 0.58, 2.07, black, root, false);
+      const hood = box("hood", 1.7, 0.1, 0.9, 0, 0.88, 1.5, body, root);
+      hood.rotation.x = 0.16;
+      const boot = box("boot", 1.7, 0.1, 0.7, 0, 0.9, -1.58, body, root);
+      boot.rotation.x = -0.12;
+      [-1, 1].forEach((sd, i) => {
+        box("mirror" + i, 0.14, 0.1, 0.18, sd * 0.94, 1.12, 0.7, body, root, false);
+        box("pillarB" + i, 0.07, 0.52, 0.1, sd * 0.8, 1.08, -1.25, body, root, false);
+        box("sill" + i, 0.05, 0.12, 3.2, sd * 0.9, 0.34, 0, trimC, root, false);
+      });
       const wheels = [];
       [[-0.85, 1.3], [0.85, 1.3], [-0.85, -1.35], [0.85, -1.35]].forEach((p, i) => {
         const axle = new B.TransformNode("axle" + i, scene);
