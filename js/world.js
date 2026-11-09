@@ -2086,16 +2086,22 @@
       const sb = Math.sin(camera.beta);
       const cx = tg.x + camera.radius * Math.cos(camera.alpha) * sb;
       const cz = tg.z + camera.radius * Math.sin(camera.alpha) * sb;
+      const now = typeof performance !== "undefined" ? performance.now() : 0;
       for (const w of innerWalls) {
         let hide = false;
         let near = false;
+        /* a wall that was hidden a moment ago stays hidden while the camera is only just clear of the tests below
+           (margin `mg`) and for 0.7 s after: a camera that drifts on the edge of a threshold, or is turned by hand
+           (the input moves it after this runs), must not flash a solid slab across the view for a frame or two */
+        const held = w.hiddenAt != null && now - w.hiddenAt < 700;
+        const mg = held ? 1.5 : 0;
         if (on) {
           /* a wall right under the camera (it sits above the room) fills a corner of the view even when it isn't on the sight line */
           const ex0 = w.x1 - w.x0;
           const ez0 = w.z1 - w.z0;
           const l2 = ex0 * ex0 + ez0 * ez0 || 1;
           const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
-          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2) hide = near = true;
+          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2 + mg) hide = near = true;
         }
         if (on && !hide) {
           /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
@@ -2105,10 +2111,10 @@
           const vl = Math.hypot(vx, vz) || 1;
           const d0 = ((w.x0 - tg.x) * vx + (w.z0 - tg.z) * vz) / vl;
           const d1 = ((w.x1 - tg.x) * vx + (w.z1 - tg.z) * vz) / vl;
-          if (Math.min(d0, d1) > 0.3) hide = near = true;
+          if (Math.min(d0, d1) > 0.3 - mg) hide = near = true;
           /* a partition that runs toward the camera (one end behind the target, the other well in front of it) shows
              as a big grey wedge down the side of the view even though the sight line misses it */
-          else if (Math.max(d0, d1) > 2) hide = near = true;
+          else if (Math.max(d0, d1) > 2 - mg) hide = near = true;
         }
         if (on && !hide) {
           const ex = w.x1 - w.x0;
@@ -2122,11 +2128,13 @@
             const den = dx * ez - dz * ex;
             if (Math.abs(den) > 1e-6) {
               const u = ((w.x0 - cx) * dz - (w.z0 - cz) * dx) / den;
-              hide = u > -0.15 && u < 1.15;
+              hide = u > -0.15 - mg * 0.1 && u < 1.15 + mg * 0.1;
             }
           }
         }
         /* a wall beside or under the camera is gone, not ghosted: even at 12% its dark slab fills the corner of a night view */
+        if (hide) w.hiddenAt = now;
+        else if (on && held) hide = near = true;
         const v = hide ? (near ? 0 : 0.12) : 1;
         if (w.mesh.visibility !== v) w.mesh.visibility = v;
         if (w.extra) for (const e of w.extra) if (e.visibility !== v) e.visibility = v;
