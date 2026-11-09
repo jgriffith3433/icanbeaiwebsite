@@ -595,9 +595,16 @@ export function installCrowd(world) {
   }
 
   const obstacles = [];
+  /* the neighbors (Birdie, Dex, Ines) stand and walk on the same sidewalks; a crowd walker on a fixed path would
+     pass through them, so walkers are nudged sideways out of this radius when they draw (the path is untouched) */
+  const bystanders = [];
+  const BYSTANDER_R = 0.9;
   function gatherObstacles() {
     obstacles.length = 0;
+    bystanders.length = 0;
     try {
+      const NB = window.day && window.day.neighbors;
+      if (NB && NB.now) for (const n of NB.now().people) if (!n.inside && Number.isFinite(n.x)) bystanders.push(n);
       const C = window.day && window.day.control;
       if (C && C.mode && C.mode() === "control") {
         const st = C.state();
@@ -770,6 +777,18 @@ export function installCrowd(world) {
       const p = people[i];
       if (!p.active || p.scale <= 0.01) { hide(mLegs, i); hide(mTorso, i); hide(mHead, i); hide(mUmb, i); hide(mHand, i); continue; }
       active++;
+      if (bystanders.length && (p.state === "walk" || p.state === "wait")) {
+        for (let b = 0; b < bystanders.length; b++) {
+          const bx = p.x - bystanders[b].x;
+          const bz = p.z - bystanders[b].z;
+          const bd = Math.hypot(bx, bz);
+          if (bd < BYSTANDER_R) {
+            const k = bd > 0.01 ? BYSTANDER_R / bd : 0;
+            p.x = bystanders[b].x + (k ? bx * k : BYSTANDER_R);
+            p.z = bystanders[b].z + bz * k;
+          }
+        }
+      }
       if (p.state === "wait") waiting++;
       else if (p.state === "door-in") leaving++;
       else if (p.state === "door-out") entering++;
