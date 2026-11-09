@@ -2191,7 +2191,14 @@
         const have = new Set(roomLights.map((rl) => rl.building));
         const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"]].filter((g) => g.every((b) => b === "car" || have.has(b) || (b === "office" && officeLights.length)));
         const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
-        const t0 = Date.now();
+        const t0 = Date.now(), budget = maxMs || 8000;
+        /* maxMs is a real deadline: a shader compile or whenReadyAsync that never settles (a slow or software GL, a lost
+           context) used to hang this promise, so the loading card (js/app.js waits for it) stayed up for good. Each wait
+           gives up when the budget is spent; the warm-up is only a head start. */
+        const within = (p, ms) => new Promise((res) => {
+          const timer = setTimeout(() => res(false), Math.max(0, ms));
+          Promise.resolve(p).then(() => { clearTimeout(timer); res(true); }, () => { clearTimeout(timer); res(true); });
+        });
         try {
           /* Materials of meshes outside the first view (the city the title orbits over, the skin once on) would
              otherwise compile the frame they first come into view. One mesh per material, in the current light set. */
@@ -2200,15 +2207,15 @@
             const mat = m.material;
             if (!mat || seen.has(mat) || !m.getTotalVertices || !m.getTotalVertices() || !mat.forceCompilationAsync) continue;
             seen.add(mat);
-            if (Date.now() - t0 > (maxMs || 8000) / 2) break;
-            try { await mat.forceCompilationAsync(m); } catch (e) { /* skip this one */ }
+            if (Date.now() - t0 > budget / 2) break;
+            if (!(await within(mat.forceCompilationAsync(m), budget / 2 - (Date.now() - t0)))) break;
           }
           for (const g of sets) {
-            if (Date.now() - t0 > (maxMs || 8000)) break;
+            if (Date.now() - t0 > budget) break;
             warmGroups = new Set(g);
             await nextFrame();
             await nextFrame();
-            await scene.whenReadyAsync();
+            if (!(await within(scene.whenReadyAsync(), budget - (Date.now() - t0)))) break;
           }
         } catch (e) { /* a warm-up is only a head start */ }
         warmGroups = null;
