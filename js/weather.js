@@ -885,7 +885,7 @@ export function startWeather(world, dayApi) {
         sun.diffuse.b += (0.55 - sun.diffuse.b) * sunK * 0.6;
       }
     }
-    if (hemi) hemi.intensity = Math.max(0.16 + 0.2 * L.cover, hemi.intensity * L.hemi * (1 + sunK * 0.2)); // floor: a dusk storm must leave the street, ramp and people readable, not black
+    if (hemi) hemi.intensity = Math.max(0.3 + 0.2 * L.cover, hemi.intensity * L.hemi * (1 + sunK * 0.2)); // floor: a dusk storm must leave the street, ramp and people readable, not black
     const baseExp = stage.lastSun ? 0.86 + 0.12 * stage.lastSun.day : 0.92;
     const targetExp = Math.min(1.08, Math.max(0.86, baseExp * (0.88 + 0.12 * L.exposure) * (1 + flash * 0.85)));
     if (world.look && world.look.setSky) {
