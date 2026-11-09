@@ -509,7 +509,10 @@ function install() {
     [0.5, Math.PI - 0.5, 0, Math.PI, 1.5708 + 0.9, 1.5708 - 0.9].forEach((a) => {
       const sb = Math.sin(beta);
       const clear = world.clearRadius ? world.clearRadius(x, 1.35, z, Math.cos(a) * sb, Math.cos(beta), Math.sin(a) * sb, wantRadius, 0.6) : wantRadius;
-      if (!best || clear > best.clear + 0.3) best = { a, clear };
+      // What the shot looks at behind him: a facade a few metres back fills the frame with one dark slab, so open street wins among the clear sides.
+      const behind = world.clearRadius ? world.clearRadius(x, 1.35, z, -Math.cos(a), 0, -Math.sin(a), 14, 0.6) : 14;
+      const score = Math.min(clear, wantRadius) * 4 + Math.min(behind, 14);
+      if (!best || score > best.score + 0.3) best = { a, clear, score };
     });
     if (best) {
       camera.alpha = best.a;
