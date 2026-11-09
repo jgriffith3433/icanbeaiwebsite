@@ -93,6 +93,7 @@ function install() {
       else if (q.shape === "cyl") m = B.MeshBuilder.CreateCylinder("nb-" + p.id + i, { diameterTop: q.size[0], diameterBottom: q.size[0], height: q.size[1], tessellation: 12 }, scene);
       else m = B.MeshBuilder.CreateBox("nb-" + p.id + i, o, scene);
       m.parent = root;
+      (p.__meshes = p.__meshes || []).push(m);
       m.position.set(q.pos[0], q.pos[1], q.pos[2]);
       if (q.tilt) m.rotation.x = q.tilt;
       m.material = mat(q.color);
@@ -179,6 +180,8 @@ function install() {
     toastTimer = setTimeout(() => toast.classList.remove("on"), 4200);
   }
 
+  const FADE_NEAR = 1.2; // m from the camera: fully faded
+  const FADE_FAR = 2.4; // m from the camera: fully drawn
   const PERSONAL = 1.1; // m between the player's centre and a neighbor's drawn centre
 
   /* ---- who is where ---- */
@@ -385,6 +388,19 @@ function install() {
         p.__yaw += Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw)) * Math.min(1, dt * 4);
       }
       root.rotation.y = p.__yaw;
+      /* the orbit camera can end up beside them: up close one box fills the screen as a big slab, so they fade out
+         (as he does below 1 m) between FADE_NEAR and FADE_FAR from the camera */
+      if (cam.position) {
+        const cdist = Math.hypot(cam.position.x - dx, cam.position.y - (p.__gy + 0.9 * (p.scale || 1)), cam.position.z - dz);
+        const vis = Math.max(0, Math.min(1, (cdist - FADE_NEAR) / (FADE_FAR - FADE_NEAR)));
+        if (vis !== p.__vis) {
+          p.__vis = vis;
+          p.__meshes.forEach((m) => {
+            m.visibility = vis;
+            m.setEnabled(vis > 0.02);
+          });
+        }
+      }
       p.__legs.forEach((l) => (l.m.rotation.x = pl.moving ? Math.sin(p.__phase) * LEG_SWING * l.dir : l.m.rotation.x * 0.8));
       stepBeats(p, h, here, nowMs);
 
