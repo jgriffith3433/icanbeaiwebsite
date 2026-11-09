@@ -309,6 +309,26 @@ export function startPowers(world, dayApi) {
   funnel.setEnabled(false);
   let funnelSpin = 0;
 
+  /* One shared material for the windows a strike blacks out (it was a new material per strike). */
+  const blackoutMat = new B.StandardMaterial("blackout", scene);
+  blackoutMat.disableLighting = true;
+  blackoutMat.emissiveColor = new B.Color3(0.01, 0.012, 0.02);
+
+  /* Shader warm-up. Every material above is first drawn the frame its power is first used, and compiling it there froze
+     the first bolt/gust/tornado by 100-300 ms. Compile them now, off the frame (parallel shader compile), on probe meshes
+     that are never drawn. A failed warm-up only means the old first-use compile, so it is not an error. */
+  const warmProbe = (mesh, mat) => { mesh.material = mat; mesh.isPickable = false; mesh.setEnabled(false); return mesh; };
+  const warmList = [
+    [boltParts[0], boltMat], [cloud, cloudMat], [gustMesh, gustMat], [funnelBits[0], funMat],
+    [warmProbe(B.MeshBuilder.CreateCylinder("scorch-probe", { diameter: 1.7, height: 0.03, tessellation: 12 }, scene), scorchMat), scorchMat],
+    [warmProbe(B.MeshBuilder.CreateBox("blackout-probe", { size: 1 }, scene), blackoutMat), blackoutMat],
+  ];
+  setTimeout(() => {
+    warmList.forEach(([mesh, mat]) => {
+      if (mat.forceCompilationAsync) mat.forceCompilationAsync(mesh).catch(() => {});
+    });
+  }, 0);
+
   let rainPs = null;
   try {
     rainPs = new B.ParticleSystem("power-rain", 700, scene);
@@ -671,9 +691,7 @@ export function startPowers(world, dayApi) {
       const z0 = b.z - b.d / 2;
       const z1 = b.z + b.d / 2;
       const floors = Math.max(1, Math.floor((b.h - 0.8) / 3));
-      const mat = new B.StandardMaterial("blackout-" + b.id, scene);
-      mat.disableLighting = true;
-      mat.emissiveColor = new B.Color3(0.01, 0.012, 0.02);
+      const mat = blackoutMat;
       for (let f = 0; f < floors; f++) {
         const wy = 1.7 + f * 3;
         if (wy > b.h - 0.9) continue;
