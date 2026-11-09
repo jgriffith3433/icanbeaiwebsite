@@ -182,6 +182,24 @@ if (dome && cam) {
 }
 ok(cam && cam.minZ >= 0.2, `camera.minZ ${cam && cam.minZ} wastes depth precision (z-fighting far off)`);
 
+/* ---- the cutaway: no interior wall stands solid in the view of the room camera (the grey wedge down the side) ----
+   At 7:30 the bedroom camera sits above the bathroom with the side panel docked; the partition at x=-1 runs toward it.
+   Pick a grid of screen rays: none may land on a solid (visibility > 0.5) interior or shell wall of the home. */
+{
+  globalThis.document.querySelector = () => ({ hidden: false, offsetParent: {}, getBoundingClientRect: () => ({ left: 540, width: 100 }) });
+  globalThis.innerWidth = 640;
+  for (let i = 0; i < 60; i++) world.update(globalThis.DayEngine.frame(day, 7 * 60 + 30), 0.05, { snap: i === 0 });
+  scene.render();
+  const c = scene.activeCamera;
+  const walls = [];
+  for (let y = 0; y < 360; y += 12) for (let x = 0; x < 640; x += 16) {
+    const p = scene.pickWithRay(scene.createPickingRay(x, y, B.Matrix.Identity(), c), (m) => m.isVisible && m.visibility > 0.5 && m.isEnabled());
+    if (p && p.hit && /^home-(wall\d+|left|right|crownL|crownR)$/.test(p.pickedMesh.name)) walls.push(`${p.pickedMesh.name}@${x},${y}`);
+  }
+  ok(!walls.length, `a solid wall fills the 7:30 bedroom view (a grey wedge in the frame): ${walls.slice(0, 6).join(', ')}`);
+  delete globalThis.document.querySelector;
+}
+
 console.log = origLog;
 if (problems.length) {
   console.error('check-render: ' + problems.length + ' problem(s)\n - ' + problems.join('\n - '));
