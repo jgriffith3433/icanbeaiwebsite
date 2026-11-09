@@ -481,6 +481,9 @@
       return g;
     }
 
+    /* interior (opaque) walls: one that stands between the camera and what it looks at fades out, so a wall on the
+       camera's side never fills the view (see cutawayWalls in the camera follow) */
+    const innerWalls = [];
     Object.entries(cfg.buildings || {}).forEach(([bid, b]) => {
       if (!b.bounds) return;
       trackMeshes(bid, () => {
@@ -518,6 +521,7 @@
           const mesh = box(bid + "-wall" + i, len, wallH, glass ? 0.04 : 0.12, (wx0 + wx1) / 2, wallH / 2 + FLOOR, (wz0 + wz1) / 2, m, null, !glass);
           mesh.rotation.y = -Math.atan2(wz1 - wz0, wx1 - wx0);
           mesh.receiveShadows = !glass;
+          if (!glass) innerWalls.push({ mesh, x0: wx0, z0: wz0, x1: wx1, z1: wz1 });
           if (glass) {
             const fm = mat("#59636e");
             const top = box(bid + "-wallt" + i, len, 0.06, 0.08, (wx0 + wx1) / 2, wallH + FLOOR, (wz0 + wz1) / 2, fm);
@@ -1999,7 +2003,39 @@
           if (r < camera.radius) camera.radius = r;
         }
       }
+      cutawayWalls(!pp.inCar && !!bd);
       sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
+    }
+
+    /* an interior wall crossing the line from the camera to its target (seen from above) is drawn faint: the
+       cutaway never has a wall in front of the room. Colliders stay; only how it looks changes. */
+    function cutawayWalls(on) {
+      if (!innerWalls.length) return;
+      const tg = camera.target;
+      const sb = Math.sin(camera.beta);
+      const cx = tg.x + camera.radius * Math.cos(camera.alpha) * sb;
+      const cz = tg.z + camera.radius * Math.sin(camera.alpha) * sb;
+      for (const w of innerWalls) {
+        let hide = false;
+        if (on) {
+          const ex = w.x1 - w.x0;
+          const ez = w.z1 - w.z0;
+          const sc = ex * (cz - w.z0) - ez * (cx - w.x0);
+          const st = ex * (tg.z - w.z0) - ez * (tg.x - w.x0);
+          if (sc * st < 0) {
+            /* the camera and the target are on opposite sides: does the sight line cross the wall's span? */
+            const dx = tg.x - cx;
+            const dz = tg.z - cz;
+            const den = dx * ez - dz * ex;
+            if (Math.abs(den) > 1e-6) {
+              const u = ((w.x0 - cx) * dz - (w.z0 - cz) * dx) / den;
+              hide = u > -0.15 && u < 1.15;
+            }
+          }
+        }
+        const v = hide ? 0.12 : 1;
+        if (w.mesh.visibility !== v) w.mesh.visibility = v;
+      }
     }
 
     /* ---------------- physics (Havok) ---------------- */
