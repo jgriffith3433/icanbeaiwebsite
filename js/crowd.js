@@ -269,7 +269,9 @@ export function installCrowd(world) {
 
   const cars = [];
   const cBody = colorsFor(MAXC, (i) => CARS[(i * 5 + 2) % CARS.length]);
-  const bodyMesh = box(1.78, 0.6, CAR_LEN, 0, 0.58, 0);
+  /* The body reaches down to 0.2 m (it was 0.28): the wheels are near-black, so at night a pale body showed as a flat white slab
+     hovering over the road with a dark gap under it. */
+  const bodyMesh = box(1.78, 0.68, CAR_LEN, 0, 0.54, 0);
   const cabinMesh = box(1.55, 0.52, 2.1, 0, 1.15, -0.25);
   const lampF = merge([box(0.4, 0.14, 0.05, -0.6, 0.72, 2.16), box(0.4, 0.14, 0.05, 0.6, 0.72, 2.16)]);
   const lampR = merge([box(0.4, 0.12, 0.05, -0.6, 0.74, -2.16), box(0.4, 0.12, 0.05, 0.6, 0.74, -2.16)]);
@@ -277,7 +279,7 @@ export function installCrowd(world) {
   const wheelsMesh = merge([box(0.26, 0.7, 0.7, -0.9, 0.36, 1.3), box(0.26, 0.7, 0.7, 0.9, 0.36, 1.3), box(0.26, 0.7, 0.7, -0.9, 0.36, -1.35), box(0.26, 0.7, 0.7, 0.9, 0.36, -1.35)]);
   const mBody = instanced("crowd-car", bodyMesh, MAXC, cBody, stdMat("crowd-car"));
   const mCabin = instanced("crowd-cabin", cabinMesh, MAXC, colorsFor(MAXC, () => "#26303a"), stdMat("crowd-cabin"));
-  const mWheels = instanced("crowd-wheels", wheelsMesh, MAXC, colorsFor(MAXC, () => "#16161a"), stdMat("crowd-wheels"));
+  const mWheels = instanced("crowd-wheels", wheelsMesh, MAXC, colorsFor(MAXC, () => "#2a2c33"), stdMat("crowd-wheels"));
   const lampMatF = stdMat("crowd-headlamp", null, new B.Color3(0.05, 0.05, 0.04));
   const lampMatR = stdMat("crowd-taillamp", null, new B.Color3(0.1, 0.02, 0.02));
   const mLampF = instanced("crowd-headlamps", lampF, MAXC, colorsFor(MAXC, () => "#fff6dc"), lampMatF);
