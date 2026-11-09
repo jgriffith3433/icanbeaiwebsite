@@ -371,7 +371,7 @@ export function startWeather(world, dayApi) {
     mixed: new B.Color3(),
     fog: new B.Color3(),
     white: new B.Color3(1, 1, 1),
-    hemiFill: new B.Color3(0.62, 0.7, 0.88),
+    hemiFill: new B.Color3(0.74, 0.8, 0.94),
     diff: new B.Color3(),
   };
   const puddles = [];
@@ -889,11 +889,11 @@ export function startWeather(world, dayApi) {
     if (hemi) {
       // floor: a dusk storm must leave the street, ramp and people readable, not black. Dark asphalt and lawn
       // (albedo ~0.1) at 0.5 of a blue-grey light came out near black, so the floor is higher and the fill lifts toward a soft grey-blue.
-      hemi.intensity = Math.max(0.85 + 0.2 * L.cover, hemi.intensity * L.hemi * (1 + sunK * 0.2));
+      hemi.intensity = Math.max(0.85 + 0.2 * L.cover + 0.3 * L.cover * L.cover, hemi.intensity * L.hemi * (1 + sunK * 0.2));
       // A hemisphere light lights a vertical face with half sky, half ground colour: the near-black ground colour left every wall
       // (facades, the ramp's side) black at dusk in a storm, so the ground colour lifts toward the fill too.
-      if (hemi.diffuse) B.Color3.LerpToRef(hemi.diffuse, scratch.hemiFill, 0.6 * L.cover, hemi.diffuse);
-      if (hemi.groundColor) B.Color3.LerpToRef(hemi.groundColor, scratch.hemiFill, 0.55 * L.cover, hemi.groundColor);
+      if (hemi.diffuse) B.Color3.LerpToRef(hemi.diffuse, scratch.hemiFill, 0.7 * L.cover, hemi.diffuse);
+      if (hemi.groundColor) B.Color3.LerpToRef(hemi.groundColor, scratch.hemiFill, 0.7 * L.cover, hemi.groundColor);
     }
     const baseExp = stage.lastSun ? 0.86 + 0.12 * stage.lastSun.day : 0.92;
     const targetExp = Math.min(1.08, Math.max(0.92, baseExp * (0.88 + 0.12 * L.exposure) * (1 + flash * 0.85)));
