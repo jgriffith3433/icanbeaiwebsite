@@ -1592,9 +1592,9 @@
       sun.direction.set(-Math.cos(ang) * 0.7, -Math.max(0.3, elev), -0.55);
       sun.intensity = hour > SR - 0.3 && hour < SS + 0.3 ? 0.18 + elev * 0.54 : 0.02;
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
-      hemi.intensity = 0.22 + day * 0.5; // the shaded faces of the city's buildings must still read in the morning
+      hemi.intensity = 0.34 + day * 0.4; // dusk/night floor: the street and people must stay readable; the shaded faces of the city's buildings must still read in the morning
       B.Color3.LerpToRef(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
-      B.Color3.LerpToRef(C("#12151e"), C("#3a362c"), day, hemi.groundColor);
+      B.Color3.LerpToRef(C("#262c3c"), C("#3a362c"), day, hemi.groundColor);
       if (!scene.metadata || !scene.metadata.dayLook) {
         const ipc = pipeline.imageProcessing && pipeline.imageProcessing.imageProcessingConfiguration;
         if (ipc) ipc._exposure = 0.84 + day * 0.1;
