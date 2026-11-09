@@ -689,8 +689,8 @@
       box("headboard", 1.79, 0.985, 0.1, 0, 0.6075, -1.33, woodDark, n);
       box("pillow", 0.65, 0.13, 0.36, -0.3, 0.68, -1.0, white, n);
       box("pillow2", 0.65, 0.13, 0.36, 0.38, 0.68, -1.02, white, n);
-      quiltUp = box("quilt", 1.66, 0.12, 1.62, 0, 0.9, 0.36, mat("#3d4f68"), n);
-      quiltDown = box("quiltdown", 1.66, 0.14, 0.45, 0, 0.66, 0.66, mat("#3d4f68"), n);
+      quiltUp = box("quilt", 1.66, 0.12, 1.62, 0, 0.9, 0.36, mat("#7088ad"), n);
+      quiltDown = box("quiltdown", 1.66, 0.14, 0.45, 0, 0.66, 0.66, mat("#7088ad"), n);
       box("bedrug", 2.6, 0.015, 1.1, 0, FLOOR + 0.008, 1.45, mat("#8d4e45"), n, false).receiveShadows = true;
       const ns = new B.TransformNode("ns", scene);
       ns.parent = n;
@@ -1701,7 +1701,7 @@
           rl.light.intensity = rl.level * (0.55 + night * 0.65);
         }
       });
-      bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.7 : 0.85);
+      bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.9 : 1.2);
       const officeOn = things.officeLights !== "off" ? 1 : 0;
       const nearOffice = px > 65 || (cam.inited && cam.x > 65);
       officeLights.forEach((L) => {
