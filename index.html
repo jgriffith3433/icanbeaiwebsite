@@ -95,7 +95,10 @@
           if (state !== "loading") return;
           var p = Math.max(4, pct());
           bar.style.width = p + "%"; bar.parentNode.setAttribute("aria-valuenow", String(p));
-          if (part) msg.textContent = TEXT[part];
+          /* Name what is still pending, not the last part that moved: with everything in but the shader warm-up the card
+             used to keep saying "Loading Small Weather…" at a full bar. */
+          if (!part) { for (var k in W) if (got[k] < 1) { part = k; break; } if (!part) part = "frame"; }
+          msg.textContent = TEXT[part];
         }
         function set(part, frac) {
           if (state !== "loading" || !(part in W)) return;
