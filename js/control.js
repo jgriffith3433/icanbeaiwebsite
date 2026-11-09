@@ -351,6 +351,8 @@ export function createMover(world, cfg) {
     walkBackSpeed,
     route: () => route,
     hasPhysics: () => !!cc,
+    /** Raycast query for anything that isn't him: his own capsule is a body too, and the camera's rays must not hit it. */
+    rayQuery: () => (cc ? { ignoreBody: cc._body } : undefined),
     /** Replace ambient + lasting columns. Player gusts use spawnUpdraft. */
     setUpdrafts(list) {
       updrafts = (list || []).map((u) => ({
@@ -578,7 +580,7 @@ function install() {
         const cx = t.x + Math.cos(camera.alpha) * sb * r;
         const cy = t.y + Math.cos(beta) * r;
         const cz = t.z + Math.sin(camera.alpha) * sb * r;
-        pl.plugin.raycast(new B.Vector3(cx, cy + 0.5, cz), new B.Vector3(cx, cy - CAM_LIFT - 0.5, cz), camRay);
+        pl.plugin.raycast(new B.Vector3(cx, cy + 0.5, cz), new B.Vector3(cx, cy - CAM_LIFT - 0.5, cz), camRay, mover.rayQuery());
         return camRay.hasHit ? camRay.hitPoint.y : null;
       };
       let lift = camera.beta;
@@ -603,7 +605,8 @@ function install() {
     if (p) {
       const dir = new B.Vector3(dx, dy, dz);
       const from = t.add(dir.scale(0.05)); // from him: starting further out missed a wall closer than that (flush against the ramp's end) and put the camera behind it
-      p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay);
+      // not his own capsule: with the target trailing him at a sprint the ray started behind it, hit it, and pulled the camera into his head
+      p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay, mover.rayQuery());
       // Stay in front of the wall, however close that is: a floor of 1.2 m used to put the camera inside or behind it.
       if (camRay.hasHit) r = Math.max(0.2, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
     }
