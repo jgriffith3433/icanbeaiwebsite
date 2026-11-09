@@ -5900,8 +5900,11 @@ installPlaytest({
   isReady: () => !!(window.day && window.day.now().frame && !(window.__loading && window.__loading.state() === "loading")),
   async start(id, options, t) {
     const errFrom = consoleErrors.length;
+    // control.js's place() (a setup teleport that snaps the camera) tells the feel sensor it was an intended cut through
+    // window.hawkesPlaytest.cut; the contract's api has none (cut lives on `t`), so every placement counted as a camera snap.
+    if (window.hawkesPlaytest && !window.hawkesPlaytest.cut) window.hawkesPlaytest.cut = (s) => t.cut(s);
     try {
-      if (id !== "title" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (id !== "title"&& window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
