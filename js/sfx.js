@@ -241,7 +241,7 @@
 
   /* ---------------- him: steps, jumps, landings, dust ---------------- */
   let dust = null;
-  function puff(x, y, z, k) {
+  function ensureDust() {
     if (!B.ParticleSystem) return;
     try {
       if (!dust) {
@@ -272,6 +272,14 @@
         dust.blendMode = B.ParticleSystem.BLENDMODE_STANDARD;
         dust.start();
       }
+    } catch (err) { /* particles are a nicety */ }
+  }
+  /* Built and started (nothing to emit) soon after load: making it on the first landing compiled its shader mid-play. */
+  setTimeout(ensureDust, 0);
+  function puff(x, y, z, k) {
+    ensureDust();
+    if (!dust) return;
+    try {
       dust.emitter.set(x, y + 0.05, z);
       dust.manualEmitCount = Math.round(10 + 30 * k);
       note("dust");

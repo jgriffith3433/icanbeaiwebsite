@@ -230,6 +230,8 @@ function armLightning(B, scene, nodes) {
     meshes.push(mesh);
     return { chain, pts, mesh };
   });
+  /* Compile the bolt's shader now: its first draw is the frame he first becomes the player's (a mid-play hitch). */
+  if (mat.forceCompilationAsync && meshes[0]) mat.forceCompilationAsync(meshes[0]).catch(() => {});
   let t = 0;
   let level = 0;
   return {
