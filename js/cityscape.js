@@ -400,7 +400,9 @@ export function installCityscape(w) {
     const t = [0.9 + (i % 3) * 0.07, 0.9 + ((i + 1) % 3) * 0.07, 0.9 + ((i + 2) % 3) * 0.07];
     if (shell) shell.setEnabled(false);
     c.facade[styleIdx].box(b.x, b.z, b.w, b.d, 0, b.h - 0.05, "facade", (i * 0.37) % 1, 0, t);
-    if (b.h > 3.4) c.shop.box(b.x, b.z, b.w + 0.14, b.d + 0.14, 0, SHOP_H, "shop", (i * 0.21) % 1, 0, [1, 1, 1]);
+    /* No shopfront band on a block with a roof ramp: the ramp climbs the north face through the band, so its lit sign
+       strip (waist height beside the walker) read as a glowing slab floating beside the ramp. */
+    if (b.h > 3.4 && !b.stair) c.shop.box(b.x, b.z, b.w + 0.14, b.d + 0.14, 0, SHOP_H, "shop", (i * 0.21) % 1, 0, [1, 1, 1]);
     stats.blocks++;
   });
   const bwin = scene.getMeshByName("bwin");
