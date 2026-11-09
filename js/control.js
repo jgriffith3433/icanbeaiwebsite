@@ -600,7 +600,11 @@ function install() {
       // Stay in front of the wall, however close that is: a floor of 1.2 m used to put the camera inside or behind it.
       if (camRay.hasHit) r = Math.max(0.5, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
     }
-    camera.radius = r < camera.radius || push.on ? r : damp(camera.radius, r, dt, 3);
+    /* Pull in fast but never in one jump: a thin edge (the ramp's end, a parapet) entering the ray used to cut the
+       radius by metres in a single frame, a visible camera snap. 45 m/s still beats a walking pace by far. */
+    if (push.on) camera.radius = r;
+    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.max(0.35, 45 * dt));
+    else camera.radius = damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
     const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5));
