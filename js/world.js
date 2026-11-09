@@ -524,7 +524,9 @@
       box("wl", 0.08, h, 0.1, -w / 2, y, 0, frameM, n);
       box("wr", 0.08, h, 0.1, w / 2, y, 0, frameM, n);
       box("wm", 0.04, h, 0.06, 0, y, 0, frameM, n);
-      const gm = mat("#cfe3f0", { unique: true });
+      /* dark diffuse: the room's own lights must not wash the glass out to wall white (at night it then read as wall
+         with a frame floating on it); the sky-coloured emissive below carries the daylight */
+      const gm = mat("#1b2635", { unique: true, spec: 0.02 });
       gm.emissiveColor = new B.Color3(0.4, 0.55, 0.7);
       const g = box("wg", w, h, 0.02, 0, y, 0, gm, n, false);
       windows.push(g);

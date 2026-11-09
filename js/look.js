@@ -360,7 +360,9 @@ export function installLook(world) {
     /* Not on a block with a roof ramp: the ramp climbs the north face where the bar hangs, so the bar read as a teal slab
        floating beside (and cutting into) the ramp. */
     if (b.stair) return;
-    const faceZ = b.z + b.d / 2 + 0.045;
+    /* The shopfront band (js/cityscape.js) stands 7 cm off the wall up to 3.2 m; a bar whose front sat at 7 cm too z-fought with it
+       (hatched cyan stripes). 8 cm out, its front is 10.5 cm off the wall: clear of the band, its back inside it. */
+    const faceZ = b.z + b.d / 2 + 0.08;
     const y = Math.min(Math.max(2.4, b.h * 0.55), b.h - 0.8);
     const mat = new B.StandardMaterial("neon-" + b.id, scene);
     const base = B.Color3.FromHexString(neonHex[i % neonHex.length]);
