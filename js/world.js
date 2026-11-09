@@ -408,8 +408,58 @@
         const under = (xa - s.x0) * Math.tan(theta) - thick / Math.cos(theta);
         const h = under - 0.06;
         if (h < 0.1) continue;
-        box(b.id + "rampside" + xa, xb - xa, h, 0.24, (xa + xb) / 2, h / 2, sideZ, wallM, null, false);
         solids.push({ x: (xa + xb) / 2, y: h / 2, z: sideZ, w: xb - xa, h, d: 0.24 });
+      }
+      /* What he sees is one wedge that follows the ramp's underside (2 cm below it, flush to its side), not the collider's
+         steps: the steps stood apart from the slope and read as slabs floating beside it. */
+      const slope = Math.tan(theta);
+      const underAt = (x) => (x - s.x0) * slope - thick / Math.cos(theta) - 0.02;
+      const xc = s.x0 + (thick / Math.cos(theta) + 0.02) / slope; // where the underside leaves the ground
+      const topY = underAt(s.x1);
+      if (topY > 0.1) {
+        const zA = s.z + s.w / 2;
+        const zB = zA + 0.24;
+        const tri = [[xc, 0], [s.x1, 0], [s.x1, topY]];
+        const P = [];
+        const idx = [];
+        const quad = (a, b, c, d) => { // a..d are 3D points, listed around the face
+          const o = P.length / 3;
+          [a, b, c, d].forEach((q) => P.push(q[0], q[1], q[2]));
+          idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+        };
+        const tri3 = (a, b, c) => {
+          const o = P.length / 3;
+          [a, b, c].forEach((q) => P.push(q[0], q[1], q[2]));
+          idx.push(o, o + 1, o + 2);
+        };
+        const [t0, t1, t2] = tri;
+        tri3([t0[0], t0[1], zA], [t1[0], t1[1], zA], [t2[0], t2[1], zA]);
+        tri3([t0[0], t0[1], zB], [t1[0], t1[1], zB], [t2[0], t2[1], zB]);
+        quad([t0[0], 0, zA], [t1[0], 0, zA], [t1[0], 0, zB], [t0[0], 0, zB]);
+        quad([t1[0], 0, zA], [t2[0], t2[1], zA], [t2[0], t2[1], zB], [t1[0], 0, zB]);
+        quad([t2[0], t2[1], zA], [t0[0], 0, zA], [t0[0], 0, zB], [t2[0], t2[1], zB]);
+        // wind every triangle so its normal points away from the middle of the wedge
+        const cx0 = (t0[0] + t1[0] + t2[0]) / 3, cy0 = topY / 3, cz0 = (zA + zB) / 2;
+        for (let i = 0; i < idx.length; i += 3) {
+          const a = idx[i] * 3, b = idx[i + 1] * 3, c = idx[i + 2] * 3;
+          const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2];
+          const vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+          const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+          const dot = nx * (P[a] - cx0) + ny * (P[a + 1] - cy0) + nz * (P[a + 2] - cz0);
+          // Babylon is left-handed: a face is front-facing when its triangle runs clockwise seen from outside, i.e. the cross product points inward
+          if (dot > 0) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
+        }
+        const N = [];
+        B.VertexData.ComputeNormals(P, idx, N);
+        const wedge = new B.Mesh(b.id + "rampside0", scene);
+        const vd = new B.VertexData();
+        vd.positions = P;
+        vd.indices = idx;
+        vd.normals = N;
+        vd.applyToMesh(wedge);
+        wedge.material = wallM;
+        wedge.isPickable = false;
+        wedge.receiveShadows = true;
       }
       const mark = new B.TransformNode("at-roof-" + b.id, scene);
       mark.position.set(b.x, b.h, b.z);
