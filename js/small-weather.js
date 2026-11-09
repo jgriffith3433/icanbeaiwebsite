@@ -133,8 +133,8 @@ export function makeSkin(B, scene, res, hipsTarget, container) {
   fill.includedOnlyMeshes = meshes.slice();
   const skyLight = scene.getLightByName("sky");
   const updateFill = () => {
-    const sky = skyLight ? Math.min(1, Math.max(0, (skyLight.intensity - 0.16) / 0.56)) : 0.5;
-    fill.intensity = 1.5 * (1 - sky) + 0.25;
+    const sky = skyLight ? Math.min(1, Math.max(0, (skyLight.intensity - 0.3) / 0.6)) : 0.5;
+    fill.intensity = 2.2 * (1 - sky) + 0.4;
   };
   updateFill();
 
