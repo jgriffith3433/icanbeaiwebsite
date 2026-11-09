@@ -596,6 +596,24 @@ function install() {
         camera.beta = Math.max(nb, camera.beta - 0.1, lift);
       }
     }
+    /* Walking at a wall with the camera on its far side squeezes the camera in to his head (a wall in front of him, the
+       camera behind the wall). Swing the orbit round, at a capped rate, to the nearest heading with room, as a
+       third-person camera does, rather than only pulling in. Not while the player is turning the camera themselves. */
+    if (world.clearRadius && !push.on && Math.abs(look.x) < 0.05) {
+      const want = Math.min(r, 3.5);
+      const sb0 = Math.sin(camera.beta);
+      const room = (a) => world.clearRadius(t.x, t.y, t.z, Math.cos(a) * sb0, Math.cos(camera.beta), Math.sin(a) * sb0, want, 0.6);
+      if (room(camera.alpha) < want - 0.3) {
+        let pick = null;
+        for (let k = 1; k <= 12 && pick == null; k++) {
+          for (const sg of [1, -1]) {
+            const a = camera.alpha + sg * k * 0.2618;
+            if (room(a) >= want - 0.05) { pick = a; break; }
+          }
+        }
+        if (pick != null) camera.alpha += Math.max(-2.2 * dt, Math.min(2.2 * dt, pick - camera.alpha));
+      }
+    }
     const dx = Math.cos(camera.alpha) * Math.sin(camera.beta);
     const dy = Math.cos(camera.beta);
     const dz = Math.sin(camera.alpha) * Math.sin(camera.beta);
