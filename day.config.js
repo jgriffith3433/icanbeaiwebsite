@@ -1482,7 +1482,7 @@ window.DAY_CONFIG = {
       camera: { alpha: 1.35, beta: 1.0, radius: 11 },
       spots: {
         frontDoorOut: [1.0, 5.3, 180],
-        carSideHome: [-0.3, 7.3, 270],
+        carSideHome: [0.4, 7.3, 270],
         mailbox: [3.6, 10.2, 0],
       },
     },
@@ -1519,7 +1519,7 @@ window.DAY_CONFIG = {
       camera: { alpha: 1.3, beta: 1.05, radius: 10 },
       spots: {
         entranceOut: [8, 5.4, 180],
-        carSideWork: [6.65, 7.6, 270],
+        carSideWork: [7.4, 7.6, 270],
       },
     },
     corridor: {
