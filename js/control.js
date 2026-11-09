@@ -508,11 +508,22 @@ function install() {
     }
     const beta = 1.1;
     let best = null;
+    const pl = world.physics && world.physics();
+    // Distance to anything solid along a ray, ramps and lips included (clearRadius only knows the big boxes): the stair's
+    // slab beside the street is a dark plane the shot would otherwise be framed against.
+    const hitDist = (dx, dy, dz, max) => {
+      if (!pl) return max;
+      const o = new B.Vector3(x, 1.35, z);
+      pl.plugin.raycast(o, o.add(new B.Vector3(dx, dy, dz).scale(max)), camRay, mover.rayQuery());
+      return camRay.hasHit ? B.Vector3.Distance(o, camRay.hitPoint) : max;
+    };
     [0.5, Math.PI - 0.5, 0, Math.PI, 1.5708 + 0.9, 1.5708 - 0.9].forEach((a) => {
       const sb = Math.sin(beta);
-      const clear = world.clearRadius ? world.clearRadius(x, 1.35, z, Math.cos(a) * sb, Math.cos(beta), Math.sin(a) * sb, wantRadius, 0.6) : wantRadius;
+      let clear = world.clearRadius ? world.clearRadius(x, 1.35, z, Math.cos(a) * sb, Math.cos(beta), Math.sin(a) * sb, wantRadius, 0.6) : wantRadius;
+      clear = Math.min(clear, hitDist(Math.cos(a) * sb, Math.cos(beta), Math.sin(a) * sb, wantRadius + 0.3) - 0.35);
       // What the shot looks at behind him: a facade a few metres back fills the frame with one dark slab, so open street wins among the clear sides.
-      const behind = world.clearRadius ? world.clearRadius(x, 1.35, z, -Math.cos(a), 0, -Math.sin(a), 14, 0.6) : 14;
+      let behind = world.clearRadius ? world.clearRadius(x, 1.35, z, -Math.cos(a), 0, -Math.sin(a), 14, 0.6) : 14;
+      behind = Math.min(behind, hitDist(-Math.cos(a), 0, -Math.sin(a), 14));
       const score = Math.min(clear, wantRadius) * 4 + Math.min(behind, 14);
       if (!best || score > best.score + 0.3) best = { a, clear, score };
     });
