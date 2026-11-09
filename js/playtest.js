@@ -5817,7 +5817,7 @@ const feelControl = () => (window.day && window.day.control && window.day.contro
 
 /* Why the sensor was silent: the city's shells and merged buildings are isPickable = false (so taps and the pointer pick
    skip them), and the sensor's camera and floor rays only hit pickable meshes, so the camera could sit inside a roof
-   unseen. At the start of a run (a bot's tab only) the big, non-instanced ones are made pickable. */
+   unseen. At the start of a run (a bot's tab only) the big, non-instanced ones, and the flat ground, are made pickable. */
 function sensorScene() {
   const w = window.day && window.day.world && window.day.world();
   const scene = w && w.scene;
@@ -5825,6 +5825,9 @@ function sensorScene() {
   let n = 0;
   for (const m of scene.meshes) {
     if (m.isPickable !== false || m.thinInstanceCount || !m.getTotalVertices || !m.getTotalVertices()) continue;
+    // The ground plane is flat (no height), so the size test below skips it: with it unpickable the floor ray found
+    // nothing under him in the street, and any float or fall of 2 s off a roof read as "fell out of the world".
+    if (m.name === "ground") { m.isPickable = true; n++; continue; }
     const e = m.getBoundingInfo().boundingBox.extendSizeWorld;
     if (e.y * 2 >= 2 && (e.x > 1 || e.z > 1)) { m.isPickable = true; n++; }
   }
