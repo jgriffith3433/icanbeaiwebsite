@@ -995,7 +995,17 @@ function install() {
     /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */
     avatar: () => avatar,
     // Playtest hook: stand him at x,z (street level) while he's the player's, so a scenario needn't walk a slow bot there.
-    place: (x, z, yaw) => (mode === "control" ? mover.start(x, z, yaw == null ? s.yaw : yaw) : null),
+    place: (x, z, yaw) => {
+      if (mode !== "control") return null;
+      const r = mover.start(x, z, yaw == null ? s.yaw : yaw);
+      // A placement is a cut, not a walk: the camera's target would glide metres to him (a visible camera jump) and could be left
+      // facing the wall he now stands at. Snap it to him, frame the side with the most room, and tell the playtest it was intended.
+      camera.target.set(s.x, s.y + 1.35, s.z);
+      frameOutdoors({}, { x: s.x, z: s.z });
+      lastRadius = null;
+      try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
+      return r;
+    },
     ride: RIDE,
     log: () => log.slice(),
     take: () => take("console"),
