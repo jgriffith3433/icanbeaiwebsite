@@ -2038,13 +2038,14 @@
       const cz = tg.z + camera.radius * Math.sin(camera.alpha) * sb;
       for (const w of innerWalls) {
         let hide = false;
+        let near = false;
         if (on) {
           /* a wall right under the camera (it sits above the room) fills a corner of the view even when it isn't on the sight line */
           const ex0 = w.x1 - w.x0;
           const ez0 = w.z1 - w.z0;
           const l2 = ex0 * ex0 + ez0 * ez0 || 1;
           const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
-          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2) hide = true;
+          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2) hide = near = true;
         }
         if (on && !hide) {
           /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
@@ -2054,7 +2055,7 @@
           const vl = Math.hypot(vx, vz) || 1;
           const d0 = ((w.x0 - tg.x) * vx + (w.z0 - tg.z) * vz) / vl;
           const d1 = ((w.x1 - tg.x) * vx + (w.z1 - tg.z) * vz) / vl;
-          if (Math.min(d0, d1) > 0.3) hide = true;
+          if (Math.min(d0, d1) > 0.3) hide = near = true;
         }
         if (on && !hide) {
           const ex = w.x1 - w.x0;
@@ -2072,7 +2073,8 @@
             }
           }
         }
-        const v = hide ? 0.12 : 1;
+        /* a wall beside or under the camera is gone, not ghosted: even at 12% its dark slab fills the corner of a night view */
+        const v = hide ? (near ? 0 : 0.12) : 1;
         if (w.mesh.visibility !== v) w.mesh.visibility = v;
         if (w.extra) for (const e of w.extra) if (e.visibility !== v) e.visibility = v;
       }
