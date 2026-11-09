@@ -179,6 +179,8 @@ function install() {
     toastTimer = setTimeout(() => toast.classList.remove("on"), 4200);
   }
 
+  const PERSONAL = 1.1; // m between the player's centre and a neighbor's drawn centre
+
   /* ---- who is where ---- */
   const hero = () => {
     const C = day.control;
@@ -357,7 +359,21 @@ function install() {
         p.__gz = pl.z;
         p.__gy = world.surfaceAt ? world.surfaceAt(pl.x, pl.z) : 0;
       }
-      root.position.set(pl.x, p.__gy, pl.z);
+      /* the player walks the same sidewalks: step the drawn figure aside (not its route or its distances) rather
+         than let the two bodies overlap */
+      let dx = pl.x;
+      let dz = pl.z;
+      if (here && !pl.inside && day.control && day.control.mode && day.control.mode() === "control") {
+        const ox = pl.x - here.x;
+        const oz = pl.z - here.z;
+        const od = Math.hypot(ox, oz);
+        if (od < PERSONAL) {
+          const k = od > 0.01 ? PERSONAL / od : 0;
+          dx = here.x + (k ? ox * k : PERSONAL);
+          dz = here.z + oz * k;
+        }
+      }
+      root.position.set(dx, p.__gy, dz);
       if (pl.moving) {
         p.__phase += dt * 9;
         const yaw = pl.yaw != null ? pl.yaw : Math.atan2(pl.x - prevX, pl.z - prevZ);
