@@ -271,7 +271,8 @@ export function startPowers(world, dayApi) {
   flashLight.diffuse = new B.Color3(0.75, 0.86, 1);
   flashLight.intensity = 0;
   flashLight.range = 28;
-  flashLight.setEnabled(false);
+  /* Stays enabled at intensity 0: enabling a light changes the light count of every material it reaches, and that
+     recompile froze the page for ~290 ms on the first bolt. Enabled from the start, the warm-up compiles with it. */
 
   const gustMat = new B.StandardMaterial("power-gust", scene);
   gustMat.disableLighting = true;
@@ -1155,8 +1156,6 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     throwFor = Math.max(0, throwFor - dt);
     flash = Math.max(0, flash - dt * 3.1);
     flashLight.intensity = flash * 36;
-    const wantFlash = flashLight.intensity > 0.01;
-    if (flashLight.isEnabled() !== wantFlash) flashLight.setEnabled(wantFlash);
     if (flash < 0.05) {
       boltParts.forEach((m) => m.setEnabled(false));
       impact.setEnabled(false);
