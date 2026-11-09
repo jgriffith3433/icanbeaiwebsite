@@ -63,13 +63,13 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
   if (!w || !w.warmLights) { ready.lights = true; return; }
   /* Runs once his model is on (or has failed): his skinned PBR shader is one of the ones that recompiles per light set,
      so warming before he joins the scene left that compile for the first night or office jump. */
-  /* The warm-up is a head start, never a reason to keep the card up: world.warmLights keeps its own 8 s budget, and this
-     cap is the gate's own, so whatever that promise does (a compile that never settles on a slow or software GL), the
+  /* The warm-up is a head start, never a reason to keep the card up: world.warmLights keeps its own 8 s budget and carries on
+     behind the title once the card is gone; this cap (2.5 s) is the gate's own, so whatever that promise does (a compile that never settles on a slow or software GL), the
      card goes once the model, the frame and the title are in. */
   const go = () => {
     const t0 = Date.now();
     const lightsDone = (how) => { if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
-    const cap = setTimeout(() => lightsDone("the 12 s cap"), 12000);
+    const cap = setTimeout(() => lightsDone("the 2.5 s cap"), 2500); // a slow GL compiles for 8 s: the card must not sit at a full bar for that
     w.warmLights(8000).catch(() => {}).finally(() => { clearTimeout(cap); lightsDone("the warm-up"); });
   };
   window.__warmLights = () => (function afterFrame() {
