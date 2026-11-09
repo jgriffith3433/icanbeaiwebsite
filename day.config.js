@@ -1418,7 +1418,7 @@ window.DAY_CONFIG = {
       area: [-7, -3.6, -1, 1.3],
       light: "bedroomLamp",
       doors: [[-3.2, -0.8], [-2.2, 1.8]],
-      camera: { alpha: 1.3, beta: 0.95, radius: 8 },
+      camera: { alpha: 1.3, beta: 0.88, radius: 10.5 },
       spots: {
         bed: [-4.6, -2.15, 0],
         bedEdge: [-3.72, -2.0, 90],
