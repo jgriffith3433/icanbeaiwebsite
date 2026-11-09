@@ -2056,6 +2056,9 @@
           const d0 = ((w.x0 - tg.x) * vx + (w.z0 - tg.z) * vz) / vl;
           const d1 = ((w.x1 - tg.x) * vx + (w.z1 - tg.z) * vz) / vl;
           if (Math.min(d0, d1) > 0.3) hide = near = true;
+          /* a partition that runs toward the camera (one end behind the target, the other well in front of it) shows
+             as a big grey wedge down the side of the view even though the sight line misses it */
+          else if (Math.max(d0, d1) > 2) hide = near = true;
         }
         if (on && !hide) {
           const ex = w.x1 - w.x0;
