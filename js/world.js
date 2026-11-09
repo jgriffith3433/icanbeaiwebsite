@@ -506,8 +506,11 @@
         right.receiveShadows = true;
         const trimM = mat(bid === "office" ? "#59636e" : "#8d5a45");
         box(bid + "-crown", W + 0.3, 0.14, 0.3, x0 + W / 2, H + 0.07, z0, trimM);
-        box(bid + "-crownL", 0.3, 0.14, D, x0, H + 0.07, z0 + D / 2, trimM);
-        box(bid + "-crownR", 0.3, 0.14, D, x1, H + 0.07, z0 + D / 2, trimM);
+        const crownL = box(bid + "-crownL", 0.3, 0.14, D, x0, H + 0.07, z0 + D / 2, trimM);
+        const crownR = box(bid + "-crownR", 0.3, 0.14, D, x1, H + 0.07, z0 + D / 2, trimM);
+        /* the side walls run toward the camera: seen from above they fill a bottom corner, so they fade like the interior ones */
+        innerWalls.push({ mesh: left, extra: [crownL], x0, z0, x1: x0, z1 });
+        innerWalls.push({ mesh: right, extra: [crownR], x0: x1, z0, x1, z1 });
         box(bid + "-base", W, 0.12, 0.05, x0 + W / 2, FLOOR + 0.06, z0 + 0.1, trimM, null, false);
         /* the open front of the cutaway: a trimmed post where each side wall ends, so the cut isn't a raw edge */
         box(bid + "-postL", 0.3, H, 0.3, x0, H / 2, z1, trimM);
@@ -2041,7 +2044,7 @@
           const ez0 = w.z1 - w.z0;
           const l2 = ex0 * ex0 + ez0 * ez0 || 1;
           const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
-          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 2.6) hide = true;
+          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2) hide = true;
         }
         if (on && !hide) {
           /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
@@ -2071,6 +2074,7 @@
         }
         const v = hide ? 0.12 : 1;
         if (w.mesh.visibility !== v) w.mesh.visibility = v;
+        if (w.extra) for (const e of w.extra) if (e.visibility !== v) e.visibility = v;
       }
     }
 
