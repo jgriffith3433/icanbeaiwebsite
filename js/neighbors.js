@@ -187,7 +187,8 @@ function install() {
   /* ---- who is where ---- */
   const hero = () => {
     const C = day.control;
-    if (C && C.mode && C.mode() === "control") {
+    if (C && C.mode && C.mode() !== "schedule") {
+      // control and the walk back are both drawn from the controller's own position
       const s = C.state();
       return { x: s.x, z: s.z, y: s.y };
     }
@@ -366,7 +367,7 @@ function install() {
          than let the two bodies overlap */
       let dx = pl.x;
       let dz = pl.z;
-      if (here && !pl.inside && day.control && day.control.mode && day.control.mode() === "control") {
+      if (here && !pl.inside && day.control && day.control.mode && day.control.mode() !== "schedule") {
         const ox = pl.x - here.x;
         const oz = pl.z - here.z;
         const od = Math.hypot(ox, oz);
