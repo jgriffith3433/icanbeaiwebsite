@@ -314,7 +314,7 @@ export function installLook(world) {
     if (tile) tileBox(mesh, tile);
   }
   const roadName = (n) => n === "road" || n === "lot" || /^ave\d+r\d+$/.test(n) || /^cross\d+r\d+$/.test(n);
-  const walkName = (n) => n === "driveway" || n === "parkpath" || /^walk[SN]\d+$/.test(n) || /^ave[SN]\d+_\d+$/.test(n) || /^cross[WE]\d+_\d+$/.test(n) || /ramp$/.test(n);
+  const walkName = (n) => n === "driveway" || n === "parkpath" || /^walk[SN]\d+$/.test(n) || /^ave[SN]\d+_\d+$/.test(n) || /^cross[WE]\d+_\d+$/.test(n) || /ramp$/.test(n) || /ramp(end|side-?[\d.]+)$/.test(n); // the ramp and its closed-off end and side walls (plain flat grey otherwise: read as black slabs)
   scene.meshes.forEach((mesh) => {
     const n = mesh.name || "";
     if (n === "ground") dress(mesh, mats.ground, 4);
