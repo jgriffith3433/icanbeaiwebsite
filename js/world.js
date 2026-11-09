@@ -556,6 +556,7 @@
         roomLights.push({ id: r.id, light: L, thing: r.light, building: r.building, level: 0 });
       }
     });
+    let warmInfo = null; // what ended the last warmLights(): { how: done|budget, ms, sets }
     let warmGroups = null; // set by warmLights(): the light groups forced on while their shaders compile
     const bedsideFill = new B.PointLight("bedside-fill", V3(-5.15, 1.45, -2.35), scene);
     bedsideFill.diffuse = B.Color3.FromHexString("#ffd296");
@@ -2199,6 +2200,19 @@
           const timer = setTimeout(() => res(false), Math.max(0, ms));
           Promise.resolve(p).then(() => { clearTimeout(timer); res(true); }, () => { clearTimeout(timer); res(true); });
         });
+        const info = warmInfo = { how: null, ms: 0, sets: [] };
+        const meshesReady = async (ms) => {
+          const end = Date.now() + Math.max(0, ms);
+          for (;;) {
+            let all = true;
+            for (const m of scene.meshes) {
+              if (m.subMeshes && m.subMeshes.length && m.isEnabled() && !m.isReady(true)) all = false;
+            }
+            if (all) return true;
+            if (Date.now() >= end) return false;
+            await nextFrame();
+          }
+        };
         try {
           /* Materials of meshes outside the first view (the city the title orbits over, the skin once on) would
              otherwise compile the frame they first come into view. One mesh per material, in the current light set. */
@@ -2215,11 +2229,21 @@
             warmGroups = new Set(g);
             await nextFrame();
             await nextFrame();
-            if (!(await within(scene.whenReadyAsync(), budget - (Date.now() - t0)))) break;
+            /* Wait for the meshes' shaders in this light set, not scene.whenReadyAsync(): that also waits on pending data,
+               every particle system and layer, and any one of those can stay "not ready" for good (the card sat on
+               "Lighting the street…" for the full cap). Same per-mesh check Scene.isReady makes, nothing else. */
+            const ok = await meshesReady(budget - (Date.now() - t0));
+            info.sets.push({ set: g.join("+"), ms: Date.now() - t0, ok });
+            if (!ok) { info.how = "budget"; break; }
           }
         } catch (e) { /* a warm-up is only a head start */ }
         warmGroups = null;
+        info.ms = Date.now() - t0;
+        if (!info.how) info.how = "done";
+        try { console.info(`[world] shader warm-up ended: ${info.how} after ${info.ms} ms (${info.sets.map((x) => `${x.set} ${x.ms}${x.ok ? "" : "!"}`).join(", ")})`); } catch (e) { /* no console */ }
+        return info;
       },
+      warmInfo: () => warmInfo,
       enablePhysics,
       /* js/cityscape.js reads the colliders so far (to find free lots) and adds its own before physics is on */
       solids,
