@@ -1011,7 +1011,17 @@ function install() {
       world.avatar.show(false);
       avatar.show(true);
     }
-    avatar.place(s.x, s.y, s.z, s.yaw);
+    /* On a slope the capsule's base sits on the surface under his middle, so the uphill foot (a stride ahead or behind)
+       is inside the slab: lift the figure by how much higher the ground is a foot-length either side, eased in and out. */
+    let lift = 0;
+    if (s.grounded && physics()) {
+      const fx = Math.sin(s.yaw) * 0.3;
+      const fz = Math.cos(s.yaw) * 0.3;
+      const up = Math.max(floorAt(s.x + fx, s.z + fz, s.y + 0.5), floorAt(s.x - fx, s.z - fz, s.y + 0.5)) - s.y;
+      lift = Math.min(0.14, Math.max(0, up));
+    }
+    s.slopeLift = (s.slopeLift || 0) + (lift - (s.slopeLift || 0)) * Math.min(1, dt * 14);
+    avatar.place(s.x, s.y + s.slopeLift, s.z, s.yaw);
     // cast / throw while a power is in his hands (js/powers.js); the walk pose otherwise
     // The cast and throw poses stand still: on the move or in the air he keeps his walk, run, jump or float (a
     // standing pose sliding along the ground reads as gliding feet).
