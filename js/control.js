@@ -478,7 +478,7 @@ function install() {
   function cameraTake() {
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (saved[k] = camera[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => ((saved[k] = kb[k]), (kb[k] = [])));
-    camera.lowerRadiusLimit = 0.5; // a wall behind him may pull the camera in this close (the wheel stops at 1.5)
+    camera.lowerRadiusLimit = 0.2; // a wall behind him may pull the camera in this close, inside his own head (the wheel stops at 1.5)
     camera.upperRadiusLimit = 16;
     camera.lowerBetaLimit = 0.25;
     camera.upperBetaLimit = 1.62;
@@ -599,10 +599,10 @@ function install() {
     const p = world.physics && world.physics();
     if (p) {
       const dir = new B.Vector3(dx, dy, dz);
-      const from = t.add(dir.scale(0.45)); // outside his own capsule
+      const from = t.add(dir.scale(0.05)); // from him: starting further out missed a wall closer than that (flush against the ramp's end) and put the camera behind it
       p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay);
       // Stay in front of the wall, however close that is: a floor of 1.2 m used to put the camera inside or behind it.
-      if (camRay.hasHit) r = Math.max(0.5, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
+      if (camRay.hasHit) r = Math.max(0.2, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
     }
     /* Pull in fast but never in one jump: a thin edge (the ramp's end, a parapet) entering the ray used to cut the
        radius by metres in a single frame, a visible camera snap. 45 m/s still beats a walking pace by far; a slow frame (dt up to 0.1 s) is capped at 1.5 m so it stays under the feel sensor's 3 m. */
@@ -611,7 +611,7 @@ function install() {
     else camera.radius = damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
-    const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5));
+    const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5)); // 0.15 at 0.5 m and closer
     if (world.person && Math.abs(vis - himVis) > 0.02) setHimVis(vis);
   }
 
