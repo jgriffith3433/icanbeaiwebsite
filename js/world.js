@@ -1962,6 +1962,16 @@
         cam.inited = true;
         cam.wasInCar = false;
         cam.user = 0;
+        /* inside a cutaway building (home, office: the break room on the way back from a Let go) the interior partitions
+           between the orbit camera and him must still ghost out, or one fills the view as a dark slab */
+        let inside = false;
+        for (const k of Object.keys(cfg.buildings || {})) {
+          const b = cfg.buildings[k];
+          if (!b || !b.bounds) continue;
+          const o = b.origin || [0, 0];
+          if (player.x > b.bounds[0] + o[0] && player.x < b.bounds[2] + o[0] && player.z > b.bounds[1] + o[1] && player.z < b.bounds[3] + o[1]) inside = true;
+        }
+        cutawayWalls(inside);
         sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
         return;
       }
