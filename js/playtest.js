@@ -2726,15 +2726,18 @@ async function weather(options, t) {
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   t.event("control-taken", "Enter, so the weather keys work");
+  const moveCfg = (window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.move) || {};
+  t.metric("feel.coyoteMs", Math.round((moveCfg.coyote != null ? moveCfg.coyote : 0.12) * 1000));
+  t.metric("feel.jumpBufferMs", Math.round((moveCfg.jumpBuffer != null ? moveCfg.jumpBuffer : 0.12) * 1000));
   const street = window.DAY_CONFIG.street || { z: 12.6 };
   const at = C.state();
-  const reached = await goTo(at.x, street.z, t, { close: 1.4, ms: 18000, progress: 0.12 });
+  const reached = await goTo(at.x, street.z, t, { close: 1.4, ms: 18000, progress: 0.1 });
   const stood = C.state();
   t.scene("On the road");
   await sleep(400);
   if (reached) t.event("on-the-road", `at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)} (the avenue is z ${street.z})`);
   else t.problem("bug", `He didn't reach the avenue (at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)}, road z ${street.z})`);
-  t.progress(0.16);
+  t.progress(0.14);
 
   const order = [
     ["1", "clear", "Clear"],
@@ -2748,10 +2751,14 @@ async function weather(options, t) {
   const heard = {};
   let blended = false;
   let flashesBeforeStorm = W.now().flashes;
+  let thundersBeforeStorm = W.now().thunders || 0;
   for (let i = 0; i < order.length; i++) {
     const [key, state, label] = order[i];
     const before = W.now();
-    if (state === "storm") flashesBeforeStorm = before.flashes;
+    if (state === "storm") {
+      flashesBeforeStorm = before.flashes;
+      thundersBeforeStorm = before.thunders || 0;
+    }
     pressKey(key);
     await sleep(180);
     const early = W.now();
@@ -2771,26 +2778,72 @@ async function weather(options, t) {
     }
     await t.until(() => W.now().state === state && W.now().blend > 0.9, 9000, `${label} to settle`);
     const done = W.now();
-    t.scene(label);
-    await sleep(500);
+    t.scene(`Street: ${label}`);
+    await sleep(450);
     heard[state] = done;
     const sig = ["air", "rain", "wind", "thunder", "hush", "snow"].map((k) => (done.sound[k] || 0).toFixed(2)).join(",");
-    t.event(`weather-${state}`, `${label}: sky ${done.sky}, wet ${done.wet.toFixed(2)}, gloss ${done.gloss.toFixed(2)}, puddles ${done.puddles}, wind ${done.wind.toFixed(2)}, fog ${done.fog.toFixed(3)}, rain ${done.rain.toFixed(2)}, snow ${done.snow.toFixed(2)}, flashes ${done.flashes}, particles ${done.particles}, sound ${sig}, heard ${done.heard.toFixed(3)}`);
+    t.event(`weather-${state}`, `${label}: sky ${done.sky}, wet ${done.wet.toFixed(2)}, roofWet ${(done.roofWet || 0).toFixed(2)}, gloss ${done.gloss.toFixed(2)}, puddles ${done.puddles} (lvl ${(done.puddleLevel || 0).toFixed(2)}, ripples ${(done.ripples || 0).toFixed(2)}), wind ${done.wind.toFixed(2)} (trees ${(done.treeSway || 0).toFixed(2)}, awnings ${done.awnings || 0}/${(done.awningSway || 0).toFixed(2)}, litter ${done.litterRate || 0}), snow ${(done.snowCover || 0).toFixed(2)}, flashes ${done.flashes}, thunders ${done.thunders || 0}, sound ${sig}`);
     t.metric(`wet-${state}`, Math.round(done.wet * 100) / 100);
     t.metric(`fog-${state}`, Math.round(done.fog * 1000) / 1000);
-    if ((state === "rain" || state === "storm") && (done.wet < 0.65 || done.gloss < 0.35 || done.puddles < 1)) {
-      t.problem("bug", `${label} didn't leave the road wet (wet ${done.wet.toFixed(2)}, gloss ${done.gloss.toFixed(2)}, puddles ${done.puddles})`);
+    if ((state === "rain" || state === "storm") && (done.wet < 0.65 || done.gloss < 0.35 || done.puddles < 1 || (done.ripples || 0) <= 0)) {
+      t.problem("bug", `${label} didn't wet road/puddles with ripples (wet ${done.wet.toFixed(2)}, gloss ${done.gloss.toFixed(2)}, puddles ${done.puddles}, ripples ${done.ripples})`);
     }
     if (state === "clear" && (done.wet > 0.15 || done.gloss > 0.2)) t.problem("bug", `Clear still looks wet (wet ${done.wet.toFixed(2)}, gloss ${done.gloss.toFixed(2)})`);
     if (state === "rain" && $("log") && !$("log").textContent.includes("Rain.")) t.problem("bug", "Changing the weather isn't in the action log");
+    if (state === "wind") {
+      t.metric("windTreeSway", done.treeSway || 0);
+      t.metric("windAwnings", done.awnings || 0);
+      t.metric("windAwningSway", done.awningSway || 0);
+      t.metric("windLitterRate", done.litterRate || 0);
+      if ((done.treeSway || 0) < 0.15 || (done.awnings || 0) < 4 || (done.awningSway || 0) < 0.15 || (done.litterRate || 0) <= 0) {
+        t.problem("bug", `Wind didn't visibly move trees, awnings and litter (treeSway ${done.treeSway}, awnings ${done.awnings}, awningSway ${done.awningSway}, litterRate ${done.litterRate})`);
+      }
+    }
     if (state === "storm") {
       if (done.flashes <= flashesBeforeStorm) {
-        await t.until(() => W.now().flashes > flashesBeforeStorm, 7000, "a lightning flash").catch(() => {});
+        await t.until(() => W.now().flashes > flashesBeforeStorm, 6000, "a lightning flash").catch(() => {});
       }
-      if (W.now().flashes <= flashesBeforeStorm) t.problem("bug", "The storm never flashed");
-      else t.event("lightning", `${W.now().flashes} flashes while the storm is up`);
+      const afterFlash = W.now();
+      if (afterFlash.flashes <= flashesBeforeStorm) {
+        t.problem("bug", "The storm never flashed");
+      } else {
+        await t.until(() => (W.now().thunders || 0) > thundersBeforeStorm, 4000, "delayed thunder after lightning").catch(() => {});
+        const afterThunder = W.now();
+        t.metric("lightningFlashes", afterThunder.flashes);
+        t.metric("thunderCount", afterThunder.thunders || 0);
+        t.metric("thunderDelaySec", afterThunder.lastThunderDelay || 0);
+        t.metric("strikeDistM", afterThunder.lastStrikeDist || 0);
+        t.event("lightning-thunder", `flashes ${afterThunder.flashes}, thunders ${afterThunder.thunders}, delay ${afterThunder.lastThunderDelay}s at ${afterThunder.lastStrikeDist}m`);
+        if ((afterThunder.thunders || 0) <= thundersBeforeStorm || (afterThunder.lastThunderDelay || 0) < 0.15) {
+          t.problem("bug", `Thunder did not follow lightning with a distance delay (thunders ${afterThunder.thunders}, delay ${afterThunder.lastThunderDelay}s)`);
+        }
+      }
+      // Measure desktop vs phone-tier storm FPS and particle budget
+      const lookApi = window.day && window.day.look;
+      const savedQ = lookApi && lookApi.quality ? lookApi.quality() : "high";
+      if (lookApi && lookApi.quality) lookApi.quality("high");
+      await sleep(150);
+      const deskStormParticles = W.now().activeParticles || 0;
+      const deskStormFps = await fpsWindow(900);
+      t.metric("desktopStormFpsAvg", deskStormFps.avg);
+      t.metric("desktopStormFpsMin", deskStormFps.min);
+      t.metric("desktopStormParticles", deskStormParticles);
+      if (lookApi && lookApi.quality) lookApi.quality("low");
+      await sleep(150);
+      t.scene("Street: Storm (phone tier)");
+      const phoneStormParticles = W.now().activeParticles || 0;
+      const phoneStormFps = await fpsWindow(1100);
+      t.metric("phoneStormFpsAvg", phoneStormFps.avg);
+      t.metric("phoneStormFpsMin", phoneStormFps.min);
+      t.metric("phoneStormParticles", phoneStormParticles);
+      t.event("storm-fps", `desktop ${deskStormFps.avg} fps (${deskStormParticles} particles/s), phone tier ${phoneStormFps.avg} fps (min ${phoneStormFps.min}, ${phoneStormParticles} particles/s)`);
+      if (phoneStormFps.avg < 30) t.problem("bug", `Phone-tier storm FPS dropped to ${phoneStormFps.avg} avg (must stay >= 30 fps)`);
+      if (phoneStormParticles >= deskStormParticles && deskStormParticles > 0) {
+        t.problem("bug", `Phone tier did not reduce storm particles (${phoneStormParticles} vs desktop ${deskStormParticles})`);
+      }
+      if (lookApi && lookApi.quality) lookApi.quality(savedQ);
     }
-    t.progress(0.2 + i * 0.09);
+    t.progress(0.16 + i * 0.06);
   }
   const rain = heard.rain;
   const storm = heard.storm;
@@ -2809,6 +2862,96 @@ async function weather(options, t) {
   const skies = new Set(Object.values(heard).map((s) => s.sky));
   t.metric("skies", skies.size);
   if (skies.size < 5) t.problem("bug", `Only ${skies.size} different sky colours across the seven states`);
+
+  // Walk up the apt building ramp onto the rooftop and cycle states on the roof (snow settling & melting, rain wetting roof & puddles, sun drying with steam wisp, wind, storm, clouds, fog)
+  const blocks = (window.DAY_CONFIG && window.DAY_CONFIG.city && window.DAY_CONFIG.city.blocks) || [];
+  const apt = blocks.find((b) => b.id === "apt") || blocks.find((b) => b.stair);
+  if (apt && apt.stair) {
+    const s = apt.stair;
+    const lip = apt.z + apt.d / 2 - 1.1;
+    const topX = s.x1 - 0.25;
+    await goTo(s.x0 - 0.9, s.z, t, { sprint: true, progress: 0.62, ms: 22000 });
+    await goTo(topX, s.z, t, { close: 0.35, progress: 0.66, ms: 18000 });
+    await goTo(topX, lip, t, { close: 0.5, progress: 0.68, ms: 8000 });
+    await goTo(apt.x, apt.z, t, { close: 0.9, progress: 0.7, ms: 9000 });
+    const stRoof = C.state();
+    t.scene("On the roof");
+    await sleep(350);
+    t.event("on-the-roof", `apt roof at ${stRoof.x.toFixed(1)}, ${stRoof.z.toFixed(1)}, y ${stRoof.y.toFixed(2)}`);
+    if (stRoof.y < apt.h - 0.5) t.problem("bug", `He didn't reach the apt rooftop (y ${stRoof.y.toFixed(2)}, roof ${apt.h})`);
+
+    // 1. Snow settles on the roof, then melts away when clear/sun comes out
+    pressKey("7");
+    await t.until(() => W.now().state === "snow" && (W.now().snowCover || 0) > 0.65, 8000, "snow to settle on roof").catch(() => {});
+    const roofSnow = W.now();
+    t.scene("Roof: Snow settled");
+    await sleep(450);
+    t.metric("roofSnowSettled", roofSnow.snowCover || 0);
+    t.event("roof-snow-settled", `snowCover ${(roofSnow.snowCover || 0).toFixed(2)}, snowMeshes ${roofSnow.snowMeshes || 0}`);
+    if ((roofSnow.snowCover || 0) < 0.6 || (roofSnow.snowMeshes || 0) < 1) {
+      t.problem("bug", `Snow did not settle on roofs (snowCover ${roofSnow.snowCover}, snowMeshes ${roofSnow.snowMeshes})`);
+    }
+    pressKey("1");
+    await t.until(() => W.now().state === "clear" && (W.now().snowCover || 0) < 0.1, 9000, "snow to melt off roof").catch(() => {});
+    const roofMelted = W.now();
+    t.scene("Roof: Snow melted");
+    await sleep(350);
+    t.metric("roofSnowMelted", roofMelted.snowCover || 0);
+    t.event("roof-snow-melted", `snowCover ${(roofMelted.snowCover || 0).toFixed(2)}, snowMeshes ${roofMelted.snowMeshes || 0}`);
+    if ((roofMelted.snowCover || 0) > 0.15) {
+      t.problem("bug", `Snow did not melt away after clear sky (snowCover ${roofMelted.snowCover})`);
+    }
+    t.progress(0.76);
+
+    // 2. Rain wets the roof and grows puddles with ripples, then sun/clear dries them with a steam wisp
+    pressKey("3");
+    await t.until(() => W.now().state === "rain" && (W.now().roofWet || 0) > 0.7 && (W.now().puddleLevel || 0) > 0.65, 8000, "rain to wet roof and grow puddles").catch(() => {});
+    const roofWet = W.now();
+    t.scene("Roof: Rain & puddles");
+    await sleep(450);
+    t.metric("roofWetRain", roofWet.roofWet || 0);
+    t.metric("roofPuddleLevel", roofWet.puddleLevel || 0);
+    t.metric("roofRipples", roofWet.ripples || 0);
+    t.event("roof-wet", `roofWet ${(roofWet.roofWet || 0).toFixed(2)}, roofGloss ${(roofWet.roofGloss || 0).toFixed(2)}, puddleLevel ${(roofWet.puddleLevel || 0).toFixed(2)}, ripples ${(roofWet.ripples || 0).toFixed(2)}`);
+    if ((roofWet.roofWet || 0) < 0.6 || (roofWet.puddleLevel || 0) < 0.5 || (roofWet.ripples || 0) <= 0) {
+      t.problem("bug", `Rain on roof didn't wet surface or form rippled puddles (roofWet ${roofWet.roofWet}, puddleLevel ${roofWet.puddleLevel}, ripples ${roofWet.ripples})`);
+    }
+    let steamPeak = 0;
+    pressKey("1");
+    const dryStart = performance.now();
+    while (performance.now() - dryStart < 6500) {
+      const cur = W.now();
+      if ((cur.steam || 0) > steamPeak) {
+        steamPeak = cur.steam || 0;
+        if (steamPeak > 0.2 && performance.now() - dryStart > 400 && performance.now() - dryStart < 1800) {
+          t.scene("Roof: Sun drying steam");
+        }
+      }
+      if (cur.state === "clear" && (cur.roofWet || 0) < 0.1 && (cur.puddleLevel || 0) < 0.08) break;
+      await sleep(90);
+    }
+    const roofDried = W.now();
+    t.scene("Roof: Dried in sun");
+    await sleep(350);
+    t.metric("roofSteamPeak", Math.round(steamPeak * 100) / 100);
+    t.metric("roofWetAfterSun", roofDried.roofWet || 0);
+    t.event("roof-dried", `steamPeak ${steamPeak.toFixed(2)}, roofWet ${(roofDried.roofWet || 0).toFixed(2)}, puddleLevel ${(roofDried.puddleLevel || 0).toFixed(2)}`);
+    if (steamPeak < 0.15) t.problem("bug", `Drying roof after rain didn't emit a steam wisp (steamPeak ${steamPeak.toFixed(2)})`);
+    if ((roofDried.roofWet || 0) > 0.18 || (roofDried.puddleLevel || 0) > 0.15) {
+      t.problem("bug", `Roof and puddles did not dry back when sun came out (roofWet ${roofDried.roofWet}, puddleLevel ${roofDried.puddleLevel})`);
+    }
+    t.progress(0.84);
+
+    // 3. Cycle remaining states on the roof (Clouds, Storm, Fog, Wind) so every state is shown on both street and rooftop
+    for (const [rKey, rState, rLabel] of [["2", "clouds", "Clouds"], ["4", "storm", "Storm"], ["5", "fog", "Fog"], ["6", "wind", "Wind"]]) {
+      pressKey(rKey);
+      await t.until(() => W.now().state === rState && W.now().blend > 0.85, 7000, `Roof ${rLabel}`).catch(() => {});
+      t.scene(`Roof: ${rLabel}`);
+      await sleep(250);
+      t.event(`roof-${rState}`, `Roof ${rLabel}: blend ${W.now().blend.toFixed(2)}, sky ${W.now().sky}`);
+    }
+  }
+  t.progress(0.9);
   keyDown("q");
   await sleep(500);
   t.scene("Weather wheel");

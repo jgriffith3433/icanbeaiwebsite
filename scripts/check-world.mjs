@@ -531,7 +531,53 @@ ok(mounted.now().state === 'rain' && mounted.now().blend < 0.55, `the world jump
 world.update(frW, 0.05, { snap: true });
 const wetRoad = mounted.now();
 ok(wetRoad.reflect > 0.8, `the player's rain doesn't reflect (reflect ${wetRoad.reflect})`);
-ok(wetRoad.blend > 0.9 && wetRoad.wet > 0.8 && wetRoad.gloss > 0.35 && wetRoad.puddles > 0, `rain didn't wet the road (wet ${wetRoad.wet.toFixed(2)}, gloss ${wetRoad.gloss == null ? '?' : wetRoad.gloss.toFixed(2)}, puddles ${wetRoad.puddles})`);
+ok(wetRoad.blend > 0.9 && wetRoad.wet > 0.8 && wetRoad.roofWet > 0.8 && wetRoad.gloss > 0.35 && wetRoad.roofGloss > 0.35 && wetRoad.puddles >= 8 && wetRoad.puddleLevel > 0.8 && wetRoad.ripples > 0.5, `rain didn't wet roofs/roads & grow rippled puddles (wet ${wetRoad.wet.toFixed(2)}, roofWet ${wetRoad.roofWet.toFixed(2)}, puddles ${wetRoad.puddles}, ripples ${wetRoad.ripples})`);
+// Criterion 1 drying + steam wisp off wet roofs:
+mounted.set('clear', 1, 'test');
+let steamPeak = 0;
+for (let i = 0; i < 36; i++) {
+  world.update(frW, 0.15, {});
+  steamPeak = Math.max(steamPeak, mounted.now().steam || 0);
+}
+ok(steamPeak > 0.2, `sun drying wet roofs after rain didn't emit a steam wisp (steamPeak ${steamPeak.toFixed(2)})`);
+ok(mounted.now().roofWet < 0.12 && mounted.now().puddleLevel < 0.1 && mounted.now().puddles === 0, `sun didn't dry roofs and puddles back (roofWet ${mounted.now().roofWet.toFixed(2)}, puddleLevel ${mounted.now().puddleLevel.toFixed(2)})`);
+// Criterion 2: wind moves trees, awnings and litter
+mounted.set('wind', 1, 'test');
+world.update(frW, 0.05, { snap: true });
+const windyNow = mounted.now();
+ok(windyNow.treeSway > 0.2 && windyNow.awnings >= 20 && windyNow.awningSway > 0.18 && windyNow.litterRate > 0, `wind didn't move trees, awnings and litter (treeSway ${windyNow.treeSway}, awnings ${windyNow.awnings}, awningSway ${windyNow.awningSway}, litterRate ${windyNow.litterRate})`);
+// Criterion 3: snow settles on roofs and melts away afterwards
+mounted.set('snow', 1, 'test');
+for (let i = 0; i < 32; i++) world.update(frW, 0.15, {});
+const snowyNow = mounted.now();
+ok(snowyNow.snowCover > 0.75 && snowyNow.snowMeshes >= 3, `snow didn't settle on roofs (snowCover ${snowyNow.snowCover.toFixed(2)}, snowMeshes ${snowyNow.snowMeshes})`);
+mounted.set('clear', 1, 'test');
+for (let i = 0; i < 36; i++) world.update(frW, 0.15, {});
+const meltedNow = mounted.now();
+ok(meltedNow.snowCover < 0.1 && meltedNow.snowMeshes === 0, `snow didn't melt away after clear (snowCover ${meltedNow.snowCover.toFixed(2)}, snowMeshes ${meltedNow.snowMeshes})`);
+// Criterion 4 & 5: storm lightning flashes light the city and thunder follows with a delay; phone tier scales particles down
+mounted.set('storm', 1, 'test');
+world.update(frW, 0.05, { snap: true });
+const f0 = mounted.now().flashes;
+const t0 = mounted.now().thunders || 0;
+let flashedBeforeThunder = false;
+for (let i = 0; i < 40; i++) {
+  world.update(frW, 0.08, {});
+  const cur = mounted.now();
+  if (cur.flashes > f0 && (cur.thunders || 0) === t0 && cur.flashLight > 0.2) flashedBeforeThunder = true;
+}
+const stormed = mounted.now();
+ok(stormed.flashes > f0 && flashedBeforeThunder && (stormed.thunders || 0) > t0 && stormed.lastThunderDelay >= 0.2, `storm lightning & delayed thunder failed (flashes ${f0}->${stormed.flashes}, thunders ${t0}->${stormed.thunders}, delay ${stormed.lastThunderDelay}s, flashedFirst ${flashedBeforeThunder})`);
+if (world.look && world.look.quality) {
+  world.look.quality('high');
+  world.update(frW, 0.05, {});
+  const highParts = mounted.now().activeParticles;
+  world.look.quality('low');
+  world.update(frW, 0.05, {});
+  const lowParts = mounted.now().activeParticles;
+  ok(lowParts > 0 && lowParts < highParts * 0.4, `phone tier didn't scale down storm particles (low ${lowParts} vs high ${highParts})`);
+  world.look.quality('high');
+}
 mounted.set('clear', 1, 'test');
 world.update(frW, 0.05, { snap: true });
 ok(mounted.now().wet < 0.12 && mounted.now().gloss < 0.2, `clear left the road wet (gloss ${mounted.now().gloss.toFixed(2)})`);
