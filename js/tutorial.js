@@ -20,7 +20,7 @@ const DEFAULTS = {
     { id: "take", do: "Take control.", hint: "Enter, or the button.", touch: "Tap Take control." },
     { id: "move", do: "Walk him.", hint: "WASD or the arrows. Shift runs.", touch: "Drag the stick. Push it to the edge to run." },
     { id: "jump", do: "Jump.", hint: "Space. Twice more in the air. Hold it to float down.", touch: "Jump. Twice more in the air. Hold it to float down." },
-    { id: "bolt", do: "Throw one lightning strike.", hint: "E, at the reticle. It spends Pressure.", touch: "Tap Bolt. It spends Pressure." },
+    { id: "bolt", do: "Throw one lightning strike.", hint: "E, at the reticle. It spends Charge.", touch: "Tap Bolt. It spends Charge." },
     { id: "letgo", do: "Let go.", hint: "Esc. He walks back to where his day is.", touch: "Tap Let go. He walks back to where his day is." },
   ],
 };
@@ -226,7 +226,7 @@ html.touch-ui .tutorial{width:min(280px,calc(100vw - 32px))}
       const d = (e && e.detail) || {};
       if (d.power === "bolt" && d.action === "bolt") boltLanded = true;
       else if (blocking() && cfg.steps[index] && cfg.steps[index].id === "bolt" && d.action === "denied" && d.power === "bolt" && hintEl) {
-        hintEl.textContent = touchy() ? "Pressure is still filling. Then tap Bolt." : "Pressure is still filling. Then E.";
+        hintEl.textContent = touchy() ? "Charge is still filling. Then tap Bolt." : "Charge is still filling. Then E.";
       }
     });
     window.addEventListener("day:control", () => { paint(); watch(); });

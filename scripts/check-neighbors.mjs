@@ -72,7 +72,7 @@ for (const p of list) {
   const BABYLON = await import("@babylonjs/core");
   globalThis.BABYLON = BABYLON;
   const el = () => ({ style: { setProperty() {} }, dataset: {}, classList: { add() {}, remove() {}, contains: () => false }, appendChild() {}, append() {}, remove() {}, setAttribute() {}, addEventListener() {}, querySelector: () => el(), set innerHTML(v) {}, get innerHTML() { return ""; } });
-  globalThis.document = { createElement: el, head: el(), body: el() };
+  globalThis.document = { createElement: el, head: el(), body: el(), getElementById: () => null };
   globalThis.localStorage = { getItem: () => null, setItem() {} };
   const events = [];
   const listeners = {};

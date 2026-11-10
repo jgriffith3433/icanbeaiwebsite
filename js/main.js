@@ -346,35 +346,42 @@
 
   /* ---------------- log ---------------- */
   /* Notes: lines that aren't in the day's timeline (taking control, letting go, back on his day), written
-     into the log at the minute they happened by day.note() (js/control.js). Kept per day. */
+     into the log at the minute they happened by day.note() (js/control.js). Kept per day.
+     Live mode: past and current only (newest last) — never an action before its time.
+     Play/pause: the same, then a labelled "Coming up" block for preview rows. */
   const notes = new Map(); // dateKey -> [{ start, text }]
   let logKey = "";
-  function renderLog(day, idx, now, steering) {
+  function renderLog(day, idx, now, steering, playMode) {
     const mine = (notes.get(day.dateKey) || []).filter((n) => n.start <= now + 1e-6);
-    const key = day.dateKey + ":" + idx + ":" + mine.length + ":" + !!steering;
+    const showSoon = playMode !== "live";
+    const key = day.dateKey + ":" + idx + ":" + mine.length + ":" + !!steering + ":" + playMode;
     if (key === logKey) return;
     logKey = key;
     const rows = day.rows;
     const from = Math.max(0, idx - 6);
-    const to = Math.min(rows.length - 1, idx + 2);
-    const list = [];
+    const to = showSoon ? Math.min(rows.length - 1, idx + 2) : idx;
+    const pastNow = [];
+    const soon = [];
     for (let i = from; i <= to; i++) {
       const r = rows[i];
       if (r.again && i !== idx) continue;
-      list.push({ at: r.start, start: r.start, text: r.text, cls: (i < idx ? "past" : i === idx ? "now" : "soon") + (r.kind === "micro" ? " micro" : "") });
+      const item = { at: r.start, start: r.start, text: r.text, cls: (i < idx ? "past" : i === idx ? "now" : "soon") + (r.kind === "micro" ? " micro" : "") };
+      if (i > idx) soon.push(item);
+      else pastNow.push(item);
     }
     // Notes since the earliest row shown. While the player has him, the latest note is what's happening; after,
     // the day's current line comes back under the notes, from the minute he was back.
     const lastNote = mine.filter((n) => n.start >= rows[from].start).pop();
     mine.filter((n) => n.start >= rows[from].start).forEach((n) => {
-      list.push({ at: n.start, start: n.start, text: n.text, cls: (steering && n === lastNote ? "now" : "past") + " note" });
+      pastNow.push({ at: n.start, start: n.start, text: n.text, cls: (steering && n === lastNote ? "now" : "past") + " note" });
     });
-    const cur = list.find((r) => r.cls.startsWith("now") && !r.cls.includes("note"));
+    const cur = pastNow.find((r) => r.cls.startsWith("now") && !r.cls.includes("note"));
     if (cur && steering) cur.cls = cur.cls.replace("now", "past");
     else if (cur && lastNote && lastNote.start > rows[idx].start) cur.at = cur.start = lastNote.start + 1e-6;
-    list.sort((a, b) => a.at - b.at);
+    pastNow.sort((a, b) => a.at - b.at);
+    const list = pastNow.slice(-10);
     el.log.innerHTML = "";
-    list.slice(-10).forEach((r) => {
+    const addRow = (r) => {
       const li = document.createElement("li");
       li.className = r.cls;
       const t = document.createElement("time");
@@ -384,7 +391,16 @@
       li.appendChild(t);
       li.appendChild(s);
       el.log.appendChild(li);
-    });
+    };
+    list.forEach(addRow);
+    if (showSoon && soon.length) {
+      const head = document.createElement("li");
+      head.className = "log-head coming-up";
+      head.setAttribute("aria-label", "Coming up");
+      head.textContent = "Coming up";
+      el.log.appendChild(head);
+      soon.forEach(addRow);
+    }
     // the log is a capped scroller (css/site.css): keep the current row in view
     const nowLi = el.log.querySelector("li.now");
     if (nowLi) el.log.scrollTop = Math.max(0, nowLi.offsetTop - el.log.offsetTop - el.log.clientHeight / 2);
@@ -429,33 +445,43 @@
     const a = fr.action;
     const steer = pilot ? pilot(fr, dt, day) : null;
 
+    const paused = mode === "pause";
     const clock = E.fmtClock(loc.minutes, true).split(" ");
     el.time.textContent = clock[0];
-    el.ampm.textContent = clock[1];
+    el.ampm.textContent = paused ? "Paused" : clock[1];
+    const nowPanel = el.time.closest(".panel.now") || el.what.closest(".panel.now");
+    if (nowPanel) nowPanel.classList.toggle("is-paused", paused);
     rowIdx = rowAt(day.rows, loc.minutes);
     const row = day.rows[rowIdx];
-    const whatText = steer && steer.text ? steer.text : row.text;
+    const whatText = paused ? "Paused" : (steer && steer.text ? steer.text : row.text);
     if (el.what.textContent !== whatText) {
       el.what.textContent = whatText;
       el.what.classList.remove("fresh");
-      void el.what.offsetWidth;
-      el.what.classList.add("fresh");
+      if (!paused) {
+        void el.what.offsetWidth;
+        el.what.classList.add("fresh");
+      }
     }
-    el.what.classList.toggle("micro", !steer && row.kind === "micro");
-    el.what.classList.toggle("steered", !!steer);
-    el.prog.style.width = (Math.max(0, Math.min(1, (loc.minutes - row.start) / Math.max(1e-6, row.end - row.start))) * 100).toFixed(1) + "%";
+    el.what.classList.toggle("micro", !paused && !steer && row.kind === "micro");
+    el.what.classList.toggle("steered", !paused && !!steer);
+    el.what.classList.toggle("paused", paused);
+    if (!paused) {
+      el.prog.style.width = (Math.max(0, Math.min(1, (loc.minutes - row.start) / Math.max(1e-6, row.end - row.start))) * 100).toFixed(1) + "%";
+    }
     const ch = (cfg.chapters || {})[a.chapter] || { label: a.chapter, color: "#888" };
     // while he's the player's he's on foot, whatever the day's own car is doing: don't say DRIVE / IN THE CAR
-    el.chapter.textContent = steer ? "Your move" : ch.label;
-    el.chapter.style.setProperty("--c", ch.color);
-    const room = steer ? "On foot" : a.inCar ? "In the car" : (day.rooms[a.room] && day.rooms[a.room].label) || "";
+    el.chapter.textContent = paused ? "Paused" : (steer ? "Your move" : ch.label);
+    el.chapter.style.setProperty("--c", paused ? "#9aa4b2" : ch.color);
+    const room = paused ? "" : (steer ? "On foot" : a.inCar ? "In the car" : (day.rooms[a.room] && day.rooms[a.room].label) || "");
     el.where.textContent = room;
     el.where.hidden = !room;
     const wsep = $("where-sep");
     if (wsep) wsep.hidden = !room;
     const nb = day.blocks.find((b) => b.start > loc.minutes + 1e-6);
-    el.next.textContent = nb ? `Next · ${E.fmtClock(nb.start)} · ${nb.title}` : "Next · the alarm";
-    renderLog(day, rowIdx, loc.minutes, !!steer);
+    el.next.textContent = paused
+      ? "Paused · clock held"
+      : (nb ? `Next · ${E.fmtClock(nb.start)} · ${nb.title}` : "Next · the alarm");
+    renderLog(day, rowIdx, loc.minutes, !!steer, mode);
     if (!dragging) el.scrub.value = String(loc.minutes);
     document.documentElement.style.setProperty("--marker", ((loc.minutes - day.dayStart) / (day.dayEnd - day.dayStart)) * 100 + "%");
 

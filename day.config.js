@@ -278,7 +278,7 @@ window.DAY_CONFIG = {
       { id: "take", do: "Take control.", hint: "Enter, or the button.", touch: "Tap Take control." },
       { id: "move", do: "Walk him.", hint: "WASD or the arrows. Shift runs.", touch: "Drag the stick. Push it to the edge to run." },
       { id: "jump", do: "Jump.", hint: "Space. Twice more in the air. Hold it to float down.", touch: "Jump. Twice more in the air. Hold it to float down." },
-      { id: "bolt", do: "Throw one lightning strike.", hint: "E, at the reticle. It spends Pressure.", touch: "Tap Bolt. It spends Pressure." },
+      { id: "bolt", do: "Throw one lightning strike.", hint: "E, at the reticle. It spends Charge.", touch: "Tap Bolt. It spends Charge." },
       { id: "letgo", do: "Let go.", hint: "Esc. He walks back to where his day is.", touch: "Tap Let go. He walks back to where his day is." },
     ],
   },
@@ -490,7 +490,7 @@ window.DAY_CONFIG = {
       gale: "A gale tears down the street.",
       fog: "Fog rolls in off the street.",
       sunbreak: "The clouds split. Warm light.",
-      dry: "Not enough pressure.",
+      dry: "Not enough charge.",
       locked: "Not unlocked yet.",
     },
     loose: [
