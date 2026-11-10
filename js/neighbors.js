@@ -152,8 +152,8 @@ function install() {
     toastTimer = setTimeout(() => toast.classList.remove("on"), 4200);
   }
 
-  const FADE_NEAR = 1.2; // m from the camera: fully faded
-  const FADE_FAR = 2.4; // m from the camera: fully drawn
+  const FADE_NEAR = 0.6; // m from the camera: fully faded
+  const FADE_FAR = 1.4; // m from the camera: fully drawn
   const PERSONAL = 1.1; // m between the player's centre and a neighbor's drawn centre
 
   /* ---- who is where ---- */
