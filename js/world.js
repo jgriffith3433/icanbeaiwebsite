@@ -417,8 +417,8 @@
       const xc = s.x0 + (thick / Math.cos(theta) + 0.02) / slope; // where the underside leaves the ground
       const topY = underAt(s.x1);
       if (topY > 0.1) {
-        const zA = s.z + s.w / 2;
-        const zB = zA + 0.24;
+        const zA = s.z - s.w / 2; // full width of the ramp: an open underside read as a beam floating over a void
+        const zB = s.z + s.w / 2 + 0.24;
         const tri = [[xc, 0], [s.x1, 0], [s.x1, topY]];
         const P = [];
         const idx = [];
