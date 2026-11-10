@@ -656,7 +656,15 @@ export function installLook(world) {
       applyQuality(quality === "low" ? "high" : "low", "click");
       btn.blur();
     });
-    document.body.append(btn);
+    const pop = document.getElementById("settings-pop");
+    const gear = document.getElementById("settings");
+    (pop || document.body).append(btn);
+    if (pop && gear) {
+      const set = (on) => { pop.hidden = !on; gear.setAttribute("aria-expanded", on ? "true" : "false"); };
+      gear.addEventListener("click", () => set(pop.hidden));
+      document.addEventListener("pointerdown", (e) => { if (!pop.hidden && !pop.contains(e.target) && e.target !== gear) set(false); });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) set(false); });
+    }
   }
   mountButton();
   applyQuality(quality);

@@ -37,6 +37,7 @@ Definition of done (all required):
 - **Build (slice):** apt crown light strip + tomato wall readable from mid-avenue; fridge hum + soft radio bed when inside (procedural sfx, no GPU).
 
 ### The Park
+- **In (slice, `js/slice.js`):** always-on straw/damp lawn (damp after Birdie's reward), pond ripples, bandstand pigeons that scatter on walk-up/Gust/bolt, bandstand creak, coin toss at the pond (Y, no Pressure), apt crown light strip + tomato wall. Playtest `slice`.
 - **Mood:** green that wants rain. Straw lawn at arc start; damp and drinking after Birdie's ask. Bandstand string lights at dusk.
 - **Look / sound:** lawn 0.03, pond, flowerbeds, path lamps, benches, bandstand. Soft park hush under city hum; rain hiss when he calls it; pond splash on over-hold (kick-back).
 - **Size:** rect x −34..30, z 20..68 (~64×48 m).

@@ -25,7 +25,7 @@ function boxOf(el) {
    visible placeholder text (a lone dash) as a bug. Called by look, photos, episodes, tutorial-episode and control,
    at each stage of the run (the label says which). Each distinct finding is reported once per run. */
 const HUD_PARTS = [
-  [".panel.now", "status card"], ["#sound", "Sound"], ["#details", "Details"], [".side", "Details panel"],
+  [".panel.now", "status card"], ["#sound", "Sound"], ["#details", "Details"], ["#settings", "Settings"], [".settings-pop", "Settings menu"], [".side", "Details panel"],
   [".hud.bottom", "timeline"], ["#control", "Take control / Let go"], ["#quality", "Quality"],
   ["#weather-btn", "Weather"], ["#pressure", "Pressure"], ["#episodes", "Episodes"], ["#neighbors-btn", "Neighbors"],
   ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .energy", "Energy"],
@@ -734,6 +734,60 @@ async function crowdReacts(options, t) {
 /* ---------------- neighbors: find three neighbors, answer their asks, collect thank-yous and surprises ---------------- */
 // Setup shortcuts: the day bar (to the morning, then to each surprise's hour) and Take control beside the car.
 // Everything else is real keys: WASD/Shift to walk the sidewalk to each neighbor, then R, X, E for what they ask.
+async function sliceScenario(options, t) {
+  t.scene("Home block and park");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.slice && window.day.control, 8000, "the slice (js/slice.js)");
+  const C = window.day.control;
+  const beads = [];
+  let last = performance.now();
+  let maxQuiet = 0;
+  const bead = (k) => {
+    const n = performance.now();
+    maxQuiet = Math.max(maxQuiet, (n - last) / 1000);
+    last = n;
+    beads.push(k);
+    t.event("bead", k);
+  };
+  ["day:slice", "day:neighbor", "day:power", "day:voice"].forEach((n) => window.addEventListener(n, (e) => bead(n + ":" + ((e.detail && e.detail.action) || ""))));
+  const day = window.day.today();
+  const outside = carSideMoment(day);
+  scrubTo(outside.start + 1);
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  scrubTo(9 * 60);
+  await sleep(700);
+  if (C.mode() !== "control") { pressKey("Enter"); await t.until(() => C.mode() === "control", 4000, "Take control again"); }
+  const sideZ = (window.DAY_CONFIG.street || { z: 12.6 }).z - 2.8;
+  const hop = async (x, z) => { for (let k = 0; k < 8; k++) { const s = C.state(); if (Math.abs(s.x - x) < 2) break; await goTo(s.x + Math.max(-20, Math.min(20, x - s.x)), sideZ, t, { sprint: true, ms: 12000, close: 1.2 }); bead("walk"); } return goTo(x, z, t, { ms: 12000, close: 1.5 }); };
+  t.scene("Birdie's pots");
+  await hop(-21, 9.5);
+  await t.until(() => window.day.neighbors.now().people.find((p) => p.id === "birdie"), 2000, "Birdie");
+  pressKey("r");
+  await sleep(1500);
+  const lawnOk = await t.until(() => window.day.slice.now().lawn === "damp", 9000, "the lawn going damp after Birdie's rain").then(() => true, () => false);
+  if (!lawnOk) t.problem("bug", "Birdie's rain didn't change the lawn");
+  t.scene("Park path to the bandstand");
+  await goTo(-8, 24, t, { ms: 14000, close: 1.5 });
+  bead("park");
+  await goTo(-18, 41, t, { ms: 16000, close: 2 });
+  await sleep(800);
+  const sl = window.day.slice.now();
+  if (!sl.scattered) t.problem("bug", "The pigeons didn't scatter when he walked up");
+  if (!sl.creaks) t.problem("bug", "The bandstand didn't creak");
+  t.scene("Pond");
+  await goTo(10, 55, t, { ms: 16000, close: 3 });
+  pressKey("y");
+  await sleep(600);
+  if (!window.day.slice.now().coins) t.problem("bug", "The coin toss at the pond did nothing");
+  t.metric("quality.maxQuietSeconds", +maxQuiet.toFixed(1));
+  t.metric("quality.textOnlyBeats", 0);
+  if (maxQuiet > 10) t.problem("bug", `Quiet for ${maxQuiet.toFixed(1)} s on the slice walk`);
+  t.event("slice-done", JSON.stringify(window.day.slice.now()));
+}
+
 async function neighborsScenario(options, t) {
   t.scene("Home");
   checkBasics(t);
@@ -5396,6 +5450,47 @@ async function clickEl(el) {
 }
 
 /* ---------------- the title screen and the day/night music ---------------- */
+async function hudLayoutScenario(options, t) {
+  t.scene("HUD layout");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const size = `${innerWidth}x${innerHeight}`;
+  const q = $("quality"), gear = $("settings");
+  if (!q || !gear) { t.problem("bug", "No Settings button or quality toggle"); return; }
+  if (!q.closest("#settings-pop")) t.problem("bug", "Quality isn't inside the Settings menu");
+  if (window.day.title && window.day.title.show) window.day.title.show();
+  await sleep(600);
+  if (hudVisible(q)) t.problem("bug", `Quality shows outside the Settings menu on the title (${size})`);
+  checkHud(t, "hud-layout: title");
+  if (window.day.title && window.day.title.quiet) window.day.title.quiet();
+  await sleep(400);
+  if (hudVisible(q)) t.problem("bug", `Quality floats on screen while Settings is closed (${size})`);
+  gear.click();
+  await sleep(300);
+  if (!hudVisible(q)) t.problem("bug", "Settings didn't open the quality toggle");
+  checkHud(t, "hud-layout: settings open");
+  t.event("settings-open", `Quality sits in the Settings menu at ${size}`);
+  pressKey("Escape");
+  await sleep(200);
+  pressKey("Enter");
+  await t.until(() => window.day.control && window.day.control.mode() === "player", 8000, "taking control");
+  await sleep(800);
+  checkHud(t, "hud-layout: in play");
+  const c = boxOf($("control"));
+  if (c) {
+    const cx = c.left + c.width / 2;
+    if (Math.abs(cx - innerWidth / 2) > 4) t.problem("bug", `Let go isn't centred (${Math.round(cx)} of ${innerWidth}) at ${size}`);
+    if (!document.documentElement.classList.contains("touch-ui") && c.top < innerHeight / 2) t.problem("bug", `Let go isn't at the bottom (${size})`);
+  }
+  const w = boxOf($("weather-btn")), p = boxOf($("pressure"));
+  if (!w || !p) t.problem("bug", `Weather or Pressure missing in play (${size})`);
+  else {
+    ["episodes", "neighbors-btn"].forEach((id) => { const b = boxOf($(id)); if (b && (boxesOverlap(b, w) || boxesOverlap(b, p))) t.problem("bug", `#${id} covers the weather meter (${size})`); });
+    if (w.left < 0 || p.right > innerWidth || p.top < 0 || w.bottom > innerHeight) t.problem("bug", `Weather meter is cut off (${size})`);
+  }
+  t.event("hud-layout-play", `weather and Pressure clear, Let go centred at ${size}`);
+  pressKey("Escape");
+}
+
 async function titleScenario(options, t) {
   t.scene("Title");
   checkBasics(t);
@@ -5860,10 +5955,12 @@ installPlaytest({
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
+    { id: "hud-layout", title: "HUD layout: Quality lives in the Settings menu, the left column stacks Episodes, Neighbors, weather and Pressure without overlap, Take control stays bottom-centre; overlap check on title and in play", seconds: 40, tags: ["hud", "smoke"], description: "Load with ?playtest=hud-layout. Real input: Settings click, Enter, Esc. Events settings-open / hud-clear / hud-layout-play. Run at 1280x720, 390x844 and 844x390." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
+    { id: "slice", title: "Vertical slice: walk from the driveway to Birdie, answer her rain, see the lawn drink, the park path, bandstand pigeons and creak, the pond coin toss; reports quality.maxQuietSeconds and quality.textOnlyBeats", seconds: 200, tags: ["slice", "story"], description: "Real WASD, R for Birdie, Y at the pond." },
     { id: "neighbors", title: "Walk the avenue to Birdie, Dex and Ines Quill: each asks for a weather ability in a speech bubble, answering it pays a thank-you and a reward, and a later surprise pays more", seconds: 260, tags: ["neighbors", "story"], description: "Day bar beside the car (setup), Enter, then real WASD/Shift to each neighbor and R, X, E for their asks; the day bar jumps to each surprise hour. Events found-<id>, beat-ask-<id>, beat-thanks-<id>, reward-<id>, beat-surprise-<id>." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
@@ -5913,6 +6010,7 @@ installPlaytest({
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
+      else if (id === "hud-layout") await hudLayoutScenario(options, t);
       else if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);
@@ -5926,6 +6024,7 @@ installPlaytest({
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-abilities") await weatherAbilities(options, t);
+      else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);

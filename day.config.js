@@ -1691,17 +1691,7 @@ window.DAY_CONFIG = {
     list: [
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
-        parts: [
-          { shape: "box", size: [0.2, 0.55, 0.22], pos: [-0.12, 0.28, 0], color: "#a5b27a", leg: -1 },
-          { shape: "box", size: [0.2, 0.55, 0.22], pos: [0.12, 0.28, 0], color: "#4a5a3a", leg: 1 },
-          { shape: "box", size: [0.5, 0.7, 0.34], pos: [0, 0.9, 0], color: "#f2c230" },
-          { shape: "box", size: [0.12, 0.6, 0.14], pos: [-0.31, 0.9, 0], color: "#f2c230" },
-          { shape: "box", size: [0.12, 0.6, 0.14], pos: [0.31, 0.9, 0], color: "#f2c230" },
-          { shape: "sphere", size: [0.36, 0.36, 0.36], pos: [0, 1.4, 0], color: "#e0b794" },
-          { shape: "cyl", size: [0.64, 0.04, 0.64], pos: [0, 1.57, 0], color: "#c9a85a" },
-          { shape: "cyl", size: [0.3, 0.14, 0.3], pos: [0, 1.66, 0], color: "#c9a85a" },
-          { shape: "box", size: [0.2, 0.17, 0.14], pos: [0.47, 0.62, 0], color: "#4f9a5b" },
-        ],
+        look: { skin: "#e0b794", top: "#f2c230", pants: "#4a5a3a", shoes: "#5a3a22", hair: "#7a5a3a", bun: true, coat: 0.5, hat: { type: "straw", brim: 0.62, color: "#c9a85a", band: "#4f9a5b" }, carry: "basket" },
         stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
         beats: [
           { id: "birdie-ask", kind: "ask", from: 7, to: 11.5, ability: "rain", text: "There you are. My tomatoes are sulking. A little rain, if you've got any?", reward: null },
@@ -1711,14 +1701,7 @@ window.DAY_CONFIG = {
       },
       {
         id: "dex", name: "Dex Moreno", role: "Courier, the shop", home: "the shop, mid avenue", scale: 1, color: "#ff7a1a",
-        parts: [
-          { shape: "box", size: [0.22, 0.85, 0.24], pos: [-0.13, 0.43, 0], color: "#24262c", leg: -1 },
-          { shape: "box", size: [0.22, 0.85, 0.24], pos: [0.13, 0.43, 0], color: "#24262c", leg: 1 },
-          { shape: "box", size: [0.56, 0.7, 0.36], pos: [0, 1.2, 0], color: "#ff7a1a" },
-          { shape: "sphere", size: [0.32, 0.32, 0.32], pos: [0, 1.73, 0], color: "#8a5a3c" },
-          { shape: "sphere", size: [0.42, 0.34, 0.42], pos: [0, 1.82, 0], color: "#e8e8e8" },
-          { shape: "box", size: [0.5, 0.42, 0.34], pos: [0, 1.2, -0.38], color: "#c8a070" },
-        ],
+        look: { skin: "#8a5a3c", top: "#ff7a1a", pants: "#24262c", shoes: "#e8e8e8", build: 1.1, hat: { type: "helmet", color: "#e8e8e8" }, carry: "parcel" },
         stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
         beats: [
           { id: "dex-ask", kind: "ask", from: 7, to: 15, ability: "sunbreak", text: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.", reward: null },
@@ -1728,15 +1711,7 @@ window.DAY_CONFIG = {
       },
       {
         id: "quill", name: "Ines Quill", role: "Stargazer, the annex", home: "the annex, east end", scale: 1.1, color: "#7a5cd6",
-        parts: [
-          { shape: "box", size: [0.2, 0.9, 0.22], pos: [-0.11, 0.46, 0], color: "#1c1c2a", leg: -1 },
-          { shape: "box", size: [0.2, 0.9, 0.22], pos: [0.11, 0.46, 0], color: "#1c1c2a", leg: 1 },
-          { shape: "box", size: [0.5, 1.0, 0.32], pos: [0, 1.25, 0], color: "#7a5cd6" },
-          { shape: "sphere", size: [0.3, 0.3, 0.3], pos: [0, 1.88, 0], color: "#e3c4a8" },
-          { shape: "box", size: [0.34, 0.1, 0.06], pos: [0, 1.9, 0.14], color: "#9fd4ff" },
-          { shape: "cyl", size: [0.06, 1.3, 0.06], pos: [0.5, 0.65, 0.3], color: "#8a8f9a" },
-          { shape: "cyl", size: [0.12, 0.7, 0.12], pos: [0.5, 1.5, 0.45], color: "#cfd4dc", tilt: 0.9 },
-        ],
+        look: { skin: "#e3c4a8", top: "#7a5cd6", pants: "#1c1c2a", shoes: "#1c1c2a", hair: "#2a2038", glasses: "#9fd4ff", coat: 0.55, carry: "telescope" },
         stops: [[0, 154, 9.8], [6.5, 154, 9.8, "inside"], [16.5, 154, 9.8]],
         beats: [
           { id: "quill-ask", kind: "ask", from: 17, to: 5, ability: "bolt", text: "Thirty nights and no lightning in my lens. One bolt, if you would. Not at me.", reward: null },

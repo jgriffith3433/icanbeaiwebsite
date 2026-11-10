@@ -981,7 +981,8 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       pad.appendChild(b);
       buttons[name] = b;
     });
-    document.body.append(meter, reticle, pad);
+    (document.getElementById("hud-left") || document.body).append(meter);
+    document.body.append(reticle, pad);
     const holdBtn = buttons.storm;
     holdBtn.addEventListener("pointerdown", (e) => {
       touchStorm = true;
