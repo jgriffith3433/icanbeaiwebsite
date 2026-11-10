@@ -174,6 +174,34 @@
       tone({ freq: 220, to: 180, dur: 0.16, vol: 0.06, wave: "square", band: 600 });
     },
     chimeUp() { note("goal"); notes([660, 990], 0.1, 0.09); },
+    /* neighbour body gestures (peoplekit ask / thanks / surprise) */
+    wave(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("gesture-ask");
+      noise({ type: "bandpass", freq: 900, to: 1600, q: 1.2, dur: 0.22, vol: 0.05 * g, attack: 0.01, pan });
+      tone({ freq: 520, to: 780, dur: 0.18, vol: 0.04 * g, wave: "triangle", pan });
+    },
+    clap(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("gesture-thanks");
+      noise({ type: "bandpass", freq: 1800, to: 900, q: 0.8, dur: 0.08, vol: 0.12 * g, attack: 0.001, pan });
+      tone({ freq: 240, to: 120, dur: 0.12, vol: 0.06 * g, pan });
+      setTimeout(() => {
+        noise({ type: "bandpass", freq: 2000, to: 1000, q: 0.8, dur: 0.07, vol: 0.1 * g, attack: 0.001, pan });
+      }, 140);
+    },
+    gasp(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("gesture-surprise");
+      tone({ freq: 380, to: 520, dur: 0.28, vol: 0.05 * g, wave: "sine", attack: 0.04, pan });
+      noise({ type: "highpass", freq: 600, dur: 0.2, vol: 0.04 * g, attack: 0.02, pan });
+    },
+    umbSnap(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("umbrella");
+      noise({ type: "lowpass", freq: 400, to: 1200, q: 1, dur: 0.25, vol: 0.08 * g, attack: 0.01, pan });
+      tone({ freq: 180, to: 90, dur: 0.2, vol: 0.05 * g, pan });
+    },
     thud() { note("fail"); tone({ freq: 120, to: 55, dur: 0.45, vol: 0.18 }); tone({ freq: 127, to: 58, dur: 0.45, vol: 0.08, wave: "sawtooth", band: 300 }); },
     blip() { note("blip"); tone({ freq: 1250, to: 1600, dur: 0.12, vol: 0.06, wave: "triangle" }); },
     rumble() { note("rumble"); noise({ type: "lowpass", freq: 120, dur: 0.9, vol: 0.25, attack: 0.05 }); },
@@ -458,6 +486,7 @@
     if (d.action === "say" && d.text && !(day.dialogue && day.dialogue.voiced(d.who, d.text))) S.babble(d.who, d.text);
     else if (d.action === "twist") S.rumble();
   });
+  let lastUmb = -1e9;
   window.addEventListener("day:neighbor", (e) => {
     const d = e.detail || {};
     if (d.action === "beat") {
@@ -465,6 +494,18 @@
       let at = { pan: 0, gain: 1 };
       if (d.x != null && d.z != null) at = place(d.x, d.z);
       S.babble(d.who || d.id || d.neighbor, d.text || "neighbor neighbor", at.pan, at.gain);
+    } else if (d.action === "gesture") {
+      let at = { pan: 0, gain: 1 };
+      if (d.x != null && d.z != null) at = place(d.x, d.z);
+      if (d.kind === "ask") S.wave(at.pan, at.gain);
+      else if (d.kind === "thanks") S.clap(at.pan, at.gain);
+      else if (d.kind === "surprise") S.gasp(at.pan, at.gain);
+    } else if (d.action === "umbrella") {
+      if (performance.now() - lastUmb < 800) return;
+      lastUmb = performance.now();
+      let at = { pan: 0, gain: 1 };
+      if (d.x != null && d.z != null) at = place(d.x, d.z);
+      S.umbSnap(at.pan, at.gain);
     } else if (d.action === "reward") S.chimeUp();
     else if (d.action === "beat-missed") tone({ freq: 440, to: 330, dur: 0.35, vol: 0.05, wave: "triangle" });
   });

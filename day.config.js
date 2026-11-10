@@ -1783,7 +1783,7 @@ window.DAY_CONFIG = {
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
         look: { skin: "#e0b794", top: "#f2c230", pants: "#4a5a3a", shoes: "#5a3a22", hair: "#7a5a3a", bun: true, coat: 0.5, hat: { type: "straw", brim: 0.62, color: "#c9a85a", band: "#4f9a5b" }, carry: "basket" },
-        stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
+        stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5, "sit"], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
         beats: [
           { id: "birdie-ask", kind: "ask", from: 7, to: 11.5, ability: "rain", text: "There you are. My tomatoes are sulking. A little rain, if you've got any?", reward: null },
           { id: "birdie-thanks", kind: "thanks", text: "Look at them drink. Bless you.", reward: { score: 50, pressure: 25, label: "for the tomatoes" } },
@@ -1793,7 +1793,7 @@ window.DAY_CONFIG = {
       {
         id: "dex", name: "Dex Moreno", role: "Courier, the shop", home: "the shop, mid avenue", scale: 1, color: "#ff7a1a",
         look: { skin: "#8a5a3c", top: "#ff7a1a", pants: "#24262c", shoes: "#e8e8e8", build: 1.1, hat: { type: "helmet", color: "#e8e8e8" }, carry: "parcel" },
-        stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
+        stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5, "sit"], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
         beats: [
           { id: "dex-ask", kind: "ask", from: 7, to: 15, ability: "sunbreak", text: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.", reward: null },
           { id: "dex-thanks", kind: "thanks", text: "Dry as a bone. I owe you a delivery.", reward: { score: 50, pressure: 25, label: "for the dry parcels" } },

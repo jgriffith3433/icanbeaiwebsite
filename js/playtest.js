@@ -910,6 +910,178 @@ async function neighborsScenario(options, t) {
   pressKey("Escape");
 }
 
+/* ---------------- neighbor-bodies: procedural peoplekit gait, beat gestures, weather posture, foot-slide detectors ---------------- */
+// Setup: day bar + Take control. Real WASD to each neighbour; R/X/E for asks. Slowed clips = day at 1× while we
+// watch a walking stretch and the ask→thanks gestures. A full-day scrub samples detectors (jumps ignored).
+async function neighborBodies(options, t) {
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  await t.until(() => window.day.neighbors && window.day.neighbors.anim, 8000, "neighbors anim API");
+  const N = window.day.neighbors;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const W = window.weather || window.day.weather;
+  const day = window.day.today();
+  if (!N || !C || !P) {
+    t.problem("bug", "neighbors, powers or Take control isn't installed");
+    return;
+  }
+  const street = (window.DAY_CONFIG.street || { z: 12.6 });
+  const sideZ = street.z - 2.8;
+  const who = (id) => N.now().people.find((p) => p.id === id);
+  const sampleAnim = (id) => (N.anim().people.find((p) => p.id === id) || {});
+
+  const outside = carSideMoment(day);
+  if (!outside) {
+    t.problem("bug", "No moment beside the car to take control");
+    return;
+  }
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(500);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  N.resetAnim && N.resetAnim();
+
+  const setClock = async (hour, why) => {
+    scrubTo(hour * 60);
+    clickSpeed(1);
+    await sleep(600);
+    t.event("clock", `${why}: ${E().fmtClock(hour * 60)}`);
+    if (C.mode() !== "control") {
+      pressKey("Enter");
+      await t.until(() => C.mode() === "control", 4000, "Take control again");
+    }
+  };
+  async function walkTo(x, z, progress) {
+    await goTo(C.state().x, sideZ, t, { sprint: true, progress, ms: 12000, close: 1.2 });
+    for (let k = 0; k < 14; k++) {
+      const s = C.state();
+      if (Math.abs(s.x - x) < 1.6) break;
+      const nx = s.x + Math.max(-22, Math.min(22, x - s.x));
+      if (!(await goTo(nx, sideZ, t, { sprint: true, progress, ms: 14000, close: 1.2 }))) break;
+    }
+    return goTo(x, z, t, { progress, ms: 8000, close: 1.4 });
+  }
+
+  /** Watch one neighbour for `ms` at 1×; log gait samples for the slowed clip review. */
+  async function slowedClip(id, label, ms) {
+    t.scene(label);
+    clickSpeed(1);
+    const rows = [];
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      const a = sampleAnim(id);
+      const p = who(id);
+      if (a.state) rows.push(`${a.state}@${(a.speed || 0).toFixed(2)} g=${a.gesture || "-"} w=${a.weatherK > 0.4 ? a.weather : "-"}`);
+      if (p && p.moving && (a.state === "walk" || a.state === "hurry")) t.event("gait-step", `${id} ${a.state} speed ${(a.speed || 0).toFixed(2)} planted ${a.plantedL ? "L" : ""}${a.plantedR ? "R" : ""}`);
+      await sleep(120);
+    }
+    const walked = rows.some((r) => /^(walk|hurry)/.test(r));
+    t.event("slow-clip", `${id}: ${rows.length} samples, walk=${walked}; last ${rows[rows.length - 1] || "?"}`);
+    return walked;
+  }
+
+  async function askThanks(id, x, z, key, scene, progress) {
+    t.scene(scene);
+    await walkTo(x, z, progress);
+    const asked = await t.until(() => who(id).asking, 6000, `${id}'s ask`).then(() => true).catch(() => false);
+    if (!asked) return t.problem("bug", `${id} never asked`);
+    t.event(`beat-ask-${id}`, who(id).bubble);
+    // wait for the wave gesture to show
+    const waved = await t.until(() => sampleAnim(id).gesture === "ask" || sampleAnim(id).state === "gesture-ask", 2500, `${id} ask gesture`).then(() => true).catch(() => false);
+    if (waved) t.event(`gesture-ask-${id}`, `state ${sampleAnim(id).state}`);
+    else t.problem("bug", `${id}: ask bubble without a wave gesture`);
+    await sleep(700);
+    const ab = (window.DAY_CONFIG.neighbors.list.find((n) => n.id === id).beats[0] || {}).ability;
+    const cost = (P.now().abilities.find((a) => a.id === ab) || {}).cost || 20;
+    await t.until(() => P.now().energy + 0.05 >= cost, 20000, `Energy for ${ab}`).catch(() => {});
+    const before = N.now().score;
+    pressKey(key);
+    const paid = await t.until(() => N.now().score > before, 7000, `${id}'s thank-you`).then(() => true).catch(() => false);
+    if (!paid) return t.problem("bug", `${id}: thanks didn't pay`);
+    const cheered = await t.until(() => sampleAnim(id).gesture === "thanks" || sampleAnim(id).state === "gesture-thanks", 2500, `${id} thanks gesture`).then(() => true).catch(() => false);
+    if (cheered) t.event(`gesture-thanks-${id}`, `state ${sampleAnim(id).state}`);
+    else t.problem("bug", `${id}: thanks without a cheer/clap gesture`);
+    t.event(`beat-thanks-${id}`, who(id).bubble);
+    await sleep(900);
+    await t.until(() => (P.now().abilities.find((a) => a.id === ab) || {}).cooldown <= 0, 12000, "cooldown").catch(() => {});
+  }
+
+  // --- Birdie: morning walk clip, then ask/thanks ---
+  await setClock(7.15, "Birdie leaving home");
+  await walkTo(-22, 9.5, 0.1);
+  // her walk from home to the pots starts around now; watch a slowed stretch
+  const birdieWalk = await slowedClip("birdie", "Birdie walk (slowed)", 2800);
+  if (!birdieWalk) {
+    // nudge the clock into a moving segment between pots and park
+    await setClock(11.5, "Birdie toward the park");
+    await walkTo(-14, 14, 0.15);
+    await slowedClip("birdie", "Birdie walk retry (slowed)", 3200);
+  }
+  await setClock(8.2, "Birdie pots");
+  await askThanks("birdie", -24.5, 9.6, "r", "Birdie ask / thanks", 0.25);
+
+  // rain posture on Birdie after her rain
+  if (W && W.now) {
+    await t.until(() => (W.now().rain || 0) > 0.2 || W.now().state === "rain", 4000, "rain from her ask").catch(() => {});
+    await sleep(1200);
+    const a = sampleAnim("birdie");
+    if (a.weather === "rain" || a.weather === "storm" || a.weatherK > 0.35) t.event("weather-pose-rain", `birdie ${a.weather} k=${(a.weatherK || 0).toFixed(2)} state ${a.state}`);
+    else t.problem("bug", `Birdie isn't hunched for rain (weather ${a.weather}, k ${a.weatherK})`);
+  }
+
+  // --- Dex: walk clip + ask/thanks + sun shield ---
+  await setClock(8.5, "Dex morning");
+  await walkTo(43.2, 9.9, 0.4);
+  await setClock(10.8, "Dex toward plaza");
+  await slowedClip("dex", "Dex walk (slowed)", 2800);
+  await setClock(8.6, "Dex ask window");
+  await askThanks("dex", 43.2, 9.9, "x", "Dex ask / thanks", 0.5);
+  if (W && W.now) {
+    await t.until(() => (W.now().sun || 0) > 0.3, 4000, "sun break from Dex").catch(() => {});
+    await sleep(1000);
+    const a = sampleAnim("dex");
+    if (a.weather === "sun" || (a.weatherK > 0.35 && (W.now().sun || 0) > 0.3)) t.event("weather-pose-sun", `dex ${a.weather} k=${(a.weatherK || 0).toFixed(2)} sun=${(W.now().sun || 0).toFixed(2)}`);
+    else t.problem("bug", `Dex isn't shielding his eyes in the sun (weather ${a.weather}, k ${a.weatherK}, sun ${W.now().sun})`);
+  }
+
+  // --- Ines: evening ask/thanks + walk ---
+  await setClock(17.7, "Ines evening");
+  await walkTo(151.5, 9.9, 0.7);
+  await slowedClip("quill", "Ines walk (slowed)", 2400);
+  await askThanks("quill", 151.5, 9.9, "e", "Ines ask / thanks", 0.85);
+
+  // --- Full in-game day: scrub the clock; detectors ignore teleports ---
+  t.scene("Full day detectors");
+  N.resetAnim && N.resetAnim();
+  const startFails = N.anim().footSlideFails;
+  for (let h = 0; h < 24; h += 0.5) {
+    scrubTo(h * 60);
+    await sleep(80);
+  }
+  clickSpeed(1);
+  await sleep(400);
+  const anim = N.anim();
+  t.metric("quality.footSlideFails", anim.footSlideFails - startFails);
+  t.metric("quality.animMismatchFails", anim.mismatchFails);
+  t.metric("quality.animSamples", anim.samples);
+  t.event("anim-detectors", `foot-slide ${anim.footSlideFails} mismatch ${anim.mismatchFails} over ${anim.samples} samples (limit ${anim.limit} m)`);
+  if (anim.footSlideFails > 0) t.problem("bug", `quality.foot-slide: ${anim.footSlideFails} planted-foot slides over a full day`);
+  else t.event("foot-slide-clean", "0 foot-slide failures over a full in-game day");
+
+  const gestures = ["birdie", "dex", "quill"].every((id) => {
+    const ev = N.events().filter((e) => e.action === "gesture" && e.id === id);
+    return ev.some((e) => e.kind === "ask") && ev.some((e) => e.kind === "thanks");
+  });
+  if (gestures) t.event("gestures-pass", "each neighbour gestured on ask and thanks");
+  else t.problem("bug", "Missing ask/thanks gesture events on a neighbour");
+
+  pressKey("Escape");
+}
+
 /* ---------------- weather-abilities: rain, gale, fog, sun break and lightning, one call each ---------------- */
 async function weatherAbilities(options, t) {
   t.scene("Outside");
@@ -6312,6 +6484,7 @@ installPlaytest({
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
     { id: "slice", title: "Vertical slice: walk from the driveway to Birdie, answer her rain, see the lawn drink, the park path, bandstand pigeons and creak, the pond coin toss; reports quality.maxQuietSeconds and quality.textOnlyBeats", seconds: 200, tags: ["slice", "story"], description: "Real WASD, R for Birdie, Y at the pond." },
     { id: "neighbors", title: "Walk the avenue to Birdie, Dex and Ines Quill: each asks for a weather ability in a speech bubble, answering it pays a thank-you and a reward, and a later surprise pays more", seconds: 260, tags: ["neighbors", "story"], description: "Day bar beside the car (setup), Enter, then real WASD/Shift to each neighbor and R, X, E for their asks; the day bar jumps to each surprise hour. Events found-<id>, beat-ask-<id>, beat-thanks-<id>, reward-<id>, beat-surprise-<id>." },
+    { id: "neighbor-bodies", title: "Peoplekit bodies: slowed walk clips for Birdie, Dex and Ines (stride matches speed), ask wave and thanks cheer gestures, rain hunch and sun eye-shield, foot-slide detectors clean over a full day", seconds: 320, tags: ["neighbors", "quality"], description: "Day bar + Enter (setup). Real WASD to each neighbour; R/X/E for asks. Events slow-clip / gait-step / gesture-ask-* / gesture-thanks-* / weather-pose-rain / weather-pose-sun / foot-slide-clean; metric quality.footSlideFails." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
@@ -6379,6 +6552,7 @@ installPlaytest({
       else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
+      else if (id === "neighbor-bodies") await neighborBodies(options, t);
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
