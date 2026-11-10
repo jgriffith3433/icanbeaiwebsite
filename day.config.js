@@ -546,24 +546,115 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
-     VOICE — Small Weather speaks (js/voice.js), same DoD voice (Eric)
+     VOICE — Small Weather speaks (js/voice.js director), same DoD voice (Eric)
      ------------------------------------------------------------------------
-     Cocky, calm, a storm god who is also a developer. Lines are short. Each
-     has text and an MP3 from Hawkes Gen audio.voice (hawkes.assets.json). A
-     cooldown keeps him from chattering. Powers roll a chance so he does not
-     bark every call. Weather reactions fire when a state starts. Take control
-     / let go are an episode open and a score-card close. Autopilot mutters
-     while his day has him. Glide is the floaty fall (Space held).
+     First-person lines that match docs/voice-style.md. `spoken` is the table the
+     director and the dialogue recipes (audio/dialogue/dlg-he-*.mp3) use: take,
+     let go, each power's first use, rooftop save, neighbour thanks, day end,
+     idle. Director: priority, no overlap, ~5 min per-line cooldown, slight
+     pitch variance, one caption clear of the ability bar. `lines` keeps the
+     older weather / glide / day beds (and fallbacks while a spoken clip is
+     missing). Voices mute is separate from music and effects (`icanbe.voices`).
      ------------------------------------------------------------------------ */
   voice: {
     voiceId: "cjVigY5qzO86Huf0OWal", // DoD Eric (doseofdestructionwebsite/content/voice.json)
-    cooldown: 2.6, // seconds between any spoken lines
-    powerChance: 0.48, // powers only: he does not talk every call
+    cooldown: 2.6, // seconds between any spoken lines (overlap gate)
+    lineCooldown: 300, // ~5 min before the same line id may play again
+    pitch: 0.04, // playbackRate variance (±)
+    powerChance: 0.48, // later power calls (first use always speaks)
     volume: 0.88,
-    dayEvery: 90, // wall seconds between autopilot mutter rolls while on his day
+    dayEvery: 90, // wall seconds between autopilot / idle mutter rolls
     dayChance: 0.55,
+    captionSecs: 2.8,
+    priorities: {
+      dayend: 100,
+      take: 90,
+      rooftop: 80,
+      neighbor: 75,
+      bolt: 70,
+      rain: 70,
+      gale: 70,
+      fog: 70,
+      sunbreak: 70,
+      storm: 70,
+      gust: 70,
+      tornado: 70,
+      letgo: 55,
+      glide: 40,
+      "weather-storm": 35,
+      "weather-rain": 35,
+      "weather-fog": 30,
+      "weather-wind": 30,
+      "weather-snow": 30,
+      "weather-clear": 25,
+      "weather-clouds": 25,
+      day: 20,
+      idle: 15,
+      "episode-open": 90,
+      "episode-close": 55,
+    },
+    /* Spoken bark table (first person). Also fed into dialogueLines as He lines. */
+    spoken: {
+      take: [
+        "Alright. My turn.",
+        "The day can wait a minute.",
+        "I'm here. Sky's listening.",
+      ],
+      letgo: [
+        "Back to the day now.",
+        "Clock kept going without me.",
+      ],
+      bolt: [
+        "Point and flash.",
+        "That one was mine.",
+      ],
+      rain: [
+        "Wet road. Good.",
+        "Rain. Finally something useful.",
+      ],
+      gale: [
+        "Wind. Hold your jacket.",
+        "Push the street a little.",
+      ],
+      fog: [
+        "Fog. Soft edges.",
+        "Keep the far end soft.",
+      ],
+      sunbreak: [
+        "Sun. Just for a minute.",
+        "Clear the sky a bit.",
+      ],
+      storm: [
+        "There it is.",
+        "This is more like it.",
+      ],
+      gust: [
+        "Move. The bins can wait.",
+        "Wind's on my side.",
+      ],
+      tornado: [
+        "Watch the street.",
+        "Funnel's going.",
+      ],
+      rooftop: [
+        "Got you. Ladder's next.",
+        "Roof's clear. Come down.",
+      ],
+      neighbor: [
+        "Anytime. Glad it helped.",
+        "That one's done for now.",
+      ],
+      dayend: [
+        "Clock's still running. So am I.",
+        "I type. The sky waits.",
+      ],
+      idle: [
+        "I type. The sky waits.",
+        "Coffee's cold. Forecast isn't.",
+      ],
+    },
     lines: [
-      // powers
+      // powers (fallback files while spoken dialogue clips land)
       { id: "bolt-1", group: "bolt", text: "Point and flash.", file: "audio/voice/bolt-1.mp3" },
       { id: "bolt-2", group: "bolt", text: "That one felt personal.", file: "audio/voice/bolt-2.mp3" },
       { id: "bolt-3", group: "bolt", text: "Keep the count. I'll keep the bolts.", file: "audio/voice/bolt-3.mp3" },
@@ -589,7 +680,7 @@ window.DAY_CONFIG = {
       { id: "wx-fog", group: "weather-fog", text: "Fog. Soft edges.", file: "audio/voice/wx-fog.mp3" },
       { id: "wx-wind", group: "weather-wind", text: "Wind's restless.", file: "audio/voice/wx-wind.mp3" },
       { id: "wx-snow", group: "weather-snow", text: "Snow. Quiet drama.", file: "audio/voice/wx-snow.mp3" },
-      // episode open (take control) and score-card close (let go)
+      // take / let go fallbacks (file text must match the mp3; spoken table is preferred)
       { id: "ep-open-1", group: "episode-open", text: "Alright. My turn.", file: "audio/voice/ep-open-1.mp3" },
       { id: "ep-open-2", group: "episode-open", text: "The day's on autopilot. I'm not.", file: "audio/voice/ep-open-2.mp3" },
       { id: "ep-open-3", group: "episode-open", text: "The Orchestrator asked for drama, so I brought the weather.", file: "audio/voice/ep-open-3.mp3" },
@@ -1692,7 +1783,7 @@ window.DAY_CONFIG = {
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
         look: { skin: "#e0b794", top: "#f2c230", pants: "#4a5a3a", shoes: "#5a3a22", hair: "#7a5a3a", bun: true, coat: 0.5, hat: { type: "straw", brim: 0.62, color: "#c9a85a", band: "#4f9a5b" }, carry: "basket" },
-        stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
+        stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5, "sit"], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
         beats: [
           { id: "birdie-ask", kind: "ask", from: 7, to: 11.5, ability: "rain", text: "There you are. My tomatoes are sulking. A little rain, if you've got any?", reward: null },
           { id: "birdie-thanks", kind: "thanks", text: "Look at them drink. Bless you.", reward: { score: 50, pressure: 25, label: "for the tomatoes" } },
@@ -1702,7 +1793,7 @@ window.DAY_CONFIG = {
       {
         id: "dex", name: "Dex Moreno", role: "Courier, the shop", home: "the shop, mid avenue", scale: 1, color: "#ff7a1a",
         look: { skin: "#8a5a3c", top: "#ff7a1a", pants: "#24262c", shoes: "#e8e8e8", build: 1.1, hat: { type: "helmet", color: "#e8e8e8" }, carry: "parcel" },
-        stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
+        stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5, "sit"], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
         beats: [
           { id: "dex-ask", kind: "ask", from: 7, to: 15, ability: "sunbreak", text: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.", reward: null },
           { id: "dex-thanks", kind: "thanks", text: "Dry as a bone. I owe you a delivery.", reward: { score: 50, pressure: 25, label: "for the dry parcels" } },

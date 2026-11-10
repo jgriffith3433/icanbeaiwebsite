@@ -296,7 +296,15 @@ export function installLook(world) {
       m.clearCoat.intensity = 0;
       m.clearCoat.roughness = 0.18;
     }
-    m.metadata = { wet: !!opt.wet, dryRough, maxCoat: opt.coat == null ? 0.45 : opt.coat };
+    const dryAlbedo = m.albedoColor ? m.albedoColor.clone() : new B.Color3(1, 1, 1);
+    m.metadata = {
+      wet: !!opt.wet,
+      dryRough,
+      dryAlbedo,
+      maxCoat: opt.coat == null ? 0.45 : opt.coat,
+      wetness: 0,
+      snow: 0,
+    };
     surfaces.push(m);
     return m;
   }
@@ -516,6 +524,8 @@ export function installLook(world) {
   let skyTime = 0;
   let last = { day: 1, dusk: 0, night: 0, exposure: 0.94, neon: -1 };
   let lastWet = -1;
+  let lastSurfaceWet = -1;
+  let lastSnow = -1;
   let lastIbl = -1;
   let lastLow = null;
   scene.fogMode = B.Scene.FOGMODE_EXP2;
@@ -614,23 +624,48 @@ export function installLook(world) {
       skyMat.setVector4("weather", weatherVec);
     }
     const wet = override && override.wet != null ? override.wet : 0;
+    const surfaceWet = override && override.surfaceWet != null ? override.surfaceWet : wet;
+    const snowCover = override && override.snowCover != null ? override.snowCover : 0;
     const low = quality === "low";
     const ibl = 0.4 + w.day * 0.26 + (override && override.cover != null ? override.cover * 0.12 : 0); // night/storm floor: dark asphalt must still read
-    if (Math.abs(wet - lastWet) > 0.01 || Math.abs(ibl - lastIbl) > 0.01 || low !== lastLow) {
+    if (
+      Math.abs(wet - lastWet) > 0.005 ||
+      Math.abs(surfaceWet - lastSurfaceWet) > 0.005 ||
+      Math.abs(snowCover - lastSnow) > 0.005 ||
+      Math.abs(ibl - lastIbl) > 0.01 ||
+      low !== lastLow
+    ) {
       lastWet = wet;
+      lastSurfaceWet = surfaceWet;
+      lastSnow = snowCover;
       lastIbl = ibl;
       lastLow = low;
       surfaces.forEach((m) => {
         m.environmentIntensity = ibl;
         const meta = m.metadata || {};
-        if (meta.wet && m !== mats.asphalt) {
+        meta.wetness = surfaceWet;
+        meta.snow = snowCover;
+        if (m !== mats.asphalt) {
           const dryRough = meta.dryRough != null ? meta.dryRough : 0.85;
-          m.roughness = Math.max(0.22, dryRough - wet * 0.52);
-          if (m.clearCoat) {
-            const wantCoat = !low; // always on at high quality (intensity carries the wetness): no mid-play recompile
-            if (m.clearCoat.isEnabled !== wantCoat) m.clearCoat.isEnabled = wantCoat;
-            m.clearCoat.intensity = wet * (meta.maxCoat || 0.42);
-            m.clearCoat.roughness = 0.14 + (1 - wet) * 0.16;
+          const dryAlb = meta.dryAlbedo || new B.Color3(1, 1, 1);
+          const wetDark = m === mats.roof ? 0.46 : m === mats.concrete ? 0.38 : m === mats.brick ? 0.26 : 0.15;
+          const snowK = m === mats.roof ? snowCover * 0.86 : m === mats.ground ? snowCover * 0.72 : m === mats.concrete ? snowCover * 0.65 : 0;
+          const mul = 1 - surfaceWet * wetDark;
+          const r = dryAlb.r * mul + (0.94 - dryAlb.r * mul) * snowK;
+          const g = dryAlb.g * mul + (0.96 - dryAlb.g * mul) * snowK;
+          const b = Math.min(1, dryAlb.b * mul + surfaceWet * 0.04) + (1.0 - Math.min(1, dryAlb.b * mul + surfaceWet * 0.04)) * snowK;
+          if (!m.albedoColor) m.albedoColor = new B.Color3(r, g, b);
+          else m.albedoColor.set(r, g, b);
+          if (meta.wet) {
+            const wEff = Math.max(wet, surfaceWet * 0.78);
+            const wetRough = Math.max(0.2, dryRough - wEff * 0.54);
+            m.roughness = wetRough + (0.9 - wetRough) * snowK;
+            if (m.clearCoat) {
+              const wantCoat = !low; // always on at high quality (intensity carries the wetness): no mid-play recompile
+              if (m.clearCoat.isEnabled !== wantCoat) m.clearCoat.isEnabled = wantCoat;
+              m.clearCoat.intensity = wet * (meta.maxCoat || 0.42) * (1 - snowK * 0.85);
+              m.clearCoat.roughness = 0.14 + (1 - wet) * 0.16;
+            }
           }
         }
       });
@@ -686,12 +721,13 @@ export function installLook(world) {
   if (world.freezeStaticMeshes) world.freezeStaticMeshes();
 
   const api = {
+    mats,
     quality(level) {
       if (level == null) return quality;
       applyQuality(level, "api");
       return quality;
     },
-    /** Weather blend. Pass a partial ({ day, dusk, night, fogDensity, fogColor, clearColor, exposure, cover, wet, storm, flash }) or null to follow the clock. */
+    /** Weather blend. Pass a partial ({ day, dusk, night, fogDensity, fogColor, clearColor, exposure, cover, wet, surfaceWet, snowCover, storm, flash }) or null to follow the clock. */
     setSky(partial) {
       override = partial || null;
     },
@@ -712,6 +748,8 @@ export function installLook(world) {
         samples: pipeline ? pipeline.samples : 0,
         exposure: last.exposure,
         neonLevel: last.neon,
+        wetness: lastSurfaceWet >= 0 ? lastSurfaceWet : 0,
+        snowCover: lastSnow >= 0 ? lastSnow : 0,
         sky: { day: last.day, dusk: last.dusk, night: last.night },
         scaling: engine.getHardwareScalingLevel(),
         dome: !!dome,

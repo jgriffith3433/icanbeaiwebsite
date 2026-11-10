@@ -1,9 +1,11 @@
 /* ==========================================================================
    People kit — low-poly articulated figures built in code (docs/characters.md).
-   buildFigure(B, scene, id, look, scale) -> { root, nodes, meshes, legs, arms, pose(phase, amount) }.
+   buildFigure(B, scene, id, look, scale) -> { root, nodes, meshes, legs, arms, pose, step, anim, ... }.
    Every limb is a named TransformNode (<id>:hipL, :kneeL, :ankleL, :shoulderR, :elbowR, :wristR, :neck, :head ...)
    with smooth-shaded Babylon primitives hanging off it, so all faces point outward. Figures face +z, feet at y 0,
-   about 1.8 m tall before `scale`. Pure data in, no globals: scripts/check-neighbors.mjs builds them in a NullEngine.
+   about 1.8 m tall before `scale`. Procedural gait: stride rate follows real ground speed (WALK_STRIDE), plant-lock
+   keeps a supporting foot from sliding, plus idles, beat gestures, sit and weather posture.
+   Pure data in, no globals: scripts/check-neighbors.mjs builds them in a NullEngine.
    ========================================================================== */
 
 const H = {
@@ -15,6 +17,14 @@ const H = {
   foreArm: 0.27,
   head: 0.18, // head radius
 };
+
+/** Metres of ground covered by one full walk cycle (left + right) at amount 1. Calibrated so plant-lock stays quiet. */
+export const WALK_STRIDE = 0.92;
+
+/** Max slide (m) a planted foot may travel before detectors count a failure. */
+export const FOOT_SLIDE_LIMIT = 0.05;
+
+const TWO_PI = Math.PI * 2;
 
 export function buildFigure(B, scene, id, look, scale = 1) {
   const root = new B.TransformNode("neighbor-" + id, scene);
@@ -60,6 +70,7 @@ export function buildFigure(B, scene, id, look, scale = 1) {
 
   const L = Object.assign({ skin: "#e0b794", top: "#888888", pants: "#333333", shoes: "#222222", build: 1 }, look);
   const w = L.build; // shoulder width factor
+  const carry = L.carry;
 
   /* ---- hips, legs, feet ---- */
   const hips = node("hips", root, 0, H.hip, 0);
@@ -72,7 +83,7 @@ export function buildFigure(B, scene, id, look, scale = 1) {
     limb("shin" + side, knee, H.shin + 0.1, 0.07 * w, L.pants);
     const ankle = node("ankle" + side, knee, 0, -H.shin, 0);
     ball("foot" + side, ankle, 0.14, 0, 0.0, 0.05, L.shoes, 0.62, 1.7).position.y = 0.045;
-    legs.push({ hip, knee, dir: s });
+    legs.push({ hip, knee, ankle, dir: s, side });
   });
   ball("pelvis", hips, 0.3 * w, 0, 0.02, 0, L.pants, 0.7, 0.75);
 
@@ -133,11 +144,10 @@ export function buildFigure(B, scene, id, look, scale = 1) {
     limb("fore" + side, el, H.foreArm + 0.08, 0.052 * w, L.sleeve || L.top);
     const wr = node("wrist" + side, el, 0, -H.foreArm, 0);
     ball("hand" + side, wr, 0.1, 0, -0.04, 0, L.gloves || L.skin);
-    arms.push({ sh, el, wr, dir: s });
+    arms.push({ sh, el, wr, dir: s, side });
   });
 
   /* ---- carried / worn things ---- */
-  const carry = L.carry;
   if (carry === "basket") {
     // a basket of tomatoes in her right hand
     const wr = nodes.wristR;
@@ -154,26 +164,444 @@ export function buildFigure(B, scene, id, look, scale = 1) {
     const cap = cyl("scopeCap", torso, 0.11, 0.11, 0.05, 0.215, 0.73, -0.24, "#b08a4a");
     cap.rotation.z = -0.35;
   }
+
+  /* umbrella (left hand): hidden until rain / storm weather pose raises it */
+  const umb = node("umbrella", nodes.wristL, 0.02, -0.06, 0.02);
+  const umbStick = cyl("umbStick", umb, 0.018, 0.018, 0.55, 0, 0.2, 0, "#3a2a1a");
+  const umbCanopy = cyl("umbCanopy", umb, 0.42, 0.08, 0.12, 0, 0.48, 0, L.top === "#f2c230" ? "#4a7fc0" : L.top);
+  umbStick.isVisible = false;
+  umbCanopy.isVisible = false;
+  const umbrellaMeshes = [umbStick, umbCanopy];
+
   meshes.forEach((m) => {
     m.freezeNormals && m.freezeNormals();
   });
 
-  /* phase is the walk cycle in radians, amount 0..1 how much of it to show */
-  function pose(phase, amount, swing = 0.7) {
+  const anim = {
+    phase: 0,
+    state: "idle",
+    amount: 0,
+    idleT: Math.random() * 10,
+    idleKind: (id.charCodeAt(0) || 0) % 4,
+    gesture: null,
+    gestureT: 0,
+    sitBlend: 0,
+    weather: "clear",
+    weatherK: 0,
+    plant: { L: null, R: null },
+    prevFoot: { L: null, R: null },
+    hipsHome: { x: 0, y: 0, z: 0 },
+  };
+  hips.position.set(0, H.hip, 0);
+
+  function footWorld(side) {
+    const ankle = nodes["ankle" + side];
+    ankle.computeWorldMatrix(true);
+    const m = ankle.getWorldMatrix().m;
+    return { x: m[12], y: m[13], z: m[14] };
+  }
+
+  function zeroJoints() {
+    legs.forEach((l) => {
+      l.hip.rotation.set(0, 0, 0);
+      l.knee.rotation.set(0, 0, 0);
+      l.ankle.rotation.set(0, 0, 0);
+    });
+    arms.forEach((a) => {
+      a.sh.rotation.set(0, 0, 0);
+      a.el.rotation.set(0, 0, 0);
+      a.wr.rotation.set(0, 0, 0);
+    });
+    torso.rotation.set(0, 0, 0);
+    neck.rotation.set(0, 0, 0);
+    head.rotation.set(0, 0, 0);
+    hips.position.set(0, H.hip, 0);
+    hips.rotation.set(0, 0, 0);
+    if (carry === "basket") arms[1].sh.rotation.x = -0.35;
+  }
+
+  /* phase is the walk cycle in radians, amount 0..1 how much of it to show (kept for NullEngine smoke) */
+  function pose(phase, amount, swing = 0.65) {
     const s = Math.sin(phase) * swing * amount;
     legs.forEach((l) => {
       l.hip.rotation.x = s * l.dir;
       l.knee.rotation.x = Math.max(0, -s * l.dir) * 0.9;
     });
     arms.forEach((a) => {
-      a.sh.rotation.x = -s * a.dir * 0.8;
-      a.el.rotation.x = -0.15 - Math.max(0, s * a.dir) * 0.5 * amount;
+      if (carry === "basket" && a.side === "R") {
+        a.sh.rotation.x = -0.35 - s * a.dir * 0.15 * amount;
+      } else {
+        a.sh.rotation.x = -s * a.dir * 0.85;
+        a.el.rotation.x = -0.15 - Math.max(0, s * a.dir) * 0.45 * amount;
+      }
     });
-    torso.rotation.y = s * 0.12;
+    torso.rotation.y = s * 0.1;
     head.rotation.y = -s * 0.08;
   }
-  pose(0, 0);
-  if (carry === "basket") arms[1].sh.rotation.x = -0.35; // basket arm held out a little
 
-  return { root, nodes, meshes, legs, arms, pose, height: 1.84 * scale, legLen: (H.thigh + H.shin) * scale };
+  function applyWalk(phase, amount, hurry) {
+    const swing = 0.55 + hurry * 0.22;
+    pose(phase, amount, swing);
+    // a slight forward lean when hurrying in the rain
+    torso.rotation.x = hurry * 0.18 * amount;
+    hips.position.y = H.hip - (H.thigh + H.shin) * (1 - Math.cos(Math.sin(phase) * swing * amount)) * 0.55;
+  }
+
+  function applyTurn(phase, amount) {
+    const s = Math.sin(phase) * 0.35 * amount;
+    legs.forEach((l) => {
+      l.hip.rotation.y = s * l.dir * 0.6;
+      l.hip.rotation.x = Math.abs(s) * 0.25;
+      l.knee.rotation.x = Math.abs(s) * 0.4;
+    });
+    arms.forEach((a) => {
+      a.sh.rotation.z = s * a.dir * 0.3;
+      a.el.rotation.x = -0.2;
+    });
+    torso.rotation.y = s * 0.2;
+  }
+
+  function applySit(blend) {
+    const b = blend;
+    hips.position.y = H.hip - 0.42 * b;
+    legs.forEach((l) => {
+      l.hip.rotation.x = -1.15 * b;
+      l.knee.rotation.x = 1.35 * b;
+      l.ankle.rotation.x = -0.2 * b;
+    });
+    torso.rotation.x = 0.08 * b;
+    arms.forEach((a) => {
+      a.sh.rotation.x = -0.35 * b;
+      a.el.rotation.x = -0.55 * b;
+    });
+    if (carry === "basket") arms[1].sh.rotation.x = -0.45;
+  }
+
+  function applyIdle(kind, t, personality) {
+    const breath = Math.sin(t * 1.7) * 0.02;
+    torso.rotation.x = breath;
+    hips.position.y = H.hip + breath * 0.5;
+    // personality owns a couple of the idle slots so each neighbour stays themselves
+    if (personality === "phone" && (kind === 2 || kind === 3)) {
+      arms[0].sh.rotation.x = -1.1;
+      arms[0].sh.rotation.z = 0.35;
+      arms[0].el.rotation.x = -1.4;
+      head.rotation.x = -0.35;
+      head.rotation.y = -0.25;
+      return;
+    }
+    if (personality === "plants" && (kind === 2 || kind === 3)) {
+      torso.rotation.x = 0.28;
+      arms[1].sh.rotation.x = -0.7;
+      arms[1].el.rotation.x = -0.9;
+      arms[0].sh.rotation.x = -0.25;
+      head.rotation.x = 0.25;
+      return;
+    }
+    if (personality === "scope" && (kind === 2 || kind === 3)) {
+      // Ines: aim the sky, one hand on the scope
+      head.rotation.x = -0.55 + Math.sin(t * 0.35) * 0.08;
+      neck.rotation.x = -0.15;
+      arms[1].sh.rotation.x = -1.5;
+      arms[1].sh.rotation.z = -0.35;
+      arms[1].el.rotation.x = -0.4;
+      arms[0].sh.rotation.x = -0.4;
+      return;
+    }
+    if (kind === 0) {
+      const wgt = Math.sin(t * 0.7) * 0.12;
+      legs[0].hip.rotation.z = wgt;
+      legs[1].hip.rotation.z = -wgt;
+      hips.position.x = wgt * 0.04;
+    } else {
+      head.rotation.y = Math.sin(t * 0.55) * 0.55;
+      neck.rotation.y = head.rotation.y * 0.35;
+      head.rotation.x = Math.sin(t * 0.4) * 0.12;
+    }
+  }
+
+  function applyGesture(name, t, dur, personality) {
+    const u = Math.min(1, t / 0.25);
+    const out = t > dur - 0.35 ? Math.max(0, (dur - t) / 0.35) : 1;
+    const k = u * out;
+    if (name === "ask") {
+      // wave toward the sky with the free arm
+      const a = carry === "basket" ? arms[0] : arms[1];
+      a.sh.rotation.x = -2.1 * k;
+      a.sh.rotation.z = (a.dir < 0 ? 0.4 : -0.4) * k;
+      a.el.rotation.x = -0.35 * k;
+      a.wr.rotation.z = Math.sin(t * 10) * 0.45 * k;
+      head.rotation.x = -0.35 * k;
+      head.rotation.y = 0.15 * k;
+    } else if (name === "thanks") {
+      // cheer / clap
+      arms.forEach((a) => {
+        a.sh.rotation.x = -1.6 * k;
+        a.sh.rotation.z = -a.dir * 0.55 * k;
+        a.el.rotation.x = -0.7 * k;
+      });
+      const clap = Math.abs(Math.sin(t * 12)) * 0.25 * k;
+      arms[0].sh.rotation.z += clap;
+      arms[1].sh.rotation.z -= clap;
+      head.rotation.x = -0.2 * k;
+      torso.rotation.x = -0.08 * k;
+    } else if (name === "surprise") {
+      // character-shaped offer / point, with a small step back
+      legs.forEach((l) => {
+        l.hip.rotation.x = (l.dir < 0 ? 0.25 : -0.4) * k;
+        l.knee.rotation.x = 0.3 * k;
+      });
+      torso.rotation.x = -0.12 * k;
+      if (personality === "plants") {
+        // Birdie: offer the tomato basket forward
+        arms[1].sh.rotation.x = -0.9 * k;
+        arms[1].sh.rotation.z = -0.35 * k;
+        arms[1].el.rotation.x = -0.5 * k;
+        arms[0].sh.rotation.x = -0.3 * k;
+        head.rotation.x = 0.15 * k;
+      } else if (personality === "phone") {
+        // Dex: present the parcel with both hands
+        arms.forEach((a) => {
+          a.sh.rotation.x = -0.85 * k;
+          a.sh.rotation.z = -a.dir * 0.25 * k;
+          a.el.rotation.x = -0.6 * k;
+        });
+        head.rotation.x = 0.1 * k;
+      } else {
+        // Ines: point at the sky / a star
+        arms[1].sh.rotation.x = -2.2 * k;
+        arms[1].sh.rotation.z = -0.2 * k;
+        arms[1].el.rotation.x = -0.15 * k;
+        arms[0].sh.rotation.x = -0.35 * k;
+        head.rotation.x = -0.55 * k;
+        neck.rotation.x = -0.2 * k;
+      }
+    } else if (name === "react") {
+      // look up / flinch at a bolt or storm he called
+      head.rotation.x = -0.7 * k;
+      neck.rotation.x = -0.25 * k;
+      arms.forEach((a) => {
+        a.sh.rotation.x = -0.55 * k;
+        a.sh.rotation.z = -a.dir * 0.25 * k;
+      });
+      torso.rotation.x = -0.1 * k;
+    }
+  }
+
+  function applyWeather(weather, k) {
+    if (k < 0.01) {
+      umbrellaMeshes.forEach((m) => (m.isVisible = false));
+      return;
+    }
+    if (weather === "rain" || weather === "storm") {
+      // hunch, free arm up holding the umbrella
+      torso.rotation.x += 0.22 * k;
+      head.rotation.x += 0.2 * k;
+      const a = arms[0];
+      a.sh.rotation.x = -2.0 * k;
+      a.sh.rotation.z = 0.55 * k;
+      a.el.rotation.x = -0.2 * k;
+      umbrellaMeshes.forEach((m) => (m.isVisible = true));
+      umb.rotation.x = -0.4;
+      umb.rotation.z = 0.3;
+    } else if (weather === "sun" || weather === "clear") {
+      // shield eyes when the sky is bright (sun break / clear with sun weight)
+      arms[0].sh.rotation.x = -1.5 * k;
+      arms[0].sh.rotation.z = 0.7 * k;
+      arms[0].el.rotation.x = -1.1 * k;
+      head.rotation.x = -0.25 * k;
+      umbrellaMeshes.forEach((m) => (m.isVisible = false));
+    } else {
+      umbrellaMeshes.forEach((m) => (m.isVisible = false));
+    }
+  }
+
+  function plantedSides(phase, amount) {
+    if (amount < 0.35) return { L: false, R: false };
+    const s = Math.sin(phase);
+    // supporting foot is the rear one (hip rotation pulls that leg back)
+    return { L: s * -1 < -0.55, R: s * 1 < -0.55 };
+  }
+
+  function plantLock(phase, amount) {
+    root.computeWorldMatrix(true);
+    const planted = plantedSides(phase, amount);
+    let slide = 0;
+    ["L", "R"].forEach((side) => {
+      const fw = footWorld(side);
+      if (!planted[side]) {
+        anim.plant[side] = null;
+        anim.prevFoot[side] = fw;
+        return;
+      }
+      if (!anim.plant[side]) anim.plant[side] = { x: fw.x, z: fw.z };
+      const dx = fw.x - anim.plant[side].x;
+      const dz = fw.z - anim.plant[side].z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 0.001) {
+        // pull hips in world XZ so the planted ankle stays put
+        const inv = root.getWorldMatrix().clone().invert();
+        const a = B.Vector3.TransformCoordinates(new B.Vector3(fw.x, 0, fw.z), inv);
+        const b = B.Vector3.TransformCoordinates(new B.Vector3(anim.plant[side].x, 0, anim.plant[side].z), inv);
+        hips.position.x += b.x - a.x;
+        hips.position.z += b.z - a.z;
+        root.computeWorldMatrix(true);
+        const after = footWorld(side);
+        slide = Math.max(slide, Math.hypot(after.x - anim.plant[side].x, after.z - anim.plant[side].z));
+      }
+      anim.prevFoot[side] = footWorld(side);
+    });
+    return { planted, slide };
+  }
+
+  /**
+   * One animation frame. ctx:
+   *   dt, speed (m/s ground), moving, yawErr (rad), sit, weather ('rain'|'storm'|'sun'|...),
+   *   sunShield (0..1), gesture ('ask'|'thanks'|'surprise'|null), personality ('phone'|'plants'|...),
+   *   jump (true = big teleport: reset plants)
+   */
+  function step(ctx) {
+    const dt = Math.max(0, Math.min(0.1, ctx.dt || 0.016));
+    const speed = Math.max(0, ctx.speed || 0);
+    const moving = !!ctx.moving && speed > 0.08;
+    const yawErr = ctx.yawErr || 0;
+    const turning = moving && Math.abs(yawErr) > 0.55;
+    const hurry = ctx.weather === "rain" || ctx.weather === "storm" ? 1 : 0;
+
+    if (ctx.jump) {
+      anim.plant.L = anim.plant.R = null;
+      anim.prevFoot.L = anim.prevFoot.R = null;
+    }
+
+    // flinch / look-up once when ability weather cracks nearby (crowd-style; cools 4 s)
+    if (anim.reactCool > 0) anim.reactCool -= dt;
+    if (ctx.react && !anim.gesture && !(anim.reactCool > 0)) {
+      anim.gesture = "react";
+      anim.gestureT = 0;
+      anim.reactCool = 4;
+    }
+    // gesture request
+    if (ctx.gesture && ctx.gesture !== anim.gesture && ctx.gesture !== "react") {
+      anim.gesture = ctx.gesture;
+      anim.gestureT = 0;
+    }
+    const gestDur = anim.gesture === "thanks" ? 1.8 : anim.gesture === "surprise" ? 1.5 : anim.gesture === "react" ? 1.2 : 2.2;
+    if (anim.gesture) {
+      anim.gestureT += dt;
+      if (anim.gestureT > gestDur) anim.gesture = null;
+    }
+
+    // weather blend
+    const wantWeather = ctx.weather === "rain" || ctx.weather === "storm" ? ctx.weather
+      : (ctx.sunShield || 0) > 0.4 ? "sun" : "clear";
+    anim.weather = wantWeather;
+    const wTarget = wantWeather === "clear" ? 0 : 1;
+    anim.weatherK += (wTarget - anim.weatherK) * Math.min(1, dt * 3);
+
+    // sit blend
+    const sitTarget = ctx.sit && !moving && !anim.gesture ? 1 : 0;
+    anim.sitBlend += (sitTarget - anim.sitBlend) * Math.min(1, dt * 4);
+
+    // walk amount + phase from real speed
+    const walkTarget = moving && !turning && anim.sitBlend < 0.4 && !anim.gesture ? 1 : 0;
+    anim.amount += (walkTarget - anim.amount) * Math.min(1, dt * (walkTarget ? 6 : 5));
+    if (turning) {
+      anim.phase += dt * 7;
+      anim.state = "turn";
+    } else if (anim.amount > 0.05 && moving) {
+      const stride = WALK_STRIDE * (hurry ? 1.12 : 1);
+      anim.phase += (speed / Math.max(0.2, stride)) * TWO_PI * dt;
+      anim.state = hurry ? "hurry" : "walk";
+    } else if (anim.gesture) {
+      anim.state = "gesture-" + anim.gesture;
+    } else if (anim.sitBlend > 0.5) {
+      anim.state = "sit";
+    } else {
+      anim.state = "idle";
+      anim.idleT += dt;
+      if (anim.idleT > 4.5 + (id.length % 3)) {
+        anim.idleT = 0;
+        anim.idleKind = (anim.idleKind + 1) % 4;
+      }
+    }
+
+    zeroJoints();
+    if (anim.sitBlend > 0.02) applySit(anim.sitBlend);
+    if (turning && moving) applyTurn(anim.phase, Math.min(1, Math.abs(yawErr)));
+    else if (anim.amount > 0.02) applyWalk(anim.phase, anim.amount, hurry);
+    else if (anim.state === "idle") {
+      applyIdle(anim.idleKind, anim.idleT, ctx.personality || null);
+    }
+    if (anim.gesture) applyGesture(anim.gesture, anim.gestureT, gestDur, ctx.personality || null);
+    // weather on top (umbrella / shield) when not mid-gesture, or lightly during walk
+    if (!anim.gesture || anim.gesture === "surprise") {
+      applyWeather(anim.weather, anim.weatherK * (anim.gesture === "surprise" && (anim.weather === "rain" || anim.weather === "storm") ? 1 : anim.gesture ? 0.35 : 1));
+    } else {
+      umbrellaMeshes.forEach((m) => (m.isVisible = false));
+    }
+
+    let plant = { planted: { L: false, R: false }, slide: 0 };
+    if (anim.amount > 0.3 && !turning && !ctx.jump) plant = plantLock(anim.phase, anim.amount);
+    else {
+      anim.plant.L = anim.plant.R = null;
+      root.computeWorldMatrix(true);
+    }
+
+    const footL = footWorld("L");
+    const footR = footWorld("R");
+    return {
+      state: anim.state,
+      phase: anim.phase,
+      amount: anim.amount,
+      speed,
+      gesture: anim.gesture,
+      weather: anim.weather,
+      weatherK: anim.weatherK,
+      sit: anim.sitBlend,
+      plantedL: plant.planted.L,
+      plantedR: plant.planted.R,
+      footL,
+      footR,
+      plantSlide: plant.slide,
+      stride: WALK_STRIDE,
+    };
+  }
+
+  zeroJoints();
+  pose(0, 0);
+
+  return {
+    root,
+    nodes,
+    meshes,
+    legs,
+    arms,
+    pose,
+    step,
+    anim,
+    footWorld,
+    height: 1.84 * scale,
+    legLen: (H.thigh + H.shin) * scale,
+    stride: WALK_STRIDE,
+  };
+}
+
+/** Compare a step sample to previous foot positions; returns { footSlide, mismatch }. */
+export function detectAnimProblems(sample, prev, opts = {}) {
+  const limit = opts.limit != null ? opts.limit : FOOT_SLIDE_LIMIT;
+  const out = { footSlide: false, mismatch: false, slideM: 0 };
+  if (!sample || !prev) return out;
+  if (sample.jump || prev.jump) return out;
+  // planted foot must not travel more than `limit` metres along the ground this frame
+  [["plantedL", "footL"], ["plantedR", "footR"]].forEach(([pKey, fKey]) => {
+    if (!sample[pKey] || !prev[pKey] || !sample[fKey] || !prev[fKey]) return;
+    const d = Math.hypot(sample[fKey].x - prev[fKey].x, sample[fKey].z - prev[fKey].z);
+    out.slideM = Math.max(out.slideM, d);
+    if (d > limit) out.footSlide = true;
+  });
+  // state / motion mismatch: idle or sit while moving, or walk while nearly still
+  const moving = sample.speed > 0.25;
+  if ((sample.state === "idle" || sample.state === "sit") && moving) out.mismatch = true;
+  if ((sample.state === "walk" || sample.state === "hurry") && sample.speed < 0.05 && sample.amount > 0.5) out.mismatch = true;
+  return out;
 }

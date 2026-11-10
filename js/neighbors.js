@@ -1,10 +1,11 @@
-import { buildFigure } from "./peoplekit.js";
+import { buildFigure, detectAnimProblems, FOOT_SLIDE_LIMIT } from "./peoplekit.js";
 /* ==========================================================================
    Neighbors — three people on his avenue with their own look, home and day
    (day.config.js `neighbors`). Each has an ask (answer it with an ability, close by),
    a thank-you and a surprise, shown as speech bubbles. Beats trigger by the clock and by
    how close he is; a finished beat pays score and Pressure and shows it (toast, stars on
-   the name tag, a floating +score, the tally). Figures come from js/peoplekit.js (docs/characters.md).
+   the name tag, a floating +score, the tally). Figures come from js/peoplekit.js (docs/characters.md);
+   their limbs are driven procedurally (stride from route speed, beat gestures, weather posture).
    Pure helpers are exported for scripts/check-neighbors.mjs.
    ========================================================================== */
 
@@ -20,9 +21,9 @@ export function hourOf(minutes) {
 }
 
 const WALK_M_PER_MIN = 80; // sim metres per sim minute for the walks between stops
-const LEG_SWING = 0.7; // how far their legs swing from the hip, radians
+const PERSONALITY = { birdie: "plants", dex: "phone", quill: "scope" };
 
-/** Where a neighbor is at hour h: { x, z, moving, inside, yaw }. `stops` are [hour, x, z, "inside"?]. */
+/** Where a neighbor is at hour h: { x, z, moving, inside, sit, yaw }. `stops` are [hour, x, z, "inside"|"sit"?]. */
 export function placeAt(stops, h) {
   let i = 0;
   for (let k = 0; k < stops.length; k++) if (stops[k][0] <= h) i = k;
@@ -33,13 +34,23 @@ export function placeAt(stops, h) {
   const dur = Math.min(Math.max(0.3, dist / WALK_M_PER_MIN) / 60, (bh - a[0]) * 0.8); // hours
   const leave = bh - dur;
   const hh = h < a[0] ? h + 24 : h;
-  if (dist < 0.01 || hh < leave) return { x: a[1], z: a[2], moving: false, inside: a[3] === "inside", yaw: null };
+  if (dist < 0.01 || hh < leave) {
+    return {
+      x: a[1],
+      z: a[2],
+      moving: false,
+      inside: a[3] === "inside",
+      sit: a[3] === "sit",
+      yaw: null,
+    };
+  }
   const f = Math.min(1, Math.max(0, (hh - leave) / dur));
   return {
     x: a[1] + (b[1] - a[1]) * f,
     z: a[2] + (b[2] - a[2]) * f,
     moving: f < 1,
     inside: false,
+    sit: false,
     yaw: Math.atan2(b[1] - a[1], b[2] - a[2]),
   };
 }
@@ -70,16 +81,18 @@ function install() {
     try { window.dispatchEvent(new window.CustomEvent("day:neighbor", { detail: Object.assign({ action }, detail) })); } catch (e) { /* node */ }
   }
 
-  /* ---- figures ---- */
+  /* ---- figures + animation detectors ---- */
+  const animStats = { footSlide: 0, mismatch: 0, samples: 0, dayKey: null };
   people.forEach((p) => {
     const fig = buildFigure(B, scene, p.id, p.look, p.scale || 1);
     p.__fig = fig;
     p.__root = fig.root;
     p.__meshes = fig.meshes;
     p.__legLen = fig.legLen;
-    p.__pos = { x: p.stops[0][1], z: p.stops[0][2], inside: false, moving: false };
+    p.__pos = { x: p.stops[0][1], z: p.stops[0][2], inside: false, moving: false, sit: false };
     p.__yaw = 0;
-    p.__phase = 0;
+    p.__sample = null;
+    p.__gestureWant = null;
   });
 
   /* ---- DOM: tags, bubbles, toast, tally, the finder panel ---- */
@@ -152,8 +165,8 @@ function install() {
     toastTimer = setTimeout(() => toast.classList.remove("on"), 4200);
   }
 
-  const FADE_NEAR = 1.2; // m from the camera: fully faded
-  const FADE_FAR = 2.4; // m from the camera: fully drawn
+  const FADE_NEAR = 0.6; // m from the camera: fully faded
+  const FADE_FAR = 1.4; // m from the camera: fully drawn
   const PERSONAL = 1.1; // m between the player's centre and a neighbor's drawn centre
 
   /* ---- who is where ---- */
@@ -217,7 +230,12 @@ function install() {
     const s = st[p.id];
     s.bubble = beat;
     s.bubbleUntil = beat.kind === "ask" ? Infinity : performance.now() + secs * 1000;
-    emit("beat", { id: p.id, beat: beat.id, kind: beat.kind, text: beat.text });
+    // ask / thanks / surprise each play their own gesture on the figure
+    if (beat.kind === "ask" || beat.kind === "thanks" || beat.kind === "surprise") {
+      p.__gestureWant = beat.kind;
+      emit("gesture", { id: p.id, kind: beat.kind, beat: beat.id, x: p.__pos.x, z: p.__pos.z });
+    }
+    emit("beat", { id: p.id, beat: beat.id, kind: beat.kind, text: beat.text, x: p.__pos.x, z: p.__pos.z });
   }
 
   function stepBeats(p, h, here, nowMs) {
@@ -322,6 +340,17 @@ function install() {
     const canvas = eng.getRenderingCanvas();
     const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: w, height: hh };
     const dt = Math.min(0.1, eng.getDeltaTime() / 1000 || 0.016);
+    if (animStats.dayKey !== dayKey) {
+      animStats.dayKey = dayKey;
+      animStats.footSlide = 0;
+      animStats.mismatch = 0;
+      animStats.samples = 0;
+    }
+    const sky = (window.weather && window.weather.now && window.weather.now())
+      || (day.weather && day.weather.now && day.weather.now())
+      || {};
+    const weatherState = sky.state || "clear";
+    const sunK = typeof sky.sun === "number" ? sky.sun : 0;
     people.forEach((p) => {
       const pl = placeAt(p.stops, h);
       const prevX = p.__pos.x;
@@ -349,18 +378,62 @@ function install() {
           dz = here.z + oz * k;
         }
       }
-      root.position.set(dx, p.__gy, dz);
-      if (pl.moving) {
-        p.__phase += dt * 9;
+      const jump = Math.hypot(pl.x - prevX, pl.z - prevZ) > 0.55;
+      const speed = jump || dt <= 0 ? 0 : Math.hypot(pl.x - prevX, pl.z - prevZ) / dt;
+      // turn-before-walk: face the route first; during a beat gesture, face him
+      let yawErr = 0;
+      const facingHim = !!(p.__gestureWant || (p.__fig.anim && p.__fig.anim.gesture)) && here;
+      if (pl.moving && !facingHim) {
         const yaw = pl.yaw != null ? pl.yaw : Math.atan2(pl.x - prevX, pl.z - prevZ);
-        p.__yaw += Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw)) * Math.min(1, dt * 8);
-        // a swung leg is shorter in height, so the hips come down by that much and the leading foot stays on the ground
-        root.position.y = p.__gy - (p.__legLen || 0) * (1 - Math.cos(Math.sin(p.__phase) * LEG_SWING));
-      } else if (here && Math.hypot(here.x - pl.x, here.z - pl.z) < 18) {
+        yawErr = Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw));
+        const turnRate = Math.abs(yawErr) > 0.55 ? 10 : 8;
+        p.__yaw += yawErr * Math.min(1, dt * turnRate);
+        yawErr = Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw));
+      } else if (here && (facingHim || Math.hypot(here.x - pl.x, here.z - pl.z) < 18)) {
         const yaw = Math.atan2(here.x - pl.x, here.z - pl.z);
-        p.__yaw += Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw)) * Math.min(1, dt * 4);
+        p.__yaw += Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw)) * Math.min(1, dt * (facingHim ? 7 : 4));
       }
+      root.position.set(dx, p.__gy, dz);
       root.rotation.y = p.__yaw;
+
+      const gest = p.__gestureWant;
+      if (gest && p.__fig.anim.gesture === gest) p.__gestureWant = null;
+      const react = !!(sky.manual && (weatherState === "storm" || weatherState === "rain" || weatherState === "wind")
+        && here && Math.hypot(here.x - pl.x, here.z - pl.z) < 22 && !gest && !pl.moving);
+      const sample = p.__fig.step({
+        dt,
+        speed: pl.moving && !jump ? Math.max(speed, 0.15) : 0,
+        moving: !!pl.moving,
+        yawErr,
+        sit: !!pl.sit,
+        weather: weatherState,
+        sunShield: sunK,
+        gesture: gest || (p.__fig.anim.gesture && p.__fig.anim.gesture !== "react" ? p.__fig.anim.gesture : null),
+        react,
+        personality: PERSONALITY[p.id] || null,
+        jump,
+      });
+      // hip drop already applied inside step; keep feet on the surface
+      root.position.y = p.__gy;
+      if (!pl.inside && !jump) {
+        const prev = p.__sample;
+        const hit = detectAnimProblems(sample, prev, { limit: FOOT_SLIDE_LIMIT });
+        animStats.samples++;
+        if (hit.footSlide) {
+          animStats.footSlide++;
+          if (animStats.footSlide <= 3) emit("anim-fail", { id: p.id, kind: "foot-slide", m: +hit.slideM.toFixed(3), state: sample.state });
+        }
+        if (hit.mismatch) {
+          animStats.mismatch++;
+          if (animStats.mismatch <= 3) emit("anim-fail", { id: p.id, kind: "mismatch", state: sample.state, speed: sample.speed });
+        }
+      }
+      if ((sample.weather === "rain" || sample.weather === "storm") && sample.weatherK > 0.5 && !(p.__umbOn)) {
+        p.__umbOn = true;
+        emit("umbrella", { id: p.id, weather: sample.weather, x: pl.x, z: pl.z });
+      } else if (sample.weatherK < 0.2) p.__umbOn = false;
+      p.__sample = Object.assign({ jump }, sample);
+
       /* the orbit camera can end up beside them: up close one box fills the screen as a big slab, so they fade out
          (as he does below 1 m) between FADE_NEAR and FADE_FAR from the camera */
       if (cam.position) {
@@ -374,8 +447,6 @@ function install() {
           });
         }
       }
-      p.__amt = pl.moving ? Math.min(1, (p.__amt || 0) + dt * 6) : Math.max(0, (p.__amt || 0) - dt * 6);
-      p.__fig.pose(p.__phase, p.__amt, LEG_SWING);
       stepBeats(p, h, here, nowMs);
 
       // the name tag and bubble above their head
@@ -419,22 +490,65 @@ function install() {
     now: () => ({
       score: total,
       dayScore,
-      people: people.map((p) => ({
-        id: p.id,
-        name: p.name,
-        x: p.__pos.x,
-        z: p.__pos.z,
-        inside: p.__pos.inside,
-        moving: p.__pos.moving,
-        stage: st[p.id].stage,
-        done: st[p.id].doneBeats.slice(),
-        asking: st[p.id].askOpen,
-        bubble: st[p.id].bubble ? st[p.id].bubble.text : "",
-        stars: stars(p),
-        parts: p.__meshes.length,
-        look: p.color,
-      })),
+      footSlideFails: animStats.footSlide,
+      mismatchFails: animStats.mismatch,
+      animSamples: animStats.samples,
+      people: people.map((p) => {
+        const s = p.__sample || {};
+        return {
+          id: p.id,
+          name: p.name,
+          x: p.__pos.x,
+          z: p.__pos.z,
+          inside: p.__pos.inside,
+          moving: p.__pos.moving,
+          sit: !!p.__pos.sit,
+          stage: st[p.id].stage,
+          done: st[p.id].doneBeats.slice(),
+          asking: st[p.id].askOpen,
+          bubble: st[p.id].bubble ? st[p.id].bubble.text : "",
+          stars: stars(p),
+          parts: p.__meshes.length,
+          look: p.color,
+          anim: s.state || "idle",
+          gesture: s.gesture || null,
+          weatherPose: s.weatherK > 0.4 ? s.weather : null,
+          speed: s.speed || 0,
+          phase: s.phase || 0,
+          plantedL: !!s.plantedL,
+          plantedR: !!s.plantedR,
+        };
+      }),
     }),
+    /** Per-frame animation detectors for the playtest (foot-slide and state/motion mismatch). */
+    anim: () => ({
+      footSlideFails: animStats.footSlide,
+      mismatchFails: animStats.mismatch,
+      samples: animStats.samples,
+      limit: FOOT_SLIDE_LIMIT,
+      people: people.map((p) => {
+        const s = p.__sample || {};
+        return {
+          id: p.id,
+          state: s.state || "idle",
+          speed: s.speed || 0,
+          gesture: s.gesture || null,
+          weather: s.weather || "clear",
+          weatherK: s.weatherK || 0,
+          sit: s.sit || 0,
+          plantedL: !!s.plantedL,
+          plantedR: !!s.plantedR,
+          footL: s.footL || null,
+          footR: s.footR || null,
+        };
+      }),
+    }),
+    /** Reset detector counters (a new day also clears them). */
+    resetAnim: () => {
+      animStats.footSlide = 0;
+      animStats.mismatch = 0;
+      animStats.samples = 0;
+    },
     events: () => events.slice(),
   };
   window.neighbors = api;
