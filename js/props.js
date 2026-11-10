@@ -613,7 +613,8 @@ export function installProps(ctx) {
       if (f.h > 24 && rng() < 0.6) antenna(f.x + f.w * 0.3, f.h, f.z + f.d * 0.3, 6 + rng() * 5);
     }
   });
-  /* the walkable roofs: a few units on the south half, away from the ramp's landing on the north */
+  /* the walkable roofs: a few units on the south half, away from the ramp's landing on the north,
+     plus distinct surface zones (gravel deck, metal grating, tar membrane, and roof-drain puddle basin) */
   (city.blocks || []).forEach((b) => {
     const sx = b.w * 0.28;
     if (b.stair) {
@@ -623,6 +624,21 @@ export function installProps(ctx) {
       acUnit(b.x + sx * 0.2, b.h, zb, 0);
       vent(b.x + sx * 1.1, b.h, zb);
       colliders.push({ x: b.x - sx, y: b.h + 0.45, z: zb, w: 1.5, h: 0.9, d: 1.1 }, { x: b.x + sx * 0.2, y: b.h + 0.45, z: zb, w: 1.5, h: 0.9, d: 1.1 });
+      // Walkable rooftop surface zones (non-overlapping, 3-4 cm pads merged into props-roof):
+      roof.frame(b.x, b.z, 0);
+      // 1. Central gravel ballast bed (dx = 0, dz = 0)
+      roof.box(0, b.h, 0, 3.1, 0.032, 2.8, hex("#726d64"));
+      // 2. East metal grating catwalk (dx = 3.0, dz = 0)
+      roof.box(3.0, b.h, 0, 2.2, 0.038, 2.8, METAL);
+      for (let gz = -1.1; gz <= 1.11; gz += 0.55) {
+        roof.box(3.0, b.h + 0.038, gz, 2.0, 0.012, 0.12, DARK);
+      }
+      // 3. West tar membrane patch (dx = -4.2, dz = -0.2)
+      roof.box(-4.2, b.h, -0.2, 2.3, 0.028, 3.0, hex("#232730"));
+      // 4. Roof-drain puddle basin + metal gutter scupper (dx = -2.2, dz = 1.6)
+      roof.box(-2.2, b.h, 1.6, 2.1, 0.034, 2.1, hex("#2c4e6b"));
+      roof.cyl(-2.2, b.h + 0.034, 1.6, 0.28, 0.28, 0.016, 8, METAL);
+      roof.box(-2.2, b.h + 0.02, b.d / 2 - 0.35, 0.14, 0.22, 0.35, METAL); // gutter scupper at parapet
     } else if (b.w >= 12) {
       acUnit(b.x - sx, b.h, b.z, 0);
       waterTank(b.x + sx, b.h, b.z + b.d * 0.1);

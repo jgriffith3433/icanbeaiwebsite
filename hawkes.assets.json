@@ -3835,6 +3835,36 @@
    "files": {
     "audio": "audio/dialogue/dlg-he-1hjhu12.mp3"
    }
+  },
+  {
+   "id": "sfx-weather-soundscape",
+   "note": "Batched urban rooftop weather soundscape loops (job j_37c19844f0f4, Stable Audio 3): light roof rain patter, heavy downpour, rooftop gutter trickle, umbrella rain patter, flapping canvas awnings, and sunny rooftop birds.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Urban rooftop weather soundscape loops",
+      "duration": 8,
+      "loop": true,
+      "variants": [
+       "Soft light rain pattering gently on a gravel and tar city rooftop, steady delicate raindrops, seamless ambient loop, no thunder, no music",
+       "Heavy torrential downpour rain roaring on urban streets and roofs, thick dense sheet of water falling, seamless ambient loop, no thunder, no music",
+       "Rainwater trickling, gurgling and splashing down a metal rooftop gutter and drainpipe, close steady water flow, seamless ambient loop, no music",
+       "Raindrops tapping and drumming rapidly on taut fabric umbrellas on a city sidewalk, crisp close fabric rain patter, seamless ambient loop, no music",
+       "Canvas shop awnings and rooftop tarps flapping, snapping and billowing in gusty city street wind, rhythmic cloth flutter, seamless ambient loop, no music",
+       "Warm sunny city morning rooftop ambience with cheerful sparrows and songbirds chirping across open air and distant gentle breeze, seamless ambient loop, no music"
+      ]
+     }
+    }
+   ],
+   "files": {
+    "rainRoof": "audio/sfx/rain-roof-light.mp3",
+    "rainDownpour": "audio/sfx/rain-downpour.mp3",
+    "gutter": "audio/sfx/rain-gutter.mp3",
+    "umbrella": "audio/sfx/rain-umbrella.mp3",
+    "awning": "audio/sfx/wind-awning.mp3",
+    "birds": "audio/sfx/sun-birds.mp3"
+   }
   }
  ]
 }
