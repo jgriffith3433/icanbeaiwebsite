@@ -1,201 +1,163 @@
 /* ==========================================================================
-   First visit. A short card (day.config.js `tutorial`) walks a new player
-   through take control, a few steps, a jump, one lightning strike, and let
-   go. Skip or finish and it is not shown again. Other playtest scenarios
-   leave it quiet so they are not covered by the card.
+   First visit. One short card, once per save: one sentence, "Take it" /
+   "Just walk". The sentence and its count come from the real ability list
+   (window.powers); the day is held still behind the card until it is
+   answered. "Take it" takes control and teaches the first two powers by doing
+   (the button is highlighted, a short bark when it is used); the others get a
+   one-time tooltip on first hover or tap. Other playtest scenarios leave it
+   quiet.
    ========================================================================== */
 
 const DEFAULTS = {
   storageKey: "icanbe.tutorial",
-  skip: "Skip",
-  done: "That's enough. His day is still running.",
-  // The first step also says what this is, for someone who has never seen the page.
-  intro: {
-    title: "This is Small Weather's day, live.",
-    line: "He lives it on his own, in real time. Take him over: walk the city, jump the roofs, call down the storm.",
-    take: "Take control",
-    hint: "Or press Enter.",
+  tipKey: "icanbe.tips",
+  sentence: "He can call {n} kinds of weather. Learn two?",
+  take: "Take it",
+  skip: "Just walk",
+  teach: ["bolt", "rain"],
+  prompts: {
+    bolt: { key: "Press {key}: lightning.", touch: "Tap Lightning." },
+    rain: { key: "Now {key}: rain.", touch: "Now tap Rain." },
   },
-  steps: [
-    { id: "take", do: "Take control.", hint: "Enter, or the button.", touch: "Tap Take control." },
-    { id: "move", do: "Walk him.", hint: "WASD or the arrows. Shift runs.", touch: "Drag the stick. Push it to the edge to run." },
-    { id: "jump", do: "Jump.", hint: "Space. Twice more in the air. Hold it to float down.", touch: "Jump. Twice more in the air. Hold it to float down." },
-    { id: "bolt", do: "Throw one lightning strike.", hint: "E, at the reticle. It spends Charge.", touch: "Tap Bolt. It spends Charge." },
-    { id: "letgo", do: "Let go.", hint: "Esc. He walks back to where his day is.", touch: "Tap Let go. He walks back to where his day is." },
-  ],
+  barks: { bolt: "That woke the roof up.", rain: "Smells like the street after." },
+  tip: "{key}: {name}. Costs {cost} Charge.",
 };
 
 export function startTutorial() {
   const day = window.day;
   const cfg = Object.assign({}, DEFAULTS, (window.DAY_CONFIG && window.DAY_CONFIG.tutorial) || {});
-  cfg.steps = (cfg.steps && cfg.steps.length ? cfg.steps : DEFAULTS.steps).map((s) => Object.assign({}, s));
-  const key = cfg.storageKey || DEFAULTS.storageKey;
+  const key = cfg.storageKey;
   const canDom = !!(document.body && document.body.append && document.head);
-  let index = 0;
+  let quiet = false;
+  let card = null;
+  let sentenceEl = null;
+  let rowEl = null;
+  let phase = "idle"; // idle | ask | teach | done
+  let step = 0;
   let shownAt = 0;
-  let moveFrom = null;
-  let jumpFrom = null;
-  let boltLanded = false;
-  let watching = false;
-  let quietForPlaytest = false;
+  let used = null;
+  let tipEl = null;
+  let tipTimer = 0;
 
   try {
-    // A bot (any scenario but first-visit and smoke) starts with empty storage: keep the card out of its way.
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "first-visit" && id !== "smoke") quietForPlaytest = true;
-    // The runner can start a scenario without ?playtest= (start() on a webdriver tab): also quiet.
-    else if (!id && navigator.webdriver) quietForPlaytest = true;
+    if (id && id !== "first-visit" && id !== "newcomer" && id !== "smoke") quiet = true;
+    else if (!id && navigator.webdriver) quiet = true;
   } catch (e) { /* no location */ }
 
-  function seen() {
-    if (quietForPlaytest) return true;
-    try { return !!localStorage.getItem(key); } catch (e) { return false; }
-  }
-  function remember(how) {
-    try { localStorage.setItem(key, how); } catch (e) { /* private mode: it may show next time */ }
-  }
-  function emit(action, extra) {
-    if (!window.dispatchEvent || typeof window.CustomEvent !== "function") return;
-    window.dispatchEvent(new CustomEvent("day:tutorial", { detail: Object.assign({ action, step: cfg.steps[index] && cfg.steps[index].id }, extra || {}) }));
-  }
-
-  function touchy() {
-    const html = document.documentElement;
-    if (html && html.classList.contains("touch-ui")) return true;
+  const store = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
+  const seen = () => quiet || !!store(key);
+  const emit = (action, extra) => {
+    if (typeof window.CustomEvent !== "function") return;
+    window.dispatchEvent(new CustomEvent("day:tutorial", { detail: Object.assign({ action }, extra || {}) }));
+  };
+  const abilities = () => {
+    const p = window.powers;
+    return p && p.now ? p.now().abilities || [] : [];
+  };
+  const touchy = () => {
+    if (document.documentElement.classList.contains("touch-ui")) return true;
     try { return window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 700; } catch (e) { return false; }
-  }
+  };
+  const blocking = () => phase === "ask" && !!card && !card.hidden;
+  const hold = (on) => { if (day && day.hold) day.hold(on); };
+  const slot = (id) => document.getElementById("ability-" + id);
 
-  let card = null;
-  let titleEl = null;
-  let hintEl = null;
-  let introEl = null;
-  let takeBtn = null;
-  let doneTimer = 0;
-  function blocking() {
-    return !!(card && !card.hidden && index < cfg.steps.length);
+  function mark(id) {
+    document.querySelectorAll(".abilitybar .ab.tut-now").forEach((b) => b.classList.remove("tut-now"));
+    const b = id && slot(id);
+    if (b) b.classList.add("tut-now");
   }
-  function paint() {
-    if (!card) return;
-    const step = cfg.steps[index];
-    const intro = step && step.id === "take" && cfg.intro;
-    card.classList.toggle("intro", !!intro);
-    introEl.hidden = takeBtn.hidden = !intro;
-    if (!step) {
-      titleEl.textContent = cfg.done;
-      hintEl.textContent = "";
-      return;
-    }
-    if (intro) {
-      introEl.querySelector(".title").textContent = intro.title;
-      introEl.querySelector(".line").textContent = intro.line;
-      takeBtn.textContent = intro.take || step.do;
-      titleEl.textContent = "";
-      hintEl.textContent = touchy() ? "" : intro.hint || "";
-    } else {
-      titleEl.textContent = step.do;
-      hintEl.textContent = (touchy() && step.touch) || step.hint || "";
-    }
-    card.setAttribute("data-step", step.id);
-  }
-  function armStep() {
-    const step = cfg.steps[index];
-    const st = day && day.control && day.control.state ? day.control.state() : null;
-    if (step && step.id === "move" && st) moveFrom = { x: st.x, z: st.z };
-    if (step && step.id === "jump" && st) jumpFrom = { y: st.y, flights: st.flights || 0 };
-    if (step && step.id === "bolt") boltLanded = false;
-    paint();
-    emit("step");
+  function prompt() {
+    const id = cfg.teach[step];
+    const a = abilities().find((x) => x.id === id);
+    const p = cfg.prompts[id] || {};
+    const text = touchy() ? p.touch || "" : (p.key || "").replace("{key}", a ? String(a.key).toUpperCase() : "");
+    sentenceEl.textContent = text;
+    mark(id);
+    emit("step", { step: id });
   }
   function finish(how) {
-    if (!blocking() && how !== "reset") return;
-    const elapsed = shownAt ? (performance.now() - shownAt) / 1000 : 0;
-    remember(how);
-    emit(how, { seconds: Math.round(elapsed * 10) / 10 });
-    index = cfg.steps.length;
-    clearTimeout(doneTimer);
-    if (!card) return;
-    if (how === "done") {
-      // The last line stays a moment; nothing waits on it.
-      paint();
-      card.classList.add("finished");
-      doneTimer = setTimeout(() => { card.hidden = true; }, 2600);
-    } else card.hidden = true;
+    if (phase === "done" || phase === "idle") return;
+    const was = phase;
+    phase = "done";
+    save(key, how);
+    hold(false);
+    mark(null);
+    if (card) card.hidden = true;
+    emit(how, { seconds: shownAt ? Math.round((performance.now() - shownAt) / 100) / 10 : 0, from: was });
   }
-  function advance() {
-    index += 1;
-    if (index >= cfg.steps.length) finish("done");
-    else armStep();
+  function take() {
+    if (phase !== "ask") return;
+    save(key, "take");
+    hold(false);
+    const p = window.powers;
+    if (p && p.abilities && p.abilities.reset) p.abilities.reset(p.now().max);
+    const btn = document.getElementById("control");
+    if (btn && !btn.disabled) btn.click();
+    else if (day && day.control) day.control.take();
+    phase = "teach";
+    step = 0;
+    rowEl.hidden = true;
+    emit("take");
+    prompt();
   }
-  function stepDone() {
-    const step = cfg.steps[index];
-    if (!step || !day || !day.control) return false;
-    const st = day.control.state();
-    const mode = day.control.mode();
-    if (step.id === "take") return mode === "control";
-    if (step.id === "move") {
-      if (!st || !moveFrom) return false;
-      return Math.hypot(st.x - moveFrom.x, st.z - moveFrom.z) > 0.55;
-    }
-    if (step.id === "jump") {
-      if (!st) return false;
-      const base = jumpFrom || { y: st.y, flights: st.flights || 0 };
-      return st.jumps > 0 || st.flights > base.flights || (!st.grounded && st.y > base.y + 0.35);
-    }
-    if (step.id === "bolt") return boltLanded;
-    if (step.id === "letgo") return mode === "returning" || mode === "schedule";
-    return false;
-  }
-  function tick() {
-    watching = false;
-    if (!blocking()) return;
-    if (stepDone()) advance();
-    if (blocking()) {
-      watching = true;
-      requestAnimationFrame(tick);
-    }
-  }
-  function watch() {
-    if (watching || !blocking()) return;
-    watching = true;
-    requestAnimationFrame(tick);
+  function used1(id) {
+    if (phase !== "teach" || id !== cfg.teach[step]) return;
+    const bark = cfg.barks[id];
+    if (bark && day && day.note) day.note(bark);
+    if (bark) emit("bark", { id, text: bark });
+    step += 1;
+    if (step >= cfg.teach.length) finish("done");
+    else prompt();
   }
   function show() {
-    if (!canDom || seen() || blocking()) return false;
+    if (!canDom || seen() || phase === "ask") return false;
     if (!card) build();
-    clearTimeout(doneTimer);
-    card.classList.remove("finished");
-    index = 0;
+    const n = abilities().length;
+    sentenceEl.textContent = cfg.sentence.replace("{n}", String(n));
+    rowEl.hidden = false;
+    phase = "ask";
     shownAt = performance.now();
-    moveFrom = null;
-    jumpFrom = null;
-    boltLanded = false;
     card.hidden = false;
-    emit("show");
-    armStep();
-    watch();
+    hold(true);
+    emit("show", { abilities: n });
     return true;
+  }
+
+  function tip(id) {
+    const seenTips = (store(cfg.tipKey) || "").split(",");
+    if (seenTips.includes(id) || phase === "ask") return;
+    const a = abilities().find((x) => x.id === id);
+    const b = slot(id);
+    if (!a || !b || (document.documentElement.classList.contains("touch-ui") && b.dataset.touch === "0")) return;
+    save(cfg.tipKey, seenTips.concat(id).filter(Boolean).join(","));
+    tipEl.textContent = cfg.tip.replace("{key}", String(a.key).toUpperCase()).replace("{name}", a.name).replace("{cost}", a.cost);
+    tipEl.hidden = false;
+    const r = b.getBoundingClientRect();
+    const w = tipEl.offsetWidth;
+    tipEl.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+    tipEl.style.top = Math.max(8, r.top - tipEl.offsetHeight - 8) + "px";
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => { tipEl.hidden = true; }, 3200);
+    emit("tip", { id });
   }
 
   function build() {
     const style = document.createElement("style");
     style.textContent = `
-.tutorial{z-index:8;width:min(300px,calc(100vw - 32px));padding:12px 14px 10px;border-radius:16px;background:rgba(14,16,22,.88);border:1px solid rgba(240,194,122,.45);color:#f6f1e8;font:500 0.95rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 16px 40px rgba(0,0,0,.4);pointer-events:auto}
+.tutorial{z-index:8;width:min(300px,calc(100vw - 32px));padding:12px 14px 10px;border-radius:16px;background:rgba(14,16,22,.9);border:1px solid rgba(240,194,122,.45);color:#f6f1e8;font:600 1rem/1.3 Fraunces,Georgia,serif;box-shadow:0 16px 40px rgba(0,0,0,.4);pointer-events:auto}
 .tutorial[hidden]{display:none}
-.tutorial.finished .row{display:none}
 .tutorial p{margin:0}
-.tutorial .do{font:600 1.05rem/1.3 Fraunces,Georgia,serif}
-.tutorial .hint{margin-top:4px;color:rgba(246,241,232,.68);font-size:0.82rem}
-.tutorial .row{display:flex;justify-content:flex-end;margin-top:8px}
+.tutorial .row{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.tutorial .row[hidden]{display:none}
 .tutorial button{appearance:none;min-height:44px;padding:8px 16px;border-radius:999px;border:1px solid rgba(246,241,232,.28);background:transparent;color:#f0c27a;font:600 0.85rem Outfit,system-ui,sans-serif;cursor:pointer}
-.tutorial button:hover{background:rgba(240,194,122,.14)}
-html.touch-ui .tutorial{width:min(280px,calc(100vw - 32px))}
-.tutorial.intro{width:min(360px,calc(100vw - 32px));padding:16px 18px 12px}
-.tutorial .intro-copy .title{font:600 1.3rem/1.25 Fraunces,Georgia,serif}
-.tutorial .intro-copy .line{margin-top:6px;color:rgba(246,241,232,.82)}
-.tutorial .do:empty{display:none}
-.tutorial .row{gap:8px}
 .tutorial button.take{background:#f0c27a;border-color:#f0c27a;color:#141210}
-.tutorial button.take:hover{background:#f6d39b}
+.abilitybar .ab.tut-now{border-color:#f0c27a;box-shadow:0 0 16px rgba(240,194,122,.95);animation:tutnow 1s ease-in-out infinite}
+@keyframes tutnow{50%{box-shadow:0 0 26px rgba(240,194,122,.5)}}
+.ab-tip{position:fixed;z-index:9;max-width:220px;padding:6px 10px;border-radius:10px;background:rgba(14,16,22,.92);border:1px solid rgba(126,200,255,.55);color:#e7eef8;font:600 .78rem/1.3 system-ui,sans-serif;pointer-events:none}
+.ab-tip[hidden]{display:none}
 `;
     document.head.appendChild(style);
     card = document.createElement("div");
@@ -204,64 +166,75 @@ html.touch-ui .tutorial{width:min(280px,calc(100vw - 32px))}
     card.hidden = true;
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-label", "First visit");
-    card.innerHTML = `<div class="intro-copy" hidden><p class="title"></p><p class="line"></p></div><p class="do"></p><p class="hint"></p><div class="row"><button type="button" class="take" id="tutorial-take" hidden></button><button type="button" id="tutorial-skip"></button></div>`;
-    titleEl = card.querySelector(".do");
-    hintEl = card.querySelector(".hint");
-    introEl = card.querySelector(".intro-copy");
-    takeBtn = card.querySelector(".take");
-    takeBtn.addEventListener("click", () => {
-      // The page's own Take control button, so it counts as a button press; the API if it isn't there.
-      const btn = document.getElementById("control");
-      if (btn && !btn.disabled) btn.click();
-      else if (day && day.control) day.control.take();
-    });
-    const skip = card.querySelector("#tutorial-skip");
-    skip.textContent = cfg.skip || "Skip";
-    skip.addEventListener("click", () => finish("skip"));
+    card.innerHTML = `<p class="do" id="tutorial-text"></p><div class="row"><button type="button" class="take" id="tutorial-take"></button><button type="button" id="tutorial-skip"></button></div>`;
+    sentenceEl = card.querySelector(".do");
+    rowEl = card.querySelector(".row");
+    const takeBtn = card.querySelector("#tutorial-take");
+    const skipBtn = card.querySelector("#tutorial-skip");
+    takeBtn.textContent = cfg.take;
+    skipBtn.textContent = cfg.skip;
+    takeBtn.addEventListener("click", take);
+    skipBtn.addEventListener("click", () => finish("skip"));
     document.body.appendChild(card);
+    tipEl = document.createElement("div");
+    tipEl.className = "ab-tip";
+    tipEl.hidden = true;
+    tipEl.setAttribute("role", "tooltip");
+    document.body.appendChild(tipEl);
+    const onTip = (e) => {
+      const b = e.target && e.target.closest && e.target.closest(".abilitybar .ab");
+      if (b && b.dataset.ability && !cfg.teach.includes(b.dataset.ability)) tip(b.dataset.ability);
+    };
+    document.addEventListener("pointerover", onTip);
+    document.addEventListener("pointerdown", onTip, true);
   }
 
   if (canDom) {
     window.addEventListener("day:power", (e) => {
       const d = (e && e.detail) || {};
-      if (d.power === "bolt" && d.action === "bolt") boltLanded = true;
-      else if (blocking() && cfg.steps[index] && cfg.steps[index].id === "bolt" && d.action === "denied" && d.power === "bolt" && hintEl) {
-        hintEl.textContent = touchy() ? "Charge is still filling. Then tap Bolt." : "Charge is still filling. Then E.";
-      }
+      if (d.action && d.action !== "denied") used1(d.power);
     });
-    window.addEventListener("day:control", () => { paint(); watch(); });
+    // Enter takes it too, as it takes control anywhere else.
+    window.addEventListener("keydown", (e) => {
+      if (blocking() && e.key === "Enter") { e.preventDefault(); e.stopPropagation(); take(); }
+    }, true);
   }
 
   const api = {
     blocking,
-    active: blocking,
+    active: () => phase === "ask" || phase === "teach",
+    take,
     reset() {
-      quietForPlaytest = false;
-      try { localStorage.removeItem(key); } catch (e) { /* private mode */ }
+      quiet = false;
+      try { localStorage.removeItem(key); localStorage.removeItem(cfg.tipKey); } catch (e) { /* private mode */ }
+      phase = "idle";
       if (card) card.hidden = true;
-      index = 0;
       return show();
     },
     skip() { finish("skip"); },
     quiet() {
-      quietForPlaytest = true;
-      clearTimeout(doneTimer);
+      quiet = true;
+      if (phase === "ask") hold(false);
+      phase = "idle";
+      mark(null);
       if (card) card.hidden = true;
     },
     now() {
-      const step = cfg.steps[index];
       return {
         showing: blocking(),
-        step: blocking() && step ? step.id : null,
-        index,
+        phase,
+        step: phase === "teach" ? cfg.teach[step] : null,
         seen: seen(),
-        seconds: shownAt && blocking() ? (performance.now() - shownAt) / 1000 : 0,
+        sentence: sentenceEl ? sentenceEl.textContent : "",
+        abilities: abilities().length,
+        seconds: shownAt && phase !== "done" ? (performance.now() - shownAt) / 1000 : 0,
+        used,
       };
     },
   };
   if (day) day.tutorial = api;
   window.tutorial = api;
-  if (canDom && !seen()) show();
+  if (canDom && !seen()) setTimeout(show, 0);
   return api;
 }
 

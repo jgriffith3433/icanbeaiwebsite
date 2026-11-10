@@ -255,7 +255,11 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
-     FIRST VISIT — one minute, then it stays quiet
+     FIRST VISIT — one card, once per save
+     ------------------------------------------------------------------------
+     One sentence and Take it / Just walk (js/tutorial.js); the day is held
+     until it is answered. Take it teaches the first two powers by doing; the
+     other abilities get a one-time tooltip on first hover or tap.
      ------------------------------------------------------------------------
      The first time the page opens, a card walks the player through taking
      him, walking, a jump, one lightning strike, and letting go. Skip ends
@@ -265,22 +269,12 @@ window.DAY_CONFIG = {
      ------------------------------------------------------------------------ */
   tutorial: {
     storageKey: "icanbe.tutorial",
-    skip: "Skip",
-    done: "That's enough. His day is still running.",
-    // The first card also says what the page is (J, 2026-10-27: catch a new visitor in the first seconds).
-    intro: {
-      title: "This is Small Weather's day, live.",
-      line: "He lives it on his own, in real time. Take him over: walk the city, jump the roofs, call down the storm.",
-      take: "Take control",
-      hint: "Or press Enter.",
-    },
-    steps: [
-      { id: "take", do: "Take control.", hint: "Enter, or the button.", touch: "Tap Take control." },
-      { id: "move", do: "Walk him.", hint: "WASD or the arrows. Shift runs.", touch: "Drag the stick. Push it to the edge to run." },
-      { id: "jump", do: "Jump.", hint: "Space. Twice more in the air. Hold it to float down.", touch: "Jump. Twice more in the air. Hold it to float down." },
-      { id: "bolt", do: "Throw one lightning strike.", hint: "E, at the reticle. It spends Charge.", touch: "Tap Bolt. It spends Charge." },
-      { id: "letgo", do: "Let go.", hint: "Esc. He walks back to where his day is.", touch: "Tap Let go. He walks back to where his day is." },
-    ],
+    // One sentence; {n} is the number of abilities on the bar (js/powers.js POWER_NAMES). Shown once per save.
+    sentence: "He can call {n} kinds of weather. Learn two?",
+    take: "Take it",
+    skip: "Just walk",
+    teach: ["bolt", "rain"],
+    barks: { bolt: "That woke the roof up.", rain: "Smells like the street after." },
   },
 
   /* ------------------------------------------------------------------------

@@ -106,6 +106,7 @@
   /* ---------------- clock & playback ---------------- */
   const SPEEDS = [1, 10, 60, 300, 1200];
   let mode = "live"; // live | play | pause
+  let held = false; // day.hold(true): the first-visit card freezes the clock until it is answered
   let speed = 1;
   let simMs = Date.now();
   let dragging = false;
@@ -431,7 +432,8 @@
     const now = performance.now();
     const dt = Math.min(0.1, (now - lastFrameMs) / 1000);
     lastFrameMs = now;
-    if (mode === "live") simMs = Date.now();
+    if (held) { /* a card is waiting for an answer: the day stands still */ }
+    else if (mode === "live") simMs = Date.now();
     else if (mode === "play") simMs += dt * speed * 1000;
 
     const loc = locate(simMs);
@@ -572,6 +574,8 @@
       syncButtons();
     },
     live: () => el.live.click(),
+    hold: (on) => { held = !!on; },
+    held: () => held,
     today: () => getDay(locate(simMs).key),
     world: () => world,
     /* for the playtest (js/playtest.js) */
