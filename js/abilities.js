@@ -2,14 +2,14 @@
    Abilities: the registry Small Weather's powers are called through.
 
    Each ability is { id, name, key, cost, cooldown, duration }: what it costs
-   in Energy (the Pressure meter, same number), how long before it can be
-   called again, and how long it lasts. Energy regenerates. use(id) is the one
-   gate: it refuses a call that is on cooldown or costs more than he has, and
-   says which. createAbilities() has no scene, so npm test can run it dry.
-   startAbilityBar() is the on-screen row: key, name, cost, a cooldown sweep
-   and the Energy bar, shown while he's the player's.
-   js/powers.js registers the four (storm, bolt, gust, tornado) from
-   day.config.js `powers`, and runs what each one does.
+   in Charge (the Pressure meter, same number; Body's "Energy" is a different
+   meter), how long before it can be called again, and how long it lasts.
+   Charge regenerates. use(id) is the one gate: it refuses a call that is on
+   cooldown or costs more than he has, and says which. createAbilities() has
+   no scene, so npm test can run it dry. startAbilityBar() is the on-screen
+   row: key, name, cost, a cooldown sweep and the Charge bar, shown while
+   he's the player's. js/powers.js registers the four (storm, bolt, gust,
+   tornado) from day.config.js `powers`, and runs what each one does.
    ========================================================================== */
 
 export function createAbilities(opt) {
@@ -46,13 +46,13 @@ export function createAbilities(opt) {
     energy = Math.min(max, energy + (rate || 0) * dt);
   }
 
-  /** Why `id` can't be used right now: "unknown", "locked", "cooldown" or "energy"; null when it can. */
+  /** Why `id` can't be used right now: "unknown", "locked", "cooldown" or "energy" (Charge); null when it can. */
   function why(id) {
     const a = byId[id];
     if (!a) return "unknown";
     if (locked.has(id)) return "locked";
     if (clock < a.readyAt - 1e-6) return "cooldown";
-    if (energy < a.cost - 1e-4) return "energy";
+    if (energy < a.cost - 1e-4) return "energy"; // Charge too low (API reason stays "energy")
     return null;
   }
 
@@ -91,7 +91,7 @@ export function createAbilities(opt) {
     return { energy, max, abilities: list.map(view) };
   }
 
-  /** Back to empty and ready (a new episode of control). Energy is kept unless asked. */
+  /** Back to empty and ready (a new episode of control). Charge is kept unless asked. */
   function reset(toEnergy) {
     list.forEach((a) => {
       a.readyAt = 0;
@@ -135,12 +135,15 @@ export function startAbilityBar(abilities, onPress) {
 .abilitybar .ab.locked{opacity:.38;border-style:dashed;filter:grayscale(1)}
 .abilitybar .ab.unlocked-now{border-color:#f0c27a;box-shadow:0 0 14px rgba(240,194,122,.9)}
 .abilitybar .ab.active{border-color:#fff;box-shadow:0 0 12px rgba(126,200,255,.9)}
-.abilitybar .energy{width:100%;min-width:230px}
-.abilitybar .energy .bar{margin-top:3px;height:8px;border-radius:99px;background:rgba(8,12,20,.55);border:1px solid rgba(126,200,255,.45);overflow:hidden}
-.abilitybar .energy .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1a4c7a,#7ec8ff);border-radius:99px}
+/* Charge (ability spend) — amber bolt look, not Body's Energy and not the blue Pressure chip */
+.abilitybar .charge{width:100%;min-width:230px;color:#f3e0b0}
+.abilitybar .charge .et{display:inline-flex;align-items:center;gap:5px;letter-spacing:.04em}
+.abilitybar .charge .et .bolt{display:inline-block;width:11px;height:14px;flex:0 0 auto;background:linear-gradient(165deg,#ffe29a,#f0a84a);clip-path:polygon(55% 0%,18% 55%,46% 55%,30% 100%,82% 42%,54% 42%)}
+.abilitybar .charge .bar{margin-top:3px;height:8px;border-radius:99px;background:rgba(20,12,4,.55);border:1px solid rgba(240,168,74,.55);overflow:hidden;box-shadow:0 0 10px rgba(240,168,74,.18)}
+.abilitybar .charge .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7a3e12,#f0a84a 55%,#ffe29a);border-radius:99px}
 .abilitybar .refuse{display:none;color:#f0c27a}
-.abilitybar .energy.refused .refuse{display:block}
-.abilitybar .energy.refused .et{display:none}
+.abilitybar .charge.refused .refuse{display:block}
+.abilitybar .charge.refused .et{display:none}
 /* phone: five tap buttons above the power pad, right-aligned; the stick, jump and pad are untouched */
 html.touch-ui .abilitybar{align-items:stretch;gap:4px;width:calc(5 * var(--abw) + 4 * 5px);--abw:min(54px,calc((100vw - 44px) / 5));font-size:.62rem}
 html.touch-ui .abilitybar .row{gap:5px}
@@ -150,8 +153,8 @@ html.touch-ui .abilitybar .ab .k{display:none}
 html.touch-ui .abilitybar .ab .n{font-size:.6rem;opacity:1;color:#d5e8ff;white-space:nowrap}
 html.touch-ui .abilitybar .ab .c{top:4px;right:5px;font-size:.66rem}
 html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:.95rem;background:rgba(3,6,12,.55)}
-html.touch-ui .abilitybar .energy{min-width:0}
-html.touch-ui .abilitybar .energy .et{font-size:.62rem}
+html.touch-ui .abilitybar .charge{min-width:0}
+html.touch-ui .abilitybar .charge .et{font-size:.62rem}
 @media (orientation:landscape) and (max-height:520px){
 }
 html.in-control:not(.preview-public):not(.touch-ui) .side .log{max-height:22vh}
@@ -167,13 +170,14 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
   const row = document.createElement("div");
   row.className = "row";
   const en = document.createElement("div");
-  en.className = "energy";
-  en.id = "energy";
+  en.className = "charge";
+  en.id = "charge";
   en.setAttribute("role", "meter");
-  en.setAttribute("aria-label", "Energy");
+  en.setAttribute("aria-label", "Charge");
   en.setAttribute("aria-valuemin", "0");
-  en.innerHTML = `<span class="et">Energy</span><span class="refuse" id="ability-refuse" role="status" aria-live="polite"></span><div class="bar"><i></i></div>`;
+  en.innerHTML = `<span class="et"><span class="bolt" aria-hidden="true"></span>Charge</span><span class="refuse" id="ability-refuse" role="status" aria-live="polite"></span><div class="bar"><i></i></div>`;
   const fill = en.querySelector("i");
+  const et = en.querySelector(".et");
   el.append(row, en);
   document.body.appendChild(el);
   const slots = {};
@@ -185,7 +189,7 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
     b.dataset.ability = a.id;
     b.dataset.touch = TOUCH_ABILITIES.includes(a.id) ? "1" : "0";
     b.setAttribute("role", "button");
-    b.setAttribute("aria-label", `${a.name}, key ${String(a.key).toUpperCase()}, costs ${a.cost}`);
+    b.setAttribute("aria-label", `${a.name}, key ${String(a.key).toUpperCase()}, costs ${a.cost} Charge`);
     b.innerHTML = `<span class="c">${a.cost}</span><span class="k">${String(a.key).toUpperCase()}</span><span class="n">${a.name}</span><span class="sweep"></span><span class="cd"></span>`;
     b.addEventListener("pointerdown", (e) => {
       if (onPress) onPress(a.id);
@@ -196,7 +200,7 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
   }
 
   let refuseTimer = 0;
-  /** A line in the Energy row for a moment (a locked or too-costly tap); it is a timeout, not a poll. */
+  /** A line in the Charge row for a moment (a locked or too-costly tap); it is a timeout, not a poll. */
   function refuse(text) {
     const r = en.querySelector(".refuse");
     r.textContent = text || "";
@@ -223,7 +227,7 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
     });
     en.setAttribute("aria-valuemax", String(s.max));
     en.setAttribute("aria-valuenow", String(Math.round(s.energy)));
-    en.querySelector(".et").textContent = `Energy ${Math.round(s.energy)}`;
+    et.innerHTML = `<span class="bolt" aria-hidden="true"></span>Charge ${Math.round(s.energy)}`;
     fill.style.width = Math.max(0, Math.min(100, (s.energy / s.max) * 100)) + "%";
   }
   return { paint, refuse, el };
