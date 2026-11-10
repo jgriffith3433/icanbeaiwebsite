@@ -64,6 +64,13 @@ export function dialogueLines(config) {
   });
   const people = (C.neighbors && C.neighbors.list) || [];
   people.forEach((p) => (p.beats || []).forEach((b) => add(neighborWho(p), b.text, `neighbor:${b.id}`)));
+  // Small Weather's spoken bark table (voice.spoken): first-person lines for the voice director.
+  const spoken = (C.voice && C.voice.spoken) || {};
+  Object.keys(spoken).forEach((group) => {
+    const pool = spoken[group];
+    if (!Array.isArray(pool)) return;
+    pool.forEach((text) => add("He", text, `voice:${group}`));
+  });
   return out;
 }
 
@@ -76,6 +83,17 @@ export function neighborWho(p) {
 function soundOn() {
   const btn = typeof document !== "undefined" && document.getElementById && document.getElementById("sound");
   return !!(btn && btn.getAttribute("aria-pressed") === "true");
+}
+
+function voicesOn() {
+  try {
+    if (typeof localStorage !== "undefined" && localStorage.getItem("icanbe.voices") === "off") return false;
+  } catch (err) {
+    /* private */
+  }
+  const btn = typeof document !== "undefined" && document.getElementById && document.getElementById("voices");
+  if (btn) return btn.getAttribute("aria-pressed") === "true";
+  return true;
 }
 
 export function startDialogue(dayApi, opts) {
@@ -123,7 +141,7 @@ export function startDialogue(dayApi, opts) {
   /** Speak a line if it has a file and Sound is on. Returns the line, or null (the text and babble carry it). */
   function speak(who, text) {
     const L = find(who, text);
-    if (!L || !AudioCtor || !(o.soundOn ? o.soundOn() : soundOn())) return null;
+    if (!L || !AudioCtor || !(o.soundOn ? o.soundOn() : soundOn()) || !(o.voicesOn ? o.voicesOn() : voicesOn())) return null;
     if (current) {
       try {
         current.pause();

@@ -19,3 +19,13 @@ camera (brims and helmets sit back and high). Built in code by `js/peoplekit.js`
 | Ines Quill (scale 1.1) | Tallest, long violet coat to the knee, round glasses, bare head | Telescope tube slung on her back, brass cap | Coat `#7a5cd6`, trousers `#1c1c2a`, hair `#2a2038`, lenses `#9fd4ff`, scope `#cfd4dc`, skin `#e3c4a8` |
 
 Small Weather himself stays the GLB (navy tech jacket, glowing blue seams).
+
+## Motion (`js/peoplekit.js` `step`)
+
+Walk cadence follows ground speed / `WALK_STRIDE` (0.92 m); a planted foot is plant-locked so detectors
+(`quality.foot-slide`, 5 cm) stay quiet. Turn-before-walk pivots when yaw error is large. Idles cycle
+(shift weight, look around) plus a personal beat: Birdie tends plants, Dex checks his phone, Ines aims
+her scope at the sky. Beat gestures: ask = wave at the sky, thanks = cheer/clap, surprise = offer
+basket / present parcel / point at a star. Sit at stops marked `"sit"`. Weather: hunch + umbrella in
+rain/storm (sfx umbrella snap), shield eyes when `weather.now().sun` is up. Gesture sfx on
+`day:neighbor` `gesture`.
