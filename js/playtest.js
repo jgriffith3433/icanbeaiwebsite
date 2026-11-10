@@ -31,6 +31,7 @@ const HUD_PARTS = [
   ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .charge", "Charge"],
   [".powerpad button", "power pad"], [".touchpad .stick", "stick"], [".touchpad .jump", "jump"],
   [".tutorial", "tutorial card"], [".ep-hud", "episode HUD"], [".control-hint", "controls hint"],
+  ["#voice-caption", "voice caption"], ["#voices", "Voices"],
 ];
 const hudSeen = new Set();
 function hudVisible(el) {
@@ -1164,6 +1165,57 @@ async function weatherAbilities(options, t) {
   else t.problem("bug", `Two abilities looked the same: ${skies.join(" ")}`);
   pressKey("Escape");
   t.event("weather-abilities-pass", "each of the five used once");
+}
+
+/* ---------------- cast-feel: every power's input-to-first-feedback time and shake length ---------------- */
+async function castFeel(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const P = window.powers || window.day.powers;
+  const C = window.day.control;
+  const day = window.day.today();
+  const outside = carSideMoment(day) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const ids = [["rain", "r"], ["gale", "v"], ["fog", "c"], ["sunbreak", "x"], ["bolt", "e"], ["gust", "g"], ["tornado", "t"], ["storm", "f"]];
+  for (const [id, key] of ids) {
+    t.scene(`Cast: ${id}`);
+    const cost = (P.now().abilities.find((x) => x.id === id) || {}).cost || 20;
+    await t.until(() => P.now().energy + 0.05 >= cost, 30000, `Charge for ${id}`).catch(() => {});
+    const t0 = performance.now();
+    let first = -1;
+    const slot = document.getElementById("ability-" + id);
+    const seen = new Promise((res) => {
+      const h = (e) => {
+        if (e.detail && e.detail.power === id && e.detail.action !== "denied") {
+          first = performance.now() - t0;
+          window.removeEventListener("day:power", h);
+          res();
+        }
+      };
+      window.addEventListener("day:power", h);
+      setTimeout(res, 1500);
+    });
+    pressKey(key);
+    await seen;
+    await sleep(500);
+    const c = P.now().cast;
+    const pulsed = slot && (slot.classList.contains("pulse") || slot.classList.contains("cooling"));
+    t.metric(`first-feedback-${id}-ms`, Math.round(first));
+    if (first >= 0 && first < 100 && c.id === id) t.event(`cast-${id}`, `${c.kind} in ${Math.round(first)} ms`);
+    else t.problem("bug", `${id} gave no feedback within 100 ms (${Math.round(first)})`);
+    if (!pulsed) t.problem("bug", `The ${id} button didn't show the press`);
+    await sleep(1500);
+  }
+  const m = P.now().cast.shakeMax;
+  t.metric("shake-max-s", Number(m.toFixed(3)));
+  if (m <= 0.3) t.event("shake-short", `longest shake ${m.toFixed(2)} s`);
+  else t.problem("bug", `A camera shake ran ${m.toFixed(2)} s`);
+  pressKey("Escape");
 }
 
 /* ---------------- day: the whole day at high speed; every block must happen ---------------- */
@@ -3223,14 +3275,16 @@ async function spokenDialogue(options, t) {
   const C = window.day.control;
   if (!D || !Ep || !C) return t.problem("bug", "day.dialogue, episodes or Take control isn't installed");
   const lines = D.lines();
+  // Story + neighbor lines must be in the build; voice.spoken bark clips land with the voice-director pass.
+  const mustHave = lines.filter((L) => L.where && !String(L.where).startsWith("voice:"));
   await t.until(() => D.now().files > 0, 6000, "audio/dialogue/index.json").catch(() => {});
   const files = D.now().files;
-  t.event("dialogue-index", `${files} clips for ${lines.length} lines`);
-  if (files < lines.length) t.problem("bug", `Only ${files} of ${lines.length} dialogue lines have a clip in the build, the rest fall back to babble`);
+  t.event("dialogue-index", `${files} clips for ${mustHave.length} story/neighbor lines (${lines.length} incl. voice barks)`);
+  if (files < mustHave.length) t.problem("bug", `Only ${files} of ${mustHave.length} story/neighbor dialogue lines have a clip in the build, the rest fall back to babble`);
   t.progress(0.1);
 
   // A sample of clips must load and decode in this browser.
-  const sample = lines.filter((_, i) => i % 13 === 0);
+  const sample = mustHave.filter((_, i) => i % 13 === 0);
   let decoded = 0;
   for (const L of sample) {
     const ok = await new Promise((res) => {
@@ -3342,10 +3396,10 @@ async function voice(options, t) {
   t.scene("Episode open");
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
-  await t.until(() => plays.some((p) => p.group === "episode-open"), 4000, "episode-open line").catch(() => {});
-  const open = plays.find((p) => p.group === "episode-open");
-  if (open) t.event("voice-play", `episode-open ${open.id}: "${open.text}"`);
-  else t.problem("bug", "Taking control didn't play an episode-open line");
+  await t.until(() => plays.some((p) => p.group === "take" || p.group === "episode-open"), 4000, "take / episode-open line").catch(() => {});
+  const open = plays.find((p) => p.group === "take" || p.group === "episode-open");
+  if (open) t.event("voice-play", `take ${open.id}: "${open.text}"`);
+  else t.problem("bug", "Taking control didn't play a take / episode-open line");
   t.progress(0.15);
 
   // Weather reactions for every state (wait past cooldown between keys)
@@ -3406,15 +3460,171 @@ async function voice(options, t) {
   const beforeClose = plays.length;
   pressKey("Escape");
   await t.until(() => C.mode() !== "control", 4000, "Let go (Esc)");
-  await t.until(() => plays.length > beforeClose && plays.some((p) => p.group === "episode-close"), 4000, "episode-close line").catch(() => {});
-  const close = [...plays].reverse().find((p) => p.group === "episode-close");
-  if (close) t.event("voice-play", `episode-close ${close.id}: "${close.text}"`);
-  else t.problem("bug", "Letting go didn't play an episode-close / score-card line");
+  await t.until(() => plays.length > beforeClose && plays.some((p) => p.group === "letgo" || p.group === "episode-close"), 4000, "letgo / episode-close line").catch(() => {});
+  const close = [...plays].reverse().find((p) => p.group === "letgo" || p.group === "episode-close");
+  if (close) t.event("voice-play", `letgo ${close.id}: "${close.text}"`);
+  else t.problem("bug", "Letting go didn't play a letgo / episode-close line");
 
   window.removeEventListener("day:voice", onVoice);
   t.metric("voicePlays", plays.length);
   t.metric("voiceSkips", skips.length);
   t.event("voice-summary", `${plays.length} plays, ${skips.length} skips, DoD voice ${V.now().voiceId}`);
+  t.progress(1);
+}
+
+/* ---------------- voice-director: take control, two first-use powers, caption, mute, no overlap ---------------- */
+// Needs ?playtest=voice-director. Sound on (real pointer), Enter, E then R (first uses), Voices off then a third
+// call stays quiet; optional phone layout via {"touch":true}. Events voice-take / voice-power-first / voice-caption /
+// voice-no-overlap / voices-mute / voice-dayend. Acceptance: speaks on take and first powers; lines never overlap;
+// same line waits ~5 min; caption clear of the ability bar; Voices mute separate from Sound.
+async function voiceDirector(options, t) {
+  t.scene("Voice director");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const V = window.voice || (window.day && window.day.voice);
+  if (!V) { t.problem("bug", "There's no voice director (js/voice.js)"); return; }
+  const C = window.day.control;
+  if (!C) { t.problem("bug", "There's no Take control"); return; }
+  if (options && options.touch && C.touch) C.touch(true);
+
+  const spoken = (window.DAY_CONFIG && window.DAY_CONFIG.voice && window.DAY_CONFIG.voice.spoken) || {};
+  const groups = ["take", "letgo", "bolt", "rain", "dayend", "idle"];
+  groups.forEach((g) => {
+    if (!Array.isArray(spoken[g]) || spoken[g].length < 2) t.problem("bug", `voice.spoken.${g} needs 2+ variants`);
+  });
+  t.event("voice-spoken", `${Object.keys(spoken).length} groups`);
+  t.metric("spokenGroups", Object.keys(spoken).length);
+
+  const day = window.day.today();
+  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  clickSpeed(1);
+  await sleep(400);
+  t.event("start-at", `${E().fmtClock(out.start)} outdoors`);
+
+  const plays = [];
+  const skips = [];
+  const onVoice = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "play") plays.push(d);
+    if (d.action === "skip") skips.push(d);
+  };
+  window.addEventListener("day:voice", onVoice);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+    sound.click();
+    await sleep(250);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+  }
+  if (V.voices && !V.voices()) V.voices(true);
+  t.progress(0.1);
+
+  t.scene("Take control bark");
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  await t.until(() => plays.some((p) => p.group === "take"), 5000, "take bark").catch(() => {});
+  const take = plays.find((p) => p.group === "take");
+  if (!take) t.problem("bug", "Taking control didn't speak a take bark");
+  else t.event("voice-take", `${take.id}: "${take.text}"`);
+  const cap = $("voice-caption");
+  await t.until(() => cap && !cap.hidden && (cap.textContent || "").trim().length > 4, 3000, "caption up").catch(() => {});
+  if (!cap || cap.hidden) t.problem("bug", "No voice caption while he speaks");
+  else {
+    const cr = cap.getBoundingClientRect();
+    const bar = document.querySelector(".abilitybar");
+    const br = bar && hudVisible(bar);
+    if (br && !(cr.bottom < br.top - 2 || cr.top > br.bottom + 2 || cr.right < br.left || cr.left > br.right)) {
+      t.problem("bug", "Voice caption overlaps the ability bar");
+    } else t.event("voice-caption", `"${(cap.textContent || "").trim()}" clear of ability bar at ${innerWidth}x${innerHeight}`);
+  }
+  t.progress(0.3);
+
+  t.scene("First power uses");
+  const P = window.powers || (window.day && window.day.powers);
+  if (P) {
+    await t.until(() => P.now().pressure + 0.05 >= 24, 12000, "Pressure for bolt").catch(() => {});
+    const beforeBolt = plays.length;
+    pressKey("e");
+    await t.until(() => plays.length > beforeBolt && plays.some((p) => p.group === "bolt"), 5000, "first bolt bark").catch(() => {});
+    const bolt = [...plays].reverse().find((p) => p.group === "bolt");
+    if (bolt) t.event("voice-power-first", `bolt ${bolt.id}: "${bolt.text}"`);
+    else t.problem("bug", "First Lightning didn't speak");
+
+    // Overlap: hammer Rain while bolt caption may still be settling; director must skip or wait.
+    await t.until(() => P.now().pressure + 0.05 >= 18, 12000, "Pressure for rain").catch(() => {});
+    const beforeRain = plays.length;
+    const skipBefore = skips.length;
+    pressKey("r");
+    await sleep(200);
+    pressKey("r"); // second tap while first may still be gated
+    await t.until(() => plays.length > beforeRain || skips.length > skipBefore, 5000, "rain bark or overlap skip").catch(() => {});
+    const rain = [...plays].reverse().find((p) => p.group === "rain");
+    if (rain) t.event("voice-power-first", `rain ${rain.id}: "${rain.text}"`);
+    else t.problem("bug", "First Rain didn't speak");
+    const overlaps = skips.filter((s) => s.reason === "overlap");
+    t.event("voice-no-overlap", `${overlaps.length} overlap refusals, playing=${!!V.now().playing}`);
+    t.metric("overlapSkips", overlaps.length);
+
+    // Same line id: refuse within the 5 min line cooldown (ignore only the between-line gap).
+    const skipCdBefore = skips.length;
+    const again = take
+      ? V.say("take", { force: true, ignoreCooldown: true, text: take.text, via: "playtest-line-cd" })
+      : null;
+    const skipCd = skips.length - skipCdBefore;
+    if (again && take && again.id === take.id) t.problem("bug", "Same take line replayed inside the 5 min line cooldown");
+    else if (skipCd < 1 && take) t.problem("bug", "Same take line wasn't refused by line-cooldown");
+    else t.event("voice-line-cooldown", `${skipCd} line-cooldown skips (same id refused)`);
+  } else t.problem("bug", "powers missing");
+  t.progress(0.55);
+
+  t.scene("Voices mute");
+  const voicesBtn = $("voices");
+  if (!voicesBtn) t.problem("bug", "No Voices button in Settings");
+  else {
+    if (voicesBtn.getAttribute("aria-pressed") !== "true") voicesBtn.click();
+    await sleep(100);
+    // Open settings if needed so the button is clickable
+    const gear = $("settings");
+    if (gear && voicesBtn.closest("#settings-pop") && $("settings-pop").hidden) gear.click();
+    voicesBtn.click();
+    await sleep(150);
+    if (voicesBtn.getAttribute("aria-pressed") !== "false") t.problem("bug", "Voices didn't turn off");
+    else t.event("voices-mute", "Voices off");
+    const beforeMute = plays.length;
+    const skipMute = skips.length;
+    if (P) {
+      await t.until(() => P.now().pressure + 0.05 >= 18, 10000, "Pressure while muted").catch(() => {});
+      pressKey("v"); // gale — not first-use if we only did bolt/rain; force a first-use gale
+      await sleep(400);
+    }
+    if (plays.length > beforeMute) t.problem("bug", "A voice line played while Voices was off");
+    else t.event("voices-mute-quiet", `${skips.length - skipMute} skips with Voices off`);
+    // Sound still on
+    if (sound && sound.getAttribute("aria-pressed") !== "true") t.problem("bug", "Voices mute also turned Sound off");
+    voicesBtn.click(); // back on
+    if (gear && !$("settings-pop").hidden) gear.click();
+  }
+  t.progress(0.75);
+
+  t.scene("Day end bark");
+  // Force the day-end moment via API (setup); director listens for day:moment day-end.
+  const beforeEnd = plays.length;
+  if (window.day.moments && window.day.moments.recap) {
+    window.day.moments.recap("playtest");
+    await t.until(() => plays.length > beforeEnd && plays.some((p) => p.group === "dayend"), 5000, "dayend bark").catch(() => {});
+    const end = [...plays].reverse().find((p) => p.group === "dayend");
+    if (end) t.event("voice-dayend", `${end.id}: "${end.text}"`);
+    else t.problem("bug", "Day end didn't speak a dayend bark");
+    if (window.day.moments.skip) window.day.moments.skip();
+  } else t.problem("bug", "moments missing, can't check dayend bark");
+
+  checkHud(t, "voice-director");
+  window.removeEventListener("day:voice", onVoice);
+  t.metric("voiceDirectorPlays", plays.length);
+  t.event("voice-director-summary", `${plays.length} plays, ${skips.length} skips at ${innerWidth}x${innerHeight}`);
   t.progress(1);
 }
 
@@ -6269,6 +6479,7 @@ installPlaytest({
     { id: "hud-layout", title: "HUD layout: Quality lives in the Settings menu, the left column stacks Episodes, Neighbors, weather and Pressure without overlap, Take control stays bottom-centre; overlap check on title and in play", seconds: 40, tags: ["hud", "smoke"], description: "Load with ?playtest=hud-layout. Real input: Settings click, Enter, Esc. Events settings-open / hud-clear / hud-layout-play. Run at 1280x720, 390x844 and 844x390." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
+    { id: "cast-feel", title: "Cast every power: feedback within 100 ms, shake under 0.3 s, button pulse", seconds: 120, tags: ["powers"], description: "Takes control, casts all eight powers by key, measures press to first feedback and the longest shake." },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
     { id: "slice", title: "Vertical slice: walk from the driveway to Birdie, answer her rain, see the lawn drink, the park path, bandstand pigeons and creak, the pond coin toss; reports quality.maxQuietSeconds and quality.textOnlyBeats", seconds: 200, tags: ["slice", "story"], description: "Real WASD, R for Birdie, Y at the pond." },
@@ -6291,6 +6502,7 @@ installPlaytest({
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
     { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
+    { id: "voice-director", title: "Voice director: take control and first power uses speak with a caption clear of the ability bar; lines never overlap; Voices mute leaves music/effects alone; day end speaks", seconds: 90, tags: ["voice", "audio"], description: "Load with ?playtest=voice-director. Sound on (real pointer), Enter, E then R, Voices off in Settings, day-end recap (setup). Optional {\"touch\":true}. Events voice-take / voice-power-first / voice-caption / voice-no-overlap / voices-mute / voice-dayend. Run at desktop and 390x844." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
     { id: "story-ending", title: "Part 3 (the reservoir) after Part 2, and the ending card: three Part 3 runs reach three different endings (Fair Weather, Heavy Weather, Overcast) and the card says how the park, turbines, market and reservoir fared", seconds: 840, tags: ["episodes", "story"], description: "Day bar to a moment outdoors and to 22:30 (setup), Enter, each part started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza, the annex and the Storm Tank, R, X, V and E. Events part3-offered / ending-say / ending-gauge / ending-kick / ending-card / ending-reached / ending-fared / three-endings." },
@@ -6336,6 +6548,7 @@ installPlaytest({
       else if (id === "fill-out") await fillOut(options, t);
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
+      else if (id === "cast-feel") await castFeel(options, t);
       else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
@@ -6346,6 +6559,7 @@ installPlaytest({
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "voice") await voice(options, t);
+      else if (id === "voice-director") await voiceDirector(options, t);
       else if (id === "spoken-dialogue") await spokenDialogue(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);

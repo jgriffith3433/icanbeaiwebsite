@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 
 const fail = [];
 const roots = [".abilitybar", ".pressure", ".powerpad", ".tutorial", ".nb-btn", ".nb-panel", ".nb-toast", ".nb-layer", ".mo-line",
-  ".ep-btn", ".ep-hud", ".ep-say", ".ep-toast", ".control-btn", ".quality-btn", ".hud-left", ".control-hint", ".touchpad", ".weather-btn", "#weather-chip", ".side"];
+  ".voice-caption", ".ep-btn", ".ep-hud", ".ep-say", ".ep-toast", ".control-btn", ".quality-btn", ".voices-btn", ".hud-left", ".control-hint", ".touchpad", ".weather-btn", "#weather-chip", ".side"];
 const placement = /(^|;)\s*(position|top|right|bottom|left|inset)\s*:/;
 
 function scan(file, text) {
