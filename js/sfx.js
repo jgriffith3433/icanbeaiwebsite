@@ -138,12 +138,135 @@
   }
   const notes = (freqs, gap, vol, wave, dur) => freqs.forEach((f, i) => tone({ freq: f, dur: dur || 0.5, vol, wave: wave || "triangle", delay: i * gap }));
 
+  /* ---------------- surface detection (rooftop gravel, metal, tar, puddle + street) ---------------- */
+  const SURFACES = ["gravel", "metal", "tar", "puddle", "pavement", "grass", "wood"];
+  const surfaces = { gravel: 0, metal: 0, tar: 0, puddle: 0, pavement: 0, grass: 0, wood: 0 };
+  let lastSurface = "pavement";
+  const recentSteps = [];
+
+  function surfaceAt(x, y, z, isWet) {
+    const cfg = window.DAY_CONFIG || {};
+    const city = cfg.city || {};
+    const blocks = city.blocks || [];
+    const wy = y == null ? 0 : y;
+    const wNow = (day.weather && day.weather.now && day.weather.now()) || {};
+    const wetLvl = isWet ? 1 : Math.max(wNow.wet || 0, wNow.state === "rain" || wNow.state === "storm" ? 0.8 : 0);
+
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      if (b.stair && wy > 0.35 && wy < b.h - 0.15) {
+        const s = b.stair;
+        if (x >= s.x0 - 0.6 && x <= s.x1 + 0.6 && Math.abs(z - s.z) <= s.w * 0.75) {
+          return "metal";
+        }
+      }
+      if (wy >= b.h - 0.55 && Math.abs(x - b.x) <= b.w / 2 + 0.8 && Math.abs(z - b.z) <= b.d / 2 + 1.2) {
+        const dx = x - b.x;
+        const dz = z - b.z;
+        // 1. Roof-drain puddle basin at (-2.2, +1.6) always holds standing water; secondary basin at (+1.2, +1.8) fills when wet
+        if (Math.hypot(dx - (-2.2), dz - 1.6) <= 1.45 || (wetLvl > 0.15 && Math.hypot(dx - 1.2, dz - 1.8) <= 1.35)) {
+          return "puddle";
+        }
+        // 2. Metal grating catwalk (dx in 1.75..4.35, |dz| <= 1.7), south AC/vent mechanical strip (dz <= -2.0), or stair landing
+        if (
+          (dx >= 1.75 && dx <= 4.35 && Math.abs(dz) <= 1.75) ||
+          dz <= -2.0 ||
+          (b.stair && dz >= b.d / 2 - 1.4 && x >= b.stair.x1 - 1.8 && x <= b.stair.x1 + 1.2)
+        ) {
+          return "metal";
+        }
+        // 3. Tar membrane patch on the west side (dx <= -2.6) or outer parapet flashing
+        if (dx <= -2.6 || Math.abs(dx) >= b.w / 2 - 1.4 || Math.abs(dz) >= b.d / 2 - 1.1) {
+          return "tar";
+        }
+        // 4. Central gravel roof ballast bed
+        return "gravel";
+      }
+    }
+
+    // Street / ground level
+    if (wetLvl > 0.25 && Math.abs(z - 12.6) < 4.5 && Math.sin(x * 0.41 + z * 0.63) > 0.55) {
+      return "puddle";
+    }
+    if (city.park && x >= city.park.x0 && x <= city.park.x1 && z >= city.park.z0 && z <= city.park.z1 && Math.abs(x - (-8)) > 1.2) {
+      return isWet ? "puddle" : "grass";
+    }
+    const blds = Object.values(cfg.buildings || {});
+    for (let i = 0; i < blds.length; i++) {
+      const bd = blds[i];
+      if (!bd || !bd.bounds) continue;
+      const o = bd.origin || [0, 0];
+      if (x >= bd.bounds[0] + o[0] && x <= bd.bounds[2] + o[0] && z >= bd.bounds[1] + o[1] && z <= bd.bounds[3] + o[1]) {
+        return "wood";
+      }
+    }
+    return isWet ? "puddle" : "pavement";
+  }
+
   /* ---------------- the palette ---------------- */
   const S = {
-    step(wet, pan) {
+    step(wetOrSurface, pan, surfaceOverride) {
+      let surf = surfaceOverride;
+      let isWet = false;
+      if (typeof wetOrSurface === "string" && SURFACES.indexOf(wetOrSurface) >= 0) {
+        surf = wetOrSurface;
+        isWet = surf === "puddle";
+      } else {
+        isWet = !!wetOrSurface;
+        if (!surf) {
+          try {
+            const st = day.control && day.control.state && day.control.state();
+            if (st && st.mode === "control") surf = surfaceAt(st.x, st.y, st.z, isWet);
+          } catch (e) { /* fallback */ }
+        }
+        if (!surf) surf = isWet ? "puddle" : "pavement";
+      }
       note("step");
-      noise({ type: "bandpass", freq: wet ? 1500 : 700 + Math.random() * 250, q: wet ? 1.2 : 1.6, dur: wet ? 0.12 : 0.07, vol: wet ? 0.07 : 0.06, pan });
-      if (wet) noise({ type: "highpass", freq: 3800, dur: 0.09, vol: 0.025, pan, delay: 0.015 });
+      note("step-" + surf);
+      surfaces[surf] = (surfaces[surf] || 0) + 1;
+      lastSurface = surf;
+      recentSteps.push({ surface: surf, wet: isWet || surf === "puddle", t: typeof performance !== "undefined" ? Math.round(performance.now()) : Date.now() });
+      if (recentSteps.length > 20) recentSteps.shift();
+      try {
+        window.dispatchEvent(new CustomEvent("day:footstep", { detail: { surface: surf, wet: isWet || surf === "puddle", pan: pan || 0 } }));
+      } catch (e) { /* ignore */ }
+
+      if (surf === "gravel") {
+        // Crunchy multi-grain gravel roof step: three staggered high-mid pebble crunches + dry sole thud
+        noise({ type: "bandpass", freq: 2350 + Math.random() * 350, q: 2.4, dur: 0.055, vol: 0.068, attack: 0.003, pan });
+        noise({ type: "bandpass", freq: 3400 + Math.random() * 450, q: 2.8, dur: 0.05, vol: 0.055, attack: 0.003, delay: 0.018, pan });
+        noise({ type: "highpass", freq: 4200, q: 1.4, dur: 0.045, vol: 0.038, attack: 0.003, delay: 0.036, pan });
+        tone({ freq: 185, to: 115, dur: 0.048, vol: 0.042, wave: "triangle", pan });
+      } else if (surf === "metal") {
+        // Resonant hollow metal grating / AC deck clank: inharmonic metallic ring partials + sharp transient
+        tone({ freq: 430 + Math.random() * 25, to: 390, dur: 0.11, vol: 0.062, wave: "triangle", attack: 0.002, pan });
+        tone({ freq: 1160 + Math.random() * 60, to: 1080, dur: 0.095, vol: 0.045, wave: "sine", band: 1200, q: 4.5, attack: 0.002, pan });
+        tone({ freq: 2340 + Math.random() * 90, to: 2100, dur: 0.065, vol: 0.028, wave: "sine", attack: 0.002, delay: 0.006, pan });
+        noise({ type: "bandpass", freq: 1750, q: 3.2, dur: 0.045, vol: 0.05, attack: 0.002, pan });
+      } else if (surf === "tar") {
+        // Heavy damped roof tar membrane thud + sticky sole peel snap
+        tone({ freq: 138, to: 62, dur: 0.075, vol: 0.078, wave: "sine", attack: 0.004, pan });
+        noise({ type: "lowpass", freq: 390, q: 1.1, dur: 0.07, vol: 0.062, attack: 0.005, pan });
+        noise({ type: "bandpass", freq: 2850 + Math.random() * 250, q: 4.2, dur: 0.028, vol: 0.034, attack: 0.002, delay: 0.038, pan });
+      } else if (surf === "puddle") {
+        // Clear water puddle splash: swept water slosh + scattered droplet pings
+        noise({ type: "bandpass", freq: 720, to: 2650, q: 1.3, dur: 0.14, vol: 0.082, attack: 0.005, pan });
+        noise({ type: "highpass", freq: 3400, q: 1.1, dur: 0.11, vol: 0.045, attack: 0.004, delay: 0.015, pan });
+        tone({ freq: 1350 + Math.random() * 250, to: 1950, dur: 0.045, vol: 0.028, wave: "sine", delay: 0.022, pan });
+        tone({ freq: 1780 + Math.random() * 320, to: 2450, dur: 0.04, vol: 0.024, wave: "sine", delay: 0.052, pan });
+      } else if (surf === "grass") {
+        noise({ type: "bandpass", freq: 1650 + Math.random() * 220, q: 1.4, dur: 0.08, vol: 0.052, attack: 0.01, pan });
+      } else if (surf === "wood") {
+        tone({ freq: 240, to: 145, dur: 0.065, vol: 0.058, wave: "triangle", pan });
+        noise({ type: "bandpass", freq: 620, q: 2.0, dur: 0.055, vol: 0.048, pan });
+      } else {
+        // Pavement
+        noise({ type: "bandpass", freq: 740 + Math.random() * 220, q: 1.6, dur: 0.068, vol: 0.06, pan });
+      }
+      if (isWet && surf !== "puddle") {
+        noise({ type: "highpass", freq: 3600, dur: 0.085, vol: 0.028, pan, delay: 0.014 });
+      }
+      return surf;
     },
     jump(air) {
       note("jump");
@@ -325,7 +448,9 @@
         const len = st.speed > 3.2 ? 1.15 : 0.78;
         if (him.stride >= len) {
           him.stride -= len;
-          S.step(wet());
+          const isWet = wet();
+          const surf = surfaceAt(st.x, st.y, st.z, isWet);
+          S.step(isWet, 0, surf);
         }
       } else him.stride = 0.5;
     }
@@ -470,7 +595,17 @@
   });
 
   day.sfx = {
-    info: () => ({ on: soundOn(), context: audio ? audio.c.state : "none", heard: { ...heard }, tornado: !!roar }),
+    info: () => ({
+      on: soundOn(),
+      context: audio ? audio.c.state : "none",
+      heard: { ...heard },
+      surfaces: { ...surfaces },
+      lastSurface,
+      recentSteps: recentSteps.slice(),
+      tornado: !!roar,
+    }),
+    surfaceAt,
+    step: (wetOrSurface, pan, surf) => S.step(wetOrSurface, pan, surf),
     play: (name, ...args) => (S[name] ? (S[name](...args), true) : false),
   };
 })();

@@ -93,10 +93,10 @@ Definition of done (all required):
 
 ### The Roofs
 - **Mood:** his playground. Stairs on apt, shop, annex; AC units, tanks, vents, antennas; lightning coils on his arms while the player steers.
-- **Look / sound:** rooftop props; storm gather over him on hold F; bolt crack and scorch; updraft float; camera orbit with wall pull-in.
+- **Look / sound:** rooftop props and distinct surface zones (gravel ballast bed, metal grating and AC decks, dark tar membrane seams, and a wet roof-drain puddle basin with gutter pipe); layered weather soundscape (light rain patter on roofs vs heavy downpour, gurgling roof gutters, rain drumming on umbrellas below, 3D-panned wind gusts and flapping canvas awnings, rolling thunder delayed by strike distance vs close cracks, sunlit rooftop birds and brightened city hum, and snow-muffled street tone); Small Weather's footsteps change across gravel, metal, tar, and splash in puddles; storm gather over him on hold F; bolt crack and scorch; updraft float; camera orbit with wall pull-in.
 - **Size:** three stair roofs plus filler rooftops with units; ramps and parapets.
 - **In / out:** north-face stairs; jump/float between; can't Take control while driving.
-- **In:** control movement (run, triple jump, float), Storm/Bolt/Gust/Tornado, lunch Hollis rescue, Part 2 turbines, smoke playtest roof bolt.
+- **In:** control movement (run, triple jump, float), rooftop surface zones and surface footsteps (`gravel`, `metal`, `tar`, `puddle`), layered weather soundscape with equal-power loop and state crossfades, Storm/Bolt/Gust/Tornado, lunch Hollis rescue, Part 2 turbines, smoke playtest roof bolt.
 - **Short:** most filler roofs are props-only (no second stair set pieces); no roof garden or water tower climb verb beyond parkour.
 - **Build:** AC fans spin with wind (code); one extra traverse prop between shop and annex roofs after queue 1.
 
@@ -216,9 +216,9 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 - **Over time:** beacon brighter in storm; worker packs up in heavy rain.
 
 ### The Roofs
-- **Interactions:** full power set; parkour; lunch Hollis; Part 2 gale; smoke bolt.
-- **On their own:** AC fans spin with wind (Build); antennas; crowd below.
-- **Ambient:** wind, city below, ability whoosh/crack.
+- **Interactions:** full power set; parkour; walk across gravel, metal grates, tar seams and puddle drain basins (surface footsteps and splashes); lunch Hollis; Part 2 gale; smoke bolt.
+- **On their own:** AC fans spin with wind (Build); antennas; roof gutters trickle when wet; crowd below.
+- **Ambient:** layered weather soundscape (roof rain patter vs heavy downpour, gutters, umbrella patter below, 3D-panned wind gusts, flapping awnings, distance-delayed thunder, sunlit birds, muffled snow city), ability whoosh/crack.
 - **Over time:** dusk→night bloom; wet sheen only on ability weather.
 - **Short:** more traverse routes between the three stairs.
 

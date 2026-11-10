@@ -12,7 +12,7 @@
 const BEDS = ["day", "night", "clear", "clouds", "rain", "storm", "fog", "snow"];
 const NIGHT_FROM = 19.75; // 7:45 PM
 const NIGHT_TO = 6.25; // 6:15 AM
-const AMB_LOOPS = ["air", "rain", "wind"];
+const AMB_LOOPS = ["air", "rain", "rainRoof", "rainDownpour", "gutter", "umbrella", "wind", "awning", "birds"];
 const FADE_DEFAULT = 2.8;
 const MUSIC_VOL = 0.3;
 const AMB_VOL = 0.62;
@@ -40,11 +40,138 @@ const DEFAULT_PATHS = {
   ambience: {
     air: "audio/sfx/city-hum.mp3",
     rain: "audio/sfx/rain-asphalt.mp3",
+    rainRoof: "audio/sfx/rain-roof-light.mp3",
+    rainDownpour: "audio/sfx/rain-downpour.mp3",
+    gutter: "audio/sfx/rain-gutter.mp3",
+    umbrella: "audio/sfx/rain-umbrella.mp3",
     wind: "audio/sfx/wind.mp3",
+    awning: "audio/sfx/wind-awning.mp3",
+    birds: "audio/sfx/sun-birds.mp3",
     thunderNear: "audio/sfx/thunder-near.mp3",
     thunderFar: "audio/sfx/thunder-far.mp3",
   },
 };
+
+/** Equal-power crossfade gains (sin^2 + cos^2 = 1) so transitions never dip in energy or click. */
+export function equalPowerGains(t) {
+  const k = Math.max(0, Math.min(1, Number(t) || 0));
+  const ang = k * Math.PI * 0.5;
+  const fadeOut = Math.cos(ang);
+  const fadeIn = Math.sin(ang);
+  return { fadeOut, fadeIn, power: fadeOut * fadeOut + fadeIn * fadeIn };
+}
+
+/**
+ * Fix loop seams on decoded AudioBuffers (m_7da611816a0b):
+ * 1. Inspect the 50 ms RMS envelope at head and tail and trim any silent hole / fade dip.
+ * 2. Rebuild the buffer by folding the tail overlap into the head with an equal-power crossfade
+ *    (sin/cos) so sample [outLen - 1] wraps directly into sample [0] with zero discontinuity.
+ */
+export function fixLoopSeam(ctxOrNull, buf, fadeSec = 0.85) {
+  if (!buf || typeof buf.getChannelData !== "function" || !buf.length || !buf.sampleRate) {
+    return { buffer: buf, trimmedSamples: 0, fadeSamples: 0, jumpBefore: 0, jumpAfter: 0, levelDiffDb: 0 };
+  }
+  const sr = buf.sampleRate;
+  const chCount = buf.numberOfChannels || 1;
+  const total = buf.length;
+  const ch0 = buf.getChannelData(0);
+  const jumpBefore = Math.abs(ch0[total - 1] - ch0[0]);
+
+  const win = Math.max(1, Math.floor(sr * 0.05)); // 50 ms envelope window
+  const nWins = Math.floor(total / win);
+  if (nWins < 8) {
+    return { buffer: buf, trimmedSamples: 0, fadeSamples: 0, jumpBefore, jumpAfter: jumpBefore, levelDiffDb: 0 };
+  }
+
+  const rmsList = new Float32Array(nWins);
+  const sorted = [];
+  for (let w = 0; w < nWins; w++) {
+    let sum = 0;
+    const base = w * win;
+    for (let i = 0; i < win; i++) {
+      const v = ch0[base + i];
+      sum += v * v;
+    }
+    const r = Math.sqrt(sum / win);
+    rmsList[w] = r;
+    if (r > 1e-5) sorted.push(r);
+  }
+  sorted.sort((a, b) => a - b);
+  const medRms = sorted.length ? sorted[Math.floor(sorted.length * 0.5)] : 0;
+  const floorRms = medRms * 0.22;
+
+  let startWin = 0;
+  let endWin = nWins;
+  while (startWin < endWin - 6 && rmsList[startWin] < floorRms) startWin++;
+  while (endWin > startWin + 6 && rmsList[endWin - 1] < floorRms) endWin--;
+
+  const startSample = startWin * win;
+  const endSample = Math.min(total, endWin * win);
+  const activeLen = endSample - startSample;
+  const trimmedSamples = total - activeLen;
+  const fadeSamples = Math.max(64, Math.min(Math.floor(sr * fadeSec), Math.floor(activeLen * 0.25)));
+  const outLen = activeLen - fadeSamples;
+  if (outLen <= fadeSamples) {
+    return { buffer: buf, trimmedSamples: 0, fadeSamples: 0, jumpBefore, jumpAfter: jumpBefore, levelDiffDb: 0 };
+  }
+
+  let outBuf = null;
+  if (ctxOrNull && typeof ctxOrNull.createBuffer === "function") {
+    try {
+      outBuf = ctxOrNull.createBuffer(chCount, outLen, sr);
+    } catch (e) {
+      outBuf = null;
+    }
+  }
+  if (!outBuf) {
+    const chans = Array.from({ length: chCount }, () => new Float32Array(outLen));
+    outBuf = {
+      sampleRate: sr,
+      length: outLen,
+      duration: outLen / sr,
+      numberOfChannels: chCount,
+      getChannelData: (c) => chans[c],
+    };
+  }
+
+  for (let c = 0; c < chCount; c++) {
+    const src = buf.getChannelData(c);
+    const dst = outBuf.getChannelData(c);
+    // Fold the last `fadeSamples` [startSample + outLen .. startSample + activeLen) into the head [0 .. fadeSamples)
+    // using equal-power gains so dst[0] == src[startSample + outLen], continuous with dst[outLen - 1] == src[startSample + outLen - 1].
+    for (let i = 0; i < fadeSamples; i++) {
+      const t = i / fadeSamples;
+      const ang = t * Math.PI * 0.5;
+      const gainHead = Math.sin(ang);
+      const gainTail = Math.cos(ang);
+      dst[i] = src[startSample + i] * gainHead + src[startSample + outLen + i] * gainTail;
+    }
+    for (let i = fadeSamples; i < outLen; i++) {
+      dst[i] = src[startSample + i];
+    }
+  }
+
+  const out0 = outBuf.getChannelData(0);
+  const jumpAfter = Math.abs(out0[outLen - 1] - out0[0]);
+  let headSum = 0;
+  let tailSum = 0;
+  for (let i = 0; i < win; i++) {
+    headSum += out0[i] * out0[i];
+    tailSum += out0[outLen - win + i] * out0[outLen - win + i];
+  }
+  const rmsHead = Math.sqrt(headSum / win);
+  const rmsTail = Math.sqrt(tailSum / win);
+  const levelDiffDb = rmsHead > 1e-6 && rmsTail > 1e-6 ? 20 * Math.log10(rmsTail / rmsHead) : 0;
+
+  return {
+    buffer: outBuf,
+    trimmedSamples,
+    fadeSamples,
+    jumpBefore: Math.round(jumpBefore * 1e6) / 1e6,
+    jumpAfter: Math.round(jumpAfter * 1e6) / 1e6,
+    levelDiffDb: Math.round(levelDiffDb * 100) / 100,
+  };
+}
 
 function cfg() {
   const s = (window.DAY_CONFIG && window.DAY_CONFIG.score) || {};
@@ -117,8 +244,12 @@ export function startScore(dayApi) {
   let loading = null;
   const buffers = Object.create(null);
   const missing = Object.create(null);
+  const seamStats = Object.create(null);
   const music = Object.create(null); // bed -> { src, gain }
-  const amb = Object.create(null); // air|rain|wind -> { src, gain }
+  const amb = Object.create(null); // AMB_LOOPS -> { src, gain, filter, panner }
+  const smoothAmb = {
+    air: 0, rain: 0, rainRoof: 0, rainDownpour: 0, gutter: 0, umbrella: 0, wind: 0, awning: 0, birds: 0, snowHush: 0, foghorn: 0,
+  };
   let currentBed = null;
   let targetBed = null;
   let fadeLeft = 0;
@@ -127,6 +258,7 @@ export function startScore(dayApi) {
   let whooshAt = 0;
   let lastCrack = 0;
   let tone = null;
+  let gustClock = 0;
   // Pressure (the energy meter) scores the music: above `pressureFrom` a low drone with a pulse swells in,
   // the beds speed up a little and the night low-pass opens. All procedural: no files.
   let tension = null; // { gain, lp, oscs, lfo, lfoGain }
@@ -137,8 +269,33 @@ export function startScore(dayApi) {
     bed: null,
     target: null,
     fade: 1,
+    equalPower: { fadeOut: 0, fadeIn: 1, power: 1 },
     music: Object.create(null),
-    amb: { air: 0, rain: 0, wind: 0, thunder: 0 },
+    amb: {
+      air: 0, rain: 0, rainRoof: 0, rainDownpour: 0, gutter: 0, umbrella: 0, wind: 0, awning: 0, birds: 0, thunder: 0,
+    },
+    soundscape: {
+      state: "clear",
+      rainRoof: 0,
+      rainDownpour: 0,
+      gutter: 0,
+      umbrella: 0,
+      wind: 0,
+      windPan: 0,
+      awning: 0,
+      awningPan: 0,
+      umbrellaPan: 0,
+      birds: 0,
+      birdPan: 0,
+      cityToneHz: 4200,
+      brightened: true,
+      muffled: 0,
+      snowHush: 0,
+      foghorn: 0,
+      onRoof: false,
+    },
+    seams: { fixed: 0, maxJumpAfter: 0, urls: Object.create(null) },
+    lastThunder: null,
     samples: false,
     unlocked: false,
     on: false,
@@ -222,6 +379,12 @@ export function startScore(dayApi) {
     return tension;
   }
 
+  function isLoopUrl(url, c) {
+    if (!url) return false;
+    if (url === c.sting || url === c.whoosh || url === c.ambience.thunderNear || url === c.ambience.thunderFar) return false;
+    return true;
+  }
+
   async function loadUrl(url) {
     if (!url || missing[url]) return null;
     if (buffers[url]) return buffers[url];
@@ -234,7 +397,22 @@ export function startScore(dayApi) {
         return null;
       }
       const raw = await res.arrayBuffer();
-      const buf = await a.decodeAudioData(raw.slice(0));
+      let buf = await a.decodeAudioData(raw.slice(0));
+      const c = cfg();
+      if (isLoopUrl(url, c)) {
+        const fixed = fixLoopSeam(a, buf, 0.85);
+        buf = fixed.buffer || buf;
+        seamStats[url] = fixed;
+        live.seams.fixed = Object.keys(seamStats).length;
+        live.seams.maxJumpAfter = Math.max(live.seams.maxJumpAfter || 0, fixed.jumpAfter || 0);
+        live.seams.urls[url] = {
+          trimmedSamples: fixed.trimmedSamples,
+          fadeSamples: fixed.fadeSamples,
+          jumpBefore: fixed.jumpBefore,
+          jumpAfter: fixed.jumpAfter,
+          levelDiffDb: fixed.levelDiffDb,
+        };
+      }
       buffers[url] = buf;
       return buf;
     } catch (err) {
@@ -250,7 +428,7 @@ export function startScore(dayApi) {
     urls.add(c.music.wind);
     urls.add(c.sting);
     if (c.whoosh) urls.add(c.whoosh);
-    Object.keys(c.ambience).forEach((k) => urls.add(c.ambience[k]));
+    Object.keys(c.ambience).forEach((k) => c.ambience[k] && urls.add(c.ambience[k]));
     await Promise.all([...urls].map(loadUrl));
     live.samples = BEDS.some((b) => !!buffers[c.music[b]]) || AMB_LOOPS.some((k) => !!buffers[c.ambience[k]]);
     return live.samples;
@@ -266,17 +444,49 @@ export function startScore(dayApi) {
     return true;
   }
 
-  function startLoop(buf, bus, vol) {
+  function startLoop(buf, bus, vol, opts) {
     if (!ctx || !buf) return null;
+    const o = opts || {};
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
+    const filter = o.filter && ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
+    if (filter) {
+      filter.type = o.filterType || "lowpass";
+      filter.frequency.value = o.filterFreq || 4200;
+      filter.Q.value = o.filterQ || 0.7;
+    }
+    const panner = o.pan && ctx.createStereoPanner ? ctx.createStereoPanner() : null;
     const g = ctx.createGain();
     g.gain.value = vol || 0;
-    src.connect(g);
+    let node = src;
+    if (filter) {
+      node.connect(filter);
+      node = filter;
+    }
+    if (panner) {
+      node.connect(panner);
+      node = panner;
+    }
+    node.connect(g);
     g.connect(bus);
     src.start();
-    return { src, gain: g };
+    return { src, gain: g, filter, panner };
+  }
+
+  /** Smoothly ramp a WebAudio AudioParam without clicks while keeping `.value` readable. */
+  function setGainSmooth(gainNode, val, tau = 0.04) {
+    if (!gainNode || !gainNode.gain) return;
+    const v = Math.max(0, Number(val) || 0);
+    if (ctx && gainNode.gain.setTargetAtTime) {
+      try {
+        gainNode.gain.setTargetAtTime(v, ctx.currentTime, tau);
+      } catch (e) {
+        gainNode.gain.value = v;
+      }
+    } else {
+      gainNode.gain.value = v;
+    }
   }
 
   /** The file a bed plays: its own, or its fallback bed's while its own is missing. */
@@ -303,7 +513,14 @@ export function startScore(dayApi) {
     if (amb[key]) return amb[key];
     const buf = buffers[url];
     if (!buf) return null;
-    amb[key] = startLoop(buf, ambBus, 0);
+    const needFilter = key === "air" || key === "rainRoof" || key === "rainDownpour";
+    const needPan = key === "wind" || key === "awning" || key === "umbrella" || key === "birds" || key === "gutter";
+    amb[key] = startLoop(buf, ambBus, 0, {
+      filter: needFilter,
+      filterType: key === "rainRoof" ? "highpass" : "lowpass",
+      filterFreq: key === "rainRoof" ? 1200 : 4200,
+      pan: needPan,
+    });
     return amb[key];
   }
 
@@ -311,11 +528,12 @@ export function startScore(dayApi) {
     const next = BEDS.indexOf(bed) >= 0 ? bed : bedFor(bed, simHour());
     if (next === targetBed && !snap) return;
     if (snap || !currentBed) {
-      Object.keys(music).forEach((k) => {
-        if (music[k]) music[k].gain.gain.value = 0;
+      BEDS.forEach((k) => {
+        live.music[k] = k === next ? 1 : 0;
+        if (music[k]) setGainSmooth(music[k], k === next ? 1 : 0, 0.02);
       });
       const node = ensureMusic(next);
-      if (node) node.gain.gain.value = 1;
+      if (node) setGainSmooth(node, 1, 0.02);
       currentBed = next;
       targetBed = next;
       fadeLeft = 0;
@@ -323,12 +541,17 @@ export function startScore(dayApi) {
       live.bed = next;
       live.target = next;
       live.fade = 1;
+      live.equalPower = equalPowerGains(1);
       return;
     }
     if (next === currentBed && fadeLeft <= 0) {
       targetBed = next;
       live.target = next;
       return;
+    }
+    // If retargeting mid-crossfade, promote the fuller bed to currentBed so there's never a hard cut.
+    if (fadeLeft > 0 && targetBed && targetBed !== currentBed && (live.music[targetBed] || 0) > (live.music[currentBed] || 0)) {
+      currentBed = targetBed;
     }
     targetBed = next;
     fadeTotal = cfg().fade;
@@ -342,30 +565,47 @@ export function startScore(dayApi) {
     if (!targetBed) return;
     if (fadeLeft <= 0) {
       if (currentBed !== targetBed) {
-        if (music[currentBed]) music[currentBed].gain.gain.value = 0;
+        if (music[currentBed]) setGainSmooth(music[currentBed], 0, 0.04);
+        live.music[currentBed] = 0;
         currentBed = targetBed;
-        if (music[currentBed]) music[currentBed].gain.gain.value = 1;
+        if (music[currentBed]) setGainSmooth(music[currentBed], 1, 0.04);
+        live.music[currentBed] = 1;
+      } else {
+        live.music[currentBed] = 1;
       }
       live.bed = currentBed;
       live.fade = 1;
+      live.equalPower = equalPowerGains(1);
       return;
     }
     fadeLeft = Math.max(0, fadeLeft - dt);
     const t = 1 - fadeLeft / Math.max(0.001, fadeTotal);
+    const ep = equalPowerGains(t);
     const from = music[currentBed];
     const to = music[targetBed];
-    if (from) from.gain.gain.value = 1 - t;
-    if (to) to.gain.gain.value = t;
+    if (from) setGainSmooth(from, ep.fadeOut, 0.04);
+    if (to) setGainSmooth(to, ep.fadeIn, 0.04);
+    BEDS.forEach((b) => {
+      if (b !== currentBed && b !== targetBed) {
+        live.music[b] = Math.max(0, (live.music[b] || 0) - dt * 1.5);
+        if (music[b]) setGainSmooth(music[b], live.music[b], 0.04);
+      }
+    });
+    live.music[currentBed] = Math.round(ep.fadeOut * 1000) / 1000;
+    live.music[targetBed] = Math.round(ep.fadeIn * 1000) / 1000;
     if (fadeLeft <= 0) {
-      if (from && currentBed !== targetBed) from.gain.gain.value = 0;
+      if (from && currentBed !== targetBed) setGainSmooth(from, 0, 0.04);
+      if (currentBed !== targetBed) live.music[currentBed] = 0;
       currentBed = targetBed;
+      live.music[currentBed] = 1;
     }
     live.bed = currentBed;
     live.target = targetBed;
-    live.fade = t;
+    live.fade = Math.round(t * 1000) / 1000;
+    live.equalPower = ep;
   }
 
-  function playOneShot(url, vol, when) {
+  function playOneShot(url, vol, when, pan) {
     if (!ctx || !soundOn() || !unlocked) return false;
     const buf = buffers[url];
     if (!buf) return false;
@@ -374,7 +614,14 @@ export function startScore(dayApi) {
     src.buffer = buf;
     const g = ctx.createGain();
     g.gain.value = vol;
-    src.connect(g);
+    if (pan != null && ctx.createStereoPanner) {
+      const p = ctx.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      src.connect(p);
+      p.connect(g);
+    } else {
+      src.connect(g);
+    }
     g.connect(master);
     src.start(t);
     return true;
@@ -385,7 +632,7 @@ export function startScore(dayApi) {
     unlock();
     const c = cfg();
     const mark = () => {
-      stingAt = (typeof performance !== "undefined" ? performance.now() : Date.now());
+      stingAt = typeof performance !== "undefined" ? performance.now() : Date.now();
       live.stingAt = stingAt;
     };
     const ok = playOneShot(c.sting, c.stingVol);
@@ -418,19 +665,176 @@ export function startScore(dayApi) {
     return ok;
   }
 
-  /** Near or far thunder crack; weather calls this on a lightning flash. */
-  function crack(kind) {
-    if (!soundOn() || !unlocked) return false;
+  /** Near or far thunder crack; weather and powers call this after a distance-based delay. */
+  function crack(kind, meta) {
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-    if (now - lastCrack < 400) return false;
+    const m = meta || {};
+    const dist = m.dist != null ? m.dist : kind === "near" ? 12 : 68;
+    const expectedDelay = m.delay != null ? m.delay : Math.min(2.2, Math.max(0.06, 0.06 + dist / 85));
+    const actualDelay = m.flashAt != null ? Math.max(0, (now - m.flashAt) / 1000) : expectedDelay;
+    const near = kind === "near" || (kind !== "far" && dist < 22);
+    const pan = m.pan != null ? Math.max(-1, Math.min(1, m.pan)) : 0;
+    live.lastThunder = {
+      kind: near ? "near" : "far",
+      dist: Math.round(dist * 10) / 10,
+      expectedDelay: Math.round(expectedDelay * 1000) / 1000,
+      actualDelay: Math.round(actualDelay * 1000) / 1000,
+      pan: Math.round(pan * 100) / 100,
+      at: Math.round(now),
+    };
+    live.amb.thunder = near ? 1 : 0.65;
+    if (!soundOn() || !unlocked) return false;
+    if (now - lastCrack < 180) return true;
     lastCrack = now;
     const c = cfg();
-    const near = kind === "near" || (kind !== "far" && Math.random() < 0.45);
     const url = near ? c.ambience.thunderNear : c.ambience.thunderFar;
-    const vol = (near ? 1 : 0.6) * c.mix.thunder * c.ambVol;
-    const ok = playOneShot(url, vol);
-    if (ok) live.amb.thunder = near ? 1 : 0.55;
-    return ok;
+    const vol = (near ? 1 : 0.68) * c.mix.thunder * c.ambVol;
+    return playOneShot(url, vol, undefined, pan);
+  }
+
+  /** Compute spatialized weather soundscape targets for the current state, rooftop height, camera yaw, and crowd. */
+  function computeSoundscape(L, state, night, d) {
+    gustClock += d;
+    const S = (L && L.sound) || {};
+    const wNow = (window.weather && window.weather.now && window.weather.now()) || { state };
+    const rainLvl = Math.max(0, Math.min(1, L && L.rain != null ? L.rain : S.rain || 0));
+    const windLvl = Math.max(0, Math.min(1, L && L.wind != null ? L.wind : S.wind || 0));
+    const wetLvl = Math.max(0, Math.min(1, (L && L.wet) || wNow.wet || 0));
+    const snowLvl = Math.max(0, Math.min(1, (L && L.snow) || S.snow || (state === "snow" ? 1 : 0)));
+    const hushLvl = Math.max(0, Math.min(1, S.hush || (state === "fog" ? 0.75 : 0)));
+    const sunBoost = Math.max(0, Math.min(1, wNow.sun || (state === "clear" && !night ? 0.65 : 0)));
+
+    let px = 0, py = 0, pz = 0, camAlpha = 0;
+    try {
+      const st = day.control && day.control.state && day.control.state();
+      if (st && st.mode === "control") {
+        px = st.x || 0;
+        py = st.y || 0;
+        pz = st.z || 0;
+      }
+      const w = day.world && day.world();
+      if (w && w.camera) {
+        camAlpha = w.camera.alpha || 0;
+        if (!py && w.camera.target) {
+          px = w.camera.target.x || px;
+          py = Math.max(py, (w.camera.target.y || 0) - 1.35);
+          pz = w.camera.target.z || pz;
+        }
+      }
+    } catch (e) { /* headless */ }
+
+    const onRoof = py > 2.2;
+    const roofFactor = onRoof ? 1 : 0.35;
+    const gust = 0.5 + 0.5 * Math.sin(gustClock * 1.15);
+    const windAngle = 0.65 + 0.35 * Math.sin(gustClock * 0.27);
+    const windPan = Math.max(-0.95, Math.min(0.95, Math.sin(camAlpha - windAngle) * 0.72 + 0.25 * Math.cos(gustClock * 0.85)));
+    const awningPan = Math.max(-0.9, Math.min(0.9, Math.cos(camAlpha + 0.4) * 0.65 + 0.2 * Math.sin(gustClock * 1.4)));
+
+    // Nearest umbrella proximity & pan when raining
+    let nearUmbrella = 0.35;
+    let umbrellaPan = Math.sin(camAlpha + 1.1) * 0.5;
+    if (rainLvl > 0.08) {
+      try {
+        const pts = day.crowd && day.crowd.positions && day.crowd.positions();
+        if (pts && pts.length) {
+          let bestD = 999;
+          let bestDx = 0;
+          let bestDz = 1;
+          for (let i = 0; i < pts.length; i++) {
+            const p = pts[i];
+            const d2 = Math.hypot((p.x || 0) - px, (p.z || 0) - pz);
+            if (d2 < bestD) {
+              bestD = d2;
+              bestDx = (p.x || 0) - px;
+              bestDz = (p.z || 0) - pz;
+            }
+          }
+          if (bestD < 32) {
+            nearUmbrella = Math.max(0.35, 1 - bestD / 36);
+            const ang = Math.atan2(bestDz, bestDx) - camAlpha;
+            umbrellaPan = Math.max(-0.9, Math.min(0.9, Math.sin(ang) * 0.8));
+          }
+        }
+      } catch (e) { /* fallback */ }
+    }
+
+    // Rain layers: light roof patter vs heavy downpour, roof gutters, and umbrella rain
+    const rainAmt = Math.max(rainLvl, S.rain || 0);
+    const rainInt = state === "storm" ? 1 : state === "rain" ? (wNow.intensity != null ? wNow.intensity : 1) : rainAmt;
+    const isLightRain = rainInt > 0.05 && rainInt <= 0.65 && state !== "storm";
+    const rainRoof = rainAmt > 0.02
+      ? Math.min(1, Math.max(rainAmt, rainInt * 0.85) * (0.52 + 0.48 * roofFactor) * (isLightRain ? 1.15 : state === "storm" ? 0.55 : 0.75))
+      : 0;
+    const rainDownpour = rainAmt > 0.05
+      ? Math.min(1, (isLightRain ? rainInt * 0.35 : Math.max(rainAmt, rainInt) * (state === "storm" ? 1.0 : 0.92)))
+      : 0;
+    const gutter = (rainAmt > 0.04 || wetLvl > 0.18)
+      ? Math.min(1, Math.max(rainAmt * 0.95, wetLvl * 0.7) * (0.45 + 0.55 * roofFactor))
+      : 0;
+    const umbrella = rainAmt > 0.05
+      ? Math.min(1, Math.max(rainAmt, rainInt * 0.7) * nearUmbrella * (onRoof ? 0.62 : 0.92))
+      : 0;
+
+    // Wind layers: 3D panned gusts + flapping awnings
+    const windOut = Math.min(1, windLvl * (0.62 + 0.38 * gust));
+    const awning = windLvl > 0.14
+      ? Math.min(1, windLvl * (0.55 + 0.45 * gust) * (state === "wind" || state === "storm" ? 0.95 : 0.6))
+      : 0;
+
+    // Sun / Clear: birds + brightened city hum
+    const birds = (state === "clear" || sunBoost > 0.25) && !night && rainLvl < 0.1 && snowLvl < 0.1
+      ? Math.min(1, 0.58 + 0.32 * sunBoost + 0.1 * roofFactor)
+      : 0;
+    const birdPan = Math.max(-0.85, Math.min(0.85, Math.sin(gustClock * 0.52 + camAlpha) * 0.7));
+
+    // City hum tone (sun brightens to ~4800 Hz; snow muffles down to ~360 Hz; fog damps to ~620 Hz)
+    let cityToneHz = 2100;
+    let muffled = 0;
+    if (snowLvl > 0.2 || state === "snow") {
+      const sk = Math.min(1, Math.max(snowLvl, state === "snow" ? 0.9 : 0));
+      cityToneHz = Math.round(320 + (1 - sk) * 400); // ~360 Hz under snow
+      muffled = sk;
+    } else if (state === "fog" || hushLvl > 0.35) {
+      cityToneHz = 620;
+      muffled = 0.55;
+    } else if (state === "clear" || sunBoost > 0.25) {
+      cityToneHz = Math.round(3800 + sunBoost * 1000); // 3800..4800 Hz
+      muffled = 0;
+    } else if (state === "clouds") {
+      cityToneHz = 1750;
+    } else if (state === "rain") {
+      cityToneHz = 1350;
+    } else if (state === "storm") {
+      cityToneHz = 1050;
+    } else if (state === "wind") {
+      cityToneHz = 2400;
+    }
+
+    const airOut = Math.max(0.08, (S.air != null ? S.air : 0.4) * (state === "snow" ? 0.52 : state === "clear" ? 1.15 : 1));
+    const foghorn = state === "fog" ? 0.48 : hushLvl * 0.4;
+
+    return {
+      state,
+      air: Math.round(airOut * 1000) / 1000,
+      rain: Math.round(rainLvl * 1000) / 1000,
+      rainRoof: Math.round(rainRoof * 1000) / 1000,
+      rainDownpour: Math.round(rainDownpour * 1000) / 1000,
+      gutter: Math.round(gutter * 1000) / 1000,
+      umbrella: Math.round(umbrella * 1000) / 1000,
+      wind: Math.round(windOut * 1000) / 1000,
+      windPan: Math.round(windPan * 100) / 100,
+      awning: Math.round(awning * 1000) / 1000,
+      awningPan: Math.round(awningPan * 100) / 100,
+      umbrellaPan: Math.round(umbrellaPan * 100) / 100,
+      birds: Math.round(birds * 1000) / 1000,
+      birdPan: Math.round(birdPan * 100) / 100,
+      cityToneHz,
+      brightened: cityToneHz >= 3600,
+      muffled: Math.round(muffled * 100) / 100,
+      snowHush: Math.round(snowLvl * 100) / 100,
+      foghorn: Math.round(foghorn * 100) / 100,
+      onRoof,
+    };
   }
 
   function tick(L, dt) {
@@ -438,20 +842,13 @@ export function startScore(dayApi) {
     live.on = on;
     live.unlocked = unlocked;
     if (on) unlock();
-    if (!ctx) return { samples: false, driving: false };
 
-    if (on && ctx.state === "suspended") ctx.resume();
     const c = cfg();
-    const d = Math.min(0.5, Math.max(0, dt || 0));
-    master.gain.value = on ? c.mix.master : 0;
-    // Under a spoken line the music dips (duck), and on the title it sits a little lower.
+    const d = Math.min(0.5, Math.max(0, dt != null ? dt : 0.05));
     const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
     const duckTo = nowMs < duckUntil ? c.mix.duck : 1;
     duckK += (duckTo - duckK) * Math.min(1, d * (duckTo < duckK ? 8 : 1.5));
     const titleUp = !!(day.title && day.title.showing && day.title.showing());
-    const musicGoal = c.musicVol * duckK * (titleUp ? c.mix.title / Math.max(0.01, c.musicVol) : 1);
-    musicBus.gain.value = musicGoal;
-    ambBus.gain.value = c.ambVol * (titleUp ? 0.5 : 1);
     live.duck = duckK;
     live.title = titleUp;
 
@@ -464,58 +861,85 @@ export function startScore(dayApi) {
     pk += (pTarget - pk) * Math.min(1, d * 0.9);
     const from = c.pressureFrom;
     const tk = Math.max(0, Math.min(1, (pk - from) / Math.max(0.01, 1 - from)));
-    const T = ensureTension();
-    if (T) {
-      T.gain.gain.value = on ? tk * tk * c.pressureGain : 0;
-      T.lp.frequency.value = 260 + tk * 1100;
-      T.lfo.frequency.value = 0.7 + tk * 2.6;
-    }
     const rate = 1 + tk * c.pressureRate;
-    Object.keys(music).forEach((k) => {
-      if (music[k] && music[k].src && music[k].src.playbackRate) music[k].src.playbackRate.value = rate;
-    });
     live.pressure = Math.round(pk * 100) / 100;
     live.tension = Math.round(tk * 100) / 100;
     live.rate = Math.round(rate * 1000) / 1000;
-    live.pulse = T ? Math.round(T.lfo.frequency.value * 100) / 100 : 0;
 
     const state = (window.weather && window.weather.now && window.weather.now().state) || "clear";
     const hour = simHour();
     const night = isNightHour(hour, c);
     live.tod = night ? "night" : "day";
-    // Night softens the top end of every bed a little (a low-pass), the night bed most of all.
-    if (tone) {
-      const goal = night ? c.mix.nightTone + (18000 - c.mix.nightTone) * tk * 0.5 : 18000;
-      tone.frequency.value += (goal - tone.frequency.value) * Math.min(1, d * 0.6);
-      live.tone = Math.round(tone.frequency.value);
-    }
+    const toneGoal = night ? c.mix.nightTone + (18000 - c.mix.nightTone) * tk * 0.5 : 18000;
+    live.tone = Math.round(live.tone + (toneGoal - live.tone) * Math.min(1, d * 0.6));
+
     setBed(bedFor(state, hour), false);
-    // Buffers may land mid-session (Gen files after first unlock); attach loops once they exist.
-    if (currentBed) ensureMusic(currentBed);
-    if (targetBed) ensureMusic(targetBed);
+    if (ctx) {
+      if (currentBed) ensureMusic(currentBed);
+      if (targetBed) ensureMusic(targetBed);
+    }
     stepFade(d);
 
-    const S = (L && L.sound) || {};
-    const gust = 0.45 + 0.55 * Math.abs(Math.sin((typeof performance !== "undefined" ? performance.now() : 0) * 0.00045));
-    const levels = {
-      air: S.air || 0,
-      rain: S.rain || 0,
-      wind: (S.wind || 0) * gust,
-    };
+    const scape = computeSoundscape(L, state, night, d);
+    live.soundscape = scape;
+    const blend = Math.min(1, 1 - Math.exp(-Math.max(0.016, d) * 4.2));
+    AMB_LOOPS.forEach((k) => {
+      const goal = scape[k] || 0;
+      smoothAmb[k] = (smoothAmb[k] || 0) + (goal - (smoothAmb[k] || 0)) * blend;
+      if (Math.abs(smoothAmb[k] - goal) < 0.002) smoothAmb[k] = goal;
+      live.amb[k] = Math.round(smoothAmb[k] * 1000) / 1000;
+    });
+    live.amb.thunder = Math.max(0, Math.round(((live.amb.thunder || 0) - d * 0.35) * 1000) / 1000);
+
+    if (!ctx) {
+      let sum = 0;
+      let n = 0;
+      Object.keys(live.music).forEach((k) => { sum += live.music[k] || 0; n++; });
+      AMB_LOOPS.forEach((k) => { sum += live.amb[k] || 0; n++; });
+      live.heard = on ? sum / Math.max(1, n) : 0;
+      return { samples: false, driving: false, bed: live.bed, fade: live.fade, soundscape: scape };
+    }
+
+    if (on && ctx.state === "suspended") ctx.resume();
+    setGainSmooth(master, on ? c.mix.master : 0, 0.04);
+    const musicGoal = c.musicVol * duckK * (titleUp ? c.mix.title / Math.max(0.01, c.musicVol) : 1);
+    setGainSmooth(musicBus, musicGoal, 0.05);
+    setGainSmooth(ambBus, c.ambVol * (titleUp ? 0.5 : 1), 0.05);
+
+    const T = ensureTension();
+    if (T) {
+      setGainSmooth(T, on ? tk * tk * c.pressureGain : 0, 0.06);
+      T.lp.frequency.value = 260 + tk * 1100;
+      T.lfo.frequency.value = 0.7 + tk * 2.6;
+    }
+    live.pulse = T ? Math.round(T.lfo.frequency.value * 100) / 100 : 0;
+    Object.keys(music).forEach((k) => {
+      if (music[k] && music[k].src && music[k].src.playbackRate) music[k].src.playbackRate.value = rate;
+    });
+    if (tone) {
+      tone.frequency.value = live.tone;
+    }
+
     let driving = false;
     AMB_LOOPS.forEach((k) => {
       const node = ensureAmb(k);
       if (node) {
-        node.gain.gain.value = on ? levels[k] : 0;
+        setGainSmooth(node, on ? live.amb[k] : 0, 0.045);
+        if (node.filter && k === "air") {
+          node.filter.frequency.value = scape.cityToneHz;
+        }
+        if (node.panner) {
+          const panVal = k === "wind" ? scape.windPan
+            : k === "awning" ? scape.awningPan
+            : k === "umbrella" ? scape.umbrellaPan
+            : k === "birds" ? scape.birdPan
+            : 0;
+          node.panner.pan.value = panVal;
+        }
         driving = true;
       }
-      live.amb[k] = levels[k];
     });
-    live.amb.thunder = Math.max(0, (live.amb.thunder || 0) - (dt || 0) * 0.35);
     live.samples = driving || BEDS.some((b) => !!music[b] || !!buffers[c.music[b]]);
-    BEDS.forEach((b) => {
-      live.music[b] = music[b] ? music[b].gain.gain.value : 0;
-    });
 
     // Rough "heard" level for the playtest / weather panel.
     let sum = 0;
@@ -530,7 +954,7 @@ export function startScore(dayApi) {
     });
     live.heard = on ? sum / Math.max(1, n) : 0;
 
-    return { samples: live.samples, driving, bed: live.bed, fade: live.fade };
+    return { samples: live.samples, driving, bed: live.bed, fade: live.fade, soundscape: scape };
   }
 
   function now() {
@@ -538,8 +962,16 @@ export function startScore(dayApi) {
       bed: live.bed,
       target: live.target,
       fade: live.fade,
+      equalPower: Object.assign({}, live.equalPower),
       music: Object.assign({}, live.music),
       amb: Object.assign({}, live.amb),
+      soundscape: Object.assign({}, live.soundscape),
+      seams: {
+        fixed: live.seams.fixed,
+        maxJumpAfter: live.seams.maxJumpAfter,
+        urls: Object.assign({}, live.seams.urls),
+      },
+      lastThunder: live.lastThunder ? Object.assign({}, live.lastThunder) : null,
       samples: live.samples,
       unlocked: live.unlocked,
       on: live.on,
@@ -598,6 +1030,8 @@ export function startScore(dayApi) {
     whoosh,
     crack,
     unlock,
+    fixLoopSeam: (buf, fadeSec) => fixLoopSeam(ctx, buf, fadeSec),
+    equalPowerGains,
     usingSamples: () => live.samples,
     bedFor: (state, hour) => bedFor(state, hour == null ? simHour() : hour),
     isNight: (hour) => isNightHour(hour == null ? simHour() : hour, cfg()),

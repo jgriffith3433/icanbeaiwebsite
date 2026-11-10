@@ -568,13 +568,15 @@ export function startPowers(world, dayApi) {
       aimX: aim.x,
       aimZ: aim.z,
       delay,
+      dist: Math.round(dist * 10) / 10,
       thunder: false,
       alarm: alarmed,
       blackout: hit ? hit.id : null,
       knocked,
       at: age,
+      flashAt: typeof performance !== "undefined" ? performance.now() : Date.now(),
     };
-    pendingThunder.push({ at: age + delay, id: strike.id, dist });
+    pendingThunder.push({ at: age + delay, id: strike.id, dist, delay, flashAt: strike.flashAt });
     note(line("bolt"));
     say("bolt", via, "bolt");
     return true;
@@ -1245,7 +1247,7 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       shake = Math.max(shake, 0.018 + 0.04 * (1 - Math.min(1, th.dist / 40)));
       // The recorded thunder (near or far by distance), with the synthesized rumble under it; the rumble alone if the
       // samples aren't unlocked yet.
-      const sampled = !!(day && day.score && day.score.crack && day.score.crack(th.dist < 22 ? "near" : "far"));
+      const sampled = !!(day && day.score && day.score.crack && day.score.crack(th.dist < 22 ? "near" : "far", { dist: th.dist, delay: th.delay, flashAt: th.flashAt }));
       burst(140, 1.35, sampled ? 0.4 : 0.85, "lowpass");
       say("thunder", "world", "bolt");
     }

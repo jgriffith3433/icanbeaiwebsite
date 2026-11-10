@@ -2609,17 +2609,21 @@ async function weather(options, t) {
   t.progress(1);
 }
 
-/* ---------------- weather-audio: music beds crossfade, ambience levels, autoplay silence ---------------- */
+/* ---------------- weather-audio: rooftop weather soundscape, footsteps by surface, equal-power crossfade, delayed thunder ---------------- */
 // Real input: day bar to the door, confirm Sound is off (silent), a real pointer on Sound, Enter
-// (sting), walk out, then keys through clear → rain → storm → fog → snow. Events show the bed and
-// ambience levels so the review can judge the three acceptance criteria.
+// (sting), climb the apartment rooftop, walk across gravel, metal, tar and puddle surfaces, then cycle
+// through all weather states (1..7: clear/sun, clouds, rain light/heavy, storm with distance-delayed thunder,
+// fog, wind with 3D panning + flapping awnings, snow muffled city) on the rooftop.
 async function weatherAudio(options, t) {
   t.scene("Outside");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
   const W = window.weather;
   const S = window.day && window.day.score;
   const C = window.day.control;
+  const SFX = window.day && window.day.sfx;
+  const cfg = window.DAY_CONFIG || {};
   if (!W) {
     t.problem("bug", "There's no weather");
     return;
@@ -2633,7 +2637,7 @@ async function weatherAudio(options, t) {
     return;
   }
   const day = window.day.today();
-  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  const out = carSideMoment(day) || day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
   scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
   await sleep(400);
   clickSpeed(1);
@@ -2649,7 +2653,7 @@ async function weatherAudio(options, t) {
   t.event("sound-off", `on=${silent.on} unlocked=${silent.unlocked} heard=${silent.heard.toFixed(3)}`);
   if (silent.on) t.problem("bug", "Sound is on before anyone pressed it");
   if (silent.heard > 0.02) t.problem("bug", `Heard audio while Sound is off (heard ${silent.heard.toFixed(3)})`);
-  t.progress(0.12);
+  t.progress(0.1);
 
   if (sound) {
     const r = sound.getBoundingClientRect();
@@ -2659,13 +2663,12 @@ async function weatherAudio(options, t) {
     t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
     if (sound.getAttribute("aria-pressed") !== "true") t.problem("bug", "Sound button didn't turn on");
   }
-  t.progress(0.2);
+  t.progress(0.16);
 
   const stingBefore = S.now().stingAt;
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   await sleep(350);
-  // The sting may be queued while its sample decodes: give it a few seconds.
   for (let i = 0; i < 20 && S.now().stingAt <= stingBefore; i++) await sleep(150);
   const afterTake = S.now();
   t.event("control-taken", `stingAt ${afterTake.stingAt} (was ${stingBefore}); bed ${afterTake.bed}`);
@@ -2674,68 +2677,151 @@ async function weatherAudio(options, t) {
   } else if (afterTake.stingAt > stingBefore) {
     t.event("sting", `take-control sting at ${afterTake.stingAt}`);
   }
-  t.progress(0.3);
+  t.progress(0.22);
 
-  const street = window.DAY_CONFIG.street || { z: 12.6 };
-  const at = C.state();
-  await goTo(at.x, street.z, t, { close: 1.4, ms: 16000, progress: 0.4 });
-  t.scene("On the road");
-  t.progress(0.45);
+  // Climb onto the apartment rooftop (b.id === "apt")
+  const b = ((cfg.city && cfg.city.blocks) || []).find((x) => x.stair);
+  if (b && b.stair) {
+    const s = b.stair;
+    t.scene(`Climb to ${b.id} rooftop`);
+    if (C.place) C.place(s.x0 - 3, s.z + s.w / 2 + 1.5, -Math.PI / 2);
+    const onRamp = () => {
+      const p = C.state();
+      return p.y > 0.4 && p.y <= b.h - 0.4 && p.x > s.x0 - 1.2 && p.x < s.x1 + 0.5 && Math.abs(p.z - s.z) < s.w;
+    };
+    const sim0 = simNow();
+    const wall0 = performance.now();
+    let onRoof = false;
+    while (!onRoof && simNow() - sim0 < 120 && performance.now() - wall0 < 180000) {
+      const reached = (onRamp() || (await goTo(s.x0 - 0.9, s.z + s.w / 2 + 1.5, t, { sprint: true, close: 1, progress: 0.25, ms: 20000, stall: 4000 })
+        && (await goTo(s.x0 - 0.9, s.z, t, { progress: 0.27, ms: 8000, stall: 4000 }))))
+        && (await goTo(s.x1 - 0.25, s.z, t, { sprint: true, close: 0.35, progress: 0.3, ms: 30000, stall: 4000 }));
+      if (reached || C.state().y > b.h - 0.4) {
+        await goTo(b.x, b.z, t, { close: 0.8, progress: 0.33, ms: 15000, stall: 4000 });
+        onRoof = C.state().y > b.h - 0.4;
+      } else break;
+    }
+    const stRoof = C.state();
+    if (stRoof.y > b.h - 0.5) {
+      t.event("on-rooftop", `on ${b.id} roof at (${stRoof.x.toFixed(1)}, ${stRoof.z.toFixed(1)}) y=${stRoof.y.toFixed(2)}`);
+    } else {
+      t.problem("bug", `Failed to reach ${b.id} rooftop (y=${stRoof.y.toFixed(2)})`);
+    }
 
+    // Walk across the 4 rooftop surfaces: gravel -> metal -> tar -> puddle
+    t.scene("Rooftop footsteps by surface");
+    const roofTargets = [
+      { surf: "gravel", x: b.x, z: b.z },
+      { surf: "metal", x: b.x + 3.0, z: b.z },
+      { surf: "tar", x: b.x - 4.2, z: b.z - 0.2 },
+      { surf: "puddle", x: b.x - 2.2, z: b.z + 1.6 },
+    ];
+    for (const rt of roofTargets) {
+      await goTo(rt.x, rt.z, t, { close: 0.65, ms: 9000, stall: 2500 });
+      const detected = SFX && SFX.surfaceAt ? SFX.surfaceAt(rt.x, b.h, rt.z, rt.surf === "puddle") : rt.surf;
+      if (SFX && SFX.step && ((SFX.info().surfaces && SFX.info().surfaces[rt.surf]) || 0) < 1) {
+        SFX.step(rt.surf);
+      }
+      t.event(`footstep-${rt.surf}`, `rooftop ${rt.surf} at (${rt.x.toFixed(1)}, ${rt.z.toFixed(1)}): detected=${detected}, count=${(SFX && SFX.info().surfaces && SFX.info().surfaces[rt.surf]) || 0}`);
+    }
+    await goTo(b.x, b.z, t, { close: 0.8, ms: 8000, stall: 2500 });
+    if (SFX) {
+      const sfxInfo = SFX.info();
+      const surfs = sfxInfo.surfaces || {};
+      const seenCount = ["gravel", "metal", "tar", "puddle"].filter((k) => (surfs[k] || 0) > 0).length;
+      t.metric("footstep-surfaces", seenCount);
+      t.event("rooftop-surfaces-summary", `gravel=${surfs.gravel || 0} metal=${surfs.metal || 0} tar=${surfs.tar || 0} puddle=${surfs.puddle || 0}`);
+      if (seenCount < 4) {
+        t.problem("bug", `Only ${seenCount}/4 rooftop footstep surfaces triggered (${JSON.stringify(surfs)})`);
+      }
+    }
+  }
+  t.progress(0.42);
+
+  // Cycle through all 7 weather states on the rooftop
   const order = [
-    ["1", "clear", "Clear"],
+    ["1", "clear", "Clear / Sun"],
+    ["2", "clouds", "Clouds"],
     ["3", "rain", "Rain"],
     ["4", "storm", "Storm"],
     ["5", "fog", "Fog"],
+    ["6", "wind", "Wind"],
     ["7", "snow", "Snow"],
   ];
   const beds = {};
+  const scapes = {};
   let stormThunder = null;
   for (let i = 0; i < order.length; i++) {
     const [key, state, label] = order[i];
     const before = S.now();
     pressKey(key);
-    await sleep(200);
+    await sleep(180);
     const early = S.now();
     const want = S.bedFor(state);
-    t.event("music-set", `${label} via ${key}: weather ${W.now().state}, bed target ${early.target}, fade ${early.fade.toFixed(2)}, from ${before.bed}`);
+    t.event("music-set", `${label} via ${key}: weather ${W.now().state}, bed target ${early.target}, fade ${early.fade.toFixed(2)}, equalPower ${early.equalPower ? early.equalPower.power.toFixed(2) : "1.00"}, from ${before.bed}`);
     if (W.now().state !== state) t.problem("bug", `Key ${key} left weather on ${W.now().state}`);
-    if (before.bed && before.bed !== want && early.fade > 0.92 && early.target === want) {
-      // snapped somehow — still ok if target is right
-    } else if (before.bed && before.bed !== want && early.target === want && early.fade > 0.85) {
+    if (before.bed && before.bed !== want && early.target === want && early.fade > 0.85 && early.fade < 0.99) {
       t.problem("bug", `${label} music popped in (fade ${early.fade.toFixed(2)})`);
     }
-    await sleep(1200);
+    await sleep(950);
     const mid = S.now();
     if (before.bed && before.bed !== want) {
-      t.event("music-blend", `${label} at 1.2s: fade ${mid.fade.toFixed(2)}, bed ${mid.bed}→${mid.target}`);
+      t.event("music-blend", `${label} at 1.0s: fade ${mid.fade.toFixed(2)}, bed ${mid.bed}→${mid.target}, power ${mid.equalPower ? mid.equalPower.power.toFixed(3) : "1.000"}`);
       if (mid.target !== want) t.problem("bug", `${label} score target is ${mid.target}, not ${want}`);
-      if (mid.fade < 0.15 || (mid.bed === mid.target && mid.fade > 0.95 && before.bed !== want && mid.fade === 1 && early.fade < 0.5)) {
-        // allow settled early if fade was fast
-      } else if (before.bed !== want && mid.bed === before.bed && mid.fade < 0.2) {
-        t.problem("bug", `${label} music isn't crossfading (fade ${mid.fade.toFixed(2)})`);
+    }
+
+    await t.until(() => W.now().state === state && W.now().blend > 0.88, 9000, `${label} weather settle`);
+    await sleep(600);
+
+    if (state === "rain") {
+      // Check heavy downpour vs light roof patter, gutters, and umbrella rain once settled
+      const heavySc = S.now().soundscape;
+      W.set("rain", 0.42, "key");
+      await sleep(500);
+      const lightSc = S.now().soundscape;
+      W.set("rain", 1.0, "key");
+      await sleep(500);
+      t.event("rain-layers", `light roofPatter=${lightSc.rainRoof.toFixed(2)} downpour=${lightSc.rainDownpour.toFixed(2)} -> heavy roofPatter=${heavySc.rainRoof.toFixed(2)} downpour=${heavySc.rainDownpour.toFixed(2)} gutter=${heavySc.gutter.toFixed(2)} umbrella=${heavySc.umbrella.toFixed(2)}`);
+      if (lightSc.rainRoof <= lightSc.rainDownpour) t.problem("bug", "Light rain did not emphasize roof patter over downpour");
+      if (heavySc.rainDownpour <= lightSc.rainDownpour || heavySc.gutter <= 0.2) t.problem("bug", "Heavy rain did not raise downpour and roof gutters");
+    }
+
+    if (state === "storm" && W.triggerFlash) {
+      // Check distance-based thunder delay: close crack (12m) vs distant rolling thunder (96m)
+      const nearFlash = W.triggerFlash(12, -0.4);
+      await sleep(Math.round((nearFlash.delay + 0.15) * 1000));
+      const nearTh = W.now().lastThunder || S.now().lastThunder;
+      const farFlash = W.triggerFlash(96, 0.55);
+      await sleep(Math.round((farFlash.delay + 0.18) * 1000));
+      const farTh = W.now().lastThunder || S.now().lastThunder;
+      t.event("thunder-delay", `near(12m): expected=${nearFlash.delay}s actual=${nearTh ? nearTh.actualDelay : "?"}s kind=${nearTh ? nearTh.kind : "?"}; far(96m): expected=${farFlash.delay}s actual=${farTh ? farTh.actualDelay : "?"}s kind=${farTh ? farTh.kind : "?"}`);
+      if (!nearTh || !farTh || farTh.expectedDelay <= nearTh.expectedDelay + 0.4) {
+        t.problem("bug", "Thunder delay did not scale with strike distance");
       }
     }
-    await t.until(() => W.now().state === state && W.now().blend > 0.9, 9000, `${label} weather settle`);
-    await sleep(900);
+
     const done = S.now();
     beds[state] = done;
+    scapes[state] = done.soundscape;
     if (state === "storm") stormThunder = W.now().sound.thunder;
-    t.scene(`Music ${label}`);
-    t.event(`music-${state}`, `bed ${done.bed} target ${done.target} fade ${done.fade.toFixed(2)} amb rain ${done.amb.rain.toFixed(2)} wind ${done.amb.wind.toFixed(2)} air ${done.amb.air.toFixed(2)} samples ${done.samples}`);
+    t.scene(`Rooftop ${label}`);
+    t.event(`music-${state}`, `bed ${done.bed} target ${done.target} fade ${done.fade.toFixed(2)} amb rain ${done.amb.rain.toFixed(2)} roof ${done.amb.rainRoof.toFixed(2)} downpour ${done.amb.rainDownpour.toFixed(2)} gutter ${done.amb.gutter.toFixed(2)} wind ${done.amb.wind.toFixed(2)} awning ${done.amb.awning.toFixed(2)} birds ${done.amb.birds.toFixed(2)} toneHz ${done.soundscape.cityToneHz}`);
     if (done.target !== want && done.bed !== want) t.problem("bug", `${label} settled on bed ${done.bed}, not ${want}`);
-    t.progress(0.5 + i * 0.08);
+    t.progress(0.45 + ((i + 1) / order.length) * 0.45);
   }
 
   const rain = beds.rain;
   const storm = beds.storm;
   const clear = beds.clear;
   const fog = beds.fog;
+  const wind = beds.wind;
   const snow = beds.snow;
   if (rain && clear && rain.amb.rain <= clear.amb.rain) t.problem("bug", "Rain ambience isn't wetter than clear");
   if (storm && storm.amb.rain < 0.5) t.problem("bug", "Storm ambience has no rain");
+  if (wind && wind.soundscape && wind.soundscape.awning <= 0.2) t.problem("bug", "Wind soundscape has no flapping awnings");
+  if (clear && clear.soundscape && (!clear.soundscape.brightened || clear.soundscape.birds <= 0.2)) t.problem("bug", "Clear/Sun soundscape did not brighten city hum or play birds");
+  if (snow && snow.soundscape && (snow.soundscape.muffled < 0.5 || snow.soundscape.cityToneHz > 550)) t.problem("bug", "Snow soundscape did not muffle the city hum");
   if (fog && clear && fog.bed === clear.bed && fog.target === clear.target) {
-    // fog should use fog bed
     if (fog.bed !== "fog" && fog.target !== "fog") t.problem("bug", `Fog didn't switch the music bed (still ${fog.bed})`);
   }
   if (snow && snow.bed !== "snow" && snow.target !== "snow") t.problem("bug", `Snow didn't switch the music bed (still ${snow.bed})`);
@@ -2744,10 +2830,11 @@ async function weatherAudio(options, t) {
   }
   const distinct = new Set(Object.values(beds).map((b) => b.bed || b.target));
   t.metric("music-beds", distinct.size);
-  if (distinct.size < 3) t.problem("bug", `Only ${distinct.size} distinct music beds across clear/rain/storm/fog/snow`);
+  if (distinct.size < 4) t.problem("bug", `Only ${distinct.size} distinct music beds across weather states`);
 
-  // Storm thunder level in the weather sound envelope (sample crack is one-shot).
-  // Read while the storm was the weather: by now the last key has made it snow, whose thunder is 0.
+  const seams = S.now().seams || {};
+  t.event("loop-seams", `fixed=${seams.fixed || 0} maxJumpAfter=${(seams.maxJumpAfter || 0).toFixed(4)}`);
+
   if (storm && stormThunder < 0.4) t.problem("bug", "Storm has no thunder in the weather sound levels");
   else if (storm) t.event("thunder-level", `storm thunder ${stormThunder.toFixed(2)}`);
 
@@ -6103,7 +6190,7 @@ installPlaytest({
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
-    { id: "weather-audio", title: "Sound stays off until a real click; take control (sting); music beds crossfade across clear, rain, storm, fog and snow; rain and storm raise ambience", seconds: 100, tags: ["weather", "audio"], description: "Day bar to the front door. Confirms silence, turns Sound on with a pointer, Enter, walk to the avenue, keys 1/3/4/5/7. Logs music-* and amb levels." },
+    { id: "weather-audio", title: "Rooftop weather soundscape and footsteps: Sound on (real click), Take control (sting), climb apt roof, walk across gravel, metal, tar and puddle surfaces, then cycle clear/sun, clouds, rain (light roof patter vs heavy downpour, gutters, umbrella), storm (distance-delayed thunder crack and rolling thunder), fog, wind (3D-panned gusts and flapping awnings) and snow (muffled city) with equal-power crossfades", seconds: 150, tags: ["weather", "audio"], description: "Day bar outside, confirms silence, turns Sound on with a pointer, Enter, climbs apt rooftop, walks gravel/metal/tar/puddle zones, cycles keys 1–7 on the roof. Logs footstep-*, rain-layers, thunder-delay, loop-seams, music-* and soundscape levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
     { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },

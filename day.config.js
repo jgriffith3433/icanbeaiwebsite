@@ -446,7 +446,13 @@ window.DAY_CONFIG = {
     ambience: {
       air: "audio/sfx/city-hum.mp3",
       rain: "audio/sfx/rain-asphalt.mp3",
+      rainRoof: "audio/sfx/rain-roof-light.mp3",
+      rainDownpour: "audio/sfx/rain-downpour.mp3",
+      gutter: "audio/sfx/rain-gutter.mp3",
+      umbrella: "audio/sfx/rain-umbrella.mp3",
       wind: "audio/sfx/wind.mp3",
+      awning: "audio/sfx/wind-awning.mp3",
+      birds: "audio/sfx/sun-birds.mp3",
       thunderNear: "audio/sfx/thunder-near.mp3",
       thunderFar: "audio/sfx/thunder-far.mp3",
     },
