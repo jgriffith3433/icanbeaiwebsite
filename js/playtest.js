@@ -995,6 +995,57 @@ async function weatherAbilities(options, t) {
   t.event("weather-abilities-pass", "each of the five used once");
 }
 
+/* ---------------- cast-feel: every power's input-to-first-feedback time and shake length ---------------- */
+async function castFeel(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const P = window.powers || window.day.powers;
+  const C = window.day.control;
+  const day = window.day.today();
+  const outside = carSideMoment(day) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const ids = [["rain", "r"], ["gale", "v"], ["fog", "c"], ["sunbreak", "x"], ["bolt", "e"], ["gust", "g"], ["tornado", "t"], ["storm", "f"]];
+  for (const [id, key] of ids) {
+    t.scene(`Cast: ${id}`);
+    const cost = (P.now().abilities.find((x) => x.id === id) || {}).cost || 20;
+    await t.until(() => P.now().energy + 0.05 >= cost, 30000, `Charge for ${id}`).catch(() => {});
+    const t0 = performance.now();
+    let first = -1;
+    const slot = document.getElementById("ability-" + id);
+    const seen = new Promise((res) => {
+      const h = (e) => {
+        if (e.detail && e.detail.power === id && e.detail.action !== "denied") {
+          first = performance.now() - t0;
+          window.removeEventListener("day:power", h);
+          res();
+        }
+      };
+      window.addEventListener("day:power", h);
+      setTimeout(res, 1500);
+    });
+    pressKey(key);
+    await seen;
+    await sleep(500);
+    const c = P.now().cast;
+    const pulsed = slot && (slot.classList.contains("pulse") || slot.classList.contains("cooling"));
+    t.metric(`first-feedback-${id}-ms`, Math.round(first));
+    if (first >= 0 && first < 100 && c.id === id) t.event(`cast-${id}`, `${c.kind} in ${Math.round(first)} ms`);
+    else t.problem("bug", `${id} gave no feedback within 100 ms (${Math.round(first)})`);
+    if (!pulsed) t.problem("bug", `The ${id} button didn't show the press`);
+    await sleep(1500);
+  }
+  const m = P.now().cast.shakeMax;
+  t.metric("shake-max-s", Number(m.toFixed(3)));
+  if (m <= 0.3) t.event("shake-short", `longest shake ${m.toFixed(2)} s`);
+  else t.problem("bug", `A camera shake ran ${m.toFixed(2)} s`);
+  pressKey("Escape");
+}
+
 /* ---------------- day: the whole day at high speed; every block must happen ---------------- */
 async function wholeDay(options, t) {
   t.scene("Start of day");
@@ -6256,6 +6307,7 @@ installPlaytest({
     { id: "hud-layout", title: "HUD layout: Quality lives in the Settings menu, the left column stacks Episodes, Neighbors, weather and Pressure without overlap, Take control stays bottom-centre; overlap check on title and in play", seconds: 40, tags: ["hud", "smoke"], description: "Load with ?playtest=hud-layout. Real input: Settings click, Enter, Esc. Events settings-open / hud-clear / hud-layout-play. Run at 1280x720, 390x844 and 844x390." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
+    { id: "cast-feel", title: "Cast every power: feedback within 100 ms, shake under 0.3 s, button pulse", seconds: 120, tags: ["powers"], description: "Takes control, casts all eight powers by key, measures press to first feedback and the longest shake." },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
     { id: "slice", title: "Vertical slice: walk from the driveway to Birdie, answer her rain, see the lawn drink, the park path, bandstand pigeons and creak, the pond coin toss; reports quality.maxQuietSeconds and quality.textOnlyBeats", seconds: 200, tags: ["slice", "story"], description: "Real WASD, R for Birdie, Y at the pond." },
@@ -6323,6 +6375,7 @@ installPlaytest({
       else if (id === "fill-out") await fillOut(options, t);
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
+      else if (id === "cast-feel") await castFeel(options, t);
       else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
