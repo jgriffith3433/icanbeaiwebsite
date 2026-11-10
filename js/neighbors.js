@@ -1,9 +1,10 @@
+import { buildFigure } from "./peoplekit.js";
 /* ==========================================================================
    Neighbors — three people on his avenue with their own look, home and day
    (day.config.js `neighbors`). Each has an ask (answer it with an ability, close by),
    a thank-you and a surprise, shown as speech bubbles. Beats trigger by the clock and by
    how close he is; a finished beat pays score and Pressure and shows it (toast, stars on
-   the name tag, a floating +score, the tally). Figures are plain boxes: art pass later.
+   the name tag, a floating +score, the tally). Figures come from js/peoplekit.js (docs/characters.md).
    Pure helpers are exported for scripts/check-neighbors.mjs.
    ========================================================================== */
 
@@ -70,42 +71,12 @@ function install() {
   }
 
   /* ---- figures ---- */
-  const mats = {};
-  const mat = (hex) => {
-    if (!mats[hex]) {
-      const m = new B.StandardMaterial("nb-" + hex, scene);
-      const c = B.Color3.FromHexString(hex);
-      m.diffuseColor = c;
-      m.emissiveColor = c.scale(0.22);
-      m.specularColor = new B.Color3(0.05, 0.05, 0.05);
-      mats[hex] = m;
-    }
-    return mats[hex];
-  };
   people.forEach((p) => {
-    const root = new B.TransformNode("neighbor-" + p.id, scene);
-    root.scaling.setAll(p.scale || 1);
-    p.__legs = [];
-    (p.parts || []).forEach((q, i) => {
-      const o = { width: q.size[0], height: q.size[1], depth: q.size[2] };
-      let m;
-      if (q.shape === "sphere") m = B.MeshBuilder.CreateSphere("nb-" + p.id + i, { diameterX: q.size[0], diameterY: q.size[1], diameterZ: q.size[2], segments: 8 }, scene);
-      else if (q.shape === "cyl") m = B.MeshBuilder.CreateCylinder("nb-" + p.id + i, { diameterTop: q.size[0], diameterBottom: q.size[0], height: q.size[1], tessellation: 12 }, scene);
-      else m = B.MeshBuilder.CreateBox("nb-" + p.id + i, o, scene);
-      m.parent = root;
-      (p.__meshes = p.__meshes || []).push(m);
-      m.position.set(q.pos[0], q.pos[1], q.pos[2]);
-      if (q.tilt) m.rotation.x = q.tilt;
-      m.material = mat(q.color);
-      m.isPickable = false;
-      if (q.leg) {
-        // swing from the hip: move the pivot to the top of the leg
-        m.setPivotPoint(new B.Vector3(0, q.size[1] / 2, 0));
-        p.__legs.push({ m, dir: q.leg });
-        p.__legLen = Math.max(p.__legLen || 0, q.size[1] * (p.scale || 1));
-      }
-    });
-    p.__root = root;
+    const fig = buildFigure(B, scene, p.id, p.look, p.scale || 1);
+    p.__fig = fig;
+    p.__root = fig.root;
+    p.__meshes = fig.meshes;
+    p.__legLen = fig.legLen;
     p.__pos = { x: p.stops[0][1], z: p.stops[0][2], inside: false, moving: false };
     p.__yaw = 0;
     p.__phase = 0;
@@ -403,7 +374,8 @@ function install() {
           });
         }
       }
-      p.__legs.forEach((l) => (l.m.rotation.x = pl.moving ? Math.sin(p.__phase) * LEG_SWING * l.dir : l.m.rotation.x * 0.8));
+      p.__amt = pl.moving ? Math.min(1, (p.__amt || 0) + dt * 6) : Math.max(0, (p.__amt || 0) - dt * 6);
+      p.__fig.pose(p.__phase, p.__amt, LEG_SWING);
       stepBeats(p, h, here, nowMs);
 
       // the name tag and bubble above their head
@@ -459,7 +431,7 @@ function install() {
         asking: st[p.id].askOpen,
         bubble: st[p.id].bubble ? st[p.id].bubble.text : "",
         stars: stars(p),
-        parts: (p.parts || []).length,
+        parts: p.__meshes.length,
         look: p.color,
       })),
     }),

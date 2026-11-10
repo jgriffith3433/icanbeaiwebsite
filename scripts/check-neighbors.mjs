@@ -34,7 +34,7 @@ for (const p of list) {
   ids.add(p.id);
   ok(!colors.has(p.color), `${p.id}: look colour repeats`);
   colors.add(p.color);
-  ok((p.parts || []).length >= 5, `${p.id}: look has too few parts`);
+  ok(p.look && p.look.hat !== undefined || p.look && p.look.hair, `${p.id}: no look`);
   const kinds = (p.beats || []).map((b) => b.kind);
   ok((p.beats || []).length >= 2 && (p.beats || []).length <= 3, `${p.id}: ${kinds.length} beats, wanted 2 or 3`);
   ok(kinds[0] === "ask" && kinds[1] === "thanks", `${p.id}: beats go ask, thanks, then surprise`);
