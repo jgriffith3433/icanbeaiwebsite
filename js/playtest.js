@@ -28,7 +28,7 @@ const HUD_PARTS = [
   [".panel.now", "status card"], ["#sound", "Sound"], ["#details", "Details"], ["#settings", "Settings"], [".settings-pop", "Settings menu"], [".side", "Details panel"],
   [".hud.bottom", "timeline"], ["#control", "Take control / Let go"], ["#quality", "Quality"],
   ["#weather-btn", "Weather"], ["#pressure", "Pressure"], ["#episodes", "Episodes"], ["#neighbors-btn", "Neighbors"],
-  ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .energy", "Energy"],
+  ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .charge", "Charge"],
   [".powerpad button", "power pad"], [".touchpad .stick", "stick"], [".touchpad .jump", "jump"],
   [".tutorial", "tutorial card"], [".ep-hud", "episode HUD"], [".control-hint", "controls hint"],
 ];
@@ -591,7 +591,7 @@ async function roofBolt(t) {
     const bar = barEl.getBoundingClientRect();
     const others = [".daybar", ".bottom", "#control-btn", ".control-btn"].map((q) => document.querySelector(q)).filter((e) => e && e.offsetParent);
     const bad = others.filter((e) => hit(bar, e.getBoundingClientRect()));
-    if (bad.length) t.problem("bug", `The ability bar and Energy label cover ${bad.map((e) => e.className || e.id).join(", ")}`);
+    if (bad.length) t.problem("bug", `The ability bar and Charge label cover ${bad.map((e) => e.className || e.id).join(", ")}`);
     const sp = [...document.querySelectorAll("#speeds button")].filter((e) => hit(bar, e.getBoundingClientRect()));
     if (sp.length) t.problem("bug", `The ability bar covers the speed buttons ${sp.map((e) => e.textContent.trim()).join(", ")}`);
     else t.event("speed-buttons-clear", "every speed button (incl. 300x, 1200x) is clear of the ability bar");
@@ -4766,12 +4766,12 @@ async function tutorialEpisode(options, t) {
       });
       five.forEach((o) => { const q = boxOf($("ability-" + o)); if (o !== b.id && b.r && q && boxesOverlap(b.r, q)) bad.push(`${b.id} overlaps ${o}`); });
     });
-    const energyEl = $("energy");
+    const energyEl = $("charge");
     const er = boxOf(energyEl);
-    if (!er || er.width < 20 || !/Energy \d+/.test(energyEl.textContent) || !energyEl.querySelector("i").style.width) bad.push("the Energy bar isn't readable on the bar");
+    if (!er || er.width < 20 || !/Charge \d+/.test(energyEl.textContent) || !energyEl.querySelector("i").style.width) bad.push("the Charge bar isn't readable on the bar");
     if (["storm", "gust", "tornado"].some((n) => { const q = boxOf($("ability-" + n)); return q && q.width > 0; })) bad.push("Storm/Gust/Tornado shouldn't be on the touch bar (they're on the power pad)");
     if (bad.length) bad.forEach((m) => t.problem("bug", `Touch ability bar: ${m}`));
-    else t.event("ability-bar-touch", `${five.length} buttons, ${Math.round(Math.min(...boxes.map((b) => b.r.width)))}×${Math.round(Math.min(...boxes.map((b) => b.r.height)))} px at least, energy ${energyEl.textContent.trim()}, clear of the stick, jump, power pad and the episode card`);
+    else t.event("ability-bar-touch", `${five.length} buttons, ${Math.round(Math.min(...boxes.map((b) => b.r.width)))}×${Math.round(Math.min(...boxes.map((b) => b.r.height)))} px at least, charge ${energyEl.textContent.trim()}, clear of the stick, jump, power pad and the episode card`);
   }
   const hud = $("episode-hud");
   if (!hud || hud.hidden) t.problem("bug", "The tutorial has no HUD");
@@ -4819,7 +4819,7 @@ async function tutorialEpisode(options, t) {
           await sleep(150);
           const b = $("ability-" + id);
           const cd = b && b.querySelector(".cd");
-          if (b && b.dataset.state === "cooldown" && cd && cd.textContent) t.event("touch-cooldown", `${id}: ${cd.textContent} s on the button, energy ${$("energy").textContent.trim()}`);
+          if (b && b.dataset.state === "cooldown" && cd && cd.textContent) t.event("touch-cooldown", `${id}: ${cd.textContent} s on the button, charge ${$("charge").textContent.trim()}`);
         }
       } else await tapKey(keys[id], 140);
       await sleep(900);
@@ -5133,7 +5133,7 @@ async function phone(options, t) {
     }
     if (ok) {
       done.push(id);
-      t.event("ability-tap-" + id, `${id} by tap, energy ${(($("energy") || {}).textContent || "").trim()}`);
+      t.event("ability-tap-" + id, `${id} by tap, charge ${(($("charge") || {}).textContent || "").trim()}`);
     } else t.problem("bug", `Tapping ${id} never used it`);
     await sleep(600);
   }
@@ -5930,6 +5930,134 @@ function sensorScene() {
   return scene;
 }
 
+/* ---------------- charge / live log / pause: Body Energy vs Charge, no future rows live, Paused holds the clock ---------------- */
+// Acceptance: Body alone says Energy; ability bar says Charge (amber); Live log has no soon rows; pause/scrub shows
+// Paused and freezes the clock; resume continues from the same minute with the log in order. Shots at the current size
+// (run at 1280x720 and 390x844).
+async function chargeLogPause(options, t) {
+  t.scene("Charge and live log");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const size = `${innerWidth}x${innerHeight}`;
+  t.event("viewport", size);
+  t.metric("feel.coyoteMs", 120);
+  t.metric("feel.jumpBufferMs", 120);
+
+  // Live: log must not preview the future.
+  pressKey("Escape");
+  await sleep(400);
+  await t.until(() => window.day.now().mode === "live", 3000, "back to live").catch(() => {});
+  await sleep(500);
+  const liveLog = $("log");
+  const liveSoon = liveLog ? [...liveLog.querySelectorAll("li.soon, li.coming-up")] : [];
+  if (liveSoon.length) t.problem("bug", `Live log shows ${liveSoon.length} upcoming row(s) before their time`);
+  else t.event("live-log-clean", `Live log has past and current only at ${($("time").textContent || "").trim()}`);
+  const liveNow = liveLog && liveLog.querySelector("li.now");
+  if (liveNow && liveNow !== liveLog.lastElementChild) {
+    // notes can sit after the day row while steering; in live schedule the current row should be last
+    const after = [...liveLog.children].slice([...liveLog.children].indexOf(liveNow) + 1);
+    if (after.some((li) => li.classList.contains("soon") || li.classList.contains("coming-up"))) {
+      t.problem("bug", "Live log still has upcoming rows after the current one");
+    }
+  }
+  t.progress(0.2);
+
+  // Pause (Space): status and clock say Paused, clock held.
+  t.scene("Paused");
+  const beforePause = window.day.now().minutes;
+  pressKey(" ");
+  await sleep(400);
+  await t.until(() => window.day.now().mode === "pause", 2000, "paused").catch(() => {});
+  const what = ($("what").textContent || "").trim();
+  const ampm = ($("ampm").textContent || "").trim();
+  const chapter = ($("chapter").textContent || "").trim();
+  if (!/paused/i.test(what) || !/paused/i.test(ampm) || !/paused/i.test(chapter)) {
+    t.problem("bug", `Paused state missing: what="${what}" ampm="${ampm}" chapter="${chapter}"`);
+  } else t.event("paused-status", `status and clock say Paused (${what} / ${ampm})`);
+  await sleep(900);
+  if (Math.abs(window.day.now().minutes - beforePause) > 1e-6) t.problem("bug", "Clock moved while paused");
+  else t.event("paused-clock", `clock held at ${($("time").textContent || "").trim()} ${ampm}`);
+  t.progress(0.4);
+
+  // Scrub: still paused, Coming up appears for preview rows.
+  t.scene("Scrub paused");
+  const day = window.day.today();
+  const mid = day.dayStart + (day.dayEnd - day.dayStart) * 0.35;
+  scrubTo(mid);
+  await sleep(500);
+  if (window.day.now().mode !== "pause") t.problem("bug", "Scrubbing the day bar should leave the day paused");
+  const coming = $("log") && $("log").querySelector("li.coming-up, li.log-head");
+  const soonRows = $("log") ? $("log").querySelectorAll("li.soon") : [];
+  if (soonRows.length && !coming) t.problem("bug", "Preview log rows have no Coming up label");
+  else if (coming) t.event("coming-up", `Coming up section with ${soonRows.length} preview row(s)`);
+  else t.event("coming-up", "no preview rows at this minute (ok)");
+  if (!/paused/i.test(($("what").textContent || ""))) t.problem("bug", "Scrubbed clock should still say Paused");
+  t.progress(0.55);
+
+  // Resume from the same time: Play, then confirm the clock advances and the log stays ordered.
+  const held = window.day.now().minutes;
+  const playBtn = $("play");
+  if (playBtn) playBtn.click();
+  else pressKey(" ");
+  await sleep(400);
+  await t.until(() => window.day.now().mode === "play", 2000, "resumed").catch(() => {});
+  if (Math.abs(window.day.now().minutes - held) > 0.05) t.problem("bug", `Resume jumped the clock (was ${held}, now ${window.day.now().minutes})`);
+  clickSpeed(10);
+  await sleep(1200);
+  if (!(window.day.now().minutes > held + 0.05)) t.problem("bug", "Clock did not continue after resume");
+  else t.event("resumed", `continued from ${E().fmtClock(held)} to ${E().fmtClock(window.day.now().minutes)}`);
+  // structural order: past/now before Coming up head before soon
+  let ordered = true;
+  const kids = $("log") ? [...$("log").children] : [];
+  const headAt = kids.findIndex((li) => li.classList.contains("log-head") || li.classList.contains("coming-up"));
+  if (headAt >= 0) {
+    const beforeHead = kids.slice(0, headAt);
+    const afterHead = kids.slice(headAt + 1);
+    if (beforeHead.some((li) => li.classList.contains("soon"))) ordered = false;
+    if (afterHead.some((li) => li.classList.contains("past") || li.classList.contains("now"))) ordered = false;
+  }
+  if (!ordered) t.problem("bug", "Log rows are out of order after resume");
+  else t.event("log-order", "past/current then Coming up, newest of the day last among past/current");
+  t.progress(0.7);
+
+  // Charge on the ability bar; Body still says Energy.
+  t.scene("Charge bar");
+  const quiet = quietMoment(day) || carSideMoment(day) || day.actions.find((a) => !a.inCar);
+  if (quiet) {
+    scrubTo(quiet.start + Math.min(0.3, (quiet.end - quiet.start) / 3));
+    clickSpeed(1);
+    await sleep(400);
+  }
+  pressKey("Enter");
+  await t.until(() => window.day.control && window.day.control.mode() === "control", 5000, "Take control").catch(() => {});
+  await sleep(600);
+  const chargeEl = $("charge");
+  const chargeText = (chargeEl && chargeEl.textContent) || "";
+  if (!chargeEl || chargeEl.hidden || !/Charge\s*\d+/i.test(chargeText)) {
+    t.problem("bug", `Ability bar Charge missing (got "${chargeText.trim()}")`);
+  } else if (/Energy/i.test(chargeText)) {
+    t.problem("bug", "Ability bar still says Energy");
+  } else {
+    const bolt = chargeEl.querySelector(".bolt");
+    const fill = chargeEl.querySelector("i");
+    if (!bolt) t.problem("bug", "Charge has no bolt mark");
+    if (!fill || !fill.style.width) t.problem("bug", "Charge bar has no fill");
+    else t.event("charge-bar", `${chargeText.trim()} amber bar with bolt at ${size}`);
+  }
+  const bodyEnergy = [...document.querySelectorAll("#meters .meter")].find((m) => /Energy/i.test((m.querySelector(".mlabel") || {}).textContent || ""));
+  if (!bodyEnergy) t.problem("bug", "Body panel has no Energy row");
+  else t.event("body-energy", `Body still labels Energy (${(bodyEnergy.querySelector(".mval") || {}).textContent || ""})`);
+  if (chargeEl && bodyEnergy && /Energy/i.test(chargeText) === false) {
+    t.event("meters-distinct", "Body Energy and ability Charge are different labels");
+  }
+  checkHud(t, "charge-log-pause: control");
+  t.progress(0.9);
+  pressKey("Escape");
+  await sleep(400);
+  t.event("charge-log-pause-pass", `Charge, live log and Paused checked at ${size}`);
+  t.progress(1);
+}
+
 installPlaytest({
   product: "icanbe",
   feel: {
@@ -5952,6 +6080,7 @@ installPlaytest({
     },
   },
   scenarios: [
+    { id: "charge-log-pause", title: "Charge vs Body Energy, Live log has no future rows, pause/scrub say Paused and hold the clock, resume continues in order", seconds: 70, tags: ["hud", "smoke"], description: "Load with ?playtest=charge-log-pause. Real input: Esc, Space, day bar scrub, Play/10x, Enter. Events live-log-clean / paused-status / paused-clock / coming-up / resumed / log-order / charge-bar / body-energy. Run at 1280x720 and 390x844." },
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
@@ -6011,6 +6140,7 @@ installPlaytest({
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
       else if (id === "hud-layout") await hudLayoutScenario(options, t);
+      else if (id === "charge-log-pause") await chargeLogPause(options, t);
       else if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);

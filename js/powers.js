@@ -38,7 +38,7 @@ const DEFAULTS = {
     gale: "A gale tears down the street.",
     fog: "Fog rolls in off the street.",
     sunbreak: "The clouds split. Warm light.",
-    dry: "Not enough pressure.",
+    dry: "Not enough charge.",
     locked: "Not unlocked yet.",
     cooling: "Not ready yet.",
   },
@@ -143,7 +143,7 @@ export function startPowers(world, dayApi) {
   cfg.durations = Object.assign({}, DEFAULTS.durations, cfg.durations);
   cfg.names = Object.assign({}, DEFAULTS.names, cfg.names);
   cfg.lines = Object.assign({}, DEFAULTS.lines, cfg.lines);
-  // The registry every call goes through (js/abilities.js); Energy is the Pressure meter.
+  // The registry every call goes through (js/abilities.js); Charge is the Pressure meter (Body Energy is separate).
   const abil = createAbilities({ max: cfg.max });
   POWER_NAMES.forEach((id) => abil.register({ id, name: cfg.names[id], key: cfg.keys[id], cost: cfg.costs[id], cooldown: cfg.cooldowns[id], duration: cfg.durations[id] }));
   const gauge = {
