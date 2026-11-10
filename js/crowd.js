@@ -249,10 +249,28 @@ export function installCrowd(world) {
   const PANTS = ["#2e333c", "#3a3e46", "#22262e", "#4a4438", "#2c3a52"];
   const CARS = ["#7d8a96", "#b55a3c", "#e4e0d6", "#3e4a5c", "#567a62", "#8a6aa0", "#c2c7cc", "#4b4b4b", "#a63d3d", "#d9b13b", "#2f5f8f", "#1f2328"];
 
+  /* Each person's look is drawn once from a themed outfit (top, trousers, bag go together; hair is a natural tone) so the
+     street varies but stays one palette. Everything stays a shared material + thin instance. */
+  const HAIRS = ["#1c1814", "#2b1d14", "#4a3322", "#6b4a2a", "#a8803f", "#c9b27a", "#8a8a8c", "#5a2a1e", "#0f0f12"];
+  const THEMES = [
+    ["#5a6d82", "#2c3a52", "#8a5a4a"], ["#8a5a4a", "#2e333c", "#3a5a6a"], ["#4a6b5a", "#4a4438", "#c9c2b0"], ["#6a5a78", "#22262e", "#b08a4a"],
+    ["#c9c2b0", "#3a3e46", "#7a3f58"], ["#a05a5a", "#2c3a52", "#2f3a4a"], ["#3a5a6a", "#4a4438", "#a05a5a"], ["#b08a4a", "#22262e", "#4f6f8f"],
+    ["#2f3a4a", "#3a3e46", "#8a5a4a"], ["#4f6f8f", "#2e333c", "#c9c2b0"], ["#7a3f58", "#22262e", "#7a6a4a"], ["#7a6a4a", "#2c3a52", "#5a6d82"],
+  ];
+  const looks = [];
+  const lrng = makeRng(77123);
+  for (let i = 0; i < MAXP; i++) {
+    const th = THEMES[Math.floor(lrng() * THEMES.length)];
+    looks.push({
+      top: th[0], pants: th[1], bagC: th[2], skin: SKINS[Math.floor(lrng() * SKINS.length)], hair: HAIRS[Math.floor(lrng() * HAIRS.length)],
+      hairLong: lrng() < 0.35 ? 1 : 0, bald: lrng() < 0.07, bag: lrng() < 0.5 ? (lrng() < 0.55 ? 1 : 2) : 0, dog: lrng() < 0.09,
+      girth: 0.9 + lrng() * 0.25, dogC: ["#8a6a45", "#2a2622", "#d8c9a8", "#b5602f"][Math.floor(lrng() * 4)],
+    });
+  }
   const people = [];
-  const pTop = colorsFor(MAXP, (i) => TOPS[(i * 7 + 3) % TOPS.length]);
-  const pSkin = colorsFor(MAXP, (i) => SKINS[(i * 5 + 1) % SKINS.length]);
-  const pPants = colorsFor(MAXP, (i) => PANTS[(i * 3) % PANTS.length]);
+  const pTop = colorsFor(MAXP, (i) => looks[i].top);
+  const pSkin = colorsFor(MAXP, (i) => looks[i].skin);
+  const pPants = colorsFor(MAXP, (i) => looks[i].pants);
   const legsMesh = cyl(0.8, 0.3, 6);
   const torsoMesh = cyl(0.6, 0.42, 8);
   const headMesh = B.MeshBuilder.CreateSphere("h", { diameter: 0.25, segments: 6 }, scene);
@@ -263,7 +281,19 @@ export function installCrowd(world) {
   const mLegs = instanced("crowd-legs", legsMesh, MAXP, pPants, stdMat("crowd-legs"));
   const mTorso = instanced("crowd-torso", torsoMesh, MAXP, pTop, stdMat("crowd-torso"));
   const mHead = instanced("crowd-head", headMesh, MAXP, pSkin, stdMat("crowd-head"));
-  const umbColors = colorsFor(MAXP, (i) => ["#1a2740", "#5a2a2a", "#2a4a3a", "#3a3a48"][i % 4]);
+  const umbColors = colorsFor(MAXP, (i) => ["#1a2740", "#5a2a2a", "#2a4a3a", "#3a3a48", "#7a5a1e", "#4a2a5a", "#a63d3d", "#2f5f8f"][i % 8]);
+  const hairMesh = B.MeshBuilder.CreateSphere("hair", { diameter: 0.29, segments: 6 }, scene);
+  const bagMesh = box(0.24, 0.3, 0.12, 0, 0, 0);
+  const dogParts = [box(0.2, 0.2, 0.5, 0, 0.32, 0), box(0.14, 0.15, 0.17, 0, 0.42, 0.32), box(0.04, 0.04, 0.2, 0, 0.4, -0.33)];
+  [[-0.07, 0.2], [0.07, 0.2], [-0.07, -0.2], [0.07, -0.2]].forEach((l) => dogParts.push(box(0.05, 0.22, 0.05, l[0], 0.11, l[1])));
+  const leadM = B.MeshBuilder.CreateBox("lead", { width: 0.02, height: 0.02, depth: 0.95 }, scene);
+  leadM.rotation.y = Math.PI / 2 - 0.2; leadM.rotation.z = 0.5; leadM.position.set(-0.3, 0.65, 0.2);
+  leadM.bakeCurrentTransformIntoVertices();
+  dogParts.push(leadM);
+  const dogMesh = merge(dogParts);
+  const mHair = instanced("crowd-hair", hairMesh, MAXP, colorsFor(MAXP, (i) => looks[i].hair), stdMat("crowd-hair"));
+  const mBag = instanced("crowd-bag", bagMesh, MAXP, colorsFor(MAXP, (i) => looks[i].bagC), stdMat("crowd-bag"));
+  const mDog = instanced("crowd-dog", dogMesh, MAXP, colorsFor(MAXP, (i) => looks[i].dogC), stdMat("crowd-dog"));
   const mUmb = instanced("crowd-umbrella", umbMesh, MAXP, umbColors, stdMat("crowd-umbrella"));
   umbMesh.setEnabled(false);
 
@@ -286,11 +316,11 @@ export function installCrowd(world) {
   const mLampR = instanced("crowd-taillamps", lampR, MAXC, colorsFor(MAXC, () => "#8a1d1d"), lampMatR);
   const mWipers = instanced("crowd-wipers", wiperMesh, MAXC, colorsFor(MAXC, () => "#101012"), stdMat("crowd-wipers"));
   wiperMesh.setEnabled(false);
-  [legsMesh, torsoMesh, headMesh, umbMesh, handMesh, bodyMesh, cabinMesh, wheelsMesh, lampF, lampR, wiperMesh].forEach((m) => {
+  [legsMesh, torsoMesh, headMesh, hairMesh, bagMesh, dogMesh, umbMesh, handMesh, bodyMesh, cabinMesh, wheelsMesh, lampF, lampR, wiperMesh].forEach((m) => {
     m.receiveShadows = false;
     m.checkCollisions = false;
   });
-  const bufs = [[legsMesh, "matrix"], [torsoMesh, "matrix"], [headMesh, "matrix"], [umbMesh, "matrix"], [handMesh, "matrix"], [bodyMesh, "matrix"], [cabinMesh, "matrix"], [wheelsMesh, "matrix"], [lampF, "matrix"], [lampR, "matrix"], [wiperMesh, "matrix"]];
+  const bufs = [[hairMesh, "matrix"], [bagMesh, "matrix"], [dogMesh, "matrix"], [legsMesh, "matrix"], [torsoMesh, "matrix"], [headMesh, "matrix"], [umbMesh, "matrix"], [handMesh, "matrix"], [bodyMesh, "matrix"], [cabinMesh, "matrix"], [wheelsMesh, "matrix"], [lampF, "matrix"], [lampR, "matrix"], [wiperMesh, "matrix"]];
 
   for (let i = 0; i < MAXP; i++) {
     people.push({
@@ -447,7 +477,8 @@ export function installCrowd(world) {
       else { p.phase += dt * 2; return; }
     }
     const reactK = rKind === "gale" ? 1 - 0.35 * rk : rKind === "fog" ? 1 - 0.2 * rk : rKind === "sun" ? 1 - 0.4 * rk : 1;
-    const sp = p.speed * (run ? 1.9 : 1) * reactK * (p.state === "door-in" || p.state === "door-out" ? 0.8 : 1);
+    const hurry = wxK.raining && !run ? 1.3 : 1; // rain: everyone walks quicker
+    const sp = p.speed * hurry * (run ? 1.9 : 1) * reactK * (p.state === "door-in" || p.state === "door-out" ? 0.8 : 1);
     // step cadence from the speed they actually move at, so feet keep pace (a run takes longer strides)
     p.phase += dt * (run ? 11 / 1.9 : 7.5) * (sp / 1.3) * (rKind === "sun" ? 1 + rk * 0.3 : 1);
     p.t += (sp * dt) / p.len;
@@ -599,6 +630,7 @@ export function installCrowd(world) {
      pass through them, so walkers are nudged sideways out of this radius when they draw (the path is untouched) */
   const bystanders = [];
   const BYSTANDER_R = 0.9;
+  const WSPACE = 0.55; // m between two walkers' centres: they slide apart rather than overlap
   function gatherObstacles() {
     obstacles.length = 0;
     bystanders.length = 0;
@@ -681,6 +713,15 @@ export function installCrowd(world) {
 
   /* ---------------- per frame ---------------- */
   const info = { people: 0, cars: 0, targetPeople: 0, targetCars: 0, walking: 0, waiting: 0, crossing: 0, entering: 0, leaving: 0, moving: 0, stopped: 0, near: { people: 0, cars: 0 }, phase: "", scale: 1, quality: "high", umbrellas: 0, wipers: 0, carSpeed: 0, hour: 12, reaction: "", reacting: 0, lookingUp: 0, hats: 0, cheering: 0, running: 0 };
+  /* spacing nudges stay within 0.2 m of the walker's path, so they never leave the sidewalk */
+  function holdPath(p) {
+    const t = Math.min(1, p.t);
+    const cx = lerp(p.ax, p.bx, t);
+    const cz = lerp(p.az, p.bz, t);
+    const ox = clamp(p.x - cx, -0.2, 0.2);
+    const oz = clamp(p.z - cz, -0.2, 0.2);
+    p.x = cx + ox; p.z = cz + oz;
+  }
   function frame(dtReal) {
     const dayNow = window.day && window.day.now ? window.day.now() : null;
     if (!dayNow || dayNow.minutes == null) return;
@@ -775,7 +816,7 @@ export function installCrowd(world) {
     let reacting = 0, lookingUp = 0, hats = 0, cheering = 0;
     for (let i = 0; i < MAXP; i++) {
       const p = people[i];
-      if (!p.active || p.scale <= 0.01) { hide(mLegs, i); hide(mTorso, i); hide(mHead, i); hide(mUmb, i); hide(mHand, i); continue; }
+      if (!p.active || p.scale <= 0.01) { hide(mLegs, i); hide(mTorso, i); hide(mHead, i); hide(mUmb, i); hide(mHand, i); hide(mHair, i); hide(mBag, i); hide(mDog, i); continue; }
       active++;
       if (bystanders.length && (p.state === "walk" || p.state === "wait")) {
         for (let b = 0; b < bystanders.length; b++) {
@@ -786,6 +827,24 @@ export function installCrowd(world) {
             const k = bd > 0.01 ? BYSTANDER_R / bd : 0;
             p.x = bystanders[b].x + (k ? bx * k : BYSTANDER_R);
             p.z = bystanders[b].z + bz * k;
+          }
+        }
+      }
+      if (dt > 0 && (p.state === "walk" || p.state === "wait")) {
+        for (let j = 0; j < i; j++) {
+          const q = people[j];
+          if (!q.active || q.scale < 0.9 || (q.state !== "walk" && q.state !== "wait")) continue;
+          const sx = p.x - q.x;
+          if (sx > WSPACE || sx < -WSPACE) continue;
+          const sz = p.z - q.z;
+          const sd = Math.hypot(sx, sz);
+          if (sd < WSPACE) {
+            const push = Math.min(0.08, (WSPACE - sd) * 0.5);
+            const ux = sd > 0.01 ? sx / sd : Math.cos(p.yaw);
+            const uz = sd > 0.01 ? sz / sd : -Math.sin(p.yaw);
+            p.x += ux * push; p.z += uz * push;
+            q.x -= ux * push; q.z -= uz * push;
+            holdPath(p); holdPath(q);
           }
         }
       }
@@ -808,8 +867,19 @@ export function installCrowd(world) {
       const hx = looking ? -Math.sin(p.yaw) * 0.07 * rk : 0;
       const hz = looking ? -Math.cos(p.yaw) * 0.07 * rk : 0;
       put(mLegs, i, p.x, PED_Y + 0.4 * h, p.z, p.yaw, p.scale, h); // feet stay on the ground; the bob is the upper body
-      put(mTorso, i, p.x + Math.sin(p.yaw) * lean, y + 1.1 * h, p.z + Math.cos(p.yaw) * lean, p.yaw + sway, p.scale, h);
+      put(mTorso, i, p.x + Math.sin(p.yaw) * lean, y + 1.1 * h, p.z + Math.cos(p.yaw) * lean, p.yaw + sway, p.scale * looks[i].girth, h);
       put(mHead, i, p.x + Math.sin(p.yaw) * lean * 1.6 + hx, y + (1.58 + (looking ? 0.05 * rk : 0)) * h, p.z + Math.cos(p.yaw) * lean * 1.6 + hz, p.yaw, p.scale, h);
+      const lk = looks[i];
+      const near = !cam || (Math.abs(p.x - cam.x) < 45 && Math.abs(p.z - cam.z) < 45);
+      const lod = quality === "low" ? near && (!cam || Math.abs(p.x - cam.x) < 25) : near;
+      const hw = lk.girth;
+      if (lk.bald || !lod) hide(mHair, i);
+      else put(mHair, i, p.x + Math.sin(p.yaw) * lean * 1.6 + hx - Math.sin(p.yaw) * 0.02, y + (lk.hairLong ? 1.6 : 1.63) * h, p.z + Math.cos(p.yaw) * lean * 1.6 + hz - Math.cos(p.yaw) * 0.02, p.yaw, p.scale, h * (lk.hairLong ? 0.9 : 0.62));
+      if (!lk.bag || !lod) hide(mBag, i);
+      else if (lk.bag === 1) put(mBag, i, p.x - Math.sin(p.yaw) * 0.2, y + 1.15 * h, p.z - Math.cos(p.yaw) * 0.2, p.yaw + sway, p.scale * hw, h);
+      else put(mBag, i, p.x + Math.cos(p.yaw) * -0.26, y + 0.9 * h, p.z + Math.sin(p.yaw) * 0.26, p.yaw, p.scale, h);
+      if (!lk.dog || quality === "low" || !near) hide(mDog, i);
+      else put(mDog, i, p.x + Math.cos(p.yaw) * 0.65 + Math.sin(p.yaw) * 0.3, PED_Y + Math.abs(Math.sin(p.phase * 2)) * 0.015, p.z - Math.sin(p.yaw) * 0.65 + Math.cos(p.yaw) * 0.3, p.yaw, 1, 1);
       if (gale > 0.3) { put(mHand, i, p.x + Math.sin(p.yaw) * lean * 1.6, y + 1.76 * h, p.z + Math.cos(p.yaw) * lean * 1.6, p.yaw, p.scale * 1.1, 1); hats++; }
       else if (rKind === "sun" && rk > 0.3) { put(mHand, i, p.x, y + 1.95 * h + cheer, p.z, p.yaw, p.scale * 2.2, 1); cheering++; }
       else hide(mHand, i);
