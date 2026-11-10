@@ -697,7 +697,8 @@ export function startWeather(world, dayApi) {
       wheel.appendChild(b);
       wedges[s] = b;
     });
-    document.body.append(btn, wheel);
+    (document.getElementById("hud-left") || document.body).append(btn);
+    document.body.append(wheel);
   }
 
   const touchMode = () => (day.control && day.control.state().touch) || window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 700;

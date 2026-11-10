@@ -497,7 +497,8 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   say.setAttribute("role", "status");
   say.setAttribute("aria-live", "polite");
 
-  document.body.append(menuBtn, hud, offer, scoreEl, endEl, closeEl, menu, toast, say);
+  (document.getElementById("hud-left") || document.body).append(menuBtn);
+  document.body.append(hud, offer, scoreEl, endEl, closeEl, menu, toast, say);
 
   const hudTitle = hud.querySelector("h3");
   const hudTag = hud.querySelector(".tag");

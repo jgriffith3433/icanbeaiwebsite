@@ -156,7 +156,8 @@ function install() {
   toast.id = "neighbor-toast";
   toast.className = "nb-toast";
   toast.setAttribute("role", "status");
-  document.body.append(layer, btn, panel, toast);
+  (document.getElementById("hud-left") || document.body).append(btn);
+  document.body.append(layer, panel, toast);
   btn.addEventListener("click", () => {
     panel.hidden = !panel.hidden;
   });

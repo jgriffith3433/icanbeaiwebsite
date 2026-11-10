@@ -25,7 +25,7 @@ function boxOf(el) {
    visible placeholder text (a lone dash) as a bug. Called by look, photos, episodes, tutorial-episode and control,
    at each stage of the run (the label says which). Each distinct finding is reported once per run. */
 const HUD_PARTS = [
-  [".panel.now", "status card"], ["#sound", "Sound"], ["#details", "Details"], [".side", "Details panel"],
+  [".panel.now", "status card"], ["#sound", "Sound"], ["#details", "Details"], ["#settings", "Settings"], [".settings-pop", "Settings menu"], [".side", "Details panel"],
   [".hud.bottom", "timeline"], ["#control", "Take control / Let go"], ["#quality", "Quality"],
   ["#weather-btn", "Weather"], ["#pressure", "Pressure"], ["#episodes", "Episodes"], ["#neighbors-btn", "Neighbors"],
   ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .energy", "Energy"],
@@ -5450,6 +5450,47 @@ async function clickEl(el) {
 }
 
 /* ---------------- the title screen and the day/night music ---------------- */
+async function hudLayoutScenario(options, t) {
+  t.scene("HUD layout");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const size = `${innerWidth}x${innerHeight}`;
+  const q = $("quality"), gear = $("settings");
+  if (!q || !gear) { t.problem("bug", "No Settings button or quality toggle"); return; }
+  if (!q.closest("#settings-pop")) t.problem("bug", "Quality isn't inside the Settings menu");
+  if (window.day.title && window.day.title.show) window.day.title.show();
+  await sleep(600);
+  if (hudVisible(q)) t.problem("bug", `Quality shows outside the Settings menu on the title (${size})`);
+  checkHud(t, "hud-layout: title");
+  if (window.day.title && window.day.title.quiet) window.day.title.quiet();
+  await sleep(400);
+  if (hudVisible(q)) t.problem("bug", `Quality floats on screen while Settings is closed (${size})`);
+  gear.click();
+  await sleep(300);
+  if (!hudVisible(q)) t.problem("bug", "Settings didn't open the quality toggle");
+  checkHud(t, "hud-layout: settings open");
+  t.event("settings-open", `Quality sits in the Settings menu at ${size}`);
+  pressKey("Escape");
+  await sleep(200);
+  pressKey("Enter");
+  await t.until(() => window.day.control && window.day.control.mode() === "player", 8000, "taking control");
+  await sleep(800);
+  checkHud(t, "hud-layout: in play");
+  const c = boxOf($("control"));
+  if (c) {
+    const cx = c.left + c.width / 2;
+    if (Math.abs(cx - innerWidth / 2) > 4) t.problem("bug", `Let go isn't centred (${Math.round(cx)} of ${innerWidth}) at ${size}`);
+    if (!document.documentElement.classList.contains("touch-ui") && c.top < innerHeight / 2) t.problem("bug", `Let go isn't at the bottom (${size})`);
+  }
+  const w = boxOf($("weather-btn")), p = boxOf($("pressure"));
+  if (!w || !p) t.problem("bug", `Weather or Pressure missing in play (${size})`);
+  else {
+    ["episodes", "neighbors-btn"].forEach((id) => { const b = boxOf($(id)); if (b && (boxesOverlap(b, w) || boxesOverlap(b, p))) t.problem("bug", `#${id} covers the weather meter (${size})`); });
+    if (w.left < 0 || p.right > innerWidth || p.top < 0 || w.bottom > innerHeight) t.problem("bug", `Weather meter is cut off (${size})`);
+  }
+  t.event("hud-layout-play", `weather and Pressure clear, Let go centred at ${size}`);
+  pressKey("Escape");
+}
+
 async function titleScenario(options, t) {
   t.scene("Title");
   checkBasics(t);
@@ -5914,6 +5955,7 @@ installPlaytest({
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
+    { id: "hud-layout", title: "HUD layout: Quality lives in the Settings menu, the left column stacks Episodes, Neighbors, weather and Pressure without overlap, Take control stays bottom-centre; overlap check on title and in play", seconds: 40, tags: ["hud", "smoke"], description: "Load with ?playtest=hud-layout. Real input: Settings click, Enter, Esc. Events settings-open / hud-clear / hud-layout-play. Run at 1280x720, 390x844 and 844x390." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
@@ -5968,6 +6010,7 @@ installPlaytest({
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
+      else if (id === "hud-layout") await hudLayoutScenario(options, t);
       else if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
       else if (id === "analytics") await analytics(options, t);
