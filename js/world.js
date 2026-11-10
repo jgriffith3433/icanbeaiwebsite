@@ -801,8 +801,8 @@
       if (tvN) {
         box("tvstand", 1.8, 0.45, 0.42, 0, 0.32, 0, woodDark, tvN);
         const sm = glowMat("#0f1216");
-        box("tv", 1.55, 0.88, 0.06, 0, 1.25, 0.06, dark, tvN);
-        glowing(box("tvface", 1.48, 0.82, 0.01, 0, 1.25, 0.095, sm, tvN, false));
+        box("tv", 1.55, 0.88, 0.06, 0, 0.99, 0.06, dark, tvN); // bottom edge on the stand top (0.545)
+        glowing(box("tvface", 1.48, 0.82, 0.01, 0, 0.99, 0.095, sm, tvN, false));
         props.tv = sm;
         box("plantpot", 0.3, 0.35, 0.3, 1.25, 0.28, 0.0, mat("#a0644c"), tvN);
         sphere("plant", 0.6, leafMs[0], tvN, 8).position.set(1.25, 0.75, 0);
