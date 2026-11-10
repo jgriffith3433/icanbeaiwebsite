@@ -134,6 +134,9 @@ export function startAbilityBar(abilities, onPress) {
 .abilitybar .ab.poor .k{color:#e08a80}
 .abilitybar .ab.locked{opacity:.38;border-style:dashed;filter:grayscale(1)}
 .abilitybar .ab.unlocked-now{border-color:#f0c27a;box-shadow:0 0 14px rgba(240,194,122,.9)}
+.abilitybar .ab.pulse{animation:abpulse .32s ease-out}
+@keyframes abpulse{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,255,255,.95)}35%{transform:scale(1.18);box-shadow:0 0 18px 6px rgba(126,200,255,.95)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(126,200,255,0)}}
+.abilitybar .ab.cooling{border-color:rgba(255,255,255,.2);outline:2px solid rgba(240,168,74,.7);outline-offset:-2px}
 .abilitybar .ab.active{border-color:#fff;box-shadow:0 0 12px rgba(126,200,255,.9)}
 /* Charge (ability spend) — amber bolt look, not Body's Energy and not the blue Pressure chip */
 .abilitybar .charge{width:100%;min-width:230px;color:#f3e0b0}
@@ -199,6 +202,15 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
     slots[a.id] = { b, sweep: b.querySelector(".sweep"), cd: b.querySelector(".cd") };
   }
 
+  window.addEventListener("day:power", (e) => {
+    const d = e.detail || {};
+    const sl = slots[d.power];
+    if (!sl || d.action === "denied") return;
+    sl.b.classList.remove("pulse");
+    void sl.b.offsetWidth;
+    sl.b.classList.add("pulse");
+    setTimeout(() => sl.b.classList.remove("pulse"), 340);
+  });
   let refuseTimer = 0;
   /** A line in the Charge row for a moment (a locked or too-costly tap); it is a timeout, not a poll. */
   function refuse(text) {
