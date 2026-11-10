@@ -102,6 +102,16 @@ for (const name of ['props-solid', 'props-glow']) {
   ok(off.size <= 2, `${name}: things off the ground by more than 3 cm at ${off.size} spots (${[...off.entries()].slice(0, 6).map(([k, v]) => k + ' ' + v).join(', ')})`);
 }
 
+// 2b. A TV sits on its stand or dresser, not in the air beside the window (the black slab in the bedroom frames).
+for (const [tv, base] of [['tv', 'tvstand'], ['btv', 'dresser']]) {
+  const t = world.scene.getMeshByName(tv);
+  const b = world.scene.getMeshByName(base);
+  t.computeWorldMatrix(true);
+  b.computeWorldMatrix(true);
+  const gap = t.getBoundingInfo().boundingBox.minimumWorld.y - b.getBoundingInfo().boundingBox.maximumWorld.y;
+  ok(Math.abs(gap) <= 0.01, `${tv} is ${gap.toFixed(3)} m off its ${base}`);
+}
+
 // 3. The district's people walk the sidewalks and the crossings, never the grass beside them.
 const { installCrowd } = await import(new URL('js/crowd.js', root).href);
 globalThis.day = { now: () => ({ minutes: 12.5 * 60, mode: 'play' }), world: () => world, control: { mode: () => 'schedule', state: () => ({}) } };
