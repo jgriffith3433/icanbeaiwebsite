@@ -1058,6 +1058,34 @@
     }
     Object.values(buildingMeshes).forEach((list) => list.forEach((m) => solidMeshes.push(m)));
 
+    /* The home's street face. The day's shot is a cutaway with the front open; seen from the street (the player outdoors,
+       or the camera outside) that read as a building with its facade missing. A wall with the door gap and windows is
+       drawn only while the camera is outside the cutaway (cutawayWalls). Visual only: it is built after the colliders
+       were collected, so the door and the open front stay walkable as before. */
+    const homeFront = [];
+    if (homeB && frontDoorNode) {
+      const [fx0, , fx1, fz] = homeB;
+      const dx = frontDoorNode.position.x + 0.44;
+      const H = 2.75;
+      const outer = mat("#c9bfb0");
+      const trim = mat("#8d5a45");
+      const part = (name, w, h, d, x, y, z, m) => {
+        const mesh = box("homefront-" + name, w, h, d, x, y, z, m, null, false);
+        homeFront.push(mesh);
+        return mesh;
+      };
+      part("L", dx - 0.5 - fx0, H, 0.16, (fx0 + dx - 0.5) / 2, H / 2, fz, outer);
+      part("R", fx1 - dx - 0.5, H, 0.16, (dx + 0.5 + fx1) / 2, H / 2, fz, outer);
+      part("lintel", 1, H - 2.3, 0.16, dx, (2.3 + H) / 2, fz, outer);
+      part("crown", fx1 - fx0 + 0.3, 0.14, 0.3, (fx0 + fx1) / 2, H + 0.07, fz, trim);
+      const glass = mat("#1b2635", { unique: true, spec: 0.02 });
+      glass.emissiveColor = new B.Color3(0.4, 0.55, 0.7);
+      [-4.4, -1.8, 3.6, 6.4, 9].forEach((wx, i) => {
+        part("win" + i + "f", 1.4 + 0.16, 1.1 + 0.16, 0.06, wx, 1.5, fz + 0.1, trim);
+        part("win" + i + "g", 1.4, 1.1, 0.04, wx, 1.5, fz + 0.14, glass);
+      });
+    }
+
     /* Parked cars that never move, in the work lot */
     function makeCar(color) {
       const root = new B.TransformNode("car", scene);
@@ -2093,6 +2121,7 @@
     /* an interior wall crossing the line from the camera to its target (seen from above) is drawn faint: the
        cutaway never has a wall in front of the room. Colliders stay; only how it looks changes. */
     function cutawayWalls(on) {
+      for (const m of homeFront) if (m.isEnabled() === on) m.setEnabled(!on);
       if (!innerWalls.length) return;
       const tg = camera.target;
       const sb = Math.sin(camera.beta);
