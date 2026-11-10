@@ -1,12 +1,29 @@
 # I Can Be AI: world bible
 
-Status: **plan for the whole district.** Built pieces are marked *in* under each area; gaps are marked *short*. Tone from `AGENTS.md` and `docs/voice-style.md`: he is He, plainly; lines short and matter-of-fact; weather is the drama; he never gloats. Story overlay lives in `docs/story-arc-beat-sheet.md` and playable parts in `day.config.js` `episodes` (Parts 1–3, lunch rescue, hurricane drive, light show). Open beat-sheet questions stay candidate until J settles them; this bible does not invent answers that contradict what already plays.
+Status: **plan for the whole district.** Built pieces are marked *In*; gaps are marked *Short* or *Build*. Tone from `AGENTS.md` and `docs/voice-style.md`: he is He, plainly; lines short and matter-of-fact; weather is the drama; he never gloats. Story overlay lives in `docs/story-arc-beat-sheet.md` and playable parts in `day.config.js` `episodes` (Parts 1–3, lunch rescue, hurricane drive, light show). Open beat-sheet questions stay candidate until J settles them; this bible does not invent answers that contradict what already plays.
 
-**Vertical slice start:** West Avenue Home Block + the Park (Alarm through Birdie's rain ask). Finish that bar before widening art or new districts. Slice definition of done: always-on park state (straw/damp/scar without an episode flag), Birdie's full ask as voice + world change, apt crown landmark readable from the plaza approach, and no quiet stretch over 10 s on the walk from driveway to bandstand.
+**Fun-review bar:** a plan that leaves between-mission emptiness, soft "planned" wishes, or text-only story beats is a **thin** world. This bible treats those as hard fails for later agents. Soft "maybe later" is not allowed under Areas / What happens / Story beats — only *In*, *Short* (named gap) or *Build* (named deliverable + acceptance).
 
-**Density bar:** a player walking under control never goes more than about 10 seconds without something to see, hear or do. Every area below lists dressing, a landmark, life, ambient sound and several kinds of interaction. Where the build falls short today, the shortfalls are named so the next agent builds to this, not past it.
+**Vertical slice (finish before widening art or new districts):** West Avenue Home Block + the Park, Alarm through Birdie's rain ask.
+Definition of done (all required):
+1. Park lawn/pond day-keyed states (straw / damp / scar) visible with **no** episode HUD open.
+2. Birdie's ask: speech + Rain → thanks voice + visible lawn/pond change + ≤1-line toast.
+3. Apt crown landmark (parapet light strip + tomato wall) readable from the plaza approach.
+4. Playtest walk driveway → bandstand: `quality.maxQuietSeconds` ≤ 10 (events every ≤8 s along the path below).
 
-**Always-on rule (fixes the "between missions" empty air):** park lawn/pond, plaza stalls and cafe life, and annex turbines exist in the world every hour of the day key, driven by day-keyed state flags — not only while an episode HUD is up. Episodes change those states; they do not spawn the only copy of the scenery.
+**Density bar:** under control, never more than about 10 seconds without something new to see, hear or do. Measured walk paths and their event beads are under **What happens → Density walks**. A later `micro-events` scenario must fail if two beads on a path are more than 8 s apart.
+
+**Always-on rule (blocks "between missions" demo air):** park lawn/pond, plaza stall shells + crates, and annex turbines are **world props driven by day-keyed flags**, not episode-only meshes that dispose when the card closes. Episodes change those states; they do not own the only copy. *Today's short:* those pieces still live in `js/episodes.js` and go away when the episode ends — that is the first build queue item, not flavour.
+
+**Build queue (ordered; do not skip ahead):**
+1. **Always-on district state** — park / plaza / annex turbines permanent + day keys; acceptance: walk at noon with no episode, see stalls, spinning blades (if wind), straw or damp lawn; `micro-events` or `fill-out` extended check.
+2. **Micro-life beads + night coverage** — park pigeons + second gardener pass + pond ripples; plaza cafe wipe + dusk busker; avenue signal-box spark / newspaper flap / puddle under ability rain; night beads (lit-window silhouettes, late diner, street sweeper, dog-walker, stoop cat); south avenue (z −34) and Tank→east on the same ≤8 s / ≤30 m spacing table; acceptance: `micro-events` at 03:00, 12:00 and 21:00 on every avenue segment, gap ≤8 s.
+3. **Non-weather verbs (Pressure at 0 still has things to do)** — at least four verbs that never spend Pressure or start an episode: (a) pick up and carry Dex's dropped parcel to the stoop / Birdie's watering can to the pots; (b) sit on a park bench or bandstand (camera settle + ambient duck); (c) knock/enter one shop bay or the apt door (fridge hum, radio, one short interact); (d) toss a coin in the fountain and tip the busker (sfx). Acceptance: slice walk with Pressure 0 logs ≥4 distinct non-weather interactions.
+4. **Story staging** — Tank loudspeaker mesh pulse + duck on Board voice; Part 2 office dim + lift crawl *before* log; ending/closing camera over four needs + voiced last line; day-end sign-off + three flashes; opening spoken or cut; acceptance: no `say`/`ending`/`day-end` beat with text alone (`quality.textOnlyBeats` = 0).
+5. **Neighbor life past the ask** — each of Birdie / Dex / Ines gets 3–4 repeatable idle barks/gestures after their ask (lawn-state line, route joke, star point); one second day-keyed beat each; readable silhouettes (hat, helmet, scope) even before Gen models. Acceptance: `check-neighbors` fires non-ask lines in a 10-min walk; three frames show distinct silhouettes.
+6. **Needle life** — worker + cart + skippable deck lookout; beacon sync sting; only after 1–4.
+7. **Second slice gate** — shop → plaza must pass the same density + non-weather + always-on checks as the home/park vertical slice before treating the district plan as "living".
+8. **Art / GPU (needs J budget)** — neighbor models, music-day/night, ending stills/stings, optional turbine Gen mesh.
 
 ## Areas
 
@@ -17,6 +34,7 @@ Status: **plan for the whole district.** Built pieces are marked *in* under each
 - **In / out:** day starts in bed; Take control anywhere outdoors or in cutaways (not while driving). Doors into the apt; Let go walks him back by the day's routes. East along the main avenue (z ≈ 12.6) toward the shops and plaza; north into the park.
 - **In:** cutaway home, stair, street props, Birdie's pots and morning ask, his day spine (alarm → shower → coffee → out).
 - **Short:** neighbor models are boxes; south of the avenue (z −34 row) is thinner dressing; no one knocks or visits the apt; interior has no ambient radio or fridge hum yet.
+- **Build (slice):** apt crown light strip + tomato wall readable from mid-avenue; fridge hum + soft radio bed when inside (procedural sfx, no GPU).
 
 ### The Park
 - **Mood:** green that wants rain. Straw lawn at arc start; damp and drinking after Birdie's ask. Bandstand string lights at dusk.
@@ -24,7 +42,8 @@ Status: **plan for the whole district.** Built pieces are marked *in* under each
 - **Size:** rect x −34..30, z 20..68 (~64×48 m).
 - **In / out:** from the home block north across the sidewalk; east toward mid-avenue and the Needle's south approach; roofs look down on it from the apt stair.
 - **In:** park props, Birdie at the noon bench (−6, 22.5), Part 1 rain-on-park goal, crowd walkers on edges.
-- **Required next (not optional flavour):** day-keyed lawn/pond mesh or material states always visible; three micro-loops on a timer so a non-episode walk still breathes — (1) pigeons on the bandstand rail that scatter on Gust or a nearby bolt, (2) a second gardener pass with a dry can when the lawn is straw, (3) pond ripples that swell when weather is rain. Wildlife stays light; no combat critters.
+- **Short:** lawn/pond state flips only while Part 1 owns the props; quiet if you walk here with no episode.
+- **Build (queue 1–2):** day-keyed lawn/pond mesh or material always visible; three micro-loops on a timer — (1) pigeons on the bandstand rail that scatter on Gust or a nearby bolt, (2) a second gardener pass with a dry can when the lawn is straw, (3) pond ripples that swell when weather is rain. Wildlife stays light; no combat critters.
 
 ### Shop Strip (mid avenue)
 - **Mood:** deliveries, damp parcels, a low shopfront glow. Dex's orange moves through it.
@@ -33,6 +52,7 @@ Status: **plan for the whole district.** Built pieces are marked *in* under each
 - **In / out:** avenue east/west; roof stair; door sites crowd enter/leave.
 - **In:** Dex morning ask (sun break), shop roof rescue in Rooftop storm, street props and signs, crowd doors.
 - **Short:** interiors of shops are facades only (no enterable shops); Dex is a box figure; between shop and plaza the filler lots still read as samey walls for stretches of walk.
+- **Build (queue 2, then 5):** kerb beads on the shop→plaza stretch; dawn stoop cat (life, not combat); window shoppers or one enterable shop bay when art budget allows.
 
 ### The Plaza Market
 - **Mood:** the district's open lung. Heat spoils stock until a sun break; night becomes a stage for the light show.
@@ -40,15 +60,17 @@ Status: **plan for the whole district.** Built pieces are marked *in* under each
 - **Size:** x 106–130, z 16.8–36.
 - **In / out:** avenue and crosses; from shop strip west/east; from office lot further east; roofs of corner/mid blocks overlook it.
 - **In:** fountain, Clock Tower, Dex lunch, Part 1 market goals, lunch Shelter set piece (Odile, Pim, Gus), Light show stage and spectators, ending/closing cards staged here in feel.
-- **Required next:** permanent stall shells and produce crates at noon–evening whenever market state is open (scarred = one awning down; shut = crates stacked); one cafe server loop (wipe table → stand → bubble ambient, no dialogue tree); busker on the Clock Tower steps at dinner hour (guitar sfx, tips hat if Sun break lands in the plaza). Board stays on the Tank speaker only.
+- **Short:** stall shells and produce crates dispose with the episode; off-episode noon can read as empty paving + fountain.
+- **Build (queue 1–2):** permanent stall shells and crates whenever market state is open (scarred = one awning down; shut = crates stacked); one cafe server loop (wipe → stand → ambient bubble, no dialogue tree); busker on the Clock Tower steps at dinner hour (guitar sfx; tips hat if Sun break lands in the plaza). Board stays on the Tank speaker only.
 
 ### Office Lot and Annex East
 - **Mood:** work light, then tired evening power. Elevator crawl when turbines are still; annex roof is Ines's sky.
 - **Look / sound:** office cutaway a few blocks east on the main avenue; work lot parking; annex block x 157 with roof stair and turbines (Part 2). Keyboard taps on his day; office hum; gale whoosh on the roof; lifts/lights react to power state in the arc.
 - **Size:** office cutaway rooms + lot (~parkWork 133.5, 7.8); annex 16×12 m; roofs connected by play.
 - **In / out:** drive arrives at lot (Take control locked in the car); on foot from plaza west; annex stair; Hurricane drive starts on the lot heading west home.
-- **In:** day spine at the desk, Part 2 Gale on annex roof, Ines routine and lightning ask, Hurricane drive open, three rooftop turbines in the episode.
-- **Required next:** the three annex turbines stay on the roof all day and spin from `weather.now()` wind / gale; Part 2 only changes power state and overspeed scar. At least two hallway coworkers as walking figures on his office spine (nod already in day lines). Half-lights are a room-wide emissive dim when power is rationed, readable without the episode card.
+- **In:** day spine at the desk, Part 2 Gale on annex roof, Ines routine and lightning ask, Hurricane drive open, three rooftop turbines while Part 2 runs.
+- **Short:** turbines are episode props today; no hallway coworker bodies; half-lights are not a room-wide readable dim outside the card.
+- **Build (queue 1, 3):** three annex turbines stay on the roof all day and spin from `weather.now()` wind / gale; Part 2 only changes power state and overspeed scar. At least two hallway coworkers as walking figures on his office spine. Half-lights = room-wide emissive dim when power is rationed, fired as an event before any log line.
 
 ### Storm Tank Yard
 - **Mood:** industrial calm that turns critical at night. Blue neon band, mast that wants charge, loudspeaker of the District Board (candidate faction voice).
@@ -56,7 +78,8 @@ Status: **plan for the whole district.** Built pieces are marked *in* under each
 - **Size:** tank footprint ~14 m across plus yard; east end of the district.
 - **In / out:** avenue/cross from the annex; Part 3 offer in bedtime chapter; walk from plaza east.
 - **In:** landmark mesh, Part 3 charge + fill goals, Strain kick floods on the avenue, ending pick after Part 3.
-- **Required next:** a physical loudspeaker mesh on the Tank that animates (grille pulse + duck music) whenever Board dialogue plays; glass gauge visible whenever he is in the yard (needle tracks reservoir state even off-episode); one yard worker with a clipboard loop by day; Overcast ending keeps the Weather Warning as a looping speaker line in the world for the rest of that day key, not only on a card.
+- **Short:** gauge and Board are episode/card anchored; no physical speaker mesh pulse; yard idle is empty.
+- **Build (queue 3):** loudspeaker mesh on the Tank that animates (grille pulse + duck music) whenever Board dialogue plays; glass gauge visible whenever he is in the yard (needle tracks reservoir state even off-episode); one yard worker with a clipboard loop by day; Overcast ending keeps the Weather Warning as a looping speaker line for the rest of that day key, not only on a card.
 
 ### Needle Approach (north skyline)
 - **Mood:** far signal. Red beacon and lit deck; the district's "you are here" spike.
@@ -64,7 +87,8 @@ Status: **plan for the whole district.** Built pieces are marked *in* under each
 - **Size:** reserved clear around the Needle; north of the park/cross grid.
 - **In / out:** north from the park or along north avenue z 76.
 - **In:** landmark mesh, skyline ring/beacons in cityscape.
-- **Required life loop (must ship before treating this area as done):** a maintenance worker on a ground loop around the base (tool cart roll sfx); a short deck-elevator ride to a lookout ledge (30 s, skippable) that frames the Clock Tower and Tank; Sun break or Fog within 20 m syncs the beacon to a brighter pulse (one sting + Ines night chart line if she is out and in tag range). No quiet walk to the Needle over 10 s: kerb props and the worker cover the approach from the park's north edge.
+- **Short:** no worker, no lookout ride, approach from park north can feel empty past props.
+- **Build (queue 4 — area not "done" until this ships):** maintenance worker on a ground loop around the base (tool cart roll sfx); short deck-elevator ride to a lookout ledge (30 s, skippable) that frames the Clock Tower and Tank; Sun break or Fog within 20 m syncs the beacon to a brighter pulse (one sting + Ines night chart line if she is out and in tag range). Kerb props + worker cover the park→Needle approach under the 8 s rule.
 
 ### The Roofs
 - **Mood:** his playground. Stairs on apt, shop, annex; AC units, tanks, vents, antennas; lightning coils on his arms while the player steers.
@@ -73,6 +97,7 @@ Status: **plan for the whole district.** Built pieces are marked *in* under each
 - **In / out:** north-face stairs; jump/float between; can't Take control while driving.
 - **In:** control movement (run, triple jump, float), Storm/Bolt/Gust/Tornado, lunch Hollis rescue, Part 2 turbines, smoke playtest roof bolt.
 - **Short:** most filler roofs are props-only (no second stair set pieces); no roof garden or water tower climb verb beyond parkour.
+- **Build:** AC fans spin with wind (code); one extra traverse prop between shop and annex roofs after queue 1.
 
 ### Main Avenue Commute
 - **Mood:** the day's artery. Morning clear drive; evening can be his own storm's debris.
@@ -80,7 +105,8 @@ Status: **plan for the whole district.** Built pieces are marked *in* under each
 - **Size:** avenues z 12.6 / −34 / 76 from x −48..210; crosses at x −42, 36, 100, 168.
 - **In / out:** his car on the day spine; on foot under control anywhere; Hurricane drive west from lot to parkHome.
 - **In:** crowd + cars, signals, weather reactions, four hurricane closures, lunch street clear (Nell, Ravi).
-- **Required next:** kerb micro-events spaced so a walk east from shop → plaza → Tank never exceeds ~8 s without one — rotating pool of vendor cart, signal-box spark (reacts to nearby bolt), newspaper box flap in wind, waiting busker move-along, puddle mirror only under ability rain. Cars turning at junctions and a daytime bus route are the next motion pass after density holds.
+- **Short:** long filler walls between shop and plaza; no junction turns; micro-events not spaced yet.
+- **Build (queue 2):** kerb micro-events so shop → plaza → Tank never exceeds ~8 s without one — rotating pool of vendor cart, signal-box spark (reacts to nearby bolt), newspaper box flap in wind, waiting busker move-along, puddle mirror only under ability rain. Cars turning at junctions and a daytime bus route are the next motion pass after density holds.
 
 ## Landmarks
 
@@ -103,82 +129,94 @@ Home Block landmark is a vertical-slice deliverable (crown light strip + tomato 
 ## Who lives here
 
 ### Small Weather (he/him)
-Same storm caller as Dose Of Destruction (`AllTheCharacters/SmallWeather`). Black messy hair, glasses, navy tech jacket with glowing blue seams, cargo pants, glowing boots. Lives a developer's day on autopilot (`day.config.js` spine); player Take control for third-person walk/run/jump/float and weather powers. Voice: DoD Eric, short first-person; log/barks say "He", never "they". Pressure meter fuels abilities; Strain ("Sky") is what the district absorbs in the arc. Reacts with barks to needs and sky changes; crowd answers his *manual* weather.
+Same storm caller as Dose Of Destruction (`AllTheCharacters/SmallWeather`). Black messy hair, glasses, navy tech jacket with glowing blue seams, cargo pants, glowing boots. Lives a developer's day on autopilot (`day.config.js` spine); player Take control for third-person walk/run/jump/float and weather powers. Voice: DoD Eric, short first-person; log/barks say "He", never "they". Pressure meter fuels abilities; Strain ("Sky") is what the district absorbs in the arc. Reacts with barks to needs and sky changes; crowd answers his *manual* weather. Main character model is always Small Weather, never a placeholder while loading.
 
 ### Birdie Alvarez
-Gardener, yellow raincoat and straw hat; apt block. Stops: inside overnight, pots at −21,9.5 from 7, park bench −6,22.5 at noon, home by 20. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). Canon: she asks him for rain for her tomatoes.
+Gardener, yellow raincoat and straw hat; apt block. Stops: inside overnight, pots at −21,9.5 from 7, park bench −6,22.5 at noon, home by 20. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). Canon: she asks him for rain for her tomatoes. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* 3–4 idle barks/gestures after the ask (wave from pots, lawn-state comment); second day-keyed beat when lawn is damp; readable hat silhouette before Gen model.
 
 ### Dex Moreno
-Courier, orange jacket, white helmet, parcel on his back; lives over the shop. Stoop by day, plaza at lunch. Ask: sun break for damp parcels; thanks; evening humming parcel surprise. Briefs and closes the lunch rescue.
+Courier, orange jacket, white helmet, parcel on his back; lives over the shop. Stoop by day, plaza at lunch. Ask: sun break for damp parcels; thanks; evening humming parcel surprise. Briefs and closes the lunch rescue. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* idle route jokes and helmet silhouette; parcel-carry handoff as a non-weather verb.
 
 ### Ines Quill
-Stargazer, violet coat, glasses, telescope; annex. Inside by day, out from 16:30 through the night. Ask: one bolt for her lens (not at her); thanks; night surprise. Reads the sky in Part 2; names the lunch cell as something "clearing its throat."
+Stargazer, violet coat, glasses, telescope; annex. Inside by day, out from 16:30 through the night. Ask: one bolt for her lens (not at her); thanks; night surprise. Reads the sky in Part 2; names the lunch cell as something "clearing its throat." *Short:* box figure until GPU neighbor pass. *Build (queue 5):* dusk star-point gesture and chart mutter; scope silhouette readable at range.
 
 ### The District Board *(candidate loudspeaker faction)*
-Utilities voice on the Storm Tank speaker. Plain official tone; does not name him. Reservoir advisories and Weather Warning. *Not settled as full canon* until J answers beat-sheet Q3; lines already play in Parts 1/3 dialogue data.
+Utilities voice on the Storm Tank speaker. Plain official tone; does not name him. Reservoir advisories and Weather Warning. *Not settled as full canon* until J answers beat-sheet Q3; lines already play in Parts 1/3 dialogue data. *Build:* physical speaker staging (queue 3).
 
 ### Crowd citizens and drivers
 Up to ~260 people / 64 cars on the day curve (commute, lunch, dinner, thin 2–5). Walk graph, cross on red for cars, enter/leave doors. React to ability weather: storm look-up then run; rain run / duck indoors; wind lean + hat; fog slow; sun break cheer. Named lunch/drive stranded: Odile, Pim, Gus, Hollis, Nell, Ravi, Marlo, Cass, Tamsin, Wren, Hale, Odette, Sorrel, Pike, Juno (challenge).
 
-### Creatures
-No wild animals as characters yet. Birds are daytime fair-weather sfx. *Plan (not yet):* park pigeons Birdie mentions, one stray cat on the shop stoop at dawn — life, not combat.
+### Creatures and micro-life *(Build queue 2; not combat)*
+- Park pigeons on the bandstand (scatter on Gust / nearby bolt).
+- Dawn stoop cat on Dex's shop (sits, leaves if Storm).
+- Birds remain daytime fair-weather sfx until pigeon meshes exist.
 
 ### How they react to the player
-Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather ending: nods). Neighbors speak when he is near in their window and answer asks when he calls the right ability in range. Cars brake for him in lane. Episode stranded thank him with voice/bubble lines.
+Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather ending: nods — candidate until J settles Q4). Neighbors speak when he is near in their window and answer asks when he calls the right ability in range. Cars brake for him in lane. Episode stranded thank him with voice/bubble lines.
 
 ## What happens
 
+### Density walks (acceptance beads; ≤8 s / ≤30 m between)
+A later playtest walks these under control at walk speed and fails if quiet > 10 s (`quality.maxQuietSeconds`). Each bead is something new to see, hear or do. Spacing is a table in metres on every avenue segment (auto-checked from placed beads), not only the three hand walks.
+
+1. **Driveway → bandstand (slice path):** kerb tree → Birdie pots (ask, watering can carry, or idle wave) → bus stop panel → park path lamp → pond ripple or gardener → bandstand pigeons/string lights / sit → Birdie noon bench if in window.
+2. **Shop → plaza → Tank (second slice):** shop neon buzz → Dex stoop / parcel carry / door knock → signal-box spark or crosswalk wait → vendor cart → fountain coin toss + Clock faces → cafe wipe or stall crates / tip busker → annex turbines (spin or still) → Tank neon + speaker idle hiss → yard clipboard worker by day.
+3. **Park north → Needle:** path lamp → park edge crowd → cart roll / worker → Needle beacon pulse → (optional) deck lookout sting.
+4. **South avenue z −34 (full length):** same kerb pool as the main avenue; no stretch without a bead every ≤30 m.
+5. **Night (23:00–06:00) and 2–5 lull:** lit-window silhouettes, late diner glow, street sweeper pass, dog-walker, stoop cat; thin crowd still counts as life if something moves or sounds every ≤8 s.
+6. **Apt ↔ shop ↔ annex roofs:** spinning AC / vent puff / antenna sway with wind, plus one parkour prop bead between stairs — roofs are on the density table, not only parkour and powers.
+
 ### West Avenue Home Block
-- **Interactions:** Take control / Let go; walk, run, jump, float; call Rain for Birdie; climb apt stair; knock props with Gust; look through cutaway rooms.
-- **On their own:** his autopilot morning; Birdie's pot watering path; crowd thin→commute; lamps by sky; day-end moment card when the clock rolls.
+- **Interactions:** Take control / Let go; walk, run, jump, float; call Rain for Birdie; climb apt stair; knock props with Gust; look through cutaway rooms; **Build:** carry watering can to pots; knock/enter apt (fridge hum, radio); sit on stoop.
+- **On their own:** his autopilot morning; Birdie's pot watering path; crowd thin→commute; lamps by sky; day-end moment when the clock rolls.
 - **Ambient:** birds, city hum, footsteps, alarm/coffee diegetic day sounds, title/score beds under the page.
-- **Over time:** outfits are model-constant (no pyjama swap); windows and lamps follow dusk/night; opening once per new player.
+- **Over time:** model-constant look; windows and lamps follow dusk/night; opening once per new player.
 - **Short:** no fridge/radio loop; few porch interactions after Birdie goes in.
 
 ### The Park
-- **Interactions:** Rain (and over-hold overflow), sit near Birdie for ask/thanks, bolt scorch grass, explore pond/bandstand, photo angles for playtests.
-- **On their own:** Birdie noon bench; park lamps; lawn state after Part 1; crowd on edges.
-- **Ambient:** softer bed under trees; rain on leaves when wet; bandstand quiet creak *planned*.
+- **Interactions:** Rain (and over-hold overflow), sit near Birdie for ask/thanks, bolt scorch grass, explore pond/bandstand; **Build:** sit on bench/bandstand (camera + ambient); pigeon scatter without spending Pressure (walk-up or Gust).
+- **On their own:** Birdie noon bench; park lamps; lawn state after Part 1 (*should* persist — Build queue 1); crowd on edges.
+- **Ambient:** softer bed under trees; rain on leaves when wet; bandstand quiet creak (Build).
 - **Over time:** straw→damp→scar brown patch across the arc day.
-- **Short:** need 2–3 always-on microevents (kid with umbrella, gardener second pass, pond ripples) so a non-episode walk still breathes.
+- **Short:** need always-on state + 2–3 microevents so a non-episode walk still breathes.
 
 ### Shop Strip
-- **Interactions:** Dex sun break; shop roof bolt/rod precision; shove bins; enter crowd doors as observation; Storm hold.
+- **Interactions:** Dex sun break; shop roof bolt/rod precision; shove bins; observe crowd doors; Storm hold; **Build:** carry Dex's dropped parcel to the stoop; knock/enter one shop bay; dawn stoop cat pet/leave.
 - **On their own:** Dex routine; shop neon; people enter shops; umbrellas.
-- **Ambient:** neon buzz *planned*, car pass-bys, courier shoes.
+- **Ambient:** neon buzz (Build), car pass-bys, courier shoes.
 - **Over time:** dusk neon weight; lunch cell drifts east toward Tank.
-- **Short:** enterable shop interior or window shoppers would kill empty-facade feel.
+- **Short:** enterable shop or window shoppers would kill empty-facade feel (queue 5 / art).
 
 ### Plaza Market
-- **Interactions:** Sun break / Fog for stock; stay while stalls fill; Shelter sun breaks; Light show cues (E/R/C/V/X on beat); fountain visit; neighbor tags.
+- **Interactions:** Sun break / Fog for stock; stay while stalls fill; Shelter sun breaks; Light show cues (E/R/C/V/X on beat); fountain visit; neighbor tags; **Build:** toss coin in fountain; tip dusk busker; sit at cafe table.
 - **On their own:** Dex lunch; spectators walk in for finale; fountain; Clock faces; stall topple on bad gale.
-- **Ambient:** fountain, crowd lunch peak, show whoosh/thunder, closing card city-fared lines voiced.
+- **Ambient:** fountain, crowd lunch peak, show whoosh/thunder, closing city-fared lines voiced.
 - **Over time:** market open/scar/shut flags; night show aurora.
-- **Short:** permanent stall dressing + one busker or cafe server loop still missing for off-episode noon.
+- **Short:** permanent stall dressing + cafe/busker loops missing for off-episode noon.
 
 ### Office Lot and Annex East
 - **Interactions:** Gale hold on turbines; Ines bolt ask; start Hurricane drive; desk is autopilot until Take control.
-- **On their own:** lights/lifts with power; Ines telescope; evening commute crowd.
-- **Ambient:** HVAC, keyboard (day), roof wind, Board distant *from Tank*.
+- **On their own:** lights/lifts with power (*should* be visible — Build); Ines telescope; evening commute crowd.
+- **Ambient:** HVAC, keyboard (day), roof wind, Board distant from Tank.
 - **Over time:** still blades → spinning → overspeed scar.
-- **Short:** coworkers as bodies in the hall; turbine meshes on more roofs.
+- **Short:** coworkers as bodies; turbines permanent.
 
 ### Storm Tank Yard
 - **Interactions:** Lightning charge mast (count); Rain fill gauge; read Strain kick-backs (flood, overcast hold).
 - **On their own:** neon band; Board advisories at part beats; gauge motion in Part 3.
 - **Ambient:** industrial hum, thunder, loudspeaker grit.
 - **Over time:** reservoir empty→full / flood / warning loop (ending C).
-- **Short:** idle yard life; physical loudspeaker prop animation when Board speaks.
+- **Short:** idle yard life; speaker prop animation when Board speaks.
 
 ### Needle Approach
-- **Interactions:** walk around base; deck-elevator lookout (skippable); Sun break or Fog beacon-sync; hear Ines night chart line when in range.
-- **On their own:** maintenance worker loop, beacon, skyline lamps, wind.
+- **Interactions:** walk around base; deck-elevator lookout (skippable, Build); Sun break or Fog beacon-sync; hear Ines night chart line when in range.
+- **On their own:** maintenance worker loop (Build), beacon, skyline lamps, wind.
 - **Ambient:** high wind bed, cart roll, distant avenue, beacon sting on sync.
 - **Over time:** beacon brighter in storm; worker packs up in heavy rain.
 
 ### The Roofs
 - **Interactions:** full power set; parkour; lunch Hollis; Part 2 gale; smoke bolt.
-- **On their own:** AC fans *planned* spin with wind; antennas; crowd below.
+- **On their own:** AC fans spin with wind (Build); antennas; crowd below.
 - **Ambient:** wind, city below, ability whoosh/crack.
 - **Over time:** dusk→night bloom; wet sheen only on ability weather.
 - **Short:** more traverse routes between the three stairs.
@@ -192,44 +230,34 @@ Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather end
 
 ## Story beats
 
-Every beat below is lived as gameplay, an in-world staged event (camera, props, crowd), sound, and/or a Hawkes Gen voice line. HUD copy is at most one short prompt line; a beat that is only a paragraph on a card is a fail until voiced or acted.
+Every beat below is lived as gameplay, an in-world staged event (camera, props, crowd), sound, and/or a Hawkes Gen voice line. HUD copy is at most one short prompt line; a beat that is only a paragraph on a card is a **fail** (`quality.textOnlyBeats`).
 
-1. **Title and first Play** — Title skyline orbit; Play hands him over. *Sound:* title bed. *Voice/event:* opening five beats on his model (`js/opening.js`) must stay spoken or skipped — never a silent text wall. *When/where:* every new visit / first Play. *Short:* opening still image / theme sting (GPU).
+| # | Beat | Where / when | How it is lived (must have ≥1 of: gameplay, camera/prop event, sfx, voice) | Text allowed |
+|---|---|---|---|---|
+| 1 | Title and first Play | every visit / first Play | Title skyline orbit + title bed; opening five beats on his model spoken (Eric) or Skip/cut — never a silent text wall | Skip label only |
+| 2 | You take over | on `day:control` take | Camera push to shoulder + one first-person line + control sting | none beyond the line if voiced |
+| 3 | Learn the weather | under control, first offer | Lock→unlock five abilities; real casts E/R/V/C/X; toast ≤1 line | prompt ≤1 line |
+| 4 | Birdie's rain | morning–noon, pots or park | Bubble ask; Rain near her; thanks voice; lawn/pond respond; toast ≤1 line | toast ≤1 line |
+| 5 | Dex / market opens | noon plaza | Ask + Sun break; stay while stalls/citizens fill; Dex thanks; Board evening advisory on Tank **speaker** (voice + pulse) | toast ≤1 line |
+| 6 | Rooftop storm lunch | ~12:20 | Uncalled cell; Dex phone brief (voice); Shelter / Hollis rod / street clear; fog twist + debris; Ines throat line (voice); rank end line spoken | HUD goals ≤1 line each |
+| 7 | Still blades | work / evening annex | Office lights dim + lift crawl **before** any log; Ines; Gale 10 s spins turbines (visible + whoosh); intact stalls; kick: overspeed + stall topple | log may echo after |
+| 8 | Hurricane drive | ~17:53 lot→home | Board wind advisory (voice); four closures help/hurt; bus twist; reach parkHome; Board close-out by rank (voice) + his one line | HUD ≤1 line |
+| 9 | Tank low + ending | ~22:20 Tank / after Part 3 | Board critical on pulsing speaker; Ines charge line; two Lightning hits + mast flash/thunder; Rain fills gauge (bolt-storm does not count); Strain as flood patch or held storm + Warning on speaker; **ending:** in-engine camera (or Gen still once budgeted) over four needs, then his last voiced line; card is caption only | caption under camera |
+| 10 | Light show finale | ~22:05 plaza | Walk into plaza; 18 cues on beat; stage beams/pools/aurora; grand salvo; closing holds crowd (Birdie, Dex, Ines) while cityFared stingers + his last line by rank are spoken | card captions audio |
+| 11 | Neighbor surprises | evening windows | Bubble + reward + Pressure; spoken when clips exist, else babble + bubble — never log-only | toast ≤1 line |
+| 12 | Day end recap | clock rolls next day | Dim score; sign-off voice; three in-world flashes tied to log events; one last spoken breath; Skip/Esc/timer | ≤1 line under flashes |
+| 13 | Crowd weather breath | any day under control | Manual weather → look-up, run, hats, cheer, umbrellas, wipers; hold then fade | none |
 
-2. **You take over** — Camera push to shoulder + one first-person line (`moments.takeover`) + control sting. *Where:* wherever he stands. Skip by move/tap.
-
-3. **Learn the weather (tutorial episode)** — Lock→unlock five abilities with toasts, Pressure top-ups, real casts (E/R/V/C/X). *Where:* anywhere under control. Skip opens all.
-
-4. **Birdie's rain (neighbor + Part 1)** — Speech bubble ask; Rain near her; thanks voice; park drinks (toast ≤1 line); lawn/pond respond. *When:* morning–noon, pots or park. Strain watches over-hold.
-
-5. **Dex's sun break / market opens (Part 1)** — Ask + Sun break on plaza; stay while stalls and citizens fill; Dex thanks. Kick: second sun scorches lawn. Board evening advisory on Tank speaker (voice), not a text dump.
-
-6. **Rooftop storm lunch rescue** — Uncalled cell; Dex phone brief (voice); Shelter / Hollis rod / street clear set pieces; fog twist with debris; Ines throat line (voice); rank card with spoken end line. *When:* ~12:20.
-
-7. **Still blades (Part 2)** — Dim office feel as event (lights), not only a log sentence; Ines on annex; Gale 10 s spins turbines (visible + whoosh); intact plaza stalls; thanks. Kick: overspeed + stall topple.
-
-8. **Hurricane drive home** — Board wind advisory (voice); four closures with help/hurt powers; bus twist to storm; reach parkHome; Board close-out by rank (voice) + his one line.
-
-9. **Tank low (Part 3)** — Board critical on the pulsing Tank speaker (voice + duck); Ines "charge the mast" (voice); two Lightning hits in zone with mast flash/thunder; Rain fills the yard gauge (storm-from-bolt does not count); Strain branches as visible flood patch or held storm + Weather Warning on the speaker. **Ending:** an in-engine camera move (or Gen still once budgeted) over the district's four needs as they stand, then his one last voiced line (Eric); the card's scene paragraph is a caption under that, never the beat alone. Day continues on "Walk the city".
-
-10. **Light show finale** — Walk into plaza (show clock starts); 18 cues on beat; stage beams/pools/aurora; grand salvo; **closing:** camera holds the plaza crowd (Birdie, Dex, Ines visible) while cityFared lines play as short Board or neighbor voice stingers and his last line by rank is spoken; any card text captions that audio. *When:* ~22:05.
-
-11. **Neighbor surprises** — Evening tomatoes / humming parcel / star line: bubble + reward toast + Pressure, each once per day key; surprise lines are spoken when clips exist, else babble + bubble (never a silent log-only beat).
-
-12. **Day end recap** — Not a text wall. When the clock rolls: dim the score, play his sign-off voice line, stage three quick in-world flashes (camera whip or freeze-frame props) tied to three log events (early / player's note / late), then one last spoken breath. Skip/Esc/timer still closes it. Card copy, if any, is one line under the flashes.
-
-13. **Crowd weather breath (always)** — Manual weather → look-up, run, hats, cheer, umbrellas, wipers; hold then fade. This is the district answering him, every day, arc or not.
-
-### Beats that must not stay text-only
+### Beats that must not stay text-only (hard fails until fixed)
 - Opening lines → voice (Eric) or cut.
 - Board advisories → loudspeaker mesh pulse + voice + world audio duck.
 - Ending / closing → camera or still of the district + voiced last line; card text is caption only.
 - Day end recap → sign-off voice + three staged flashes; no recap that is only a list of sentences.
-- Part 2 power ration → office lights dim and lift audio crawl *before* any log line; the log may echo after.
+- Part 2 power ration → office lights dim and lift audio crawl *before* any log line.
 
 ### What already exists vs short
-- **In:** neighbors, Parts 1–3, lunch rescue, hurricane drive, light show, tutorial, opening, moments, crowd reactions, landmarks, cityscape density, spoken dialogue pipeline for story/neighbor lines.
-- **Must build next (ordered, matches fun-review gaps):** (1) always-on park / plaza stalls / annex turbines + day-keyed states; (2) Needle life loop + avenue kerb micro-events; (3) Tank loudspeaker staging + day-end flashes and ending camera/voice so no story beat is card-text alone. Then: neighbor/crowd art pass, junction turns, home crown landmark, GPU music-day/night and ending stills/stings when J approves budget.
+- **In:** neighbors (box figures + beats), Parts 1–3, lunch rescue, hurricane drive, light show, tutorial, opening (text beats), moments, crowd reactions, landmarks, cityscape density, spoken dialogue pipeline for story/neighbor lines (~104 clips), Strain/endings as cards.
+- **Must build next (matches fun-review gaps, same order as Build queue):** (1) always-on park / plaza stalls / annex turbines + day-keyed states; (2) micro-life + night/south-avenue density beads + playtest; (3) four non-weather verbs with Pressure at 0; (4) Tank loudspeaker + day-end flashes + ending camera/voice (`textOnlyBeats` = 0); (5) neighbor idle life past the ask + silhouettes; (6) Needle life; (7) second-slice gate shop→plaza; (8) GPU art when J approves budget.
 
 ### Canon flags (do not quietly flip)
 - Storm Tank as reservoir, District Board identity, how much the district "knows," and Ines's larger "pulling" hook stay tied to `docs/story-arc-beat-sheet.md` open questions / story-spec recommendations. Playable arc uses the recommendations; bible treats them as **working canon for builds** until J overrides.
