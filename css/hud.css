@@ -83,16 +83,13 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(-
 }
 html.touch-ui.in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
 
-/* ---------- Quality ---------- */
-.quality-btn { position: fixed; left: calc(50% + 108px); bottom: calc(var(--tl) + 38px); }
-html.in-control:not(.preview-public):not(.touch-ui) .quality-btn { bottom: calc(var(--above-a) + 6px); }
-.preview-public .quality-btn { bottom: 40px; }
-@media (max-width: 700px) {
-  .quality-btn { left: auto; right: max(12px, env(safe-area-inset-right)); bottom: auto; top: var(--tr-quality); }
-  .in-control .quality-btn, .preview-public .quality-btn { top: var(--safe-t); }
-}
-html.touch-ui .quality-btn { left: auto; right: max(12px, env(safe-area-inset-right)); bottom: auto; top: var(--tr-quality); }
-html.touch-ui.in-control .quality-btn, html.touch-ui.preview-public .quality-btn { top: var(--safe-t); }
+/* ---------- Settings popover (top-right cluster, under the Settings button) ---------- */
+.tools { position: relative; }
+.settings-pop { position: absolute; top: 100%; right: 0; margin-top: 6px; z-index: 12; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.settings-pop[hidden] { display: none; }
+.settings-pop .quality-btn { position: static; }
+@media (max-width: 700px) { .settings-pop { position: static; align-items: flex-end; } }
+html.touch-ui .settings-pop { position: static; align-items: flex-end; }
 
 /* ---------- the controls hint ---------- */
 .control-hint {
@@ -109,29 +106,21 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-hint { bottom: calc
 .touchpad { position: fixed; inset: auto 0 150px 0; }
 .preview-public .touchpad, html.touch-ui.in-control .touchpad { bottom: var(--safe-b); }
 
-/* ---------- left stack (desktop): Episodes, Neighbors, weather, Pressure ---------- */
-.ep-btn { position: fixed; left: 18px; bottom: var(--l1); }
-.preview-public .ep-btn { bottom: 78px; }
-.nb-btn { position: fixed; left: 18px; bottom: var(--l2); }
-.nb-panel { position: fixed; left: 18px; bottom: calc(var(--l2) + 46px); }
-.weather-btn, #weather-chip { position: fixed; top: auto; bottom: var(--l3); left: var(--gutter); }
-.preview-public .weather-btn, .preview-public #weather-chip { bottom: 132px; top: auto; }
-.pressure { position: fixed; left: 18px; bottom: var(--l4); }
-.preview-public .pressure { bottom: 176px; }
-
-/* ---------- phone: top-left (weather, Pressure), top-right (Quality, Episodes), bottom (Episodes in control) ---------- */
-html.touch-ui .weather-btn, html.touch-ui #weather-chip { top: var(--safe-t); bottom: auto; left: max(12px, env(safe-area-inset-left)); }
-html.touch-ui .pressure, html.touch-ui.public .pressure, html.touch-ui.preview-public .pressure {
-  left: max(12px, env(safe-area-inset-left)); right: auto; bottom: auto; top: max(78px, calc(env(safe-area-inset-top) + 72px));
-}
+/* ---------- left column: one flex stack, bottom-up: Episodes, Neighbors, weather, Pressure ---------- */
+.hud-left { position: fixed; left: var(--safe-l); bottom: var(--l1); z-index: 5; display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; pointer-events: none; }
+.hud-left > * { position: static; pointer-events: auto; }
+.hud-left .ep-btn { order: 1; }
+.hud-left .nb-btn { order: 2; }
+.hud-left .weather-btn, .hud-left #weather-chip { order: 3; }
+.hud-left .pressure { order: 4; }
+.nb-panel { position: fixed; left: var(--safe-l); bottom: calc(var(--l1) + 100px); }
+.preview-public .hud-left { bottom: 78px; }
+/* phone: the column hangs top-left (weather, Pressure, Neighbors, Episodes), clear of the tools column */
 @media (max-width: 700px) {
-  .ep-btn { left: auto; right: max(12px, env(safe-area-inset-right)); top: var(--tr-ep); bottom: auto; transform: none; }
-  .preview-public .ep-btn { top: calc(var(--safe-t) + 50px); bottom: auto; }
-  .in-control .ep-btn { left: 50%; right: auto; top: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); }
+  .hud-left { bottom: auto; top: var(--safe-t); flex-direction: column; left: max(12px, env(safe-area-inset-left)); }
+  .in-control .hud-left .ep-btn { order: 5; }
 }
-html.touch-ui .ep-btn { left: auto; right: max(12px, env(safe-area-inset-right)); top: var(--tr-ep); bottom: auto; transform: none; }
-html.touch-ui.preview-public .ep-btn { top: calc(var(--safe-t) + 50px); bottom: auto; }
-html.touch-ui.in-control .ep-btn { left: 50%; right: auto; top: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); }
+html.touch-ui .hud-left { bottom: auto; top: var(--safe-t); flex-direction: column; left: max(12px, env(safe-area-inset-left)); }
 
 /* ---------- bottom row: the ability bar, the power pad ---------- */
 .abilitybar { position: fixed; left: 50%; bottom: var(--safe-b); transform: translateX(-50%); }
