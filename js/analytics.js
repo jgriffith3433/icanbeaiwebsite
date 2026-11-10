@@ -47,6 +47,8 @@
   $("play").addEventListener("click", safe(() => feature($("play").textContent === "Play" ? "pause" : "play", { via: via() })));
   $("live").addEventListener("click", safe(() => feature("live", { via: via() })));
   $("sound").addEventListener("click", safe(() => feature("sound", { value: $("sound").getAttribute("aria-pressed") === "true" ? "on" : "off" })));
+  // Voices mute (js/voice.js): separate from Sound (music / effects).
+  window.addEventListener("day:voices", safe((e) => feature("voices", { value: (e.detail || {}).value || "off" })));
   $("details").addEventListener("click", safe(() => feature("details", { value: $("details").getAttribute("aria-pressed") === "true" ? "open" : "closed" })));
   // Taking control of him (js/control.js). take_control, let_go and glide are their own
   // features; control still carries the same actions for the older list.
