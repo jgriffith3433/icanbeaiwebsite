@@ -344,7 +344,7 @@
        onto the roof. A ramp, not a stack of steps: the controller treats a sharp riser as a
        wall once the capsule's curve meets it, and a slope under 30° stays walkable. */
     const trimM = mat("#2c333c");
-    const stepM = mat("#566059", { emissive: "#0d100e" }); // the faint emissive keeps the ramp readable at night, when only the hemi light reaches it
+    const stepM = mat("#566059", { emissive: "#1a201c" }); // the faint emissive keeps the ramp readable at night, when only the hemi light reaches it
     const winM = glowMat("#1a2838");
     const blockWin = box("bwin", 1.15, 1.25, 0.06, 0, 0, 0, winM, null, false);
     glowing(blockWin);
@@ -398,7 +398,7 @@
       /* Close the wedge under the ramp: its high end and its street side are walls, so nobody walks in under the
          ramp where the gap is lower than the capsule and gets stuck. The side is stepped to follow the underside
          (always a little below it, so it never touches the walkable slope). */
-      const wallM = mat("#4a5459", { emissive: "#0e1215" }); // lighter than before: at night the end and side walls read as a black slab beside the ramp
+      const wallM = mat("#58636a", { emissive: "#1c242a" }); // lighter than before: at night the end and side walls read as a black slab beside the ramp
       const endH = Math.max(0.5, b.h - 0.35);
       box(b.id + "rampend", 0.3, endH, s.w + 0.4, s.x1 + 0.15, endH / 2, s.z, wallM, null, false);
       solids.push({ x: s.x1 + 0.15, y: endH / 2, z: s.z, w: 0.3, h: endH, d: s.w + 0.4 });
