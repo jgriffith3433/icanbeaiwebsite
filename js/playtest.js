@@ -289,16 +289,26 @@ async function checkFoundation(t) {
   await sleep(1500);
 
   // Night bedroom: bedside/moonlight fill keeps Small Weather and the bed/desk clearly readable at night.
+  // The bedrug must be in those lights' includedOnlyMeshes (cast:false left it hemi-only and near-black).
   t.scene("Night bedroom");
   scrubTo(23 * 60 + 40);
   await sleep(2200);
   const st = w && w.stage;
   const fillI = st && st.bedsideFill ? st.bedsideFill.intensity : 0;
   const bedI = st && st.bedroomLight ? st.bedroomLight.intensity : 0;
+  const rug = w && w.scene && w.scene.getMeshByName("bedrug");
+  const rugLit =
+    rug &&
+    ((st.bedroomLight && st.bedroomLight.includedOnlyMeshes && st.bedroomLight.includedOnlyMeshes.indexOf(rug) >= 0) ||
+      (st.bedsideFill && st.bedsideFill.includedOnlyMeshes && st.bedsideFill.includedOnlyMeshes.indexOf(rug) >= 0));
   if (!(fillI > 0.35 && bedI > 0.35)) {
     t.problem("bug", `Bedroom night fill is too dim at 23:40 (bedsideFill ${fillI.toFixed(2)}, bedroomLight ${bedI.toFixed(2)})`);
+  } else if (!rug) {
+    t.problem("bug", "Night bedroom: bedrug mesh is missing");
+  } else if (!rugLit) {
+    t.problem("bug", "Night bedroom: bedrug is not lit by the ceiling or bedside fill (floor reads near-black)");
   } else {
-    t.event("bedroom-night-fill", `bedsideFill ${fillI.toFixed(2)}, bedroomLight ${bedI.toFixed(2)}, personOnScreen ${personOnScreen()}`);
+    t.event("bedroom-night-fill", `bedsideFill ${fillI.toFixed(2)}, bedroomLight ${bedI.toFixed(2)}, bedrugLit, personOnScreen ${personOnScreen()}`);
   }
 
   pressKey("Escape");
