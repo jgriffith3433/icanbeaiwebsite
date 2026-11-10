@@ -344,7 +344,7 @@
        onto the roof. A ramp, not a stack of steps: the controller treats a sharp riser as a
        wall once the capsule's curve meets it, and a slope under 30° stays walkable. */
     const trimM = mat("#2c333c");
-    const stepM = mat("#566059", { emissive: "#0d100e" }); // the faint emissive keeps the ramp readable at night, when only the hemi light reaches it
+    const stepM = mat("#566059", { emissive: "#1a201c" }); // the faint emissive keeps the ramp readable at night, when only the hemi light reaches it
     const winM = glowMat("#1a2838");
     const blockWin = box("bwin", 1.15, 1.25, 0.06, 0, 0, 0, winM, null, false);
     glowing(blockWin);
@@ -398,7 +398,7 @@
       /* Close the wedge under the ramp: its high end and its street side are walls, so nobody walks in under the
          ramp where the gap is lower than the capsule and gets stuck. The side is stepped to follow the underside
          (always a little below it, so it never touches the walkable slope). */
-      const wallM = mat("#4a5459", { emissive: "#0e1215" }); // lighter than before: at night the end and side walls read as a black slab beside the ramp
+      const wallM = mat("#58636a", { emissive: "#1c242a" }); // lighter than before: at night the end and side walls read as a black slab beside the ramp
       const endH = Math.max(0.5, b.h - 0.35);
       box(b.id + "rampend", 0.3, endH, s.w + 0.4, s.x1 + 0.15, endH / 2, s.z, wallM, null, false);
       solids.push({ x: s.x1 + 0.15, y: endH / 2, z: s.z, w: 0.3, h: endH, d: s.w + 0.4 });
@@ -693,7 +693,9 @@
       box("pillow2", 0.65, 0.13, 0.36, 0.38, 0.68, -1.02, white, n);
       quiltUp = box("quilt", 1.66, 0.12, 1.62, 0, 0.9, 0.36, mat("#7088ad"), n);
       quiltDown = box("quiltdown", 1.66, 0.14, 0.45, 0, 0.66, 0.66, mat("#7088ad"), n);
-      box("bedrug", 2.6, 0.015, 1.1, 0, FLOOR + 0.008, 1.45, mat("#8d4e45"), n, false).receiveShadows = true;
+      /* cast true so the rug joins casters and the bedroom/bedside point lights (includedOnlyMeshes);
+         furnitureSet still skips it as a sun shadow caster. Colour was near the old navy quilt — too dark under night fill. */
+      box("bedrug", 2.6, 0.015, 1.1, 0, FLOOR + 0.008, 1.45, mat("#b07a6c"), n).receiveShadows = true;
       const ns = new B.TransformNode("ns", scene);
       ns.parent = n;
       ns.position.set(-1.25, 0, -1.0);
@@ -801,8 +803,8 @@
       if (tvN) {
         box("tvstand", 1.8, 0.45, 0.42, 0, 0.32, 0, woodDark, tvN);
         const sm = glowMat("#0f1216");
-        box("tv", 1.55, 0.88, 0.06, 0, 1.25, 0.06, dark, tvN);
-        glowing(box("tvface", 1.48, 0.82, 0.01, 0, 1.25, 0.095, sm, tvN, false));
+        box("tv", 1.55, 0.88, 0.06, 0, 0.99, 0.06, dark, tvN); // bottom edge on the stand top (0.545)
+        glowing(box("tvface", 1.48, 0.82, 0.01, 0, 0.99, 0.095, sm, tvN, false));
         props.tv = sm;
         box("plantpot", 0.3, 0.35, 0.3, 1.25, 0.28, 0.0, mat("#a0644c"), tvN);
         sphere("plant", 0.6, leafMs[0], tvN, 8).position.set(1.25, 0.75, 0);
