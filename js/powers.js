@@ -174,6 +174,15 @@ export function startPowers(world, dayApi) {
   let throwFor = 0;
   let flash = 0;
   let shake = 0;
+  let shakeT = 0;
+  let shaking = false;
+  let shakeRun = 0;
+  let shakeMax = 0;
+  let hitstop = 0;
+  let push = 0;
+  let pushApplied = 0;
+  let lastCast = null;
+  const fxList = [];
   const shaken = { a: 0, b: 0 };
   let strike = null;
   let strikeSnap = null;
@@ -226,7 +235,101 @@ export function startPowers(world, dayApi) {
       /* the test's window has no events */
     }
   }
+
+  /* ---- cast sequence: wind-up, burst at the target, layered SFX, a short push; all in the press's own frame ---- */
+  const CAST = {
+    storm: { kind: "bloom", color: [0.35, 0.42, 0.7], base: 110, hold: 0.09 },
+    bolt: { kind: "fork", color: [1, 1.2, 1.6], base: 520 },
+    gust: { kind: "ring", color: [0.7, 0.9, 1], base: 300 },
+    tornado: { kind: "bloom", color: [0.5, 0.5, 0.58], base: 85 },
+    rain: { kind: "flurry", color: [0.45, 0.7, 1.1], base: 400 },
+    gale: { kind: "ring", color: [0.6, 1, 0.8], base: 240 },
+    fog: { kind: "flurry", color: [0.85, 0.9, 1], base: 180 },
+    sunbreak: { kind: "shaft", color: [1.4, 1.1, 0.5], base: 660 },
+  };
+  function fxMat(c) {
+    const m = new B.StandardMaterial("cast-fx", scene);
+    m.disableLighting = true;
+    m.emissiveColor = new B.Color3(c[0], c[1], c[2]);
+    m.alpha = 0.8;
+    m.transparencyMode = B.Material.MATERIAL_ALPHABLEND;
+    m.backFaceCulling = false;
+    return m;
+  }
+  function addFx(mesh, mat, life, grow, rise) {
+    mesh.material = mat;
+    mesh.isPickable = false;
+    fxList.push({ mesh, mat, life, t: 0, grow, rise: rise || 0, s0: mesh.scaling.clone() });
+  }
+  function castSound(id, c) {
+    const a = ensureAudio();
+    if (!a || !soundOn()) return;
+    if (a.ctx.state === "suspended") a.ctx.resume();
+    const v = Math.floor(Math.random() * 3);
+    const pitch = (0.92 + Math.random() * 0.16) * [1, 1.12, 0.89][v];
+    const t = a.ctx.currentTime;
+    const o = a.ctx.createOscillator();
+    const g = a.ctx.createGain();
+    o.type = ["sine", "triangle", "sawtooth"][v];
+    o.frequency.setValueAtTime(c.base * pitch * 0.5, t);
+    o.frequency.exponentialRampToValueAtTime(c.base * pitch, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(g);
+    g.connect(a.master);
+    o.start(t);
+    o.stop(t + 0.25);
+    burst(c.base * pitch * 2.2, 0.28 + v * 0.06, 0.2, ["lowpass", "bandpass", "highpass"][v]);
+  }
+  function castFx(id) {
+    const c = CAST[id];
+    if (!c || !scene) return;
+    const p = who();
+    const f = forward();
+    let tg;
+    if (id === "bolt") tg = groundAim() || { x: p.x + f.x * 6, y: p.y, z: p.z + f.z * 6 };
+    else if (id === "storm" || id === "tornado") tg = { x: p.x + f.x * 4, y: p.y, z: p.z + f.z * 4 };
+    else tg = { x: p.x + f.x * 5, y: p.y, z: p.z + f.z * 5 };
+    castFor = Math.max(castFor, 0.5);
+    [-0.45, 0.45].forEach((side) => {
+      const h = B.MeshBuilder.CreateSphere("cast-hand", { diameter: 0.5, segments: 6 }, scene);
+      h.position.set(p.x + f.z * side, (p.y || 0) + 1.5, p.z - f.x * side);
+      addFx(h, fxMat(c.color), 0.4, 1.8, 0.5);
+    });
+    const mat = fxMat(c.color);
+    const y = tg.y || 0;
+    if (c.kind === "bloom") {
+      for (let i = 0; i < 4; i++) {
+        const m = B.MeshBuilder.CreateSphere("cast-bloom", { diameter: 1.6, segments: 6 }, scene);
+        m.position.set(tg.x + (i - 1.5) * 0.9, y + 3 + (i % 2) * 0.6, tg.z);
+        addFx(m, mat, 0.6, 1.7, 0.8);
+      }
+    } else if (c.kind === "ring") {
+      const m = B.MeshBuilder.CreateTorus("cast-ring", { diameter: 1.4, thickness: 0.14, tessellation: 20 }, scene);
+      m.position.set(tg.x, y + 1.1, tg.z);
+      m.rotation.x = Math.PI / 2;
+      addFx(m, mat, 0.5, 5, 0);
+    } else if (c.kind === "shaft") {
+      const m = B.MeshBuilder.CreateCylinder("cast-shaft", { diameter: 1.6, height: 12, tessellation: 12 }, scene);
+      m.position.set(tg.x, y + 6, tg.z);
+      addFx(m, mat, 0.7, 1.4, 0);
+    } else if (c.kind === "flurry") {
+      for (let i = 0; i < 10; i++) {
+        const m = B.MeshBuilder.CreateSphere("cast-flurry", { diameter: 0.22, segments: 4 }, scene);
+        m.position.set(tg.x + (Math.random() - 0.5) * 3, y + 3 + Math.random() * 1.5, tg.z + (Math.random() - 0.5) * 3);
+        addFx(m, mat, 0.6, 1, -4);
+      }
+    }
+    // the fork and its flash come from bolt() itself
+    castSound(id, c);
+    push = id === "storm" ? 0.05 : 0.03;
+    if (c.hold) hitstop = c.hold;
+    if (id !== "bolt" && id !== "gale" && id !== "tornado") shake = Math.max(shake, 0.008);
+    lastCast = { id, at: performance.now(), kind: c.kind, hitstop: !!c.hold };
+  }
   function say(action, via, power) {
+    if (action !== "denied") castFx(power || action);
     const g = gauge.now();
     const a = abil.get(power || action);
     emit({ action, via: via || "key", power: power || action, pressure: Math.round(g.value), energy: Math.round(g.value), cooldown: a ? a.cooldown : 0, reason: action === "denied" ? lastWhy : undefined });
@@ -1223,7 +1326,6 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       // Gale: a steady shove down the street, fading, and a little shake
       const k = (callFx.until - age) / 3;
       props.forEach((prop) => shove(prop, callFx.dirX * 5 * k, 0.4, callFx.dirZ * 5 * k));
-      shake = Math.max(shake, 0.004 * k);
     }
     if (gustFx && age > gustFx.until) {
       gustMesh.setEnabled(false);
@@ -1267,7 +1369,6 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
         const rad = 0.7 + (i % 3) * 0.45;
         m.position.set(Math.sin(a) * rad, 0.4 + i * 0.85, Math.cos(a) * rad);
       });
-      shake = Math.max(shake, 0.008);
       props.forEach((prop) => {
         const dx = tornado.x - prop.mesh.position.x;
         const dz = tornado.z - prop.mesh.position.z;
@@ -1313,6 +1414,36 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       } else scorches[i].mesh.visibility = Math.min(1, (scorches[i].until - age) / 4);
     }
 
+    for (let i = fxList.length - 1; i >= 0; i--) {
+      const f = fxList[i];
+      f.t += dt;
+      const k = f.t / f.life;
+      if (k >= 1) {
+        f.mesh.dispose();
+        f.mat.dispose();
+        fxList.splice(i, 1);
+        continue;
+      }
+      f.mesh.scaling.set(f.s0.x * (1 + (f.grow - 1) * k), f.s0.y * (1 + (f.grow - 1) * k), f.s0.z * (1 + (f.grow - 1) * k));
+      f.mesh.position.y += f.rise * dt;
+      f.mat.alpha = 0.8 * (1 - k);
+    }
+    hitstop = Math.max(0, hitstop - dt);
+    // Camera shake never runs over 0.28 s in one go; a push in the fov goes with it.
+    if (shake > 0.0005 && !shaking) {
+      shaking = true;
+      shakeT = 0.28;
+      shakeRun = 0;
+    }
+    if (shaking) {
+      shakeRun += dt;
+      shakeMax = Math.max(shakeMax, shakeRun);
+      shakeT -= dt;
+      if (shakeT <= 0 || shake <= 0.0005) {
+        shake = 0;
+        shaking = false;
+      }
+    }
     const cam = world.camera;
     if (cam) {
       cam.alpha -= shaken.a;
@@ -1322,6 +1453,10 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       cam.alpha += shaken.a;
       cam.beta += shaken.b;
       shake = Math.max(0, shake - dt * 1.6);
+      cam.fov += pushApplied;
+      pushApplied = push;
+      cam.fov -= pushApplied;
+      push = Math.max(0, push - dt * 0.4);
     }
 
     const aim = on ? groundAim() : null;
@@ -1331,7 +1466,7 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
 
   const prev = world.update.bind(world);
   world.update = function (fr, dt, opts) {
-    prev(fr, dt, opts);
+    prev(fr, hitstop > 0 ? dt * 0.1 : dt, opts);
     try {
       tick(dt);
     } catch (err) {
@@ -1371,6 +1506,7 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       alarm: !!(alarm && age < alarm.until),
       props: propPositions(),
       localRain: localStorm,
+      cast: lastCast ? Object.assign({ shakeMax }, lastCast) : { shakeMax },
     };
   }
 

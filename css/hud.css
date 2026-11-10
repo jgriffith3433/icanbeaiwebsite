@@ -160,6 +160,23 @@ html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { 
 .mo-line { position: fixed; left: 50%; bottom: max(230px, calc(env(safe-area-inset-bottom) + 210px)); transform: translateX(-50%); }
 html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); } /* above the ability bar */
 
+/* voice director caption: above the ability bar, never over it */
+.voice-caption {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--above-a) + 56px);
+  z-index: 36;
+}
+html:not(.in-control) .voice-caption { bottom: calc(var(--tl) + 88px); }
+.preview-public .voice-caption { bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); }
+html.touch-ui.in-control .voice-caption {
+  bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px));
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  html.touch-ui .voice-caption { bottom: max(140px, calc(env(safe-area-inset-bottom) + 128px)); }
+}
+
 /* ---------- phone landscape (short window): the ability bar and the tutorial sit between the stick and the pad ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
   html.touch-ui .abilitybar { right: auto; left: max(164px, calc(env(safe-area-inset-left) + 150px)); bottom: max(60px, calc(env(safe-area-inset-bottom) + 54px)); }

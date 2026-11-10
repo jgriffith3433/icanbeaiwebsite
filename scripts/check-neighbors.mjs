@@ -123,6 +123,42 @@ for (const p of list) {
   globalThis.day.now = () => ({ key: "d2", minutes: 8 * 60 + 10, frame: { person: { x: pos.x, z: pos.z } } });
   await frames(3);
   ok(by("birdie").stage === 0 && by("birdie").asking, "a new day starts the beats again");
+  ok(typeof N.anim === "function" && typeof N.resetAnim === "function", "neighbors.anim detectors API");
+
+  // Procedural gait: drive a figure at walking speed and require 0 planted-foot slides.
+  const { buildFigure, detectAnimProblems, FOOT_SLIDE_LIMIT, WALK_STRIDE } = await import("../js/peoplekit.js");
+  const fig = buildFigure(BABYLON, scene, "walk-test", { skin: "#e0b794", top: "#888", pants: "#333", shoes: "#222" }, 1);
+  fig.root.position.set(0, 0, 0);
+  let prev = null;
+  let slides = 0;
+  let mismatches = 0;
+  const walkSpeed = 1.3;
+  for (let i = 0; i < 180; i++) {
+    const dt = 1 / 60;
+    fig.root.position.z += walkSpeed * dt;
+    const sample = fig.step({ dt, speed: walkSpeed, moving: true, yawErr: 0, weather: "clear", sunShield: 0, jump: false });
+    const hit = detectAnimProblems(sample, prev, { limit: FOOT_SLIDE_LIMIT });
+    if (hit.footSlide) slides++;
+    if (hit.mismatch) mismatches++;
+    prev = sample;
+  }
+  ok(slides === 0, `planted foot slid on ${slides} frames (limit ${FOOT_SLIDE_LIMIT} m, stride ${WALK_STRIDE})`);
+  ok(mismatches === 0, `state/motion mismatch on ${mismatches} frames`);
+  const gAsk = fig.step({ dt: 0.016, speed: 0, moving: false, gesture: "ask" });
+  ok(gAsk.gesture === "ask" && gAsk.state === "gesture-ask", "ask gesture plays");
+  const gTh = fig.step({ dt: 0.016, speed: 0, moving: false, gesture: "thanks" });
+  ok(gTh.gesture === "thanks", "thanks gesture plays");
+  let rainPose = null;
+  for (let i = 0; i < 40; i++) rainPose = fig.step({ dt: 0.05, speed: 0, moving: false, weather: "rain", sunShield: 0 });
+  ok(rainPose.weather === "rain" && rainPose.weatherK > 0.5, "rain posture blends in");
+  let sunPose = null;
+  for (let i = 0; i < 40; i++) sunPose = fig.step({ dt: 0.05, speed: 0, moving: false, weather: "clear", sunShield: 1 });
+  ok(sunPose.weather === "sun" && sunPose.weatherK > 0.5, "sun shield posture blends in");
+
+  // Birdie's park stop and Dex's plaza stop sit
+  ok(placeAt(list.find((p) => p.id === "birdie").stops, 12).sit, "Birdie sits on the park bench at noon");
+  ok(placeAt(list.find((p) => p.id === "dex").stops, 12).sit, "Dex sits in the plaza at lunch");
+
   scene.dispose();
 }
 if (problems.length) {

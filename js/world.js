@@ -693,7 +693,9 @@
       box("pillow2", 0.65, 0.13, 0.36, 0.38, 0.68, -1.02, white, n);
       quiltUp = box("quilt", 1.66, 0.12, 1.62, 0, 0.9, 0.36, mat("#7088ad"), n);
       quiltDown = box("quiltdown", 1.66, 0.14, 0.45, 0, 0.66, 0.66, mat("#7088ad"), n);
-      box("bedrug", 2.6, 0.015, 1.1, 0, FLOOR + 0.008, 1.45, mat("#8d4e45"), n, false).receiveShadows = true;
+      /* cast true so the rug joins casters and the bedroom/bedside point lights (includedOnlyMeshes);
+         furnitureSet still skips it as a sun shadow caster. Colour was near the old navy quilt — too dark under night fill. */
+      box("bedrug", 2.6, 0.015, 1.1, 0, FLOOR + 0.008, 1.45, mat("#b07a6c"), n).receiveShadows = true;
       const ns = new B.TransformNode("ns", scene);
       ns.parent = n;
       ns.position.set(-1.25, 0, -1.0);
@@ -801,8 +803,8 @@
       if (tvN) {
         box("tvstand", 1.8, 0.45, 0.42, 0, 0.32, 0, woodDark, tvN);
         const sm = glowMat("#0f1216");
-        box("tv", 1.55, 0.88, 0.06, 0, 1.25, 0.06, dark, tvN);
-        glowing(box("tvface", 1.48, 0.82, 0.01, 0, 1.25, 0.095, sm, tvN, false));
+        box("tv", 1.55, 0.88, 0.06, 0, 0.99, 0.06, dark, tvN); // bottom edge on the stand top (0.545)
+        glowing(box("tvface", 1.48, 0.82, 0.01, 0, 0.99, 0.095, sm, tvN, false));
         props.tv = sm;
         box("plantpot", 0.3, 0.35, 0.3, 1.25, 0.28, 0.0, mat("#a0644c"), tvN);
         sphere("plant", 0.6, leafMs[0], tvN, 8).position.set(1.25, 0.75, 0);

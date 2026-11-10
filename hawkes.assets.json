@@ -3305,6 +3305,538 @@
    }
   },
   {
+   "id": "dlg-he-fx9i4c",
+   "note": "Spoken line (voice:take), He: \"Alright. My turn.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Alright. My turn.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-fx9i4c.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-b8k18r",
+   "note": "Spoken line (voice:take), He: \"The day can wait a minute.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The day can wait a minute.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-b8k18r.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1936hrn",
+   "note": "Spoken line (voice:take), He: \"I'm here. Sky's listening.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I'm here. Sky's listening.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1936hrn.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-77q2sv",
+   "note": "Spoken line (voice:letgo), He: \"Back to the day now.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Back to the day now.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-77q2sv.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-ckas4i",
+   "note": "Spoken line (voice:letgo), He: \"Clock kept going without me.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Clock kept going without me.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-ckas4i.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1rn1duv",
+   "note": "Spoken line (voice:bolt), He: \"Point and flash.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Point and flash.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1rn1duv.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-saisq1",
+   "note": "Spoken line (voice:bolt), He: \"That one was mine.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That one was mine.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-saisq1.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1w6efkf",
+   "note": "Spoken line (voice:rain), He: \"Wet road. Good.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Wet road. Good.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1w6efkf.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-p7etdt",
+   "note": "Spoken line (voice:rain), He: \"Rain. Finally something useful.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain. Finally something useful.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-p7etdt.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1sped9u",
+   "note": "Spoken line (voice:gale), He: \"Wind. Hold your jacket.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Wind. Hold your jacket.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1sped9u.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1l6jyil",
+   "note": "Spoken line (voice:gale), He: \"Push the street a little.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Push the street a little.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1l6jyil.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-e5q884",
+   "note": "Spoken line (voice:fog), He: \"Fog. Soft edges.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Fog. Soft edges.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-e5q884.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-5ygwy2",
+   "note": "Spoken line (voice:fog), He: \"Keep the far end soft.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Keep the far end soft.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-5ygwy2.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-l0kof6",
+   "note": "Spoken line (voice:sunbreak), He: \"Sun. Just for a minute.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Sun. Just for a minute.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-l0kof6.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-u0pzax",
+   "note": "Spoken line (voice:sunbreak), He: \"Clear the sky a bit.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Clear the sky a bit.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-u0pzax.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-pzasdr",
+   "note": "Spoken line (voice:storm), He: \"There it is.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "There it is.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-pzasdr.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-ywisgv",
+   "note": "Spoken line (voice:storm), He: \"This is more like it.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "This is more like it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-ywisgv.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-178z8pt",
+   "note": "Spoken line (voice:gust), He: \"Move. The bins can wait.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Move. The bins can wait.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-178z8pt.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1d8p3c",
+   "note": "Spoken line (voice:gust), He: \"Wind's on my side.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Wind's on my side.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1d8p3c.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-105ix5d",
+   "note": "Spoken line (voice:tornado), He: \"Watch the street.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Watch the street.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-105ix5d.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ik0nck",
+   "note": "Spoken line (voice:tornado), He: \"Funnel's going.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Funnel's going.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ik0nck.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1srzniu",
+   "note": "Spoken line (voice:rooftop), He: \"Got you. Ladder's next.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Got you. Ladder's next.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1srzniu.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1tr92ur",
+   "note": "Spoken line (voice:rooftop), He: \"Roof's clear. Come down.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Roof's clear. Come down.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1tr92ur.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-kn3uwm",
+   "note": "Spoken line (voice:neighbor), He: \"Anytime. Glad it helped.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Anytime. Glad it helped.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-kn3uwm.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1kejl22",
+   "note": "Spoken line (voice:neighbor), He: \"That one's done for now.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That one's done for now.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1kejl22.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-13zh2fa",
+   "note": "Spoken line (voice:dayend), He: \"Clock's still running. So am I.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Clock's still running. So am I.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-13zh2fa.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1e7fq23",
+   "note": "Spoken line (voice:dayend), He: \"I type. The sky waits.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I type. The sky waits.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1e7fq23.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1hjhu12",
+   "note": "Spoken line (voice:idle), He: \"Coffee's cold. Forecast isn't.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Coffee's cold. Forecast isn't.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1hjhu12.mp3"
+   }
+  },
+  {
    "id": "sfx-weather-soundscape",
    "note": "Batched urban rooftop weather soundscape loops (job j_37c19844f0f4, Stable Audio 3): light roof rain patter, heavy downpour, rooftop gutter trickle, umbrella rain patter, flapping canvas awnings, and sunny rooftop birds.",
    "steps": [

@@ -76,7 +76,8 @@ ok(day.dialogue === api, 'day.dialogue is not set');
 const beatOf = new Map();
 (cfg.neighbors.list || []).forEach((p) => (p.beats || []).forEach((b) => beatOf.set(b.id, b)));
 let unplayed = [];
-lines.forEach((L) => {
+const storyish = lines.filter((L) => !String(L.where || '').startsWith('voice:'));
+storyish.forEach((L) => {
   const before = played.length;
   if (L.where.startsWith('neighbor:')) {
     const beat = L.where.slice('neighbor:'.length);
@@ -86,6 +87,12 @@ lines.forEach((L) => {
   }
   const a = played[played.length - 1];
   if (played.length !== before + 1 || a.src !== L.file) unplayed.push(L.id);
+});
+// voice.spoken clips are played by the voice director, not day:story — still speak() them once each.
+lines.filter((L) => String(L.where || '').startsWith('voice:')).forEach((L) => {
+  const before = played.length;
+  api.speak(L.who, L.text);
+  if (played.length !== before + 1 || played[played.length - 1].src !== L.file) unplayed.push(L.id);
 });
 ok(unplayed.length === 0, `${unplayed.length} lines did not play their clip: ${unplayed.slice(0, 5).join(', ')}`);
 ok(played.slice(0, -1).every((a) => a.paused), 'a new line did not stop the one before it');
