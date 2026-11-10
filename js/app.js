@@ -27,6 +27,7 @@ import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let 
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
 import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build
+import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
 import "./title.js"; // the title screen: the skyline, Play and Episodes (opens first)
 import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause perf & leak monitor (window.hawkesPerf)

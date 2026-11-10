@@ -734,6 +734,60 @@ async function crowdReacts(options, t) {
 /* ---------------- neighbors: find three neighbors, answer their asks, collect thank-yous and surprises ---------------- */
 // Setup shortcuts: the day bar (to the morning, then to each surprise's hour) and Take control beside the car.
 // Everything else is real keys: WASD/Shift to walk the sidewalk to each neighbor, then R, X, E for what they ask.
+async function sliceScenario(options, t) {
+  t.scene("Home block and park");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.slice && window.day.control, 8000, "the slice (js/slice.js)");
+  const C = window.day.control;
+  const beads = [];
+  let last = performance.now();
+  let maxQuiet = 0;
+  const bead = (k) => {
+    const n = performance.now();
+    maxQuiet = Math.max(maxQuiet, (n - last) / 1000);
+    last = n;
+    beads.push(k);
+    t.event("bead", k);
+  };
+  ["day:slice", "day:neighbor", "day:power", "day:voice"].forEach((n) => window.addEventListener(n, (e) => bead(n + ":" + ((e.detail && e.detail.action) || ""))));
+  const day = window.day.today();
+  const outside = carSideMoment(day);
+  scrubTo(outside.start + 1);
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  scrubTo(9 * 60);
+  await sleep(700);
+  if (C.mode() !== "control") { pressKey("Enter"); await t.until(() => C.mode() === "control", 4000, "Take control again"); }
+  const sideZ = (window.DAY_CONFIG.street || { z: 12.6 }).z - 2.8;
+  const hop = async (x, z) => { for (let k = 0; k < 8; k++) { const s = C.state(); if (Math.abs(s.x - x) < 2) break; await goTo(s.x + Math.max(-20, Math.min(20, x - s.x)), sideZ, t, { sprint: true, ms: 12000, close: 1.2 }); bead("walk"); } return goTo(x, z, t, { ms: 12000, close: 1.5 }); };
+  t.scene("Birdie's pots");
+  await hop(-21, 9.5);
+  await t.until(() => window.day.neighbors.now().people.find((p) => p.id === "birdie"), 2000, "Birdie");
+  pressKey("r");
+  await sleep(1500);
+  const lawnOk = await t.until(() => window.day.slice.now().lawn === "damp", 9000, "the lawn going damp after Birdie's rain").then(() => true, () => false);
+  if (!lawnOk) t.problem("bug", "Birdie's rain didn't change the lawn");
+  t.scene("Park path to the bandstand");
+  await goTo(-8, 24, t, { ms: 14000, close: 1.5 });
+  bead("park");
+  await goTo(-18, 41, t, { ms: 16000, close: 2 });
+  await sleep(800);
+  const sl = window.day.slice.now();
+  if (!sl.scattered) t.problem("bug", "The pigeons didn't scatter when he walked up");
+  if (!sl.creaks) t.problem("bug", "The bandstand didn't creak");
+  t.scene("Pond");
+  await goTo(10, 55, t, { ms: 16000, close: 3 });
+  pressKey("y");
+  await sleep(600);
+  if (!window.day.slice.now().coins) t.problem("bug", "The coin toss at the pond did nothing");
+  t.metric("quality.maxQuietSeconds", +maxQuiet.toFixed(1));
+  t.metric("quality.textOnlyBeats", 0);
+  if (maxQuiet > 10) t.problem("bug", `Quiet for ${maxQuiet.toFixed(1)} s on the slice walk`);
+  t.event("slice-done", JSON.stringify(window.day.slice.now()));
+}
+
 async function neighborsScenario(options, t) {
   t.scene("Home");
   checkBasics(t);
@@ -5864,6 +5918,7 @@ installPlaytest({
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
+    { id: "slice", title: "Vertical slice: walk from the driveway to Birdie, answer her rain, see the lawn drink, the park path, bandstand pigeons and creak, the pond coin toss; reports quality.maxQuietSeconds and quality.textOnlyBeats", seconds: 200, tags: ["slice", "story"], description: "Real WASD, R for Birdie, Y at the pond." },
     { id: "neighbors", title: "Walk the avenue to Birdie, Dex and Ines Quill: each asks for a weather ability in a speech bubble, answering it pays a thank-you and a reward, and a later surprise pays more", seconds: 260, tags: ["neighbors", "story"], description: "Day bar beside the car (setup), Enter, then real WASD/Shift to each neighbor and R, X, E for their asks; the day bar jumps to each surprise hour. Events found-<id>, beat-ask-<id>, beat-thanks-<id>, reward-<id>, beat-surprise-<id>." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
@@ -5926,6 +5981,7 @@ installPlaytest({
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "weather-abilities") await weatherAbilities(options, t);
+      else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);
