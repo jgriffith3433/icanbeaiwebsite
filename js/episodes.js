@@ -672,7 +672,18 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     fill.parent = root;
     fill.material = smat("gauge-water", "#3ecbff", 0.9);
     fill.isPickable = false;
-    story.gauge = { root, fill, H, level: 0, to: 0, glow: fill.material };
+    // the Board's speaker on its own post beside the gauge: it lights up and pulses when the Board speaks
+    const post = B.MeshBuilder.CreateCylinder("ep-gauge-post", { diameter: 0.22, height: 4.2, tessellation: 8 }, world.scene);
+    post.parent = root;
+    post.position.set(2.6, 2.1, 0);
+    post.material = smat("speaker-post", "#5a5a60", 0.05);
+    post.isPickable = false;
+    const horn = B.MeshBuilder.CreateBox("ep-gauge-speaker", { width: 1.0, height: 0.65, depth: 0.65 }, world.scene);
+    horn.parent = root;
+    horn.position.set(2.6, 4.5, 0);
+    horn.material = smat("speaker", "#ffb347", 0.15);
+    horn.isPickable = false;
+    story.gauge = { root, fill, H, level: 0, to: 0, glow: fill.material, speaker: horn.material, flare: 0 };
     setGauge(0, true);
   }
   function setGauge(v, snap) {
@@ -706,6 +717,9 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (story.gauge) story.gauge.root.dispose(false, true);
     story.gauge = null;
     story.turned = false;
+    story.momentSpin = false;
+    story.speakerOn = false;
+    if (world.officePower) world.officePower(1);
     story.stalls = [];
     story.turbines = [];
     story.patches = [];
@@ -967,20 +981,33 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (!active || g.done || !afterMet(g, active)) return false;
     g.done = true;
     g.progress = Math.max(g.progress | 0, g.count | 0);
-    if (day.note) day.note((g.label || g.id) + ".");
     mark("goal", { id: active.ep.id, goal: g.id, via: via || "play" });
-    const tt = active.ep.toasts && active.ep.toasts["goal:" + g.id];
-    if (tt) showToast(tt);
-    sayKey("goal:" + g.id);
-    if (g.kind === "wind-time") story.turned = true;
+    // a turning point plays as a moment (camera, world, sting, voice) and stands in for the toast and the log line
+    const staged = playTurning("goal:" + g.id);
+    if (!staged) {
+      if (day.note) day.note((g.label || g.id) + ".");
+      const tt = active.ep.toasts && active.ep.toasts["goal:" + g.id];
+      if (tt) showToast(tt);
+      sayKey("goal:" + g.id);
+    }
+    if (g.kind === "wind-time") {
+      story.turned = true;
+      if (!staged && world.officePower) world.officePower(1);
+    }
     if (g.kind === "help" && active.rescue) afterPiece();
     if (active.ep.tutorial) {
       const next = currentTutorialGoal(active);
       if (next) unlockAbility(next.power, active);
     }
     paintHud();
-    if (allDone(active)) finish("clear");
-    else if (active.ep.strain && settled(active)) finish("scarred");
+    const A = active;
+    const over = () => {
+      if (active !== A) return;
+      if (allDone(A)) finish("clear");
+      else if (A.ep.strain && settled(A)) finish("scarred");
+    };
+    if (momentOn()) A.afterMoment = over; // the card waits for the moment to end
+    else over();
     return true;
   }
   function bumpProgress(g, n, via) {
@@ -1061,8 +1088,102 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     const e = ep || (active && active.ep);
     const lines = e && e.say && e.say[key];
     if (!lines) return;
-    lines.forEach(([who, text]) => sayQueue.push({ who, text, key, ep: e.id }));
+    const spent = active && active.spent;
+    // a turning-point moment (playTurning) already spoke some of a key's lines
+    lines.forEach(([who, text], i) => { if (!(spent && spent.has(e.id + ":" + key + "#" + i))) sayQueue.push({ who, text, key, ep: e.id }); });
     if (sayLeft <= 0) nextSay();
+  }
+  /* ---- turning points (js/moments.js `play`, data in day.config.js moments.turning) ---- */
+  const momentOn = () => !!(day.moments && day.moments.playing && day.moments.playing());
+  function turningFor(beat) {
+    const T = active && day.moments && day.moments.turning && day.moments.turning(active.ep.id);
+    return T && T.on === beat && day.moments.enabled && day.moments.enabled() ? T : null;
+  }
+  /* The episode's big beat as a staged moment instead of a toast and a log line: a cut-away camera on the place, the
+     event happening there (`fx`), a music sting, and the episode's own voiced lines (one caption line at a time). */
+  function playTurning(beat) {
+    const A = active;
+    const T = turningFor(beat);
+    if (!T || A.turnedBeats && A.turnedBeats.has(beat)) return false;
+    const sk = (T.say.scarredKey && (A.over || A.kicks.length)) ? T.say.scarredKey : T.say.key;
+    const all = (A.ep.say && A.ep.say[sk]) || [];
+    const play = T.say.play.filter((p) => all[p.i]);
+    A.spent = A.spent || new Set();
+    A.turnedBeats = A.turnedBeats || new Set();
+    A.turnedBeats.add(beat);
+    play.forEach((p) => A.spent.add(A.ep.id + ":" + sk + "#" + p.i));
+    const rest = all.filter((l, i) => !play.some((p) => p.i === i));
+    const fxs = turnFx(T.fx, A);
+    const ok = day.moments.play({
+      id: A.ep.id,
+      title: T.title,
+      secs: T.secs,
+      sting: T.sting,
+      shot: T.shot,
+      lines: play.map((p) => ({ who: all[p.i][0], text: all[p.i][1], at: p.at, caption: p.caption })),
+      speak: (who, text) => {
+        said.push({ t: performance.now(), who, text, key: sk, ep: A.ep.id, moment: true });
+        if (said.length > 80) said.shift();
+        storyEvent("say", { who, text, key: sk, id: A.ep.id, moment: true });
+      },
+      onStart: fxs.start,
+      tick: fxs.tick,
+      onEnd: () => {
+        fxs.end();
+        if (active !== A) return;
+        if (T.rest === true) rest.forEach(([who, text]) => sayQueue.push({ who, text, key: sk, ep: A.ep.id }));
+        if (T.rest === true && sayLeft <= 0) nextSay();
+        mark("moment", { id: A.ep.id, beat, moment: T.title });
+        const after = A.afterMoment;
+        A.afterMoment = null;
+        if (after) after();
+      },
+    });
+    if (!ok) { play.forEach((p) => A.spent.delete(A.ep.id + ":" + sk + "#" + p.i)); A.turnedBeats.delete(beat); }
+    return ok;
+  }
+  /* What happens in the world during a moment, by `fx`: { start, tick(k), end }. */
+  function turnFx(kind, A) {
+    const none = { start() {}, tick() {}, end() {} };
+    const W = window.weather || day.weather;
+    const flick = (s) => { try { day.cityscape && day.cityscape.flicker && day.cityscape.flicker(s); } catch (e) { /* no city */ } };
+    if (kind === "lawn") {
+      const lawn = (k) => { try { day.slice && day.slice.setLawn && day.slice.setLawn("damp", k, true); } catch (e) { /* no slice */ } };
+      return {
+        start() { lawn(0); if (W && W.set) W.set("rain", 0.85, "power"); },
+        tick(k) { lawn(Math.max(0, Math.min(1, (k - 0.15) / 0.6))); },
+        end() { lawn(1); },
+      };
+    }
+    if (kind === "turbines") {
+      return {
+        start() { story.momentSpin = true; flick(1.4); if (world.officePower) world.officePower(0.15); },
+        // the blades spin up first, then the office lights come back on a stutter and settle
+        tick(k) {
+          if (!world.officePower) return;
+          const on = k < 0.3 ? 0.15 : k < 0.5 ? (Math.sin(k * 90) > 0 ? 0.9 : 0.25) : 1;
+          world.officePower(on);
+        },
+        end() { story.momentSpin = false; if (world.officePower) world.officePower(1); },
+      };
+    }
+    if (kind === "gauge") {
+      return {
+        start() { story.speakerOn = true; if (story.gauge) story.gauge.flare = 1; },
+        tick() {},
+        end() { story.speakerOn = false; if (story.gauge) story.gauge.flare = 0; },
+      };
+    }
+    if (kind === "fog") return { start() { flick(1.8); }, tick() {}, end() {} };
+    if (kind === "gate") {
+      const gate = () => props.set.find((q) => q.kind === "gate");
+      return {
+        start() { const q = gate(); if (q) q.momentAngle = 1.2; },
+        tick(k) { const q = gate(); if (q) q.momentAngle = k < 0.25 ? 1.2 : Math.max(0.05, 1.2 - ((k - 0.25) / 0.5) * 1.15); },
+        end() { const q = gate(); if (q) q.momentAngle = null; },
+      };
+    }
+    return none;
   }
   function nextSay() {
     const n = sayQueue.shift();
@@ -1249,7 +1370,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     paintHud();
   }
   /* The storm turns: the rain stops and a fog the street can't see through takes its place. */
-  function doTwist() {
+  function doTwist(say) {
     const R = active.rescue;
     if (R.twisted) return;
     R.twisted = true;
@@ -1257,19 +1378,21 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     R.sky = { state: ts.state, intensity: ts.intensity };
     const W = window.weather || day.weather;
     if (W && W.set) W.set(ts.state, ts.intensity, "story");
-    sayKey("twist");
+    if (say !== false) sayKey("twist");
     mark("twist", { id: active.ep.id, sky: ts.state });
     storyEvent("twist", { id: active.ep.id });
   }
   function afterPiece() {
     const R = active.rescue;
     const def = R.def;
-    if (def.twist) doTwist();
+    const staged = !!(def.twist && turningFor("twist"));
+    if (def.twist) doTwist(!staged);
     if (active.ep.pieces[R.idx + 1]) beginPiece(R.idx + 1);
     else {
       R.sky = null;
       R.def = null;
     }
+    if (staged && !playTurning("twist")) sayKey("twist");
   }
   function helpPerson(p) {
     const R = active.rescue;
@@ -1358,8 +1481,8 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
         q.water.scaling.y += (want - q.water.scaling.y) * Math.min(1, dt * 1.5);
       } else if (q.kind === "gate" && q.pivot) {
         const el = A.age - R.at;
-        const want = calm ? 1.2 : Math.min(0, 1.2 - 1.2 * Math.max(0, el / (q.def.limit || 60)) - 0.3 * q.hurts);
-        q.angle += (want - q.angle) * Math.min(1, dt * 2);
+        const want = q.momentAngle != null ? q.momentAngle : calm ? 1.2 : Math.min(0, 1.2 - 1.2 * Math.max(0, el / (q.def.limit || 60)) - 0.3 * q.hurts);
+        q.angle += (want - q.angle) * Math.min(1, dt * (q.momentAngle != null ? 6 : 2));
         q.pivot.rotation.x = q.angle;
       } else if (q.kind === "bus" && q.glass && calm && q.glass.material !== q.lit) q.glass.material = q.lit;
     });
@@ -1582,6 +1705,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (ep.debris) spawnDebris();
     if (ep.market) spawnStalls(!!ep.market.open);
     if (ep.turbines) spawnTurbines(ep.turbines);
+    if (ep.id === "still-blades" && world.officePower) world.officePower(0.15); // "the lights are low": the moment brings them back
     if (ep.gauge) spawnGauge(ep.gauge);
     stopStage();
     pendingClosing = null;
@@ -1601,6 +1725,9 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     return true;
   }
   function endQuiet() {
+    if (active) active.afterMoment = null;
+    if (momentOn()) day.moments.skip();
+    if (world.officePower) world.officePower(1);
     if (active && active.show && !stageHold) stopStage();
     if (active && active.ep.tutorial) openAllAbilities();
     if (active && active.rescue) active.rescue.sky = null;
@@ -2116,6 +2243,15 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       }
       g.level += (g.to - g.level) * Math.min(1, dt * 3);
       applyGauge();
+      if (g.speaker) {
+        const pulse = story.speakerOn ? 0.55 + 0.45 * Math.sin(performance.now() / 110) : 0.15;
+        const c = g.speaker.emissiveColor;
+        if (c) c.set(1 * pulse, 0.7 * pulse, 0.28 * pulse);
+        if (g.glow && g.glow.emissiveColor) {
+          const f = 0.9 + 0.1 * (g.flare ? Math.sin(performance.now() / 160) : 0);
+          g.glow.emissiveColor.set(0.24 * f * (1 + g.flare), 0.8 * f * (1 + g.flare * 0.4), 1 * f);
+        }
+      }
     }
     // Part 2: blades turn with the wind on the roof; a shut turbine stands dead; a won one turns for good.
     if (story.turbines.length) {
@@ -2124,7 +2260,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       const turned = story.turned;
       const shut = A && A.age < A.shutUntil;
       const blowing = !!(wx && wx.state === "wind") && !!A;
-      const want = shut ? 0 : turned ? 2.2 : blowing ? 6 : 0;
+      const want = story.momentSpin ? 7 : shut ? 0 : turned ? 2.2 : blowing ? 6 : 0;
       story.turbines.forEach((t) => {
         t.w += (want - t.w) * Math.min(1, dt * 1.6);
         t.rotor.rotation.z -= t.w * dt;
@@ -2154,6 +2290,11 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       stage.update(dt, Math.max(0, Math.min(1, (fg - 0.01) / 0.03)));
     }
     if (!active) return;
+    if (momentOn()) {
+      // a turning-point moment is playing: the episode's clock waits (the set pieces keep moving)
+      if (active.rescue) rescueTick(dt);
+      return;
+    }
     active.age += dt;
     if (active.show) showTick(dt);
     if (!active) return;

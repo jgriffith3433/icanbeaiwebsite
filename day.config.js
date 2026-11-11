@@ -266,6 +266,38 @@ window.DAY_CONFIG = {
       skip: "Skip",
       lines: ["Okay. My turn.", "Finally. Let's see the sky.", "All right. Where to?"],
     },
+    /* TURNING POINTS: each episode's big beat plays as a short, skippable moment (js/moments.js `play`, started by
+       js/episodes.js) in place of the toast and log line it stands for: a cut-away camera that orbits the place
+       (never into geometry), the event happening in the world, a music sting (score.momentSting, synthesized), and the
+       episode's own spoken lines (`say.key`: the lines at `play[].i`, one caption line each; the rest of that key is spent
+       with it, or after it when `rest`). 8 s at most. Skip: the button, a tap, or Esc. `on` is the beat in js/episodes.js. */
+    turning: {
+      "dry-park": {
+        on: "goal:rain-park", title: "The drought breaks", secs: 7, sting: "drought", fx: "lawn", rest: true,
+        say: { key: "goal:rain-park", play: [{ i: 0, at: 1.2 }] },
+        shot: { tx: -2, ty: 2, tz: 44, alpha: [-1.95, -1.3], beta: [1.0, 1.1], radius: [30, 19], fov: 0.1 },
+      },
+      "still-blades": {
+        on: "goal:turn", title: "The roofs have power", secs: 7, sting: "turbines", fx: "turbines",
+        say: { key: "goal:turn", play: [{ i: 0, at: 2.2, caption: "Do you see how they turn?" }] },
+        shot: { tx: 146, ty: 5, tz: 1, alpha: [-1.05, -1.5], beta: [0.95, 1.05], radius: [32, 25], fov: 0.08 },
+      },
+      "low-tank": {
+        on: "goal:fill", title: "The Tank is full", secs: 8, sting: "tank", fx: "gauge",
+        say: { key: "end:clean", scarredKey: "end:scarred", play: [{ i: 0, at: 1.6, caption: "Reservoir level: full." }] },
+        shot: { tx: 190, ty: 5.5, tz: 35.4, alpha: [-1.45, -1.85], beta: [1.3, 1.25], radius: [27, 17] },
+      },
+      "lunch": {
+        on: "twist", title: "The storm turns", secs: 8, sting: "twist", fx: "fog",
+        say: { key: "twist", play: [{ i: 0, at: 0.9, caption: "That was something clearing its throat." }, { i: 2, at: 4.9 }] },
+        shot: { tx: 66, ty: 3, tz: 10, alpha: [3.0, 3.5], beta: [1.0, 1.1], radius: [24, 30], fov: 0.06 },
+      },
+      "commute-home": {
+        on: "twist", title: "The bridge is closing", secs: 8, sting: "bridge", fx: "gate",
+        say: { key: "twist", play: [{ i: 0, at: 0.8, caption: "The bridge will close on high wind." }] },
+        shot: { tx: 10, ty: 2.5, tz: 12.6, alpha: [3.05, 2.6], beta: [1.05, 1.15], radius: [24, 16] },
+      },
+    },
     dayEnd: {
       kicker: "Small Weather",
       title: "That was the day.",

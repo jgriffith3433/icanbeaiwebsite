@@ -598,6 +598,7 @@ function install() {
   }
   /* The take-over push: the camera starts wide and fast-pushes in to his shoulder (js/moments.js asks for it).
      Any move, jump or stick input, or push(null), ends it. */
+  let holdIn = false; // a moment is playing (js/moments.js): he stands still, input is ignored
   const push = { on: false, t: 0, secs: 1.4, extra: 0, fov: 0, baseFov: 0 };
   function pushStart(spec) {
     if (!spec) return pushEnd();
@@ -616,6 +617,7 @@ function install() {
     return true;
   }
   function cameraFollow(dt, look) {
+    if (world.cineOn && world.cineOn()) return; // a moment's cut-away camera (js/moments.js) has the view
     // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
     if (!push.on && lastRadius != null && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
     camera.alpha -= look.x * 2.4 * dt;
@@ -842,6 +844,13 @@ function install() {
         return;
       }
       if (mode !== "control") return;
+      if (holdIn && e.key === "Escape") {
+        // a turning-point moment is playing: Esc skips it (js/moments.js), it doesn't let him go
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (day.moments && day.moments.skip) day.moments.skip();
+        return;
+      }
       if (e.key === "Escape") {
         letGo("key");
       } else {
@@ -1037,7 +1046,7 @@ function install() {
         ambientAge = 0;
         refreshAmbientUpdrafts();
       }
-      const inp = readInput(gp);
+      const inp = holdIn ? { x: 0, z: 0, sprint: false, jump: 0, hold: false } : readInput(gp);
       if (push.on && (inp.jump || inp.x || inp.z)) pushEnd();
       mover.step(dt, inp);
       simT += dt;
@@ -1154,6 +1163,7 @@ function install() {
     log: () => log.slice(),
     take: () => take("console"),
     push: (spec) => pushStart(spec),
+    hold: (on) => { holdIn = !!on; return holdIn; },
     pushing: () => push.on,
     letGo: () => letGo("console"),
     spawnUpdraft: (x, z, opt) => {

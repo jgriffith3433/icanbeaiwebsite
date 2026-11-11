@@ -5511,6 +5511,203 @@ async function hurricaneDrive(options, t) {
   t.progress(1);
 }
 
+/* ---------------- turning-moments: each episode's turning point plays as a staged, skippable moment ---------------- */
+// ?playtest=turning-moments ({"touch":true} or a 390x844 phone for the touch run). Setup shortcuts (named): each episode
+// started by its API, the Pressure meter topped up, and control.place putting him at the beat (the stick can't be driven
+// by a bot). Everything else is real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc,
+// a tap on Skip / the screen. Events: moment-<id>-start / -layout / -toast / -end plus moment-summary; metrics
+// momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY.
+async function turningMoments(options, t) {
+  const bail = (msg) => { t.problem("bug", msg); t.finish("fail"); };
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const M = window.day.moments;
+  if (!Ep || !C || !P || !M) return bail("episodes, powers, Take control or moments isn't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  if (touch) { try { C.touch(true); } catch (e) { /* desktop */ } }
+  M.enable(true);
+  forcePublicView();
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") !== "true") await clickEl(sound);
+  const cfg = window.DAY_CONFIG;
+  try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
+  const evs = [];
+  window.addEventListener("day:moment", (e) => { if (e.detail && e.detail.moment && !/^(takeover|day-end)$/.test(e.detail.moment)) evs.push(e.detail); });
+  const spoken = [];
+  window.addEventListener("day:story", (e) => { const d = (e && e.detail) || {}; if (d.action === "say") spoken.push(d); });
+  const day = window.day.today();
+  const outside = carSideMoment(day);
+  if (!outside) return bail("No moment outdoors to take control");
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  const off = $("episode-offer");
+  if (off && !off.hidden) { const no = off.querySelector("button.decline"); if (no) no.click(); }
+  await sleep(3800); // the take-over line is its own moment; let it finish
+  const refill = () => { if (P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  const KEY = { bolt: "e", rain: "r", wind: "v", fog: "c", sunbreak: "x" };
+  async function use(id, hold) {
+    refill();
+    if (touch) {
+      const el = $("ability-" + id);
+      if (!el) return t.problem("bug", `No ${id} button on the touch bar`);
+      const r = el.getBoundingClientRect();
+      touchOn(el, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+      await sleep(hold || 90);
+      touchOn(el, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+    } else if (hold) await holdVerb(KEY[id], hold);
+    else pressKey(KEY[id]);
+    await sleep(500);
+  }
+  const at = async (x, z) => { C.place(x, z, 0); await sleep(500); };
+  const goalDone = (id) => { const n = Ep.now(); return !!(n && n.goals.some((g) => g.id === id && g.done)); };
+  const toastEl = () => document.querySelector(".ep-toast");
+  const results = [];
+  let maxSecs = 0, minSkipY = 9999, insideTotal = 0;
+
+  /* Wait for the moment, check what the player sees, end it the way asked (esc | tap | wait), and record it. */
+  async function watch(id, how, toastText) {
+    await t.until(() => M.now().turning === id, 8000, `the ${id} moment`);
+    const w = window.day.world();
+    const start = evs.filter((e) => e.moment === id && e.action === "start").pop();
+    if (!start) return t.problem("bug", `${id}: no moment start event`);
+    t.event(`moment-${id}-start`, `"${start.title}" camera ${start.camera}, sting ${start.sting} (played ${start.stingPlayed}), ${start.secs} s, ${start.lines} voiced line(s)`);
+    if (!start.camera || !w.cineOn()) t.problem("bug", `${id}: the moment has no camera move`);
+    if (!start.sting) t.problem("bug", `${id}: the moment has no music sting`);
+    await sleep(1800);
+    // the screen: one caption line, the Skip button in reach, nothing of the old toast
+    const cap = $("moment-cap"), skip = $("moment-cine-skip");
+    const cb = boxOf(cap), sb = boxOf(skip);
+    const cs = getComputedStyle(cap);
+    const lineH = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.25;
+    const lines = cb ? Math.round((cb.h - 18) / lineH) : 0;
+    const fits = !!cb && !!sb && cb.x >= 0 && cb.x + cb.w <= innerWidth + 1 && sb.x >= 0 && sb.x + sb.w <= innerWidth && sb.y + sb.h <= innerHeight + 1;
+    t.event(`moment-${id}-layout`, `caption "${cap.textContent}" ${lines} line(s) ${cb ? Math.round(cb.w) : "-"} px wide, Skip at y ${sb ? Math.round(sb.y) : "-"} (${sb ? Math.round(sb.w) + "x" + Math.round(sb.h) : "-"}), ${fits ? "fits" : "OFF SCREEN"}, ${innerWidth}x${innerHeight}`);
+    if (cap.textContent && lines > 1) t.problem("bug", `${id}: the caption is ${lines} lines`);
+    if (cap.scrollWidth > cap.clientWidth + 1) t.problem("bug", `${id}: the caption is cut off`);
+    if (!fits) t.problem("bug", `${id}: the moment doesn't fit ${innerWidth}x${innerHeight}`);
+    if (sb) { minSkipY = Math.min(minSkipY, sb.y); if (touch && innerHeight >= 800 && sb.y < 563) t.problem("bug", `${id}: Skip is at y ${Math.round(sb.y)}, above the bottom third`); if (sb.w < 44 || sb.h < 44) t.problem("bug", `${id}: Skip is ${Math.round(sb.w)}x${Math.round(sb.h)}`); }
+    const tt = toastEl();
+    const toastShown = !!(tt && tt.classList.contains("on") && toastText && tt.textContent.indexOf(toastText) >= 0);
+    t.event(`moment-${id}-toast`, toastShown ? `THE TOAST "${toastText}" IS UP` : "no toast for the beat");
+    if (toastShown) t.problem("bug", `${id}: the beat still shows its toast`);
+    if (document.documentElement.classList.contains("cine-up") === false) t.problem("bug", `${id}: the HUD didn't step aside`);
+    if (how === "wait") await t.until(() => !M.now().turning, 10000, `the ${id} moment to end by itself`);
+    else if (how === "esc") { pressKey("Escape"); await sleep(250); }
+    else if (touch) await tapEl($("moment-cine-skip")); else await clickEl($("moment-cine-skip"));
+    await t.until(() => !M.now().turning, 2000, `the ${id} moment to end`).catch(() => t.problem("bug", `${id}: ${how} didn't end the moment`));
+    const end = evs.filter((e) => e.moment === id && (e.action === "end" || e.action === "skip")).pop();
+    if (!end) return t.problem("bug", `${id}: no moment end event`);
+    maxSecs = Math.max(maxSecs, end.seconds);
+    insideTotal += end.insideFrames || 0;
+    if (end.seconds > 8.05) t.problem("bug", `${id}: the moment ran ${end.seconds} s`);
+    if (end.insideFrames > 0) t.problem("bug", `${id}: the camera was inside geometry for ${end.insideFrames} of ${end.frames} frames`);
+    if (C.mode() !== "control") t.problem("bug", `${id}: ending the moment let go of him`);
+    const said = spoken.filter((x) => x.moment && x.id === id).length;
+    t.event(`moment-${id}-end`, `${end.action} by ${end.via} after ${end.seconds} s, camera inside ${end.insideFrames} of ${end.frames} frames (lowest ${end.minClear} m above ground), ${said} line(s) voiced`);
+    results.push({ id, secs: end.seconds, inside: end.insideFrames, frames: end.frames, skip: sb ? Math.round(sb.y) : null });
+    await sleep(600);
+  }
+
+  /* 1. Part 1: the drought breaks over the park */
+  t.scene("Part 1: the drought breaks");
+  Ep.start("dry-park", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "dry-park", 3000, "Part 1 running");
+  await sleep(2500);
+  await at(-6, 24.5);
+  await use("rain");
+  await watch("dry-park", "esc", "The park drank.");
+  t.progress(0.2);
+  Ep.end("api");
+  const sc1 = $("episode-score"); if (sc1 && !sc1.hidden) sc1.querySelector("button.ok").click();
+
+  /* 2. Part 2: the turbines spin up and the office lights come back */
+  t.scene("Part 2: the roofs have power");
+  Ep.start("still-blades", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "still-blades", 3000, "Part 2 running");
+  await sleep(2000);
+  await at(154, 9.8);
+  await t.until(() => goalDone("ines"), 4000, "finding Ines");
+  const lightsLow = window.day.world().officePowerNow ? window.day.world().officePowerNow() : 1;
+  for (let i = 0; i < 5 && !goalDone("turn") && !M.now().turning; i++) { await use("wind", 750); await sleep(2600); }
+  await watch("still-blades", "skip", "The roofs have power.");
+  t.event("moment-lights", `office lights at ${lightsLow} before, ${window.day.world().officePowerNow ? window.day.world().officePowerNow() : "?"} after`);
+  Ep.end("api");
+  const sc2 = $("episode-score"); if (sc2 && !sc2.hidden) sc2.querySelector("button.ok").click();
+  t.progress(0.4);
+
+  /* 3. Part 3: the reservoir gauge and the Board on the Tank speaker */
+  t.scene("Part 3: the Tank is full");
+  window.day.jump("22:30");
+  await sleep(500);
+  Ep.start("low-tank", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "low-tank", 3000, "Part 3 running");
+  await sleep(2000);
+  await at(190, 44);
+  await use("bolt"); await sleep(1500); await use("bolt");
+  await t.until(() => goalDone("charge"), 5000, "the mast charged");
+  await sleep(600);
+  await use("rain");
+  for (let i = 0; i < 6 && !goalDone("fill") && !M.now().turning; i++) { await sleep(3000); if (!goalDone("fill")) await use("rain"); }
+  await watch("low-tank", "esc", "The Tank is full.");
+  t.progress(0.6);
+  const sc3 = $("episode-score"); if (sc3 && !sc3.hidden) await t.until(() => $("episode-score").hidden || true, 500);
+  if (sc3 && !sc3.hidden) sc3.querySelector("button.ok").click();
+  await sleep(400);
+  const ec = $("ending-card"); if (ec && !ec.hidden) { const b = ec.querySelector("button"); if (b) b.click(); }
+  Ep.end("api");
+
+  /* 4. Rooftop storm: the twist */
+  t.scene("Rooftop storm: the twist");
+  window.day.jump("12:20");
+  await sleep(500);
+  Ep.start("lunch", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "lunch", 3000, "the lunch episode");
+  await sleep(2000);
+  for (const [x, z] of [[109.5, 27.6], [118, 31.6], [126.5, 26.2]]) { await at(x, z); await use("sunbreak"); }
+  await t.until(() => goalDone("shelter"), 4000, "the plaza sheltered");
+  await at(50, 9.2);
+  await use("bolt");
+  await watch("lunch", "skip", "Hollis is down. The fog is in.");
+  Ep.end("api");
+  const sc4 = $("episode-score"); if (sc4 && !sc4.hidden) sc4.querySelector("button.ok").click();
+  t.progress(0.8);
+
+  /* 5. Hurricane drive: the bridge closes (this one plays to its end by itself) */
+  t.scene("Hurricane drive: the bridge closes");
+  window.day.jump("17:53");
+  await sleep(500);
+  Ep.start("commute-home", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "commute-home", 3000, "the drive");
+  await sleep(2000);
+  const drive = (cfg.episodes.list.find((e) => e.id === "commute-home") || {}).pieces || [];
+  const keys = ["wind", "sunbreak", "bolt"];
+  for (let i = 0; i < 3; i++) {
+    const pc = drive[i];
+    if (!pc) break;
+    await at(pc.people[0].x, pc.people[0].z - 0.8);
+    for (let k = 0; k < pc.people.length; k++) { await use(keys[i], i === 0 ? 750 : 0); await sleep(300); }
+    await t.until(() => goalDone(pc.goal), 5000, `piece ${pc.id}`).catch(() => t.problem("bug", `The ${pc.id} piece didn't finish`));
+  }
+  await watch("commute-home", "wait", "The bus is rolling. The cell is on the avenue.");
+  Ep.end("api");
+  const sc5 = $("episode-score"); if (sc5 && !sc5.hidden) sc5.querySelector("button.ok").click();
+
+  t.metric("momentsCameraInsideFrames", insideTotal);
+  t.metric("momentsMaxSeconds", maxSecs);
+  t.metric("momentsSkipMinY", minSkipY === 9999 ? 0 : Math.round(minSkipY));
+  t.event("moment-summary", `${results.length} of 5 moments: ${results.map((r) => `${r.id} ${r.secs}s inside ${r.inside}`).join("; ")}`);
+  if (results.length < 5) t.problem("bug", `Only ${results.length} of the five turning points played a moment`);
+  t.progress(1);
+}
+
 /* ---------------- story ending: Part 1, 2 and 3 in a row, then Part 3 again to reach each of the three endings ---------------- */
 // Setup shortcuts: the day bar to a moment outdoors (and to 22:30 before Part 3), the Pressure meter topped up, and each
 // part started by its API. Everything else is real keys: Enter, WASD with Shift, R, X, V, E. Events: ending-* with the
@@ -7622,7 +7819,9 @@ installPlaytest({
   product: "icanbe",
   feel: {
     get scene() { return sensorScene(); },
-    active: () => !!feelControl(),
+    // a turning-point moment is a cutscene (its own camera, js/moments.js): only frame hitches are watched while it plays,
+    // and the moment counts its own camera-inside frames (turning-moments checks them)
+    active: () => !!feelControl() && !(window.day.world && window.day.world().cineOn && window.day.world().cineOn()),
     player: () => {
       const C = feelControl();
       return C && C.avatar ? C.avatar().root : null;
@@ -7642,6 +7841,7 @@ installPlaytest({
   scenarios: [
     { id: "charge-log-pause", title: "Charge vs Body Energy, Live log has no future rows, pause/scrub say Paused and hold the clock, resume continues in order", seconds: 70, tags: ["hud", "smoke"], description: "Load with ?playtest=charge-log-pause. Real input: Esc, Space, day bar scrub, Play/10x, Enter. Events live-log-clean / paused-status / paused-clock / coming-up / resumed / log-order / charge-bar / body-energy. Run at 1280x720 and 390x844." },
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
+    { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, holds the bolt at the shop roof's rod within 30 s, and the street looks up and Birdie calls up in her voice, with under 25 words on screen before the first cast", seconds: 60, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (E held; the Bolt button held on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
@@ -7752,6 +7952,7 @@ installPlaytest({
       else if (id === "spoken-dialogue") await spokenDialogue(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);
+      else if (id === "turning-moments") await turningMoments(options, t);
       else if (id === "score-ranks") await scoreRanks(options, t);
       else if (id === "episode-select") await episodeSelect(options, t);
       else if (id === "story-ending") await storyEnding(options, t);
