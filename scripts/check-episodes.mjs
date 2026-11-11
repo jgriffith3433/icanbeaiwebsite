@@ -53,8 +53,11 @@ ok(ids.join(",") === "tutorial,morning,dry-park,lunch,still-blades,commute-home,
 
 const tut = E.list[0];
 ok(tut.tutorial && tut.id === "tutorial", "the tutorial is first in the list");
-ok(tut.goals.map((g) => g.power).join(",") === "bolt,rain,gale,fog,sunbreak", "the tutorial teaches the five abilities in order");
+ok(tut.goals.map((g) => g.power).join(",") === "bolt,rain,wind,fog,sunbreak", "the tutorial teaches the five verbs in order");
 tut.goals.forEach((g, i) => ok(g.kind === "ability" && g.prompt && g.label && (i === 0 ? !g.after : g.after === tut.goals[i - 1].id), `tutorial goal ${g.id}: kind, prompt, label and a chain`));
+E.list.forEach((ep) => (ep.goals || []).forEach((g) => {
+  ok(!/\([A-Z0-9](?:\s*\/\s*[A-Z0-9]+)?\)/.test(String(g.label || "")), `${ep.id}/${g.id}: goal label has no bracketed key (${g.label})`);
+}));
 ok(!matchEpisode(E.list, "ready", clockMinutes("7:55")).tutorial, "the tutorial is never matched by chapter");
 
 E.list.filter((e) => !e.tutorial).forEach((ep) => {

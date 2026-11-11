@@ -127,40 +127,43 @@ html.touch-ui .hud-left { bottom: auto; top: var(--safe-t); flex-direction: colu
 }
 html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; bottom: 156px; flex-direction: column-reverse; }
 
-/* ---------- bottom row: the ability bar, the power pad ---------- */
+/* ---------- bottom row: the ability bar (five verbs; phone = arc + Charge ring) ---------- */
 .abilitybar { position: fixed; left: 50%; bottom: var(--safe-b); transform: translateX(-50%); }
 html:not(.preview-public):not(.touch-ui) .abilitybar { bottom: var(--row-a); }
+/* phone: verb arc on the right edge above the thumb zone (Jump), clear of the character */
 html.touch-ui .abilitybar {
-  left: auto; right: max(12px, env(safe-area-inset-right));
-  bottom: max(252px, calc(env(safe-area-inset-bottom) + 240px)); transform: none;
+  left: auto; right: max(8px, env(safe-area-inset-right));
+  bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); transform: none;
 }
-.powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; }
-/* phone: the controls legend sits above the stick, left of the power pad */
-html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 250px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
-/* phone: the legend shows for a few seconds, then fades so it never sits over the character */
-html.touch-ui .control-hint { animation: hint-fade .6s ease 7s forwards; }
-@keyframes hint-fade { to { opacity: 0; visibility: hidden; } }
-html.touch-ui .powerpad { right: max(12px, env(safe-area-inset-right)); bottom: max(150px, calc(env(safe-area-inset-bottom) + 138px)); }
+.powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; display: none !important; }
+/* phone: the controls legend shows once, then fades */
+html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 160px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
+.control-hint.hint-faded { opacity: 0; visibility: hidden; transition: opacity .6s ease; }
+html.touch-ui .powerpad { display: none !important; }
 
 /* ---------- centre cards: tutorial, Episodes HUD, toasts, the take-over line, the episode line ---------- */
 .tutorial { position: fixed; left: 50%; transform: translateX(-50%); bottom: 202px; top: auto; }
 html.in-control .tutorial { bottom: 232px; }
 .preview-public .tutorial { bottom: max(72px, calc(env(safe-area-inset-bottom) + 62px)); }
 .preview-public.in-control .tutorial { bottom: 116px; }
-html.touch-ui.in-control .tutorial { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); }
-html.touch-ui.in-control:not(.preview-public) .tutorial { bottom: max(338px, calc(env(safe-area-inset-bottom) + 326px)); }
+html.touch-ui.in-control .tutorial { bottom: max(300px, calc(env(safe-area-inset-bottom) + 288px)); }
+html.touch-ui.in-control:not(.preview-public) .tutorial { bottom: max(290px, calc(env(safe-area-inset-bottom) + 278px)); }
 /* desktop, in control: top centre (the memory "HUD z-order" convention), clear of the bottom row */
 html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { top: 156px; bottom: auto; }
 
 .ep-hud { position: fixed; right: 18px; top: 88px; }
 @media (min-width: 900px) { html:has(.side:not([hidden])) .ep-hud { right: calc(var(--gutter, 18px) + var(--side-w) + 12px); } }
-/* phone portrait: under the weather chip and Pressure (top-left column), right-aligned, never taller than the room above the ability row */
+/* phone: Light show / episode card collapses to a top strip so the character and verb arc stay clear */
 @media (max-width: 700px) {
-  .ep-hud { right: max(12px, env(safe-area-inset-right)); top: max(132px, calc(env(safe-area-inset-top) + 126px)); width: min(280px, calc(100vw - 24px)); max-height: calc(100vh - 132px - 470px); overflow: hidden; }
+  .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: max(52px, calc(env(safe-area-inset-top) + 44px)); width: min(420px, calc(100vw - 24px)); max-height: 88px; overflow: hidden; }
+  html.touch-ui .ep-hud .ep-card { padding: 8px 12px; border-radius: 12px; }
+  html.touch-ui .ep-hud h3 { font-size: 0.82rem; margin: 0 0 2px; }
+  html.touch-ui .ep-hud .tag { display: none; }
+  html.touch-ui .ep-hud ul { display: flex; flex-wrap: wrap; gap: 4px 10px; max-height: 36px; overflow: hidden; }
+  html.touch-ui .ep-hud li { margin: 0; font-size: 0.68rem; }
 }
-/* phone landscape: top centre, between the left column and the right controls, above the ability bar */
 @media (orientation: landscape) and (max-height: 520px) {
-  html.touch-ui .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: calc(var(--safe-t) + 50px); width: min(260px, 34vw); max-height: calc(100vh - var(--safe-t) - 50px - 160px); overflow: hidden; }
+  html.touch-ui .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: calc(var(--safe-t) + 8px); width: min(480px, 70vw); max-height: 72px; overflow: hidden; }
 }
 .ep-say { position: fixed; left: 50%; bottom: max(96px, calc(env(safe-area-inset-bottom) + 88px)); }
 .ep-toast { position: fixed; left: 50%; top: max(64px, calc(env(safe-area-inset-top) + 56px)); }
@@ -187,8 +190,8 @@ html.touch-ui.in-control .voice-caption {
 
 /* ---------- phone landscape (short window): the ability bar and the tutorial sit between the stick and the pad ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
-  html.touch-ui .abilitybar { right: auto; left: max(164px, calc(env(safe-area-inset-left) + 150px)); bottom: max(60px, calc(env(safe-area-inset-bottom) + 54px)); }
-  html.touch-ui.in-control:not(.preview-public) .tutorial { left: max(164px, calc(env(safe-area-inset-left) + 150px)); transform: none; bottom: max(146px, calc(env(safe-area-inset-bottom) + 140px)); }
+  html.touch-ui .abilitybar { right: max(8px, env(safe-area-inset-right)); left: auto; bottom: max(56px, calc(env(safe-area-inset-bottom) + 48px)); }
+  html.touch-ui.in-control:not(.preview-public) .tutorial { left: 50%; transform: translateX(-50%); bottom: max(146px, calc(env(safe-area-inset-bottom) + 140px)); }
 }
 
 /* ---------- bubbles ---------- */

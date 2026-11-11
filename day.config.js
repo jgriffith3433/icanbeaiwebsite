@@ -504,15 +504,21 @@ window.DAY_CONFIG = {
     aim: 3.6, // metres past him the reticle rests, along the camera
     cone: 52, // gust half-angle, degrees
     reach: 11, // gust length, metres
-    costs: { storm: 40, bolt: 24, gust: 16, tornado: 48, rain: 18, gale: 20, fog: 16, sunbreak: 22 },
-    keys: { storm: "f", bolt: "e", gust: "g", tornado: "t", rain: "r", gale: "v", fog: "c", sunbreak: "x" },
+    // Five verbs on the bar: Lightning (hold → Storm), Rain, Wind (tap Gust / hold Gale / full Tornado), Fog, Sun.
+    // Storm/gust/gale/tornado stay as spend ids for those hold depths. G aliases a Wind tap (Gust).
+    costs: { storm: 40, bolt: 24, gust: 16, tornado: 48, rain: 18, gale: 20, fog: 16, sunbreak: 22, wind: 16 },
+    keys: { bolt: "e", rain: "r", wind: "v", fog: "c", sunbreak: "x", gust: "g" },
+    windHold: 0.55,
+    windFull: 1.35,
+    tapMax: 0.28,
     // js/abilities.js: the bar's cooldown sweep. Seconds before the next call, and how long it lasts.
-    cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8, rain: 4, gale: 5, fog: 4, sunbreak: 6 },
-    durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4, rain: 3, gale: 3, fog: 3, sunbreak: 3 },
-    names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado", rain: "Rain", gale: "Gale", fog: "Fog", sunbreak: "Sun break" },
+    cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8, rain: 4, gale: 5, fog: 4, sunbreak: 6, wind: 2 },
+    durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4, rain: 3, gale: 3, fog: 3, sunbreak: 3, wind: 0 },
+    names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado", rain: "Rain", gale: "Gale", fog: "Fog", sunbreak: "Sun", wind: "Wind" },
     lines: {
       cooling: "Not ready yet.",
       gather: "The sky draws in over him.",
+      windGather: "The air tightens in his hands.",
       storm: "He calls the storm down.",
       bolt: "Lightning. Where he aimed.",
       gust: "A hard gust. The air lifts under him.",
@@ -834,14 +840,14 @@ window.DAY_CONFIG = {
         title: "Learn the weather",
         tagline: "Five abilities, one at a time. Skip any time.",
         goals: [
-          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Press E to throw Lightning where the reticle is." },
+          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Tap E for Lightning. Hold E to call a Storm." },
           { id: "rain", kind: "ability", power: "rain", label: "Call Rain", prompt: "Press R. Rain, just here, just for a moment.", after: "bolt" },
-          { id: "gale", kind: "ability", power: "gale", label: "Call a Gale", prompt: "Press V. A gale shoves bins and umbrellas down the street.", after: "rain" },
-          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Press C. Fog rolls in off the street.", after: "gale" },
+          { id: "wind", kind: "ability", power: "wind", label: "Call Wind", prompt: "Tap V for a Gust. Hold V for a Gale; hold longer for a Tornado.", after: "rain" },
+          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Press C. Fog rolls in off the street.", after: "wind" },
           { id: "sunbreak", kind: "ability", power: "sunbreak", label: "Break the Sun through", prompt: "Press X. The clouds split.", after: "fog" },
         ],
         lines: {
-          start: "Five abilities. He learns them one at a time.",
+          start: "Five verbs. He learns them one at a time.",
           done: "That's all five. The sky is his.",
           skip: "Skipped. Every ability is open.",
           unlock: "New ability: {name}. Key {key}.",
@@ -886,8 +892,8 @@ window.DAY_CONFIG = {
         market: { open: false },
         strain: { budget: 4 },
         goals: [
-          { id: "rain-park", kind: "ability-in", power: "rain", zone: "park", label: "Rain on the park (R, near Birdie)" },
-          { id: "sun-market", kind: "ability-in", power: "sunbreak", zone: "market", after: "rain-park", label: "Sun break over the market (X)" },
+          { id: "rain-park", kind: "ability-in", power: "rain", zone: "park", label: "Rain on the park, near Birdie" },
+          { id: "sun-market", kind: "ability-in", power: "sunbreak", zone: "market", after: "rain-park", label: "Sun over the market" },
           { id: "stalls", kind: "stay", zone: "market", seconds: 20, after: "sun-market", label: "Stay while the stalls fill" },
         ],
         lines: {
@@ -1000,9 +1006,9 @@ window.DAY_CONFIG = {
           },
         ],
         goals: [
-          { id: "shelter", kind: "help", piece: "shelter", count: 3, label: "Shelter the plaza: Sun break near each (X)" },
-          { id: "rescue", kind: "help", piece: "rescue", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop (E)" },
-          { id: "street", kind: "help", piece: "street", count: 2, after: "rescue", label: "Clear the street: Gale or Gust near each (V / G)" },
+          { id: "shelter", kind: "help", piece: "shelter", count: 3, label: "Shelter the plaza: Sun near each" },
+          { id: "rescue", kind: "help", piece: "rescue", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop" },
+          { id: "street", kind: "help", piece: "street", count: 2, after: "rescue", label: "Clear the street: Wind near each" },
         ],
         lines: {
           start: "Lunch break. A storm nobody called.",
@@ -1059,7 +1065,7 @@ window.DAY_CONFIG = {
         strain: { budget: 7 },
         goals: [
           { id: "ines", kind: "reach", x: 154, z: 9.8, r: 8, label: "Find Ines at the annex" },
-          { id: "turn", kind: "wind-time", zone: "roofs", seconds: 10, after: "ines", label: "Keep a gale on the roof (V)" },
+          { id: "turn", kind: "wind-time", zone: "roofs", seconds: 10, after: "ines", label: "Keep Wind on the roof" },
           { id: "stalls-stand", kind: "intact", after: "turn", label: "Leave every stall standing" },
         ],
         lines: {
@@ -1203,10 +1209,10 @@ window.DAY_CONFIG = {
           },
         ],
         goals: [
-          { id: "debris", kind: "help", piece: "debris", count: 2, label: "Clear the road: Gale or Gust near each (V / G)" },
-          { id: "underpass", kind: "help", piece: "underpass", count: 2, after: "debris", label: "Drain the underpass: Sun break near each (X)" },
-          { id: "bus", kind: "help", piece: "bus", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it (E)" },
-          { id: "bridge", kind: "help", piece: "bridge", count: 2, after: "bus", label: "Hold the bridge open: Fog near each (C)" },
+          { id: "debris", kind: "help", piece: "debris", count: 2, label: "Clear the road: Wind near each" },
+          { id: "underpass", kind: "help", piece: "underpass", count: 2, after: "debris", label: "Drain the underpass: Sun near each" },
+          { id: "bus", kind: "help", piece: "bus", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it" },
+          { id: "bridge", kind: "help", piece: "bridge", count: 2, after: "bus", label: "Hold the bridge open: Fog near each" },
           { id: "home", kind: "reach", spot: "parkHome", r: 8, after: "bridge", label: "Get home" },
         ],
         lines: {
@@ -1278,8 +1284,8 @@ window.DAY_CONFIG = {
         gauge: { x: 190, z: 35.4, h: 10 },
         strain: { budget: 6, costs: { bolt: 1, rain: 1, gale: 1, sunbreak: 1, fog: 1, gust: 1, tornado: 2, storm: 2 }, stackSec: 0 },
         goals: [
-          { id: "charge", kind: "ability-in", power: "bolt", zone: "tank", count: 2, label: "Charge the mast: Lightning at the Tank (E)" },
-          { id: "fill", kind: "weather-time", states: ["rain"], zone: "tank", seconds: 5, after: "charge", label: "Rain on the Tank until the gauge fills (R)" },
+          { id: "charge", kind: "ability-in", power: "bolt", zone: "tank", count: 2, label: "Charge the mast: Lightning at the Tank" },
+          { id: "fill", kind: "weather-time", states: ["rain"], zone: "tank", seconds: 5, after: "charge", label: "Rain on the Tank until the gauge fills" },
         ],
         lines: {
           start: "The Storm Tank. The gauge needle lies at the bottom.",

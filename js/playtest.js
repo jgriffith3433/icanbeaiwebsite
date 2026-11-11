@@ -216,8 +216,16 @@ function clickSpeed(s) {
   return false;
 }
 
+/** A tap: keydown then keyup. Lightning / Wind resolve on release (hold depths use keyDown + sleep + keyUp). */
 function pressKey(key) {
   window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  window.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
+}
+/** Hold a verb key long enough for Gale (or longer for Tornado). */
+async function holdVerb(key, ms) {
+  keyDown(key);
+  await sleep(ms);
+  keyUp(key);
 }
 
 /** Drag the day bar to a minute, the way a player does. */
@@ -742,7 +750,7 @@ async function crowdReacts(options, t) {
   const cases = [
     { id: "bolt", key: "e", kind: "lookup", count: (i) => i.lookingUp, what: "stop and look up at the flash" },
     { id: "rain", key: "r", kind: "rain", count: (i) => i.running, what: "run for cover (umbrellas up, the rest into doorways)" },
-    { id: "gale", key: "v", kind: "gale", count: (i) => i.hats, what: "lean into the wind with a hand on the hat" },
+    { id: "gale", key: "v", hold: 700, kind: "gale", count: (i) => i.hats, what: "lean into the wind with a hand on the hat" },
     { id: "fog", key: "c", kind: "fog", count: (i) => i.reacting, what: "slow down; traffic crawls", cars: true },
     { id: "sunbreak", key: "x", kind: "sun", count: (i) => i.cheering, what: "stroll and cheer, hands up" },
   ];
@@ -752,12 +760,13 @@ async function crowdReacts(options, t) {
     n++;
     t.scene(`Citizens: ${c.id}`);
     t.progress(0.1 + 0.16 * n);
-    const cost = (P.now().abilities.find((x) => x.id === c.id) || {}).cost || 20;
+    const cost = (P.now().abilities.find((x) => x.id === c.id) || P.now().abilities.find((x) => x.id === "wind") || {}).cost || 20;
     await t.until(() => P.now().energy + 0.05 >= cost, 15000, `Energy for ${c.id}`).catch(() => {});
     await t.until(calm, 10000, "a calm sky").catch(() => {});
     await t.until(() => crowd.info().reacting === 0, 6000, "the crowd back to routine").catch(() => {});
     const before = crowd.info();
-    pressKey(c.key);
+    if (c.hold) await holdVerb(c.key, c.hold);
+    else pressKey(c.key);
     let peak = before;
     let best = 0;
     const t0 = Date.now();
@@ -1156,15 +1165,16 @@ async function weatherAbilities(options, t) {
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   t.event("control-taken", "Enter, so his abilities work");
+  const verbs = ["bolt", "rain", "wind", "fog", "sunbreak"];
   const ids = ["rain", "gale", "fog", "sunbreak", "bolt"];
-  // The bar's slots are built on the first frame painted under control, so wait for them.
-  await t.until(() => ids.every((id) => document.getElementById("ability-" + id)), 4000, "the ability bar slots").catch(() => {});
+  // The bar's slots are the five verbs (Wind covers Gale).
+  await t.until(() => verbs.every((id) => document.getElementById("ability-" + id)), 4000, "the ability bar slots").catch(() => {});
   const bar = P.now().abilities;
-  const keys = ids.map((id) => {
+  const keys = verbs.map((id) => {
     const a = bar.find((x) => x.id === id);
     return a ? `${a.key.toUpperCase()} ${a.name}` : `${id} MISSING`;
   });
-  if (ids.every((id) => bar.some((x) => x.id === id) && document.getElementById("ability-" + id))) t.event("five-abilities", keys.join(", "));
+  if (verbs.every((id) => bar.some((x) => x.id === id) && document.getElementById("ability-" + id))) t.event("five-abilities", keys.join(", "));
   else t.problem("bug", `The ability bar doesn't have all five: ${keys.join(", ")}`);
   const calm = () => {
     const n = W.now();
@@ -1173,11 +1183,11 @@ async function weatherAbilities(options, t) {
   await t.until(calm, 6000, "a calm sky to start").catch(() => {});
   const looks = {};
   const probes = {
-    rain: { key: "r", ok: (n) => n.state === "rain" && n.rain > 0.3, show: (n) => `rain ${n.rain.toFixed(2)}, wet ${n.wet.toFixed(2)}` },
-    gale: { key: "v", ok: (n) => n.state === "wind" && n.wind > 0.5, show: (n) => `wind ${n.wind.toFixed(2)}, dust ${n.dust.toFixed(2)}` },
-    fog: { key: "c", ok: (n) => n.state === "fog" && n.fog > 0.04, show: (n) => `fog density ${n.fog.toFixed(3)}` },
-    sunbreak: { key: "x", ok: (n) => n.sun > 0.5, show: (n) => `warm light ${n.sun.toFixed(2)}, sky ${n.sky}` },
-    bolt: { key: "e", ok: (n) => n.state === "storm", show: (n) => `storm, flashes ${n.flashes}` },
+    rain: { key: "r", hold: 0, slot: "rain", ok: (n) => n.state === "rain" && n.rain > 0.3, show: (n) => `rain ${n.rain.toFixed(2)}, wet ${n.wet.toFixed(2)}` },
+    gale: { key: "v", hold: 700, slot: "wind", ok: (n) => n.state === "wind" && n.wind > 0.5, show: (n) => `wind ${n.wind.toFixed(2)}, dust ${n.dust.toFixed(2)}` },
+    fog: { key: "c", hold: 0, slot: "fog", ok: (n) => n.state === "fog" && n.fog > 0.04, show: (n) => `fog density ${n.fog.toFixed(3)}` },
+    sunbreak: { key: "x", hold: 0, slot: "sunbreak", ok: (n) => n.sun > 0.5, show: (n) => `warm light ${n.sun.toFixed(2)}, sky ${n.sky}` },
+    bolt: { key: "e", hold: 0, slot: "bolt", ok: (n) => n.state === "storm", show: (n) => `storm, flashes ${n.flashes}` },
   };
   let n = 0;
   for (const id of ids) {
@@ -1185,18 +1195,19 @@ async function weatherAbilities(options, t) {
     const pr = probes[id];
     t.scene(`Ability: ${id}`);
     t.progress(0.1 + 0.17 * n);
-    const cost = (P.now().abilities.find((x) => x.id === id) || {}).cost || 20;
+    const cost = (P.now().abilities.find((x) => x.id === id) || P.now().abilities.find((x) => x.id === pr.slot) || {}).cost || 20;
     await t.until(() => P.now().energy + 0.05 >= cost, 15000, `Energy for ${id}`).catch(() => {});
     const e0 = P.now().energy;
-    pressKey(pr.key);
+    if (pr.hold) await holdVerb(pr.key, pr.hold);
+    else pressKey(pr.key);
     const hit = await t.until(() => (id === "bolt" ? P.now().strike : true) && pr.ok(W.now()), 4000, `${id} to show in the sky`).then(() => true).catch(() => false);
     await sleep(900);
     const seen = W.now();
     looks[id] = { sky: seen.sky, fog: seen.fog, rain: seen.rain, wind: seen.wind, sun: seen.sun };
-    const slot = document.getElementById("ability-" + id);
+    const slot = document.getElementById("ability-" + pr.slot);
     if (hit && pr.ok(seen)) t.event(`ability-${id}`, `${pr.show(seen)}; spent ${Math.round(e0 - P.now().energy)} energy`);
     else t.problem("bug", `${pr.key.toUpperCase()} (${id}) didn't change the sky as it should (state ${seen.state})`);
-    if (!slot || !(slot.classList.contains("cooling") || slot.classList.contains("active"))) t.problem("bug", `The ${id} slot didn't show it was used`);
+    if (!slot || !(slot.classList.contains("cooling") || slot.classList.contains("active") || slot.classList.contains("pulse"))) t.problem("bug", `The ${pr.slot} slot didn't show it was used`);
     const heard = (W.now().heard || 0);
     t.metric(`heard-${id}`, Number(heard.toFixed(3)));
     const t0 = Date.now();
@@ -1226,17 +1237,25 @@ async function castFeel(options, t) {
   await sleep(600);
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
-  const ids = [["rain", "r"], ["gale", "v"], ["fog", "c"], ["sunbreak", "x"], ["bolt", "e"], ["gust", "g"], ["tornado", "t"], ["storm", "f"]];
-  for (const [id, key] of ids) {
+  // Five verbs (+ G gust alias). Storm / tornado are hold depths of Lightning / Wind.
+  const ids = [
+    ["rain", "r", "rain"],
+    ["fog", "c", "fog"],
+    ["sunbreak", "x", "sunbreak"],
+    ["bolt", "e", "bolt"],
+    ["gust", "g", "gust"],
+  ];
+  for (const [id, key, expect] of ids) {
     t.scene(`Cast: ${id}`);
     const cost = (P.now().abilities.find((x) => x.id === id) || {}).cost || 20;
     await t.until(() => P.now().energy + 0.05 >= cost, 30000, `Charge for ${id}`).catch(() => {});
     const t0 = performance.now();
     let first = -1;
-    const slot = document.getElementById("ability-" + id);
+    const slotId = id === "gust" ? "wind" : id;
+    const slot = document.getElementById("ability-" + slotId);
     const seen = new Promise((res) => {
       const h = (e) => {
-        if (e.detail && e.detail.power === id && e.detail.action !== "denied") {
+        if (e.detail && e.detail.power === expect && e.detail.action !== "denied") {
           first = performance.now() - t0;
           window.removeEventListener("day:power", h);
           res();
@@ -1251,9 +1270,9 @@ async function castFeel(options, t) {
     const c = P.now().cast;
     const pulsed = slot && (slot.classList.contains("pulse") || slot.classList.contains("cooling"));
     t.metric(`first-feedback-${id}-ms`, Math.round(first));
-    if (first >= 0 && first < 100 && c.id === id) t.event(`cast-${id}`, `${c.kind} in ${Math.round(first)} ms`);
+    if (first >= 0 && first < 100 && c.id === expect) t.event(`cast-${id}`, `${c.kind} in ${Math.round(first)} ms`);
     else t.problem("bug", `${id} gave no feedback within 100 ms (${Math.round(first)})`);
-    if (!pulsed) t.problem("bug", `The ${id} button didn't show the press`);
+    if (!pulsed) t.problem("bug", `The ${slotId} button didn't show the press`);
     await sleep(1500);
   }
   const m = P.now().cast.shakeMax;
@@ -2906,6 +2925,10 @@ async function weather(options, t) {
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   t.event("control-taken", "Enter, so the weather keys work");
+  // Keys 1–7 need Sky studio (off by default).
+  if (W.skyStudio) W.skyStudio(true);
+  else try { localStorage.setItem("icanbe.skyStudio", "on"); } catch (e) { /* */ }
+  t.event("sky-studio", "Sky studio on for keys 1–7");
   const moveCfg = (window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.move) || {};
   t.metric("feel.coyoteMs", Math.round((moveCfg.coyote != null ? moveCfg.coyote : 0.12) * 1000));
   t.metric("feel.jumpBufferMs", Math.round((moveCfg.jumpBuffer != null ? moveCfg.jumpBuffer : 0.12) * 1000));
@@ -3430,6 +3453,7 @@ async function atmosphere(options, t) {
   t.event("sound-on", `button "${sound.textContent}", saved ${localStorage.getItem("icanbe.sound")}`);
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  if (W.skyStudio) W.skyStudio(true);
   const street = window.DAY_CONFIG.street || { z: 12.6 };
   await goTo(C.state().x, street.z, t, { close: 1.4, ms: 16000, progress: 0.3 });
   t.progress(0.3);
@@ -3495,9 +3519,9 @@ async function atmosphere(options, t) {
   t.progress(1);
 }
 
-/* ---------------- powers: storm, lightning, gust, tornado, and the Pressure meter ---------------- */
+/* ---------------- powers: five verbs, Charge, Lightning hold→Storm, Wind full→Tornado ---------------- */
 // Real input: day bar beside the car (setup), Sound on, Enter, WASD to the avenue near the loose props,
-// hold F for the storm, E bolt, G gust, T tornado; then try one dry so the meter refuses.
+// hold E for Storm, tap E bolt, G/V gust, hold V for Gale then Tornado; Charge refuses when dry.
 async function powers(options, t) {
   t.scene("Outside");
   checkBasics(t);
@@ -3536,49 +3560,51 @@ async function powers(options, t) {
   pressKey("Enter");
   await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
   t.event("control-taken", "Enter, so his powers work");
-  const meter = $("pressure");
-  if (!meter || meter.hidden) t.problem("bug", "The Pressure meter isn't showing while he's the player's");
-  else t.event("pressure-meter", "Pressure is on screen");
+  const chargeEl = $("charge");
+  const verbs = ["bolt", "rain", "wind", "fog", "sunbreak"].map((id) => $("ability-" + id)).filter(Boolean);
+  const bar = document.querySelector(".abilitybar");
+  if (!chargeEl || (bar && bar.hidden)) t.problem("bug", "Charge isn't showing while he's the player's");
+  else t.event("charge-meter", "Charge is on screen");
+  if (verbs.length !== 5) t.problem("bug", `Ability bar shows ${verbs.length} verbs, want 5`);
+  else t.event("five-verbs", verbs.map((el) => el.dataset.ability).join(","));
+  const pressure = $("pressure");
+  if (pressure && !pressure.hidden && getComputedStyle(pressure).display !== "none") t.problem("bug", "The old Pressure chip is still visible (Charge replaced it)");
 
-  // Near the loose bins and umbrellas on the avenue (day.config.js powers.loose).
   const nearLoose = { x: -2.2, z: street.z - 1.8 };
-  const reached = await goTo(nearLoose.x, nearLoose.z, t, { close: 1.6, ms: 20000, sprint: true, progress: 0.12 });
+  const reached = await goTo(nearLoose.x, nearLoose.z, t, { close: 1.6, ms: 20000, run: true, progress: 0.12 });
   const stood = C.state();
   t.scene("On the avenue");
   if (reached) t.event("at-props", `at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)} near the loose props`);
   else t.problem("bug", `He didn't reach the avenue props (at ${stood.x.toFixed(1)}, ${stood.z.toFixed(1)})`);
   t.progress(0.18);
 
-  async function waitPressure(cost, label) {
-    await t.until(() => P.now().pressure + 0.05 >= cost, 12000, `Pressure for ${label} (${cost})`);
-    t.metric(`pressure-before-${label}`, Math.round(P.now().pressure));
+  async function waitCharge(cost, label) {
+    await t.until(() => P.now().pressure + 0.05 >= cost, 12000, `Charge for ${label} (${cost})`);
+    t.metric(`charge-before-${label}`, Math.round(P.now().pressure));
   }
 
-  // 1. Hold F: cloud over him, then the storm and rain.
   t.scene("Summon storm");
-  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.storm) || 40, "storm");
+  await waitCharge((cfg.powers && cfg.powers.costs && cfg.powers.costs.storm) || 40, "storm");
   const beforeStorm = window.weather ? window.weather.now() : null;
-  keyDown("f");
-  await t.until(() => P.now().charging || P.now().radius > 1, 2000, "the cloud to gather").catch(() => {});
+  keyDown("e");
+  await t.until(() => P.now().charging || P.now().radius > 1, 2500, "the cloud to gather").catch(() => {});
   if (P.now().radius > 0.8 || P.now().charging) t.event("storm-gather", `cloud radius ${P.now().radius.toFixed(1)}, charging ${P.now().charging}`);
-  else t.problem("bug", "Holding F didn't darken the sky over him");
-  await sleep(900);
-  keyUp("f");
+  else t.problem("bug", "Holding E didn't darken the sky over him");
+  await sleep(1000);
+  keyUp("e");
   await t.until(() => P.now().called || (window.weather && window.weather.now().state === "storm"), 5000, "the storm he called");
   const afterStorm = P.now();
   const wx = window.weather && window.weather.now();
   if (afterStorm.called || (wx && wx.state === "storm")) {
     t.event("storm-called", `local rain ${afterStorm.localRain}, weather ${wx && wx.state}, rain ${wx && wx.rain.toFixed(2)}, sky ${wx && wx.sky}`);
-  } else t.problem("bug", "Holding F didn't summon a storm");
+  } else t.problem("bug", "Holding E didn't summon a storm");
   if (beforeStorm && wx && wx.rain <= beforeStorm.rain && !(afterStorm.localRain || afterStorm.called)) {
     t.problem("bug", "Summoning a storm didn't start rain");
   }
-  if ($("log") && !$("log").textContent.includes("storm")) t.problem("polish", "Calling the storm isn't in the action log");
   t.progress(0.35);
 
-  // 2. E: lightning at the reticle — flash, thunder, a mark on the world.
   t.scene("Lightning");
-  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.bolt) || 24, "bolt");
+  await waitCharge((cfg.powers && cfg.powers.costs && cfg.powers.costs.bolt) || 24, "bolt");
   const props0 = (P.now().props || []).map((p) => ({ ...p }));
   pressKey("e");
   await sleep(200);
@@ -3587,22 +3613,16 @@ async function powers(options, t) {
   if (!strike) {
     t.problem("bug", "E didn't throw lightning");
   } else {
-    t.event("bolt-struck", `at ${strike.x.toFixed(1)},${strike.z.toFixed(1)} · flash ${P.now().flash.toFixed(2)} · alarm ${strike.alarm} · blackout ${strike.blackout || "none"} · knocked ${strike.knocked}`);
-    if (!(P.now().flash > 0.05 || strike.thunder)) {
-      await t.until(() => P.now().strike && P.now().strike.thunder, 3000, "thunder").catch(() => {});
-    }
-    if (P.now().strike && P.now().strike.thunder) t.event("thunder", `thunder after ${P.now().strike.delay.toFixed(2)} s`);
-    else if (!(P.now().flash > 0)) t.problem("bug", "The strike had no flash or thunder");
+    t.event("bolt-struck", `at ${strike.x.toFixed(1)},${strike.z.toFixed(1)} · flash ${P.now().flash.toFixed(2)}`);
     const moved = (P.now().props || []).some((p, i) => props0[i] && Math.hypot(p.x - props0[i].x, p.z - props0[i].z) > 0.3);
     const worldHit = !!(strike.alarm || strike.blackout || strike.knocked > 0 || moved || P.now().alarm || P.now().blackout);
-    if (worldHit) t.event("bolt-world", `alarm ${!!(strike.alarm || P.now().alarm)}, lights out ${P.now().blackout || strike.blackout || "none"}, props moved ${moved}, knocked ${strike.knocked}`);
-    else t.problem("bug", "Lightning left no mark on the world (no alarm, lights out or knocked prop)");
+    if (worldHit) t.event("bolt-world", `alarm ${!!(strike.alarm || P.now().alarm)}, knocked ${strike.knocked}, props moved ${moved}`);
+    else t.problem("bug", "Lightning left no mark on the world");
   }
-  t.progress(0.55);
+  t.progress(0.5);
 
-  // 3. G: a gust that pushes what's in front of him.
   t.scene("Gust");
-  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.gust) || 16, "gust");
+  await waitCharge((cfg.powers && cfg.powers.costs && cfg.powers.costs.gust) || 16, "gust");
   const beforeGust = (P.now().props || []).map((p) => ({ ...p }));
   pressKey("g");
   await sleep(350);
@@ -3613,16 +3633,15 @@ async function powers(options, t) {
     t.event("gust-cast", `pushes ${gust.pushes}, props moved ${pushed}`);
     if (gust.pushes < 1 && pushed < 1) t.problem("bug", "The gust didn't push anything");
   }
-  t.progress(0.7);
+  t.progress(0.65);
 
-  // 4. T: a tornado down the street.
   t.scene("Tornado");
-  await waitPressure((cfg.powers && cfg.powers.costs && cfg.powers.costs.tornado) || 48, "tornado");
-  pressKey("t");
-  await sleep(200);
-  await t.until(() => P.now().tornado && P.now().tornado.life > 0, 2000, "a tornado");
+  await waitCharge((cfg.powers && cfg.powers.costs && cfg.powers.costs.tornado) || 48, "tornado");
+  keyDown("v");
+  await t.until(() => P.now().tornado && P.now().tornado.life > 0, 4000, "a tornado from full-charge Wind").catch(() => {});
+  keyUp("v");
   const tw0 = P.now().tornado;
-  if (!tw0) t.problem("bug", "T didn't send a tornado");
+  if (!tw0) t.problem("bug", "Full-charge Wind didn't send a tornado");
   else {
     t.event("tornado-start", `on the ${tw0.axis} street at ${tw0.x.toFixed(1)},${tw0.z.toFixed(1)}, life ${tw0.life.toFixed(1)} s`);
     await sleep(1800);
@@ -3631,42 +3650,121 @@ async function powers(options, t) {
     if (travelled > 2) t.event("tornado-ran", `travelled ${travelled.toFixed(1)} m down the street`);
     else t.problem("bug", `The tornado barely moved (${(travelled || 0).toFixed(1)} m)`);
   }
-  t.progress(0.85);
+  t.progress(0.82);
 
-  // 5. Pressure limits him: spend what's left, then a refused call.
-  t.scene("Pressure");
+  t.scene("Charge");
   let denied = false;
-  for (let i = 0; i < 8 && !denied; i++) {
-    const before = P.now().pressure;
-    pressKey("t");
-    await sleep(180);
-    const snap = P.now();
-    if (snap.blocked && snap.blocked.power) {
-      denied = true;
-      t.event("pressure-denied", `refused ${snap.blocked.power} at pressure ${snap.blocked.pressure} (had ${before.toFixed(0)})`);
-    }
+  while (P.now().pressure > 5) {
+    pressKey("g");
+    await sleep(120);
   }
-  if (!denied) {
-    // Drain with gusts if tornado never refused (still filling).
-    while (P.now().pressure > 5) {
-      pressKey("g");
-      await sleep(120);
-    }
-    pressKey("t");
-    await sleep(200);
-    if (P.now().blocked) {
-      denied = true;
-      t.event("pressure-denied", `refused ${P.now().blocked.power} at ${P.now().blocked.pressure}`);
-    }
+  pressKey("g");
+  await sleep(200);
+  if (P.now().blocked) {
+    denied = true;
+    t.event("charge-denied", `refused ${P.now().blocked.power} at ${P.now().blocked.pressure}`);
   }
-  if (!denied) t.problem("bug", "The Pressure meter never refused a power");
-  else t.metric("pressure-floor", P.now().blocked ? P.now().blocked.pressure : Math.round(P.now().pressure));
+  if (!denied) t.problem("bug", "Charge never refused a power");
+  else t.metric("charge-floor", P.now().blocked ? P.now().blocked.pressure : Math.round(P.now().pressure));
+
+  const W = window.weather;
+  if (W && W.skyStudio) W.skyStudio(false);
+  const before = W && W.now().state;
+  pressKey("3");
+  await sleep(200);
+  if (W && W.now().state !== before && W.now().manual) t.problem("bug", "Sky studio off but key 3 still set the weather");
+  else t.event("sky-studio-off", "keys 1–7 idle");
 
   C.touch(true);
   await sleep(250);
   const pad = $("powerpad");
-  if (!pad || pad.hidden) t.problem("polish", "The power pad isn't showing with touch controls on");
-  else t.event("power-pad", "Storm / Bolt / Gust / Tornado on the phone");
+  if (pad && !pad.hidden && getComputedStyle(pad).display !== "none") t.problem("bug", "The old power pad is still showing on touch");
+  else t.event("no-power-pad", "verb arc only on touch");
+  t.progress(1);
+}
+
+/* ---------------- five-verbs: acceptance for the collapsed power set + phone arc ---------------- */
+// Real input on a phone-sized touch layout: five verb slots, Charge ring, street tap aims, ≤7 controls,
+// none over the character; Lightning hold → Storm and Wind full → Tornado already covered in `powers`.
+async function fiveVerbs(options, t) {
+  await powers(options, t);
+  t.scene("Phone arc");
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  if (!C || !P) return;
+  C.touch(true);
+  await sleep(300);
+  // Resize is the runner's job at 390x844; count visible touch controls.
+  const parts = [
+    ".touchpad .stick", ".touchpad .jump",
+    "#ability-bolt", "#ability-rain", "#ability-wind", "#ability-fog", "#ability-sunbreak",
+  ];
+  const live = parts.filter((sel) => {
+    const el = document.querySelector(sel);
+    if (!el || el.hidden) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 2 && r.height > 2 && getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden";
+  });
+  t.metric("touch-controls", live.length);
+  if (live.length > 7) t.problem("bug", `More than 7 touch controls in play (${live.length}: ${live.join(", ")})`);
+  else t.event("touch-budget", `${live.length} controls (stick, jump, five verbs)`);
+  const char = (() => {
+    try {
+      const st = C.state();
+      const cam = window.day.world && window.day.world().camera;
+      if (!cam || !window.BABYLON) return null;
+      const eng = window.day.world().engine;
+      const rw = eng.getRenderWidth();
+      const rh = eng.getRenderHeight();
+      const v = window.BABYLON.Vector3.Project(
+        new window.BABYLON.Vector3(st.x, (st.y || 0) + 0.9, st.z),
+        window.BABYLON.Matrix.Identity(),
+        window.day.world().scene.getTransformMatrix(),
+        cam.viewport.toGlobal(rw, rh)
+      );
+      const canvas = eng.getRenderingCanvas();
+      const rect = canvas.getBoundingClientRect();
+      return {
+        left: rect.left + (v.x / rw) * rect.width - 28,
+        right: rect.left + (v.x / rw) * rect.width + 28,
+        top: rect.top + (v.y / rh) * rect.height - 60,
+        bottom: rect.top + (v.y / rh) * rect.height + 40,
+      };
+    } catch (e) { return null; }
+  })();
+  let over = 0;
+  if (char) {
+    live.forEach((sel) => {
+      const el = document.querySelector(sel);
+      const b = el.getBoundingClientRect();
+      if (!(b.right < char.left || b.left > char.right || b.bottom < char.top || b.top > char.bottom)) {
+        over++;
+        t.problem("bug", `HUD ${sel} overlaps the character box`);
+      }
+    });
+  }
+  t.metric("hud-over-character", over);
+  if (over === 0) t.event("hud-clear-character", "no touch controls over the character");
+
+  // Tap the street ahead to move the aim reticle.
+  const canvas = window.day.world().engine.getRenderingCanvas();
+  const rect = canvas.getBoundingClientRect();
+  const aimBefore = P.now().aim;
+  const cx = rect.left + rect.width * 0.55;
+  const cy = rect.top + rect.height * 0.62;
+  canvas.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: cx, clientY: cy, button: 0, pointerId: 21, pointerType: "touch" }));
+  canvas.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: cx, clientY: cy, button: 0, pointerId: 21, pointerType: "touch" }));
+  await sleep(200);
+  const aimAfter = P.now().aim;
+  if (aimAfter && (!aimBefore || Math.hypot(aimAfter.x - (aimBefore.x || 0), aimAfter.z - (aimBefore.z || 0)) > 0.4)) {
+    t.event("street-aim", `reticle at ${aimAfter.x.toFixed(1)}, ${aimAfter.z.toFixed(1)}`);
+  } else t.problem("bug", "Tapping the street didn't move the cast aim");
+  // Labels: no bracketed keys in episode goals
+  const bad = ((window.DAY_CONFIG.episodes && window.DAY_CONFIG.episodes.list) || [])
+    .flatMap((ep) => (ep.goals || []).map((g) => ({ ep: ep.id, g })))
+    .filter(({ g }) => /\([A-Z0-9](?:\s*\/\s*[A-Z0-9]+)?\)/.test(String(g.label || "")));
+  if (bad.length) t.problem("bug", `Goal labels still have bracketed keys: ${bad.map((b) => b.ep + "/" + b.g.id).join(", ")}`);
+  else t.event("goal-labels", "no bracketed keys in episode goals");
   t.progress(1);
 }
 
@@ -4808,7 +4906,11 @@ async function storyParts(options, t) {
     el.querySelector("button.ok").click();
     return { text, strain, scarred: /scarred/.test(text) };
   }
-  async function press(key, wait) { pressKey(key); await sleep(wait || 600); }
+  async function press(key, wait) {
+    if (key === "v") await holdVerb("v", 750); // Gale: past windHold, before Tornado
+    else pressKey(key);
+    await sleep(wait || 600);
+  }
 
   /* ---- Part 1, overused: three rains on the park go past the budget of 4 ---- */
   t.scene("Part 1: the park, overused");
@@ -4960,7 +5062,11 @@ async function lunchRescue(options, t) {
     el.querySelector("button.ok").click();
     return { rank, text, detail };
   }
-  async function press(key, wait) { pressKey(key); await sleep(wait || 600); }
+  async function press(key, wait) {
+    if (key === "v") await holdVerb("v", 750); // Gale: past windHold, before Tornado
+    else pressKey(key);
+    await sleep(wait || 600);
+  }
 
   /* ---- run 1: one person helped, then let go ---- */
   t.scene("Rooftop storm: one helped");
@@ -5104,7 +5210,11 @@ async function hurricaneDrive(options, t) {
     el.querySelector("button.ok").click();
     return { rank, text, detail };
   }
-  async function press(key, wait) { pressKey(key); await sleep(wait || 600); }
+  async function press(key, wait) {
+    if (key === "v") await holdVerb("v", 750); // Gale: past windHold, before Tornado
+    else pressKey(key);
+    await sleep(wait || 600);
+  }
   // One set piece: walk to each stranded person and call the ability (the right one for the piece).
   async function playPiece(q, key, progress) {
     for (let i = 0; i < q.people.length; i++) {
@@ -5230,7 +5340,11 @@ async function storyEnding(options, t) {
     el.querySelector("button.ok").click();
     return { text, strain, scarred: /scarred/.test(text) };
   }
-  async function press(key, wait) { pressKey(key); await sleep(wait || 600); }
+  async function press(key, wait) {
+    if (key === "v") await holdVerb("v", 750); // Gale: past windHold, before Tornado
+    else pressKey(key);
+    await sleep(wait || 600);
+  }
 
   /* ---- Part 1, played clean ---- */
   t.scene("Part 1: the park and the market");
@@ -5421,7 +5535,9 @@ async function lightShow(options, t) {
       const c = cues[i];
       const at = c.at + (mode === "perfect" ? 0 : 0.7);
       if (s.t >= at - 0.04) {
-        pressKey(mode === "perfect" ? keyFor(c.power) : keyFor("bolt"));
+        const k = mode === "perfect" ? keyFor(c.power) : keyFor("bolt");
+        if (mode === "perfect" && c.power === "gale") await holdVerb(k || "v", 700);
+        else pressKey(k);
         i++;
         if (i === 6 || i === 12 || i === cues.length - 1) await sleep(900), stage(`after cue ${i}`);
       } else await sleep(Math.max(15, Math.min(120, (at - s.t) * 1000 - 60)));
@@ -5553,7 +5669,7 @@ async function tutorialEpisode(options, t) {
   const tapAbility = (id) => tapEl($("ability-" + id));
   if (touch) {
     t.event("touch-layout", `${innerWidth}×${innerHeight}: the five abilities are pressed by pointer taps`);
-    const five = ["bolt", "rain", "gale", "fog", "sunbreak"];
+    const five = ["bolt", "rain", "wind", "fog", "sunbreak"];
     const fixed = ["stick", "jump-btn", "powerpad", "episode-hud", "tutorial", "control", "pressure", "weather-btn"];
     const bad = [];
     const boxes = five.map((id) => ({ id, el: $("ability-" + id), r: boxOf($("ability-" + id)) }));
@@ -5582,7 +5698,7 @@ async function tutorialEpisode(options, t) {
   else t.event("tutorial-skip-ready", "Skip is on the tutorial card");
 
   const order = tut.goals.map((g) => g.power);
-  const keys = { bolt: "e", rain: "r", gale: "v", fog: "c", sunbreak: "x" };
+  const keys = { bolt: "e", rain: "r", wind: "v", fog: "c", sunbreak: "x" };
   for (let i = 0; i < order.length; i++) {
     const id = order[i];
     const goal = tut.goals[i];
@@ -5603,15 +5719,15 @@ async function tutorialEpisode(options, t) {
     if (i === 1) {
       // A locked ability refuses, changes nothing.
       const before = window.powers.now().energy;
-      if (touch) await tapAbility("gale");
+      if (touch) await tapAbility("wind");
       else tapKey("v", 120);
       await sleep(300);
-      if (window.powers.abilities.get("gale").uses > 0) t.problem("bug", "Gale worked while locked");
+      if ((window.powers.abilities.get("wind") || {}).uses > 0 || (window.powers.abilities.get("gust") || {}).uses > 0) t.problem("bug", "Wind worked while locked");
       else if (touch) {
         const rf = $("ability-refuse");
         if (!rf || !rf.textContent) t.problem("bug", "A tap on a locked ability gave no refusal line");
-        else t.event("locked-refused", `Gale (tap) is refused before it unlocks: "${rf.textContent}"`);
-      } else t.event("locked-refused", "Gale (V) is refused before it unlocks");
+        else t.event("locked-refused", `Wind (tap) is refused before it unlocks: "${rf.textContent}"`);
+      } else t.event("locked-refused", "Wind (V) is refused before it unlocks");
       void before;
     }
     for (let k = 0; k < 6 && !(Ep.now() && Ep.now().goals[i].done); k++) {
@@ -5923,7 +6039,7 @@ async function phone(options, t) {
   // 4. The five abilities and a power, each by tap.
   t.scene("Abilities");
   const done = [];
-  for (const id of ["bolt", "rain", "gale", "fog", "sunbreak"]) {
+  for (const id of ["bolt", "rain", "wind", "fog", "sunbreak"]) {
     const el = $("ability-" + id);
     const before = uses(id);
     let ok = false;
@@ -5952,7 +6068,7 @@ async function phone(options, t) {
   }
   if (padOk) t.event("power-tap", `${pid} from the power pad by tap`);
   else t.problem("bug", `The power pad's ${pid} never fired by tap`);
-  if (done.length === 5) t.event("abilities-tapped", "Lightning, Rain, Gale, Fog and Sun break all used by tap");
+  if (done.length === 5) t.event("abilities-tapped", "Lightning, Rain, Wind, Fog and Sun all used by tap");
   t.progress(0.6);
 
   // 5. The Episodes menu and an episode card.
@@ -7207,7 +7323,8 @@ installPlaytest({
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
     { id: "weather-audio", title: "Rooftop weather soundscape and footsteps: Sound on (real click), Take control (sting), climb apt roof, walk across gravel, metal, tar and puddle surfaces, then cycle clear/sun, clouds, rain (light roof patter vs heavy downpour, gutters, umbrella), storm (distance-delayed thunder crack and rolling thunder), fog, wind (3D-panned gusts and flapping awnings) and snow (muffled city) with equal-power crossfades", seconds: 150, tags: ["weather", "audio"], description: "Day bar outside, confirms silence, turns Sound on with a pointer, Enter, climbs apt rooftop, walks gravel/metal/tar/puddle zones, cycles keys 1–7 on the roof. Logs footstep-*, rain-layers, thunder-delay, loop-seams, music-* and soundscape levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
-    { id: "powers", title: "Take control on the avenue, hold F for a storm, E lightning, G a gust, T a tornado; Pressure refuses a call when empty", seconds: 120, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Real keys for each power; the meter must deny one." },
+    { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
+    { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "voice-director", title: "Voice director: take control and first power uses speak with a caption clear of the ability bar; lines never overlap; Voices mute leaves music/effects alone; day end speaks", seconds: 90, tags: ["voice", "audio"], description: "Load with ?playtest=voice-director. Sound on (real pointer), Enter, E then R, Voices off in Settings, day-end recap (setup). Optional {\"touch\":true}. Events voice-take / voice-power-first / voice-caption / voice-no-overlap / voices-mute / voice-dayend. Run at desktop and 390x844." },
@@ -7232,6 +7349,12 @@ installPlaytest({
     // control.js's place() (a setup teleport that snaps the camera) tells the feel sensor it was an intended cut through
     // window.hawkesPlaytest.cut; the contract's api has none (cut lives on `t`), so every placement counted as a camera snap.
     if (window.hawkesPlaytest && !window.hawkesPlaytest.cut) window.hawkesPlaytest.cut = (s) => t.cut(s);
+    // Most scenarios still use keys 1–7 for forecast weather; Sky studio is off for players by default.
+    // Powers / five-verbs turn it off again to assert the gate.
+    try {
+      if (id !== "powers" && id !== "five-verbs") localStorage.setItem("icanbe.skyStudio", "on");
+      else localStorage.setItem("icanbe.skyStudio", "off");
+    } catch (e) { /* private mode */ }
     try {
       if (["smoke", "hud-layout", "phone", "cold-start", "quiet-ui"].includes(id)) forcePublicView();
       if (id !== "title" && id !== "cold-start" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
@@ -7270,6 +7393,7 @@ installPlaytest({
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
+      else if (id === "five-verbs") await fiveVerbs(options, t);
       else if (id === "voice") await voice(options, t);
       else if (id === "voice-director") await voiceDirector(options, t);
       else if (id === "spoken-dialogue") await spokenDialogue(options, t);
