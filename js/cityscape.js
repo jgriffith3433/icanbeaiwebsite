@@ -270,7 +270,7 @@ export function installCityscape(w) {
   skyMat.emissiveColor = new B.Color3(0, 0, 0);
   skyMat.specularColor = new B.Color3(0, 0, 0);
   skyMat.maxSimultaneousLights = 2;
-  skyMat.fogEnabled = false; // tinted toward the sky colour below, so the far lights stay bright at night
+  skyMat.fogEnabled = true; // by day only: switched off at dusk below so the far lights stay bright at night
 
   /* ---------------- what's free to build on ---------------- */
   const homeB = cfg.buildings && cfg.buildings.home;
@@ -664,6 +664,9 @@ export function installCityscape(w) {
     // the skyline fades to the sky's colour by day and goes dark blue at night
     fogV.copyFrom(scene.fogColor);
     const dayK = Math.max(0, 1 - windows);
+    // by day the far towers take the scene's fog like every other building (else they stay dark slabs against the pale sky);
+    // once the windows come on, fog goes off so the far lights stay bright
+    skyMat.fogEnabled = windows < 0.3;
     skyMat.diffuseColor.set(fogV.r * 0.55 + 0.16 * dayK, fogV.g * 0.6 + 0.18 * dayK, fogV.b * 0.65 + 0.22 * dayK);
   });
 
