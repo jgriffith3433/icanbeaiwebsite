@@ -353,6 +353,19 @@ window.DAY_CONFIG = {
      while autopilot still has the weather he left behind. Steps and pools
      can use `when: { weather: "rain" }` (or an array) against the forecast.
      ------------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------------
+     WIND AND FOG YOU CAN SEE (js/windfog.js)
+     One global wind (direction, strength, time) that bends the street trees, planters and awnings in a
+     vertex shader, streaks ribbons along a gust, swirls leaves and papers through eddies, streams the flags
+     and laundry, and flips walkers' umbrellas inside out. Fog is ground fog in noise slices that slide in
+     from the river (it lies to the north, +z) and hug the streets. `prevailing` is the wind's own direction
+     (x, z) when nobody has cast; a Gust or a Gale turns it to the way he is facing and it drifts back.
+     ------------------------------------------------------------------------ */
+  windfog: {
+    prevailing: [0.82, -0.57],
+    river: [0, 1],
+  },
+
   weather: {
     blend: 3.4,
     // How long a power's weather lasts and how fast it eases out: ABILITY_HOLD_SEC / ABILITY_FADE_SEC at the top of js/weather.js.

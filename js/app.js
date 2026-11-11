@@ -21,6 +21,7 @@ import "./score.js"; // weather music beds, sampled ambience, take-control sting
 import "./render-pipeline.js"; // the picture: ACES, a grade LUT per hour and weather, emissive bloom, SSAO2, cascaded shadows (after weather: it follows weather.now())
 import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyline curtains, window runnels, drips, lens drops, height fog (after weather)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
+import "./windfog.js"; // wind and fog you can see: a shader bend, ribbons, leaves, flags, cloth, umbrellas, ground-fog slices (after powers, weather, crowd)
 import "./barks.js"; // Small Weather's needs and weather reactions in the log, once each per day (docs/voice-style.md)
 import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card

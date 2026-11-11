@@ -58,6 +58,7 @@ class Part {
     this.idx = [];
     this.prims = []; // world-space boxes of every box/cylinder/ball: the city audit (js/city-audit.js) clusters them into props
     this.f = { ox: 0, oz: 0, oy: 0, c: 1, s: 0 };
+    this.bend = 0; // 0 = rigid; up to 1 = flexible in the wind: stored as the vertex alpha (1 - bend / 2), read by js/windfog.js's shader
   }
   frame(ox, oz, yaw, oy) {
     this.f = { ox, oz, oy: oy || 0, c: Math.cos(yaw || 0), s: Math.sin(yaw || 0) };
@@ -90,7 +91,7 @@ class Part {
       this.pos.push(q[0], q[1], q[2]);
       const m = this.wn(n[0], n[1], n[2]);
       this.nrm.push(m[0], m[1], m[2]);
-      this.col.push(col[0], col[1], col[2], 1);
+      this.col.push(col[0], col[1], col[2], 1 - 0.5 * this.bend);
     });
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
@@ -118,7 +119,7 @@ class Part {
       const w = this.w(q[0], q[1], q[2]);
       this.pos.push(w[0], w[1], w[2]);
       this.nrm.push(m[0], m[1], m[2]);
-      this.col.push(col[0], col[1], col[2], 1);
+      this.col.push(col[0], col[1], col[2], 1 - 0.5 * this.bend);
     });
     this.idx.push(base, base + 1, base + 2);
     if (p.length === 4) this.idx.push(base, base + 2, base + 3);
@@ -194,12 +195,12 @@ class Part {
         const up = this.wn(0, 1, 0);
         this.pos.push(c[0], c[1], c[2]);
         this.nrm.push(up[0], up[1], up[2]);
-        this.col.push(col[0], col[1], col[2], 1);
+        this.col.push(col[0], col[1], col[2], 1 - 0.5 * this.bend);
         [p(r1, a0, y0 + h), p(r1, a1, y0 + h)].forEach((q) => {
           const wq = this.w(q[0], q[1], q[2]);
           this.pos.push(wq[0], wq[1], wq[2]);
           this.nrm.push(up[0], up[1], up[2]);
-          this.col.push(col[0], col[1], col[2], 1);
+          this.col.push(col[0], col[1], col[2], 1 - 0.5 * this.bend);
         });
         this.idx.push(top, top + 1, top + 2); // the cap faces up (it was culled from above)
       }
@@ -288,8 +289,10 @@ export function installProps(ctx) {
     solid.frame(x, z, 0, G);
     solid.cyl(0, 0, 0, 0.17 * s, 0.11 * s, 2.1 * s, 6, hex("#5a4230"));
     const lc = LEAF[Math.floor(rng() * LEAF.length)];
+    solid.bend = 0.75; // the crown bends in the wind (a vertex shader, js/windfog.js)
     solid.ball(0, 3.0 * s, 0, 1.5 * s, 0.85, lc, 7);
     solid.ball(0.5 * s, 2.5 * s, 0.3 * s, 1.0 * s, 0.8, lc.map((v) => v * 0.9), 6);
+    solid.bend = 0;
     colliders.push({ x, y: G + 1, z, w: 0.4, h: 2, d: 0.4 });
     stats.trees++;
   }
@@ -502,7 +505,9 @@ export function installProps(ctx) {
     [[-11, 24, "#d85a7a"], [-5, 24, "#e6b84a"], [-11, 64, "#9a6ad8"], [-5, 64, "#e6b84a"], [4, 45, "#d85a7a"]].forEach(([x, z, c]) => {
       if (!clearIn(x, z, 0.8)) return;
       solid.bbox(x, LAWN_TOP, z, 2.6, 0.22, 1.3, hex("#5b4636"), 0.04);
+      solid.bend = 0.8; // the flowers lean in the wind
       for (let k = 0; k < 7; k++) solid.ball(x - 1.1 + k * 0.37, LAWN_TOP + 0.3, z + ((k % 2) - 0.5) * 0.5, 0.17, 1, hex(c), 4);
+      solid.bend = 0;
       stats.planters++;
     });
     // lamps and benches along the path (x = -8), on the lawn

@@ -696,6 +696,8 @@ export function installCityscape(w) {
       const r = runCityAudit(scene, B, cfg, { solids: world.solids });
       return { failures: r.failures, counts: r.counts };
     },
+    /** The street lamps' [x, z] (js/windfog.js hangs light shafts under them in fog). */
+    lampSpots: () => lampSpots,
     info() {
       return {
         fillers: stats.fillers,
