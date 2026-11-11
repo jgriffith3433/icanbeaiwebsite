@@ -2118,69 +2118,85 @@
           if (r < camera.radius) camera.radius = r;
         }
       }
-      cutawayWalls(!pp.inCar && !!bd);
+      let goalPose = null;
+      if (cam.user <= 0) {
+        const gsb = Math.sin(shot.beta);
+        goalPose = {
+          tx: tx + ox,
+          tz: tz + oz,
+          cx: tx + ox + shot.radius * Math.cos(alphaGoal) * gsb,
+          cz: tz + oz + shot.radius * Math.sin(alphaGoal) * gsb,
+        };
+      }
+      cutawayWalls(!pp.inCar && !!bd, goalPose);
       sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
     }
 
     /* an interior wall crossing the line from the camera to its target (seen from above) is drawn faint: the
        cutaway never has a wall in front of the room. Colliders stay; only how it looks changes. */
-    function cutawayWalls(on) {
+    function cutawayWalls(on, goal) {
       for (const m of homeFront) if (m.isEnabled() === on) m.setEnabled(!on);
       if (!innerWalls.length) return;
       const tg = camera.target;
       const sb = Math.sin(camera.beta);
-      const cx = tg.x + camera.radius * Math.cos(camera.alpha) * sb;
-      const cz = tg.z + camera.radius * Math.sin(camera.alpha) * sb;
+      const cur = {
+        tx: tg.x,
+        tz: tg.z,
+        cx: tg.x + camera.radius * Math.cos(camera.alpha) * sb,
+        cz: tg.z + camera.radius * Math.sin(camera.alpha) * sb,
+      };
       const now = typeof performance !== "undefined" ? performance.now() : 0;
+      /* 0 = drawn, 1 = ghosted, 2 = gone: how one wall reads from one camera pose */
+      function judge(w, p, mg) {
+        const { tx, tz, cx, cz } = p;
+        /* a wall right under the camera (it sits above the room) fills a corner of the view even when it isn't on the sight line */
+        const ex0 = w.x1 - w.x0;
+        const ez0 = w.z1 - w.z0;
+        const l2 = ex0 * ex0 + ez0 * ez0 || 1;
+        const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
+        if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2 + mg) return 2;
+        /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
+           the near edge of the room even when the sight line misses it */
+        const vx = cx - tx;
+        const vz = cz - tz;
+        const vl = Math.hypot(vx, vz) || 1;
+        const d0 = ((w.x0 - tx) * vx + (w.z0 - tz) * vz) / vl;
+        const d1 = ((w.x1 - tx) * vx + (w.z1 - tz) * vz) / vl;
+        if (Math.min(d0, d1) > 0.3 - mg) return 2;
+        /* a partition that runs toward the camera (one end behind the target, the other well in front of it) shows
+           as a big grey wedge down the side of the view even though the sight line misses it */
+        if (Math.max(d0, d1) > 2 - mg) return 2;
+        const sc = ex0 * (cz - w.z0) - ez0 * (cx - w.x0);
+        const st = ex0 * (tz - w.z0) - ez0 * (tx - w.x0);
+        if (sc * st < 0) {
+          /* the camera and the target are on opposite sides: does the sight line cross the wall's span? */
+          const dx = tx - cx;
+          const dz = tz - cz;
+          const den = dx * ez0 - dz * ex0;
+          if (Math.abs(den) > 1e-6) {
+            const u = ((w.x0 - cx) * dz - (w.z0 - cz) * dx) / den;
+            if (u > -0.15 - mg * 0.1 && u < 1.15 + mg * 0.1) return 1;
+          }
+        }
+        return 0;
+      }
       for (const w of innerWalls) {
-        let hide = false;
-        let near = false;
+        let r = 0;
         /* a wall that was hidden a moment ago stays hidden while the camera is only just clear of the tests below
            (margin `mg`) and for 0.7 s after: a camera that drifts on the edge of a threshold, or is turned by hand
            (the input moves it after this runs), must not flash a solid slab across the view for a frame or two */
         const held = w.hiddenAt != null && now - w.hiddenAt < 700;
         const mg = held ? 1.5 : 0;
         if (on) {
-          /* a wall right under the camera (it sits above the room) fills a corner of the view even when it isn't on the sight line */
-          const ex0 = w.x1 - w.x0;
-          const ez0 = w.z1 - w.z0;
-          const l2 = ex0 * ex0 + ez0 * ez0 || 1;
-          const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
-          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2 + mg) hide = near = true;
-        }
-        if (on && !hide) {
-          /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
-             the near edge of the room even when the sight line misses it */
-          const vx = cx - tg.x;
-          const vz = cz - tg.z;
-          const vl = Math.hypot(vx, vz) || 1;
-          const d0 = ((w.x0 - tg.x) * vx + (w.z0 - tg.z) * vz) / vl;
-          const d1 = ((w.x1 - tg.x) * vx + (w.z1 - tg.z) * vz) / vl;
-          if (Math.min(d0, d1) > 0.3 - mg) hide = near = true;
-          /* a partition that runs toward the camera (one end behind the target, the other well in front of it) shows
-             as a big grey wedge down the side of the view even though the sight line misses it */
-          else if (Math.max(d0, d1) > 2 - mg) hide = near = true;
-        }
-        if (on && !hide) {
-          const ex = w.x1 - w.x0;
-          const ez = w.z1 - w.z0;
-          const sc = ex * (cz - w.z0) - ez * (cx - w.x0);
-          const st = ex * (tg.z - w.z0) - ez * (tg.x - w.x0);
-          if (sc * st < 0) {
-            /* the camera and the target are on opposite sides: does the sight line cross the wall's span? */
-            const dx = tg.x - cx;
-            const dz = tg.z - cz;
-            const den = dx * ez - dz * ex;
-            if (Math.abs(den) > 1e-6) {
-              const u = ((w.x0 - cx) * dz - (w.z0 - cz) * dx) / den;
-              hide = u > -0.15 - mg * 0.1 && u < 1.15 + mg * 0.1;
-            }
-          }
+          r = judge(w, cur, mg);
+          /* the camera is gliding to its shot (a room change, a day-bar jump): a wall the shot it's heading for hides
+             never shows on the way, it would flash as a dark slab until the glide ends */
+          if (goal) r = Math.max(r, judge(w, goal, mg));
         }
         /* a wall beside or under the camera is gone, not ghosted: even at 12% its dark slab fills the corner of a night view */
-        if (hide) w.hiddenAt = now;
-        else if (on && held) hide = near = true;
-        const v = hide ? (near ? 0 : 0.12) : 1;
+        if (r) w.hiddenAt = now;
+        else if (on && held) r = 2;
+        const v = r ? (r === 2 ? 0 : 0.12) : 1;
         if (w.mesh.visibility !== v) w.mesh.visibility = v;
         if (w.extra) for (const e of w.extra) if (e.visibility !== v) e.visibility = v;
       }
