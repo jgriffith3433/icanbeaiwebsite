@@ -64,6 +64,11 @@ export function dialogueLines(config) {
   });
   const people = (C.neighbors && C.neighbors.list) || [];
   people.forEach((p) => (p.beats || []).forEach((b) => add(neighborWho(p), b.text, `neighbor:${b.id}`)));
+  // Today's request (js/daily.js, config `daily.pool`): each ask and thanks, spoken by the one who asks.
+  ((C.daily && C.daily.pool) || []).forEach((a) => {
+    add(a.name, a.ask, `daily:${a.id}:ask`);
+    add(a.name, a.thanks, `daily:${a.id}:thanks`);
+  });
   // What they remember of him (neighbors.list[].remember: helped / botched): their voice, same as their beats.
   people.forEach((p) => Object.keys(p.remember || {}).forEach((tone) => add(neighborWho(p), p.remember[tone], `neighbor:${p.id}-remember-${tone}`)));
   // The autopilot's memory steps (`say` on a spine step or a pool entry with `remembers`): his voice.

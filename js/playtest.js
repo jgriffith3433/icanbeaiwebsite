@@ -950,6 +950,141 @@ async function memoryScenario(options, t) {
   M.shiftDays(0);
 }
 
+/* ---------------- daily: a neighbour asks for one bit of weather today; answering leaves a reward that stays all day ---------------- */
+// Setup shortcuts (named): the store cleared, day.memory.shiftDays(n) for the date moving on, day.memory/daily reload() for a page
+// reload, the day bar to the ask's window, a full Charge, and on a phone control.place for the stick. Everything else is real input:
+// the title's line and Play, WASD (or the touch ability bar), the "!" tap, the power key (or a tap on the ability), Esc.
+async function dailyScenario(options, t) {
+  const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  t.scene("Title");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.daily && window.day.title && window.day.memory && window.day.control, 8000, "today's request (js/daily.js)");
+  const M = window.day.memory, D = window.day.daily, C = window.day.control, N = window.day.neighbors;
+  const cfg = window.DAY_CONFIG.daily;
+  M.reset(); D.reset(); M.shiftDays(0);
+  window.day.title.show();
+  await sleep(800);
+  const lineEl = $("title-daily"), ydayEl = $("title-yday"), playEl = $("title-play");
+  const nLines = (el) => { const cs = getComputedStyle(el); const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.3; return Math.round(el.getBoundingClientRect().height / lh); };
+  const layout = (label) => {
+    const r = lineEl.getBoundingClientRect(), p = playEl.getBoundingClientRect();
+    const rows = nLines(lineEl);
+    t.event("daily-layout", `${label} ${innerWidth}x${innerHeight}: "${lineEl.textContent}" ${rows} line(s), bottom ${Math.round(r.bottom)} vs Play top ${Math.round(p.top)}`);
+    if (rows > 2) t.problem("bug", `The request wraps to ${rows} lines (${label})`);
+    if (r.bottom > p.top - 2) t.problem("bug", `The request line overlaps or sits below the Play button (${label})`);
+    if (r.top < 0 || p.bottom > innerHeight) t.problem("bug", `The request or Play is off screen (${label})`);
+    if (!ydayEl.hidden) { const y = ydayEl.getBoundingClientRect(); if (nLines(ydayEl) > 2 || y.bottom > p.top - 2) t.problem("bug", `The Yesterday line overlaps Play or wraps past two lines (${label})`); }
+  };
+  const todayLine = lineEl.textContent;
+  t.event("daily-title", todayLine);
+  if (!/^Today: /.test(todayLine)) t.problem("bug", `The title shows no request under the name ("${todayLine}")`);
+  layout("title");
+  t.scene("Title with today's request");
+  // the date moves on: another ask each day, and no ask twice in any 7 dates
+  const seen = [];
+  for (let i = 0; i < 16; i++) { M.shiftDays(i); seen.push(D.today().id); }
+  let repeats = 0;
+  for (let i = 0; i + 7 <= seen.length; i++) if (new Set(seen.slice(i, i + 7)).size !== 7) repeats++;
+  t.event("daily-week", `${seen.slice(0, 8).join(", ")} ...; ${repeats} repeating weeks`);
+  if (repeats) t.problem("bug", "An ask repeats within 7 consecutive dates");
+  M.shiftDays(1);
+  await sleep(300);
+  if (lineEl.textContent === todayLine) t.problem("bug", "The title's request didn't change when the date moved forward a day");
+  t.event("daily-next-day", lineEl.textContent);
+  M.shiftDays(0);
+  await sleep(300);
+  window.day.title.quiet();
+  const ask = D.today();
+  const A = cfg.pool.find((a) => a.id === ask.id);
+  // Take control beside the car, then the clock into the ask's window
+  const outside = carSideMoment(window.day.today());
+  scrubTo(outside.start + 1);
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  if (touch) { try { C.touch(true); } catch (e) { /* desktop */ } }
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") !== "true") {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+  }
+  const P = window.powers || window.day.powers;
+  const refill = () => { if (P && P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  refill();
+  scrubTo((A.from <= A.to ? (A.from + A.to) / 2 : A.from) * 60);
+  clickSpeed(1);
+  await sleep(700);
+  const stand = (() => { if (["birdie", "dex", "quill"].includes(A.who)) { const p = N.now().people.find((q) => q.id === A.who); return p && !p.inside ? { x: p.x, z: p.z } : null; } const c = cfg.citizens[A.who]; return { x: c.x, z: c.z }; })() || { x: A.place.x, z: A.place.z };
+  const sideZ = (window.DAY_CONFIG.street || { z: 12.6 }).z - 2.8;
+  const walk = async (x, z, close) => {
+    if (touch) { C.place(x - 3, z + 2, 0); await sleep(500); return; }
+    for (let k = 0; k < 10 && Math.hypot(C.state().x - x, C.state().z - z) > close + 1; k++) {
+      const s = C.state();
+      if (Math.abs(s.z - sideZ) > 4 && Math.abs(s.x - x) > 12) await goTo(s.x, sideZ, t, { sprint: true, ms: 12000, close: 1.5 });
+      await goTo(Math.abs(C.state().x - x) > 20 ? C.state().x + Math.max(-20, Math.min(20, x - C.state().x)) : x, Math.abs(C.state().x - x) > 20 ? sideZ : z, t, { sprint: true, ms: 14000, close });
+    }
+  };
+  t.scene("Walking to " + A.name);
+  await walk(stand.x, stand.z, 6);
+  refill();
+  // the neighbour says it aloud when he is close; the "!" above them asks again on a tap
+  await t.until(() => D.now().bubble, 5000, `${A.name} saying today's request`).then(() => t.event("daily-ask-said", D.now().bubble)).catch(() => t.problem("bug", `${A.name} didn't say the request when he came close`));
+  const mark = $("daily-mark");
+  await t.until(() => D.now().marker, 4000, "the ! over them").catch(() => t.problem("bug", `No "!" over ${A.name}`));
+  if (mark && D.now().marker) {
+    const r = mark.getBoundingClientRect();
+    t.event("daily-mark", `${Math.round(r.width)}x${Math.round(r.height)} at ${Math.round(r.left)},${Math.round(r.top)}`);
+    if (r.width < 44 || r.height < 44) t.problem("bug", `The "!" is ${Math.round(r.width)}x${Math.round(r.height)} (needs 44px)`);
+    const before = D.now().events.filter((e) => e.action === "ask").length;
+    if (touch) await tapEl(mark); else await clickEl(mark);
+    await sleep(300);
+    if (D.now().events.filter((e) => e.action === "ask").length <= before) t.problem("bug", "Tapping the ! didn't open the ask");
+  }
+  t.scene(`${A.name} asks: ${A.title}`);
+  await sleep(1500);
+  // to the place if they stand outside it, then the power
+  if (Math.hypot(C.state().x - A.place.x, C.state().z - A.place.z) > A.place.r - 2) { t.scene("To " + A.place.name); await walk(A.place.x, A.place.z, Math.min(8, A.place.r / 2)); }
+  refill();
+  await sleep(1900);
+  const key = { bolt: "e", rain: "r", wind: "v", fog: "c", sunbreak: "x" }[A.power];
+  if (touch) { const b = $("ability-" + A.power); if (b) await tapEl(b); else t.problem("bug", `No #ability-${A.power} button on the phone`); } else pressKey(key);
+  await t.until(() => D.today().answered, 4000, "the request answered").catch(() => t.problem("bug", `Calling ${A.power} at ${A.place.name} in the window didn't answer ${A.name}'s request`));
+  const thanks = await t.until(() => D.now().events.find((e) => e.action === "thanks"), 4000, "the thanks").catch(() => null);
+  if (thanks) {
+    t.event("daily-thanks", `${A.name}: ${A.thanks} (voiced: ${thanks.voiced})`);
+    if (!thanks.voiced) t.problem("bug", `${A.name}'s thanks has no voice clip playing (Sound on? clip in audio/dialogue?)`);
+  }
+  if (!M.today().deeds.dailyAnswered) t.problem("bug", "Answering the request recorded no deed in day.memory");
+  await sleep(900);
+  const rw = D.now();
+  t.event("daily-reward", `${rw.rewardKind}: ${rw.reward} meshes`);
+  if (!rw.reward) t.problem("bug", "Answering the request left no reward in the city");
+  t.scene(`The ${rw.rewardKind} for ${A.name}`);
+  await sleep(1500);
+  pressKey("Escape");
+  await sleep(1200);
+  D.reload(); // a page reload stands in
+  await sleep(500);
+  t.event("daily-reload", `same date: ${D.now().reward} reward meshes, answered ${D.today().answered}`);
+  if (!D.now().reward || !D.today().answered) t.problem("bug", "After a same-day reload the reward is gone");
+  t.scene("Same day, after a reload");
+  await sleep(1000);
+  // the next day: a new request, the reward is gone, and the title says what he did yesterday
+  M.shiftDays(1);
+  await sleep(500);
+  if (D.now().reward) t.problem("bug", "The reward is still standing on the next date");
+  window.day.title.show();
+  await sleep(800);
+  t.event("daily-yesterday", `${lineEl.textContent} | ${ydayEl.textContent}`);
+  if (ydayEl.hidden || !/^Yesterday: /.test(ydayEl.textContent)) t.problem("bug", "The title doesn't say what he did yesterday");
+  layout("next day");
+  t.scene("Title, next day");
+  await sleep(1200);
+  window.day.title.quiet();
+  M.reset(); D.reset(); M.shiftDays(0);
+}
+
 async function neighborsScenario(options, t) {
   t.scene("Home");
   checkBasics(t);
@@ -7519,6 +7654,7 @@ installPlaytest({
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
     { id: "slice", title: "Vertical slice: walk from the driveway to Birdie, answer her rain, see the lawn drink, the park path, bandstand pigeons and creak, the pond coin toss; reports quality.maxQuietSeconds and quality.textOnlyBeats", seconds: 200, tags: ["slice", "story"], description: "Real WASD, R for Birdie, Y at the pond." },
     { id: "memory", title: "The city remembers: rain on the park turns the lawn green, a bolt on the avenue leaves a scorch; a same-day reload shows both again, a day on they're fainter, three days on the city is back to default; with marks present on low quality the frame rate stays over 30", seconds: 150, tags: ["memory", "retention", "phone"], description: "Day bar beside the car (setup), Enter, the store cleared and a full Charge (setup). Real keys: WASD with Shift to the park, R, WASD to the avenue, E, Esc. day.memory.reload() stands in for a page reload and day.memory.shiftDays(1 / 3) for the date moving on (setup). Events memory-park / -rain / -bolt / -reload / -plus1 / -plus3 / -low; metrics memoryLowFps, memoryDecalsLow. Option {\"touch\":true} for 390x844 touch." },
+    { id: "daily", title: "Today's request: the title shows one neighbour's ask under the name (two lines at most, above Play) and it changes when the date moves; the neighbour says it aloud when he comes close, the ! over them opens it on a tap, calling the weather in the place and window answers it with a voiced thanks and a reward that stays after a same-day reload; next day the title says what he did yesterday", seconds: 240, tags: ["story", "retention", "phone", "characters"], description: "Title, the date shifted over 16 days (setup: day.memory.shiftDays), the day bar into the ask's window (setup), Enter, WASD to the asker, tap the !, the power key, Esc; daily.reload() stands in for a page reload. {\"touch\":true} for 390x844 touch: tapping the ! and the ability button (control.place stands in for the stick)." },
     { id: "remembers", title: "Help Birdie, press Let go: he names the deed aloud, and his day detours past her pots within 5 game minutes; more deeds show more memory steps; the day end speaks two deeds one line at a time", seconds: 150, tags: ["story", "characters", "memory"], description: "Day bar 8:05 (setup), Enter, W to Birdie, R, Esc; checks the caption (one line, under the status card, over no control), the rebuilt day and the detour; memory.note adds deeds (setup); then the clock rolls at 1200x for the day-end card. {\"touch\":true} for 390x844 touch (taps; control.place stands in for the stick)." },
     { id: "neighbors", title: "Walk the avenue to Birdie, Dex and Ines Quill: each asks for a weather ability in a speech bubble, answering it pays a thank-you and a reward, and a later surprise pays more", seconds: 260, tags: ["neighbors", "story"], description: "Day bar beside the car (setup), Enter, then real WASD/Shift to each neighbor and R, X, E for their asks; the day bar jumps to each surprise hour. Events found-<id>, beat-ask-<id>, beat-thanks-<id>, reward-<id>, beat-surprise-<id>." },
     { id: "neighbor-bodies", title: "Peoplekit bodies: slowed walk clips for Birdie, Dex and Ines (stride matches speed), ask wave and thanks cheer gestures, rain hunch and sun eye-shield, foot-slide detectors clean over a full day", seconds: 320, tags: ["neighbors", "quality"], description: "Day bar + Enter (setup). Real WASD to each neighbour; R/X/E for asks. Events slow-clip / gait-step / gesture-ask-* / gesture-thanks-* / weather-pose-rain / weather-pose-sun / foot-slide-clean; metric quality.footSlideFails." },
@@ -7603,6 +7739,7 @@ installPlaytest({
       else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
       else if (id === "memory") await memoryScenario(options, t);
+      else if (id === "daily") await dailyScenario(options, t);
       else if (id === "neighbor-bodies") await neighborBodies(options, t);
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);
