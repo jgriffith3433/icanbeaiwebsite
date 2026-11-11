@@ -316,6 +316,12 @@ export function installLook(world) {
     roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.35 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
+  /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
+     overwrite world.js's StandardMaterial (which already had an emissive) with the shared sidewalk concrete
+     (emissive 0), so after dusk the vertical rampend/rampside read as a black slab in smoke. */
+  mats.rampLit = pbr("rampLit", maps.concrete, { roughness: 0.86, wet: true, coat: 0.38, bump: 0.32 });
+  mats.rampLit.emissiveColor = new B.Color3(0.16, 0.19, 0.22);
+  mats.rampLit.albedoColor = new B.Color3(1.1, 1.12, 1.14);
 
   function dress(mesh, mat, tile) {
     if (!mesh) return;
@@ -325,10 +331,12 @@ export function installLook(world) {
   }
   const roadName = (n) => n === "road" || n === "lot" || /^ave\d+r\d+$/.test(n) || /^cross\d+r\d+$/.test(n);
   const walkName = (n) => n === "driveway" || n === "parkpath" || /^walk[SN]\d+$/.test(n) || /^ave[SN]\d+_\d+$/.test(n) || /^cross[WE]\d+_\d+$/.test(n) || /ramp$/.test(n) || /ramp(end|side-?[\d.]+)$/.test(n); // the ramp and its closed-off end and side walls (plain flat grey otherwise: read as black slabs)
+  const rampName = (n) => /ramp$/.test(n) || /ramp(end|side-?[\d.]+)$/.test(n);
   scene.meshes.forEach((mesh) => {
     const n = mesh.name || "";
     if (n === "ground") dress(mesh, mats.ground, 4);
     else if (roadName(n)) dress(mesh, mats.asphalt, 2.8);
+    else if (rampName(n)) dress(mesh, mats.rampLit, 2.4);
     else if (walkName(n)) dress(mesh, mats.concrete, 2.4);
   });
   // Weather (js/weather.js) wets stage.road; point it at the visible PBR asphalt, not the old StandardMaterial.
