@@ -634,6 +634,15 @@
     else if (d.action === "twist") S.rumble();
   });
   let lastUmb = -1e9;
+  let lastFlip = -1e9;
+  // a strong gust turns walkers' umbrellas inside out (js/windfog.js, js/crowd.js): the snap of the canopy
+  window.addEventListener("day:wind", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action !== "umbrella-flip") return;
+    if (performance.now() - lastFlip < 800) return;
+    lastFlip = performance.now();
+    S.umbSnap(0, 0.9);
+  });
   window.addEventListener("day:neighbor", (e) => {
     const d = e.detail || {};
     if (d.action === "beat") {
