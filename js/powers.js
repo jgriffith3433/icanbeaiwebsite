@@ -11,7 +11,9 @@
    ========================================================================== */
 
 import * as boltFx from "./lightning.js";
+import * as tornadoFx from "./tornado.js";
 import { createAbilities, startAbilityBar, VERB_IDS } from "./abilities.js";
+export { debrisCap, shellCount, inPlaza, plazaCourse, FUNNEL_LIFE } from "./tornado.js";
 
 /** All spendable effects (verbs + hold depths). The bar shows VERB_IDS only. */
 export const POWER_NAMES = ["bolt", "rain", "wind", "fog", "sunbreak", "storm", "gust", "gale", "tornado"];
@@ -192,8 +194,7 @@ export function startPowers(world, dayApi) {
   const reach = cfg.reach || 11;
   const aimDist = cfg.aim || 3.6;
 
-  const props = [];
-  let propsReady = false;
+  let props = []; // filled from the tornado debris pool (bins, chairs, …)
   let age = 0;
   // Lightning hold → Storm; Wind hold → Gale / full → Tornado (tap = bolt / gust).
   let keyBolt = false;
@@ -421,30 +422,6 @@ export function startPowers(world, dayApi) {
   gustMesh.isPickable = false;
   gustMesh.setEnabled(false);
 
-  const funMat = new B.StandardMaterial("power-funnel", scene);
-  funMat.disableLighting = true;
-  funMat.emissiveColor = new B.Color3(0.12, 0.16, 0.26);
-  funMat.alpha = 0.72;
-  funMat.transparencyMode = B.Material.MATERIAL_ALPHABLEND;
-  const funnel = new B.TransformNode("power-tornado", scene);
-  const funnelBits = [0, 1, 2, 3, 4].map((i) => {
-    const m = B.MeshBuilder.CreateBox("funnel-" + i, { width: 0.35 + i * 0.45, height: 1.15, depth: 0.35 + i * 0.45 }, scene);
-    m.parent = funnel;
-    m.position.y = 0.6 + i * 1.15;
-    m.material = funMat;
-    m.isPickable = false;
-    return m;
-  });
-  const debris = [0, 1, 2, 3, 4, 5].map((i) => {
-    const m = B.MeshBuilder.CreateBox("debris-" + i, { size: 0.18 }, scene);
-    m.parent = funnel;
-    m.material = boltMat;
-    m.isPickable = false;
-    return m;
-  });
-  funnel.setEnabled(false);
-  let funnelSpin = 0;
-
   /* One shared material for the windows a strike blacks out (it was a new material per strike). */
   const blackoutMat = new B.StandardMaterial("blackout", scene);
   blackoutMat.disableLighting = true;
@@ -455,7 +432,7 @@ export function startPowers(world, dayApi) {
      that are never drawn. A failed warm-up only means the old first-use compile, so it is not an error. */
   const warmProbe = (mesh, mat) => { mesh.material = mat; mesh.isPickable = false; mesh.setEnabled(false); return mesh; };
   const warmList = [
-    [cloud, cloudMat], [gustMesh, gustMat], [funnelBits[0], funMat],
+    [cloud, cloudMat], [gustMesh, gustMat],
     [warmProbe(B.MeshBuilder.CreateBox("blackout-probe", { size: 1 }, scene), blackoutMat), blackoutMat],
   ];
   setTimeout(() => {
@@ -499,6 +476,52 @@ export function startPowers(world, dayApi) {
     quality: () => (day.look && day.look.quality ? day.look.quality() : window.look && window.look.quality ? window.look.quality() : "high"),
   });
   setTimeout(() => fx.warm(), 0);
+
+  const qOf = () => (day.look && day.look.quality ? day.look.quality() : window.look && window.look.quality ? window.look.quality() : "high");
+  function looseSpecs() {
+    const street = (window.DAY_CONFIG && window.DAY_CONFIG.street) || { z: 12.6 };
+    const list = (cfg.loose || []).map((spec) => ({
+      kind: spec.kind || "bin",
+      x: spec.x,
+      z: spec.z != null ? spec.z : street.z + (spec.dz || 0),
+      y: spec.y,
+      yaw: spec.yaw || 0,
+    }));
+    return list;
+  }
+  function persistDebris(marks) {
+    try {
+      if (day.memory && day.memory.noteDebris) day.memory.noteDebris(marks);
+      else {
+        window.dispatchEvent(new CustomEvent("day:tornado-debris", { detail: { marks } }));
+      }
+    } catch (err) { /* memory optional */ }
+  }
+  const tornadoLook = tornadoFx.createTornadoFx(B, scene, {
+    quality: qOf,
+    physics: () => world.physics && world.physics(),
+    surfaceAt: (x, z) => {
+      if (world.surfaceAt) return world.surfaceAt(x, z);
+      return surfaceY(x, z);
+    },
+    wetAt: (x, z) => {
+      const w = wx();
+      const wet = w && w.now ? (w.now().wet || 0) : 0;
+      // fountain pool in the plaza, or ability-wet road
+      if (wet > 0.2) return true;
+      return Math.hypot(x - 118, z - 23.3) < 3.2;
+    },
+    onLand: persistDebris,
+    onShake: (amp) => { shake = Math.max(shake, amp); },
+    exclude: (mesh) => {
+      if (!mesh || !mesh.name) return false;
+      // neighbours and Small Weather stay out of the debris set
+      if (/^(nb-|sw-|small-weather|person|avatar)/i.test(mesh.name)) return true;
+      return false;
+    },
+    specs: looseSpecs,
+  });
+  setTimeout(() => tornadoLook.warm(), 0);
 
   let cloudR = 0;
   let cloudTarget = 0;
@@ -551,6 +574,7 @@ export function startPowers(world, dayApi) {
   }
 
   function shove(prop, ix, iy, iz) {
+    if (!prop || prop.state === "done" || prop.landed) return;
     const at = prop.mesh.getAbsolutePosition();
     if (prop.body) {
       try {
@@ -564,62 +588,12 @@ export function startPowers(world, dayApi) {
   }
 
   function ensureProps() {
-    if (propsReady) return;
-    const phys = world.physics && world.physics();
-    if (!phys && age < 1.5) return;
-    propsReady = true;
-    const street = (window.DAY_CONFIG && window.DAY_CONFIG.street) || { z: 12.6 };
-    const list = cfg.loose || [];
-    list.forEach((spec, i) => {
-      const kind = spec.kind === "bin" ? "bin" : "umbrella";
-      const root = B.MeshBuilder.CreateBox("loose-" + kind + "-" + i, { width: 0.5, height: kind === "bin" ? 0.85 : 0.7, depth: 0.5 }, scene);
-      const z = street.z + (spec.dz || 0);
-      root.position.set(spec.x, kind === "bin" ? 0.5 : 0.42, z);
-      root.isPickable = false;
-      const mat = new B.StandardMaterial("loose-mat-" + i, scene);
-      mat.diffuseColor = kind === "bin" ? new B.Color3(0.1, 0.28, 0.2) : new B.Color3(0.25, 0.32, 0.48);
-      mat.specularColor = new B.Color3(0.04, 0.04, 0.05);
-      root.material = mat;
-      let body = null;
-      if (phys) {
-        try {
-          const agg = new B.PhysicsAggregate(root, B.PhysicsShapeType.BOX, { mass: kind === "bin" ? 9 : 6.5, friction: 0.55, restitution: 0.02 }, scene);
-          body = agg.body;
-          body.setLinearDamping(0.42);
-          body.setAngularDamping(0.45);
-        } catch (err) {
-          body = null;
-        }
-      }
-      if (kind === "umbrella") {
-        const skin = new B.StandardMaterial("loose-skin-" + i, scene);
-        skin.diffuseColor = new B.Color3(0.72, 0.55, 0.42);
-        const head = B.MeshBuilder.CreateSphere("loose-head-" + i, { diameter: 0.28, segments: 6 }, scene);
-        head.parent = root;
-        head.position.y = 0.55;
-        head.material = skin;
-        head.isPickable = false;
-        const cloth = new B.StandardMaterial("loose-cloth-" + i, scene);
-        cloth.diffuseColor = new B.Color3(0.08, 0.12, 0.22);
-        cloth.emissiveColor = new B.Color3(0.02, 0.05, 0.12);
-        const cap = B.MeshBuilder.CreateSphere("loose-cap-" + i, { diameter: 1.15, segments: 8 }, scene);
-        cap.parent = root;
-        cap.position.y = 0.95;
-        cap.scaling.y = 0.22;
-        cap.material = cloth;
-        cap.isPickable = false;
-        const pole = B.MeshBuilder.CreateCylinder("loose-pole-" + i, { diameter: 0.04, height: 0.7 }, scene);
-        pole.parent = root;
-        pole.position.y = 0.7;
-        pole.material = mat;
-        pole.isPickable = false;
-      }
-      props.push({ mesh: root, body, kind, i });
-    });
+    tornadoLook.ensurePool(looseSpecs());
+    props = tornadoLook.pool;
   }
 
   function propPositions() {
-    return props.map((p) => ({ kind: p.kind, x: p.mesh.position.x, y: p.mesh.position.y, z: p.mesh.position.z }));
+    return tornadoLook.propPositions();
   }
 
   /* ---- calls ---- */
@@ -742,22 +716,23 @@ export function startPowers(world, dayApi) {
     if (mode() !== "control") return false;
     if (tornado && tornado.life > 0) return false;
     if (!gauge.spend("tornado")) return refuse("tornado", via);
+    ensureProps();
     const p = who();
     const f = forward();
-    const course = streetCourse(window.DAY_CONFIG || {}, p.x, p.z, f.x, f.z);
-    tornado = {
-      x: course.axis === "x" ? p.x : course.x,
+    const plaza = tornadoFx.plazaCourse(p.x, p.z, f.x);
+    const course = plaza || streetCourse(window.DAY_CONFIG || {}, p.x, p.z, f.x, f.z);
+    const start = {
+      x: course.axis === "x" ? (plaza ? Math.max(course.from + 2, Math.min(course.to - 2, p.x)) : p.x) : course.x,
       z: course.axis === "z" ? p.z : course.z,
       axis: course.axis,
       dir: course.dir,
       from: course.from,
       to: course.to,
-      life: 5.4,
-      age: 0,
-      startX: course.axis === "x" ? p.x : course.x,
-      startZ: course.axis === "z" ? p.z : course.z,
+      life: cfg.durations.tornado || tornadoFx.FUNNEL_LIFE,
+      zone: course.zone || (plaza ? "plaza" : "street"),
     };
-    funnel.setEnabled(true);
+    tornado = tornadoLook.start(start);
+    // crowd scare + scream come from day:crowd scatter (tornadoLook.start) and day:power (crowd.js)
     note(line("tornado"));
     say("tornado", via, "tornado");
     burst(90, 0.8, 0.5, "lowpass");
@@ -1401,9 +1376,13 @@ html.touch-ui.in-control .side{display:none}
     }
 
     if (callFx.until > age) {
-      // Gale: a steady shove down the street, fading, and a little shake
+      // Gale: a steady shove nearby, fading (not every plaza chair from across the district)
       const k = (callFx.until - age) / 3;
-      props.forEach((prop) => shove(prop, callFx.dirX * 5 * k, 0.4, callFx.dirZ * 5 * k));
+      const me = who();
+      props.forEach((prop) => {
+        if (Math.hypot(prop.mesh.position.x - me.x, prop.mesh.position.z - me.z) > 16) return;
+        shove(prop, callFx.dirX * 5 * k, 0.4, callFx.dirZ * 5 * k);
+      });
     }
     if (gustFx && age > gustFx.until) {
       gustMesh.setEnabled(false);
@@ -1432,33 +1411,10 @@ html.touch-ui.in-control .side{display:none}
       say("thunder", "world", "bolt");
     }
 
-    if (tornado && tornado.life > 0) {
-      const step = 9.2 * dt * tornado.dir;
-      if (tornado.axis === "x") tornado.x = Math.max(tornado.from + 2, Math.min(tornado.to - 2, tornado.x + step));
-      else tornado.z = Math.max(tornado.from + 2, Math.min(tornado.to - 2, tornado.z + step));
-      tornado.life -= dt;
-      tornado.age += dt;
-      funnel.position.set(tornado.x, 0, tornado.z);
-      funnelSpin += dt * 5.5;
-      funnel.rotation.y = funnelSpin;
-      funnelBits.forEach((m, i) => (m.rotation.y = funnelSpin * (i % 2 ? -1.4 : 1)));
-      debris.forEach((m, i) => {
-        const a = funnelSpin * 1.6 + i;
-        const rad = 0.7 + (i % 3) * 0.45;
-        m.position.set(Math.sin(a) * rad, 0.4 + i * 0.85, Math.cos(a) * rad);
-      });
-      props.forEach((prop) => {
-        const dx = tornado.x - prop.mesh.position.x;
-        const dz = tornado.z - prop.mesh.position.z;
-        const d = Math.hypot(dx, dz);
-        if (d > 4.6 || d < 0.05) return;
-        const pull = (1 - d / 4.6) * 22;
-        shove(prop, (dx / d) * pull + -dz * 8, 14, (dz / d) * pull + dx * 8);
-      });
-      if (tornado.life <= 0) {
-        funnel.setEnabled(false);
-        tornado.life = 0;
-      }
+    {
+      const cam = world.camera && world.camera.position;
+      tornadoLook.update(dt, cam);
+      tornado = tornadoLook.info().active;
     }
 
     if (blackout) {
@@ -1573,9 +1529,31 @@ html.touch-ui.in-control .side{display:none}
       strike: strike ? Object.assign({}, strike) : null,
       bolt: fx.info(),
       gust: gustFx ? { id: gustFx.id, pushes: gustFx.pushes, dirX: gustFx.dirX, dirZ: gustFx.dirZ, alive: gustMesh.isEnabled() } : null,
-      tornado: tornado
-        ? { x: tornado.x, z: tornado.z, axis: tornado.axis, dir: tornado.dir, life: tornado.life, travelled: Math.hypot(tornado.x - tornado.startX, tornado.z - tornado.startZ) }
-        : null,
+      tornado: (() => {
+        const ti = tornadoLook.info();
+        const a = ti.active || tornado;
+        if (!a) {
+          return ti.landed > 0 || ti.settleLeft > 0
+            ? {
+                x: 0, z: 0, life: 0, travelled: 0, faded: true,
+                shells: ti.shells, layers: ti.shells + 1, dustRing: true,
+                lifted: ti.lifted, landed: ti.landed, floating: ti.floating, sunk: ti.sunk,
+                debrisCap: ti.debrisCap, settleLeft: ti.settleLeft, ground: ti.ground,
+              }
+            : null;
+        }
+        return {
+          x: a.x, z: a.z, axis: a.axis, dir: a.dir, life: a.life, age: a.age,
+          travelled: a.travelled != null ? a.travelled : Math.hypot(a.x - (a.startX || a.x), a.z - (a.startZ || a.z)),
+          zone: a.zone, shells: a.shells, layers: a.layers || (a.shells + 1),
+          dustRing: a.dustRing !== false, spray: !!a.spray,
+          lifted: a.lifted != null ? a.lifted : ti.lifted,
+          landed: a.landed != null ? a.landed : ti.landed,
+          floating: ti.floating, sunk: ti.sunk, debrisCap: a.debrisCap || ti.debrisCap,
+          settleLeft: ti.settleLeft, ground: ti.ground, faded: a.life <= 0,
+        };
+      })(),
+      tornadoFx: tornadoLook.info(),
       blocked: blocked ? Object.assign({}, blocked) : null,
       blackout: blackout ? blackout.id : null,
       alarm: !!(alarm && age < alarm.until),

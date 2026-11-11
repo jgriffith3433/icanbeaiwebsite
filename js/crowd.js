@@ -609,6 +609,11 @@ export function installCrowd(world) {
   if (typeof window !== "undefined" && window.addEventListener) {
     window.addEventListener("day:crowd", (e) => {
       const d = (e && e.detail) || {};
+      if (d.action === "scatter" && d.x != null && d.z != null) {
+        scare(d.x, d.z, d.r || 22, 4);
+        info.screams = (info.screams || 0) + 1;
+        return;
+      }
       if (d.action !== "flinch") return;
       const R = d.radius || 40;
       flinching = 0;

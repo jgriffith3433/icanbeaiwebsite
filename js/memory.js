@@ -206,6 +206,17 @@ export function installMemory(day, world) {
       board.parent = root; board.position.y = 2.1; board.material = M.board;
       [pole, board].forEach((q) => (q.isPickable = false));
       built.push(pole, board, root);
+    } else if (m.kind === "chair" || m.kind === "cone" || m.kind === "planter" || m.kind === "awning" || m.kind === "debris") {
+      // tornado wreck: a tipped stand-in that lasts the real day (the live Havok body stays in-session;
+      // this mark is what a later visit / reload still shows)
+      const y = surf(m.x, m.z);
+      const body = B.MeshBuilder.CreateBox("mem-" + m.kind, { width: 0.5, height: 0.4, depth: 0.5 }, scene);
+      body.material = M.bin;
+      body.rotation.z = Math.PI / 2;
+      body.rotation.y = m.yaw || 0;
+      body.position.set(m.x, y + 0.22, m.z);
+      body.isPickable = false;
+      built.push(body);
     }
   };
 
@@ -347,9 +358,32 @@ export function installMemory(day, world) {
     skyDays: () => Object.keys(store.days).filter((k) => Object.keys(store.days[k].deeds).length > 0).length,
     /** For the playtest: write a deed as if he had done it (named setup shortcut). */
     note: (kind, zone, power) => { record(kind, zone, power); return api.facts(); },
+    /** Tornado wreck that stayed: keep a few solid marks (skip paper/leaf) so scorches aren't flooded out. */
+    noteDebris(marks) {
+      const keep = (marks || []).filter((m) => m && m.x != null && m.z != null
+        && m.kind !== "paper" && m.kind !== "leaf");
+      const t = today();
+      // at most 4 wreck marks per cast (bins/chairs/signs read clearest)
+      keep.slice(0, 4).forEach((m) => {
+        const kind = m.kind === "bin" || m.kind === "sign" || m.kind === "chair" || m.kind === "cone"
+          || m.kind === "planter" || m.kind === "awning" ? m.kind : "debris";
+        addMark(store, t, { at: Date.now(), kind, x: +m.x, z: +m.z, y: m.y, yaw: m.yaw || 0 });
+      });
+      if (keep.length) {
+        prune(store, t);
+        save();
+        apply("tornado");
+        emit("deed", { kind: "tornadoDebris", zone: zoneOf(keep[0].x, keep[0].z), power: "tornado", mark: "debris", count: Math.min(4, keep.length) });
+      }
+      return Math.min(4, keep.length);
+    },
     apply: () => apply("api"),
     reset() { store = emptyStore(); session = {}; factsCache = null; save(); apply("reset"); },
   };
+  window.addEventListener("day:tornado-debris", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.marks && d.marks.length) api.noteDebris(d.marks);
+  });
   day.memory = api;
   apply("load");
   return api;

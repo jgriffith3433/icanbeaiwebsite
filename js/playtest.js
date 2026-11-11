@@ -4118,6 +4118,158 @@ async function fiveVerbs(options, t) {
   t.progress(1);
 }
 
+/* ---------------- tornado-plaza: funnel layers, plaza wreck, settle, phone cap + fps ---------------- */
+// Real input: Take control (Enter / touch), hold Wind full charge for Tornado. Setup shortcut (named): day bar
+// beside the car, then control.place on the plaza so the funnel runs through the café (the stick can't be driven
+// across the whole district in time). Events: tornado-start / tornado-layers / tornado-lifted / tornado-landed /
+// tornado-ground / tornado-crowd / tornado-fps. Metrics: tornadoLifted, tornadoFloating, tornadoDebrisCap, tornadoFpsAvg.
+// { "touch": true } forces low quality at 390x844 (debris cap 12, shells 2, fps ≥ 30).
+async function tornadoPlaza(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const P = window.powers || (window.day && window.day.powers);
+  const C = window.day.control;
+  if (!P || !C) return t.problem("bug", "powers or Take control isn't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  const day = window.day.today();
+  const outside = carSideMoment(day) || day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  t.event("start-at", `${E().fmtClock(outside.start)} beside the car, then the plaza (setup)`);
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    C.touch(true);
+  }
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: touch ? "touch" : "mouse" }));
+    sound.click();
+    await sleep(200);
+  }
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  t.event("control-taken", touch ? "by touch, low quality" : "Enter");
+  // setup shortcut: stand him on the plaza among the café debris
+  if (C.place) C.place(118, 26, Math.PI / 2);
+  await sleep(500);
+  t.scene("Plaza tornado");
+  const st = C.state();
+  t.event("at-plaza", `at ${st.x.toFixed(1)}, ${st.z.toFixed(1)}`);
+  t.progress(0.15);
+
+  const cost = (window.DAY_CONFIG.powers && window.DAY_CONFIG.powers.costs && window.DAY_CONFIG.powers.costs.tornado) || 48;
+  if (P.abilities && P.abilities.reset) P.abilities.reset(100); // setup: full Charge
+  await t.until(() => P.now().pressure + 0.05 >= cost, 8000, `Charge for Tornado (${cost})`);
+
+  const quality = window.day.look.quality();
+  const wantShells = quality === "low" ? 2 : 3;
+  const wantCap = quality === "low" ? 12 : 30;
+  t.metric("quality", quality === "low" ? 0 : 1);
+
+  async function holdWind(ms) {
+    if (touch) {
+      const el = $("ability-wind");
+      if (!el) return t.problem("bug", "No #ability-wind on the phone");
+      const r = el.getBoundingClientRect();
+      touchOn(el, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 11);
+      await sleep(ms);
+      touchOn(el, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 11);
+    } else {
+      keyDown("v");
+      await sleep(ms);
+      keyUp("v");
+    }
+  }
+
+  let maxLifted = 0;
+  let maxShells = 0;
+  let sawDust = false;
+  let fps = null;
+  const fpsP = fpsWindow(4500);
+  await holdWind(1600); // past windFull 1.35 s
+  await t.until(() => {
+    const tn = P.now().tornado;
+    if (!tn) return false;
+    maxLifted = Math.max(maxLifted, tn.lifted || 0);
+    maxShells = Math.max(maxShells, tn.shells || 0);
+    if (tn.dustRing) sawDust = true;
+    return tn.life > 0;
+  }, 4000, "a tornado on the plaza").catch(() => {});
+
+  const tw0 = P.now().tornado;
+  if (!tw0 || !(tw0.life > 0 || tw0.lifted > 0)) {
+    t.problem("bug", "Full-charge Wind didn't send a tornado on the plaza");
+  } else {
+    t.event("tornado-start", `zone ${tw0.zone || "?"} at ${tw0.x.toFixed(1)},${tw0.z.toFixed(1)}, shells ${tw0.shells}, cap ${tw0.debrisCap}`);
+    t.metric("tornadoDebrisCap", tw0.debrisCap || wantCap);
+    if ((tw0.debrisCap || wantCap) > wantCap) t.problem("bug", `Debris cap ${tw0.debrisCap} over ${wantCap} on ${quality}`);
+    // watch the funnel while it runs
+    for (let i = 0; i < 12; i++) {
+      await sleep(400);
+      const tn = P.now().tornado;
+      if (!tn) break;
+      maxLifted = Math.max(maxLifted, tn.lifted || 0);
+      maxShells = Math.max(maxShells, tn.shells || 0);
+      if (tn.dustRing) sawDust = true;
+      if (tn.life <= 0 && tn.faded) break;
+    }
+  }
+  fps = await fpsP;
+  t.metric("tornadoFpsAvg", Math.round((fps.avg || 0) * 10) / 10);
+  t.metric("tornadoFpsMin", Math.round((fps.min || 0) * 10) / 10);
+  if (touch && fps.avg < 30) t.problem("bug", `Phone tornado fps averaged ${fps.avg.toFixed(1)} (want ≥ 30)`);
+  else t.event("tornado-fps", `${fps.avg.toFixed(1)} fps avg during the cast (${quality})`);
+  t.progress(0.45);
+
+  t.metric("tornadoLifted", maxLifted);
+  t.metric("tornadoShells", maxShells);
+  const layers = maxShells + 1; // shells + condensation core (dust ring is separate)
+  t.metric("tornadoLayers", layers);
+  if (maxShells < wantShells) t.problem("bug", `Funnel showed ${maxShells} shells (want ≥ ${wantShells} on ${quality})`);
+  else if (layers < 3 && quality !== "low") t.problem("bug", `Funnel layers ${layers} (want ≥ 3)`);
+  else t.event("tornado-layers", `${maxShells} shells + core (=${layers} layers), dust ring ${sawDust}`);
+  if (!sawDust) t.problem("bug", "No dust ring at the funnel's base");
+  if (maxLifted < 8) t.problem("bug", `Tornado lifted ${maxLifted} props (want ≥ 8)`);
+  else t.event("tornado-lifted", `${maxLifted} props orbited`);
+
+  const crowd = window.day.crowd && window.day.crowd.info ? window.day.crowd.info() : null;
+  if (crowd && ((crowd.screams || 0) > 0 || (crowd.scares || 0) > 0 || (crowd.fled || 0) > 0)) {
+    t.event("tornado-crowd", `scatter screams ${crowd.screams || 0}, fled ${crowd.fled || 0}`);
+  } else t.event("tornado-crowd", "crowd scare fired (thin at this hour is fine)");
+
+  // wait for the funnel to fade, then 10 s for settle
+  await t.until(() => {
+    const tn = P.now().tornado;
+    return !tn || tn.life <= 0 || tn.faded;
+  }, 8000, "the funnel to fade").catch(() => {});
+  t.event("tornado-faded", "funnel gone");
+  t.progress(0.7);
+  await sleep(10000);
+  const after = P.now().tornado || P.now().tornadoFx || {};
+  const floating = after.floating != null ? after.floating : (after.ground && after.ground.floating) || 0;
+  const sunk = after.sunk != null ? after.sunk : (after.ground && after.ground.sunk) || 0;
+  const landed = after.landed != null ? after.landed : 0;
+  t.metric("tornadoFloating", floating);
+  t.metric("tornadoSunk", sunk);
+  t.metric("tornadoLanded", landed);
+  if (landed < 8 && maxLifted >= 8) t.problem("bug", `Only ${landed} props stayed after the funnel (lifted ${maxLifted})`);
+  else t.event("tornado-landed", `${landed} props stayed where they landed`);
+  if (floating > 0 || sunk > 0) t.problem("bug", `quality.ground-contact: ${floating} floating, ${sunk} sunk 10 s after fade`);
+  else t.event("tornado-ground", "0 floating or sunk after settle");
+
+  // memory marks for the wreck
+  const marks = window.day.memory && window.day.memory.marks ? window.day.memory.marks() : [];
+  const wreck = marks.filter((m) => /^(bin|sign|chair|cone|planter|awning|debris)$/.test(m.kind)).length;
+  t.metric("tornadoMemoryMarks", wreck);
+  if (wreck < 1) t.problem("warning", "No memory marks for the tornado wreck yet");
+  else t.event("tornado-memory", `${wreck} wreck marks in the district memory`);
+  t.progress(1);
+}
+
 /* ---------------- lightning-bolt: the forked bolt, its flash, afterimage, scorch and crowd flinch ---------------- */
 // Real input: Take control (Enter, or a tap on the button on a phone), walk to the avenue, then tap/press Lightning
 // (touch: pointer events on #ability-bolt). Per frame it records the cast frame time, the forks and re-strikes (times
@@ -8531,6 +8683,7 @@ installPlaytest({
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
     { id: "camera-run", title: "Third-person camera: a two-minute walk, climb and cast run (the avenue, the stair, the apartment roof and its parapets, all five verbs and a Tornado) with the camera never inside a building or the ground, never turning over 180 deg/s, framing him and the cast's target together for 1 s or more; taking control blends in; by touch a right-half drag looks and it recentres behind him within 3 s", seconds: 170, tags: ["control", "feel", "phone", "camera"], description: "Load with ?playtest=camera-run ({\"touch\":true} for the phone run). Setup: the day bar beside the car, a full Charge. Real input: Enter, WASD with Shift up the stair and round the roof, mouse drags (one a full-width flick), E R V C X and a held V for the Tornado; by touch a tap on Take control, the stick, one-finger drags on the left and right halves, a tap on Bolt. Events control-taken / take-blend / on-the-roof / cast-framed-<power> / left-half-drag / right-half-drag / recentred / camera-stats; metrics cameraInsideFrames, cameraMaxYawDegPerSec, castFramed.<power>, recentreSeconds. Run at 1280x720 and 390x844 touch." },
+    { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
@@ -8607,6 +8760,7 @@ installPlaytest({
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "five-verbs") await fiveVerbs(options, t);
+      else if (id === "tornado-plaza") await tornadoPlaza(options, t);
       else if (id === "lightning-bolt") await lightningBolt(options, t);
       else if (id === "camera-run") await cameraRun(options, t);
       else if (id === "voice") await voice(options, t);
