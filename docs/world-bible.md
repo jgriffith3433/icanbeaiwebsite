@@ -115,7 +115,7 @@ One far-off steer-by per area (player can aim the camera and walk toward it):
 
 | Area | Landmark | Where | Read from far |
 |---|---|---|---|
-| West Avenue Home Block | Apt crown + Birdie's tomato wall (raised parapet light strip) | apt north face, x ≈ −28..−17 | warm window band and tomato wall readable from mid-avenue; stair wedge |
+| West Avenue Home Block | Apt crown + Birdie's tomato wall (raised parapet light strip) | apt north face, x ≈ −32..−29 (west of the roof ramp, which fills −28.5..−17) | warm window band and tomato wall readable from mid-avenue; stair wedge |
 | The Park | Bandstand with string lights | inside park rect | warm bulbs over the lawn |
 | Shop Strip | Shop roof lightning rod | shop roof | metal rod catches bolts in lunch rescue |
 | Plaza Market | **Clock Tower** | plaza north edge (~tower at plaza) | four lit faces, tallest plaza piece |
