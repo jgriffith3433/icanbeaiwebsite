@@ -249,9 +249,40 @@
     o.stop(at + len + 0.02);
   }
 
+  /* ---------------- the Time control (public view) ----------------
+     One pill: a live dot and the clock. A click or tap opens the drawer (Live, Pause, speeds, date and the day bar);
+     it closes on a second tap, a tap outside, or when he's taken over. The dev HUD shows the drawer open and no pill. */
+  function isPublicView() {
+    return document.documentElement.classList.contains("preview-public");
+  }
+  const timeBtn = $("time-btn");
+  const timeDrawer = $("time-drawer");
+  const timeClock = $("time-btn-clock");
+  function setDrawer(on, via) {
+    if (!timeBtn || !timeDrawer) return;
+    on = !!on && isPublicView() && !document.documentElement.classList.contains("in-control");
+    if (timeDrawer.classList.contains("open") === on) return;
+    timeDrawer.classList.toggle("open", on);
+    timeBtn.setAttribute("aria-expanded", on ? "true" : "false");
+    window.dispatchEvent(new CustomEvent("day:time-drawer", { detail: { open: on, via: via || "click" } }));
+  }
+  if (timeBtn) {
+    timeBtn.addEventListener("click", () => setDrawer(!timeDrawer.classList.contains("open"), "click"));
+    window.addEventListener("pointerdown", (e) => {
+      if (timeDrawer.classList.contains("open") && !e.target.closest("#timebar")) setDrawer(false, "outside");
+    }, true);
+    window.addEventListener("day:control", (e) => {
+      const d = (e && e.detail) || {};
+      if (d.action === "take") setDrawer(false, "take-over");
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && timeDrawer.classList.contains("open")) setDrawer(false, "key");
+    });
+  }
+
   /* ---------------- details panel ---------------- */
   const wide = () => window.matchMedia("(min-width: 900px)").matches;
-  let sideOpen = wide();
+  let sideOpen = wide() && !isPublicView(); // the public view has no developer panel (CSS hides it, the toggle (H) can switch)
   function syncSide() {
     el.side.hidden = !sideOpen;
     el.details.setAttribute("aria-pressed", sideOpen ? "true" : "false");
@@ -449,6 +480,11 @@
     const clock = E.fmtClock(loc.minutes, true).split(" ");
     el.time.textContent = clock[0];
     el.ampm.textContent = paused ? "Paused" : clock[1];
+    if (timeClock) {
+      const pillText = clock[0] + " " + clock[1];
+      if (timeClock.textContent !== pillText) timeClock.textContent = pillText;
+      if (timeBtn.dataset.mode !== mode) timeBtn.dataset.mode = mode;
+    }
     const nowPanel = el.time.closest(".panel.now") || el.what.closest(".panel.now");
     if (nowPanel) nowPanel.classList.toggle("is-paused", paused);
     rowIdx = rowAt(day.rows, loc.minutes);
@@ -549,19 +585,51 @@
   const BUILD = buildMeta ? buildMeta.content : "dev";
   const foot = document.querySelector(".foot");
   if (foot) foot.insertAdjacentHTML("beforeend", ` <span class="ver" data-hawkes-version hidden></span>`);
-  // The page is meant to stay open all day. On the live site, check for a newly
-  // published build every 10 minutes and reload into it.
-  if (document.documentElement.classList.contains("public") && buildMeta) {
-    setInterval(() => {
-      fetch("index.html?check=" + Date.now(), { cache: "no-store" })
-        .then((r) => (r.ok ? r.text() : ""))
-        .then((html) => {
-          const m = /<meta name="(?:build|version)" content="([^"]+)"/.exec(html);
-          if (m && m[1] !== BUILD) location.reload();
-        })
-        .catch(() => {});
-    }, 10 * 60 * 1000);
+  // The page is meant to stay open all day, so a newer build can be waiting. No polling: the check runs when the tab
+  // comes back into view (visibilitychange), at most once every 30 minutes, and only offers a small "New version" pill.
+  // It never reloads by itself, and never shows while he's the player's or an episode is running.
+  let updateFound = false;
+  let lastCheck = performance.now();
+  let updatePill = null;
+  const busy = () => {
+    const h = document.documentElement;
+    if (h.classList.contains("in-control")) return true;
+    const ep = window.day && window.day.episodes && window.day.episodes.now && window.day.episodes.now();
+    return !!(ep && (ep.active || ep.id));
+  };
+  function paintUpdate() {
+    if (!updateFound) return;
+    if (!updatePill) {
+      updatePill = document.createElement("button");
+      updatePill.type = "button";
+      updatePill.id = "update-pill";
+      updatePill.className = "update-pill";
+      updatePill.textContent = "New version";
+      updatePill.title = "A newer version is out. Tap to reload.";
+      updatePill.addEventListener("click", () => location.reload());
+      document.body.appendChild(updatePill);
+    }
+    updatePill.hidden = busy();
   }
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden || !document.documentElement.classList.contains("public") || !buildMeta) return;
+    if (updateFound) return paintUpdate();
+    if (performance.now() - lastCheck < 30 * 60 * 1000) return;
+    lastCheck = performance.now();
+    fetch("index.html?check=" + Date.now(), { cache: "no-store" })
+      .then((r) => (r.ok ? r.text() : ""))
+      .then((html) => {
+        const m = /<meta name="(?:build|version)" content="([^"]+)"/.exec(html);
+        if (m && m[1] !== BUILD) {
+          updateFound = true;
+          paintUpdate();
+        }
+      })
+      .catch(() => {});
+  });
+  // keep the pill out of control and episodes: hide it when either starts, show it again after
+  window.addEventListener("day:control", () => setTimeout(paintUpdate, 0));
+  window.addEventListener("day:episode", () => setTimeout(paintUpdate, 0));
 
   /* for tinkering in the console */
   window.day = {

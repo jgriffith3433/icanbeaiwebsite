@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="css/hud.css?v=b2c4a141f5" />
     <style id="loading-css">
       /* The loading card: static, shown from the first paint. Hidden when html loses .loading (js/loading below). */
-      html.loading .hud, html.loading .side, html.loading .privacy-tag, html.loading .version-tag, html.loading .public-toggle { visibility: hidden !important; }
+      html.loading .hud, html.loading .hud-left, html.loading .side, html.loading .privacy-tag, html.loading .version-tag, html.loading .public-toggle, html.loading .update-pill { visibility: hidden !important; }
       #loading { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; overflow: auto;
         padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
         background: radial-gradient(120% 90% at 50% 20%, #1a2233 0%, #0b0e15 70%); color: #f6f1e8; font: 500 1rem/1.4 Outfit, system-ui, sans-serif; opacity: 1; transition: opacity .45s ease; }
@@ -43,7 +43,13 @@
         var h = location.hostname;
         var local = location.protocol === "file:" || h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1" ||
           /^(10|192\.168)\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /\.local$/.test(h);
-        if (!local) document.documentElement.classList.add("public");
+        var root = document.documentElement;
+        /* The public view: every real host, or ?view=public anywhere (the playtests pass it). It is the quiet page: the status
+           card, one Time control, Take control and Episodes. Local hosts keep the full developer HUD. */
+        var forced = false;
+        try { forced = new URLSearchParams(location.search).get("view") === "public"; } catch (e) {}
+        if (!local) root.classList.add("public", "preview-public");
+        else if (forced) root.classList.add("preview-public", "view-forced");
       })();
     </script>
     <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
@@ -165,8 +171,9 @@
         <button type="button" id="settings" aria-haspopup="true" aria-expanded="false" aria-controls="settings-pop">Settings</button>
         <div class="settings-pop" id="settings-pop" role="group" aria-label="Settings" hidden></div>
       </div>
-      <div class="hud-left" id="hud-left"></div>
     </header>
+    <!-- Not inside the header: the header is hidden on a phone in control, and Episodes, weather and Pressure stay. Placement: css/hud.css -->
+    <div class="hud-left" id="hud-left"></div>
 
     <aside class="panel side" id="side">
       <section>
@@ -184,21 +191,27 @@
       <p class="foot">Edit <code>day.config.js</code> to change the day. <a href="privacy.html">Privacy</a></p>
     </aside>
 
-    <footer class="hud bottom panel">
-      <div class="controls">
-        <button type="button" id="live" class="live" aria-pressed="true">● Live</button>
-        <button type="button" id="play">Pause</button>
-        <div class="speeds" id="speeds" role="group" aria-label="Playback speed"></div>
-        <span class="spacer"></span>
-        <span class="date" id="date"></span>
-        <span class="count" id="count"></span>
-      </div>
-      <div class="daybar">
-        <div class="segs" id="segs"></div>
-        <div class="marker" aria-hidden="true"></div>
-        <label class="sr" for="scrub">Time of day</label>
-        <input id="scrub" type="range" min="450" max="1889.99" step="0.05" value="450" />
-        <div class="ticks" id="ticks" aria-hidden="true"></div>
+    <footer class="hud bottom panel" id="timebar">
+      <!-- The public view shows only this button (a live dot and the clock); it opens the drawer. The dev HUD shows the drawer open. -->
+      <button type="button" id="time-btn" class="time-btn" aria-expanded="false" aria-controls="time-drawer" aria-label="Time: open the day bar">
+        <i class="dot" aria-hidden="true"></i><span id="time-btn-clock"></span>
+      </button>
+      <div class="time-drawer" id="time-drawer">
+        <div class="controls">
+          <button type="button" id="live" class="live" aria-pressed="true">● Live</button>
+          <button type="button" id="play">Pause</button>
+          <div class="speeds" id="speeds" role="group" aria-label="Playback speed"></div>
+          <span class="spacer"></span>
+          <span class="date" id="date"></span>
+          <span class="count" id="count"></span>
+        </div>
+        <div class="daybar">
+          <div class="segs" id="segs"></div>
+          <div class="marker" aria-hidden="true"></div>
+          <label class="sr" for="scrub">Time of day</label>
+          <input id="scrub" type="range" min="450" max="1889.99" step="0.05" value="450" />
+          <div class="ticks" id="ticks" aria-hidden="true"></div>
+        </div>
       </div>
     </footer>
 
@@ -227,6 +240,7 @@
           var q = new URLSearchParams(location.search);
           if (!navigator.webdriver && !q.get("playtest")) saved = localStorage.getItem("previewPublic") === "1";
         } catch (e) {}
+        if (root.classList.contains("view-forced")) { btn.hidden = true; return; } // ?view=public: nothing but the page
         set(saved);
         btn.addEventListener("click", function () { set(!root.classList.contains("preview-public")); });
         window.addEventListener("keydown", function (e) {

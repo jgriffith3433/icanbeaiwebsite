@@ -1850,6 +1850,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
 
   function hideMenu() {
     menu.hidden = true;
+    document.documentElement.classList.remove("ep-menu-up"); // css/hud.css: the in-play HUD comes back
   }
   function showMenu() {
     const best = loadBest(storageKey);
@@ -1894,6 +1895,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       menuList.appendChild(cb);
     });
     menu.hidden = false;
+    document.documentElement.classList.add("ep-menu-up"); // css/hud.css: caption, ability bar and hint step aside
     mark("menu", {});
   }
 

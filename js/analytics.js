@@ -280,7 +280,7 @@
   // Watching a day needs no input, so the SDK's active time (input in the last minute) undercounts it:
   // watch_time counts the minutes the tab was on screen.
   const MILESTONES = [1, 3, 5, 10, 20, 30, 60, 120, 240, 480];
-  const ASK_AFTER = 180; // seconds on screen before the question
+  const ASK_AFTER = 0; // no longer a time on screen: the question comes after the first episode score card (below)
   let watched = 0;
   let askDue = null;
   setInterval(safe(() => {
@@ -288,13 +288,23 @@
     watched++;
     const m = watched / 60;
     if (MILESTONES.includes(m)) A.track("watch_time", { minutes: m, mode: window.day.now().mode });
-    if (watched === ASK_AFTER) askDue = askDue || "3 minutes";
-    if (askDue && performance.now() - lastInput > 4000 && !scrubbing && !gesture) {
+    // Never while he's the player's, in an episode, or with a score card up: it waits for the next quiet moment.
+    const h = document.documentElement;
+    const ep = window.day.episodes && window.day.episodes.now && window.day.episodes.now();
+    const busy = h.classList.contains("in-control") || h.classList.contains("title-up") || h.classList.contains("ep-menu-up") || !!(ep && ep.id) ||
+      !!document.querySelector("#episode-score:not([hidden]), #ending-card:not([hidden]), #closing-card:not([hidden]), #episode-offer:not([hidden])");
+    if (askDue && !busy && performance.now() - lastInput > 4000 && !scrubbing && !gesture) {
       const why = askDue;
       askDue = null;
       ask(why);
     }
   }), 1000);
+
+  // The first episode score card (a finished or timed-out run, not a let-go) is what earns the question.
+  window.addEventListener("day:episode", safe((e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "score" && !d.tutorial) askDue = askDue || "first episode score";
+  }));
 
   let dayEndSent = false;
   function dayEnded(now) {
