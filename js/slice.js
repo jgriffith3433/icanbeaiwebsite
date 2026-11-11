@@ -20,7 +20,7 @@ export function installSlice(day, world) {
     if (glow) m.emissiveColor = B.Color3.FromHexString(hex).scale(glow);
     return m;
   };
-  const st = { lawn: "straw", scattered: 0, coins: 0, creaks: 0, ripples: 0, drinks: 0 };
+  const st = { lawn: "straw", lawnK: 0, tomatoes: 0, scattered: 0, coins: 0, creaks: 0, ripples: 0, drinks: 0 };
   const emit = (action, detail) => {
     try { window.dispatchEvent(new window.CustomEvent("day:slice", { detail: Object.assign({ action }, detail) })); } catch (e) { /* node */ }
   };
@@ -59,11 +59,34 @@ export function installSlice(day, world) {
   lawn.material = strawM;
   lawn.isPickable = false;
   lawn.visibility = 0.55;
-  const setLawn = (s) => {
-    st.lawn = s;
-    lawn.material = s === "damp" ? dampM : strawM;
-    lawn.visibility = s === "damp" ? 0.3 : 0.55;
-    emit("lawn", { state: s });
+  /* `k` (0..1) is how fresh the water is (js/memory.js fades it over three real days); `quiet` = a restore, no event. */
+  const blendM = mat("slice-blend", "#8a7c45");
+  const strawC = B.Color3.FromHexString("#8a7c45");
+  const dampC = B.Color3.FromHexString("#2f5a38");
+  const setLawn = (s, k, quiet) => {
+    const f = s === "damp" ? (k == null ? 1 : Math.max(0, Math.min(1, k))) : 0;
+    st.lawn = s === "damp" && f > 0 ? "damp" : "straw";
+    st.lawnK = +f.toFixed(2);
+    if (f >= 1) lawn.material = dampM;
+    else if (f <= 0) lawn.material = strawM;
+    else { blendM.diffuseColor = B.Color3.Lerp(strawC, dampC, f); lawn.material = blendM; }
+    lawn.visibility = 0.55 + (0.3 - 0.55) * f;
+    if (!quiet) emit("lawn", { state: st.lawn });
+  };
+  // fuller tomato wall after Birdie's rain: a second set of fruit between the first (js/memory.js sets how many by freshness)
+  const extra = [];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) {
+    const f = B.MeshBuilder.CreateSphere("slice-tom-extra", { diameter: 0.4, segments: 4 }, scene);
+    f.position.set(-31.1 + i * 0.8 + (j % 2) * 0.2, 1.3 + j * 0.8, 6.8);
+    f.material = wallM;
+    f.isPickable = false;
+    f.setEnabled(false);
+    extra.push(f);
+  }
+  const setTomatoes = (k) => {
+    const n = Math.round(extra.length * Math.max(0, Math.min(1, k || 0)));
+    extra.forEach((f, i) => f.setEnabled(i < n));
+    st.tomatoes = n;
   };
 
   // pond ripples: rings that grow and fade
@@ -177,7 +200,7 @@ export function installSlice(day, world) {
     const d = e.detail || {};
     if (d.action === "reward" && (d.id === "birdie" || d.neighbor === "birdie" || d.who === "birdie")) {
       st.drinks++;
-      setLawn("damp");
+      if (!(day.memory && day.memory.now)) setLawn("damp"); // js/memory.js (if it's up) sets the lawn and the fruit from the store
       sfx("pad");
       sfx("rumble");
       emit("birdie-rain", {});
@@ -188,6 +211,7 @@ export function installSlice(day, world) {
     now: () => ({ ...st, pigeons: pigeons.filter((p) => p.fly < 0).length }),
     scatter,
     setLawn,
+    setTomatoes,
   };
   day.slice = api;
   return api;

@@ -268,3 +268,11 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 ## Cold open (first Play)
 - **Story beat:** dusk on the apt roof (19:00). A storm cell he didn't call rolls in over the avenue; the shop roof's lightning rod is the only thing he says is his. His first bolt lights the avenue: the lamps stutter, the street looks up, Birdie (on the avenue below the apt block) calls up that her tomatoes want rain, and he says "Rain. I can do that." That is the seed of her morning rain ask.
 - **Voice lines:** He "That storm isn't mine. The rod on the shop roof is." / Birdie "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain." / He "Rain. I can do that."
+
+## The city remembers (js/memory.js)
+
+- **Areas:** the park lawn (green after rain), the avenue (scorch, puddles, toppled bins, a leaning sign), roofs and plaza (scorch where a bolt landed), Birdie's tomato wall (fuller after her rain).
+- **Landmarks:** the scorch on the road, the leaning sign by the kerb, the green lawn seen from the bandstand.
+- **Who lives here:** Birdie's tomatoes answer her rain; the pigeons and the crowd are unchanged. No new characters.
+- **What happens:** the deeds he does under control (asks answered or botched, each power by zone, rescues, scars, endings) are kept by real local date in `icanbe.memory`. Marks are full for the rest of that real day and fade over 3 real days; 20 decals at most, 6 on a phone.
+- **Story beats:** none new. The city simply shows what he did, the way the Goose's bell pile does: come back later the same day and it's still there.
