@@ -319,6 +319,16 @@
       tone({ freq: 380, to: 520, dur: 0.28, vol: 0.05 * g, wave: "sine", attack: 0.04, pan });
       noise({ type: "highpass", freq: 600, dur: 0.2, vol: 0.04 * g, attack: 0.02, pan });
     },
+    /* Crowd scream when a tornado tears through (day:crowd scatter). */
+    scream(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("scream");
+      for (let i = 0; i < 3; i++) {
+        const f = 420 + i * 90 + Math.random() * 80;
+        tone({ freq: f, to: f * 1.35, dur: 0.35, vol: 0.045 * g, wave: "sawtooth", band: 1400, delay: i * 0.07, pan: (pan || 0) + (i - 1) * 0.15 });
+      }
+      noise({ type: "bandpass", freq: 1200, to: 700, q: 0.8, dur: 0.5, vol: 0.08 * g, attack: 0.02, pan });
+    },
     umbSnap(pan, gain) {
       const g = gain == null ? 1 : gain;
       note("umbrella");
@@ -609,6 +619,13 @@
     const d = e.detail || {};
     if (d.action === "unlock") S.sparkle(); // a neighbor's ask opened a verb (js/street.js)
     else if (d.action === "thanks") S.blip();
+  });
+  window.addEventListener("day:crowd", (e) => {
+    const d = e.detail || {};
+    if (d.action === "scatter" || d.action === "scream") {
+      const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
+      S.scream(at.pan, at.gain);
+    }
   });
   window.addEventListener("day:story", (e) => {
     const d = e.detail || {};
