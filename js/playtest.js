@@ -2686,6 +2686,141 @@ async function fillOut(options, t) {
   t.progress(1);
 }
 
+/* ---------------- city-audit: props sit on their roofs and pavements; no flicker; he walks every roof ---------------- */
+// Setup shortcuts: the audit runs on the built scene, and six probe cameras (three rooftops, three street spots) are put
+// where a player's camera could be for two frames each, the second 2 cm to the side. Real input: Enter, then WASD with
+// Shift up each walkable roof's ramp and along its row of AC units, the way he could before. Events: city-audit,
+// flicker-<spot>, city-shots-size, roof-walk-<block>. Metrics: cityAuditFailures, flickerBlocks.
+async function cityAudit(options, t) {
+  t.scene("Home street");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.cityscape && window.day.cityscape.audit, 8000, "the city audit (js/city-audit.js)");
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const blocks = ((cfg.city && cfg.city.blocks) || []).filter((b) => b.stair);
+  const cs = window.day.cityscape;
+  const B = window.BABYLON;
+  scrubTo(12 * 60);
+  await sleep(800);
+
+  // 1. the audit: floating or sunk props, coplanar faces, inside-out normals, the AC colliders
+  const rep = cs.audit();
+  t.metric("cityAuditFailures", rep.failures.length);
+  t.event("city-audit", `${rep.counts.props} props on ${rep.counts.surfaces} surfaces, ${rep.counts.faces} faces, ${rep.counts.units} roof units, ${rep.counts.poles} lamp poles: ${rep.failures.length} failures`);
+  rep.failures.slice(0, 12).forEach((f) => t.problem("bug", "City audit: " + f));
+  t.event("city-shots-size", `${innerWidth}x${innerHeight}`);
+  t.progress(0.1);
+
+  // 2. six probe cameras, two frames each: the second moved 2 cm; blocks of the picture that flip between the frames
+  const scene = world().scene;
+  const canvas = world().engine.getRenderingCanvas();
+  const W = 640;
+  const H = 360;
+  const g = document.createElement("canvas");
+  g.width = W;
+  g.height = H;
+  const gc = g.getContext("2d", { willReadFrequently: true });
+  let probe = null;
+  const place = (cam, p) => {
+    const eye = new B.Vector3(p.eye[0] + p.dx, p.eye[1], p.eye[2]);
+    const tgt = new B.Vector3(p.target[0], p.target[1], p.target[2]);
+    if (cam.setPosition && cam.setTarget && cam.getClassName() === "ArcRotateCamera") {
+      cam.setTarget(tgt);
+      cam.setPosition(eye);
+    } else {
+      cam.position.copyFrom(eye);
+      cam.setTarget(tgt);
+    }
+  };
+  const before = scene.onBeforeRenderObservable.add(() => {
+    if (probe && scene.activeCamera) place(scene.activeCamera, probe);
+  });
+  const after = scene.onAfterRenderObservable.add(() => {
+    if (!probe || !probe.grab) return;
+    gc.drawImage(canvas, 0, 0, W, H);
+    probe.frames.push(gc.getImageData(0, 0, W, H).data);
+    probe.grab = false;
+  });
+  const pz = cs.info().props.plaza;
+  const cross = ((cfg.city && cfg.city.crosses) || [])[1] || { x: 60 };
+  const spots = blocks.slice(0, 3).map((b) => {
+    const zb = b.z - b.d / 2 + 1.4;
+    const sx = b.w * 0.28;
+    return { name: `roof-${b.id}`, eye: [b.x + 1, b.h + 2.2, b.z + 3.8], target: [b.x - sx * 0.4, b.h + 0.5, zb] };
+  });
+  spots.push({ name: "street-crossing", eye: [cross.x - 9, 1.8, street.z - 3.0], target: [cross.x + 3.5, 0.3, street.z] });
+  spots.push({ name: "street-shops", eye: [58, 1.7, street.z - 3.1], target: [66, 1.6, street.z - 0.6] });
+  spots.push({ name: "street-plaza", eye: [pz.x0 + 3, 2.0, pz.z0 + 3], target: [(pz.x0 + pz.x1) / 2, 1.2, pz.z0 + 6.5] });
+  let totalBlocks = 0;
+  let k = 0;
+  for (const sp of spots) {
+    t.scene(`Camera ${k + 1} of ${spots.length}: ${sp.name}`);
+    probe = { ...sp, dx: 0, grab: false, frames: [] };
+    await sleep(500);
+    probe.grab = true;
+    await t.until(() => probe.frames.length >= 1, 3000, "the first frame of " + sp.name).catch(() => {});
+    probe.dx = 0.02;
+    await sleep(120);
+    probe.grab = true;
+    await t.until(() => probe.frames.length >= 2, 3000, "the second frame of " + sp.name).catch(() => {});
+    let flick = 0;
+    if (probe.frames.length >= 2) {
+      const A = probe.frames[0];
+      const C = probe.frames[1];
+      // 8 x 8 px blocks where over a third of the pixels change a lot: a flat surface flipping between two depths
+      for (let by = 0; by < H; by += 8) for (let bx = 0; bx < W; bx += 8) {
+        let n = 0;
+        for (let y = by; y < by + 8; y++) for (let x = bx; x < bx + 8; x++) {
+          const i = (y * W + x) * 4;
+          if (Math.abs(A[i] - C[i]) + Math.abs(A[i + 1] - C[i + 1]) + Math.abs(A[i + 2] - C[i + 2]) > 90) n++;
+        }
+        if (n > 21) flick++;
+      }
+    }
+    totalBlocks += flick;
+    t.event("flicker-" + sp.name, `${probe.frames.length} frames, camera moved 2 cm: ${flick} flickering blocks`);
+    if (probe.frames.length < 2) t.problem("warning", `The probe camera at ${sp.name} didn't get two frames`);
+    else if (flick > 8) t.problem("bug", `Surfaces flicker between two frames at ${sp.name} (${flick} blocks of 8 x 8 px change a lot for a 2 cm camera move)`);
+    k++;
+    t.progress(0.1 + 0.3 * (k / spots.length));
+  }
+  probe = null;
+  scene.onBeforeRenderObservable.remove(before);
+  scene.onAfterRenderObservable.remove(after);
+  t.metric("flickerBlocks", totalBlocks);
+  checkHud(t, "city-audit shots");
+
+  // 3. he walks each walkable roof along its row of AC units, the way he could before
+  const outside = carSideMoment(window.day.today());
+  if (outside) scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  await sleep(600);
+  const C = window.day.control;
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  let n = 0;
+  for (const b of blocks) {
+    const s = b.stair;
+    t.scene(`Roof ${b.id}: up the ramp and along the units`);
+    const sx = b.w * 0.28;
+    const zb = b.z - b.d / 2 + 1.4;
+    const ok = [];
+    ok.push(await goTo(s.x0 - 0.9, s.z, t, { sprint: true, progress: 0.4 + 0.18 * n, ms: 40000 }));
+    ok.push(ok[0] && (await goTo(s.x1 - 0.25, s.z, t, { close: 0.35, progress: 0.4 + 0.18 * n, ms: 20000 })));
+    const legs = [[b.x + 1, b.z + 1.5], [b.x - sx - 2, zb + 1.3], [b.x - sx, zb + 1.3], [b.x + sx * 0.2, zb + 1.3], [b.x + sx * 1.1, zb + 1.6], [b.x, b.z]];
+    for (const [x, z] of legs) ok.push(ok[ok.length - 1] && (await goTo(x, z, t, { close: 0.8, progress: 0.4 + 0.18 * n, ms: 14000, stall: 3000 })));
+    const reached = ok.filter(Boolean).length;
+    const st = C.state();
+    t.event("roof-walk-" + b.id, `${reached} of ${ok.length} legs walked, ended at ${st.x.toFixed(1)},${st.z.toFixed(1)} (y ${st.y.toFixed(2)})`);
+    if (reached < ok.length) t.problem("bug", `He snagged on the ${b.id} roof or its ramp (${reached} of ${ok.length} legs; at ${st.x.toFixed(1)},${st.z.toFixed(1)}, y ${st.y.toFixed(2)})`);
+    await goTo(s.x1 - 0.25, s.z, t, { close: 0.7, ms: 14000 });
+    await goTo(s.x0 - 0.9, s.z, t, { close: 0.9, ms: 20000 });
+    n++;
+  }
+  pressKey("Escape");
+  t.progress(1);
+}
+
 /* ---------------- weather: every state, blended, and the road goes wet in the rain ---------------- */
 // Real input: the day bar to the door (setup), Enter, WASD out to the avenue, the Sound button,
 // keys 1–7, hold Q and a wedge, then the phone's Weather button. Each state gets a scene once it has settled.
@@ -6724,6 +6859,7 @@ installPlaytest({
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
     { id: "photos", title: "Photos of the dense city: noon at five spots along the avenue, dusk (windows and street lamps come on), night; frame rate at each", seconds: 120, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, then WASD with Shift east along the avenue. Events photo-noon / photo-dusk / photo-night / photo-fps; metrics photoFpsMin, photoFpsAvg, cityFillers, cityLamps." },
     { id: "crowd", title: "The street's people and cars follow the clock: quiet at 3 AM, busy at the 8:30 rush, full at lunch and dinner, thin again late; they walk, cross, go in and out of buildings; rain opens umbrellas; Quality: low thins them; frame rate at each", seconds: 90, tags: ["crowd", "photos"], description: "Day bar beside the car and to each hour (setup), then 1x. Enter, WASD with Shift to the shops, key 3, the quality button. Events crowd-night / crowd-rush / crowd-lunch / crowd-dinner / crowd-late / crowd-follows-clock / crowd-rain / crowd-quality-low / photo-fps; metrics crowd<Hour>People, crowd<Hour>Cars, photoFpsMin, photoFpsAvg." },
+    { id: "city-audit", title: "City audit: every prop from props.js and cityscape.js sits on its roof or pavement (nothing floating, sunk, coplanar or inside out); six probe cameras (three rooftops, three streets) show no flicker between two frames; he walks each walkable roof along its AC units; shots at desktop and 844x390", seconds: 240, tags: ["look", "photos"], description: "Setup: scrubs to noon, runs day.cityscape.audit(), places six probe cameras for two frames each (the second moved 2 cm). Real input: Enter, WASD with Shift up each walkable roof's ramp and along its row of units, Esc. Events city-audit / city-shots-size / flicker-<spot> / roof-walk-<block>; metrics cityAuditFailures, flickerBlocks." },
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
@@ -6776,6 +6912,7 @@ installPlaytest({
       else if (id === "look") await look(options, t);
       else if (id === "photos") await photos(options, t);
       else if (id === "fill-out") await fillOut(options, t);
+      else if (id === "city-audit") await cityAudit(options, t);
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "cast-feel") await castFeel(options, t);
