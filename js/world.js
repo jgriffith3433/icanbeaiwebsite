@@ -1730,16 +1730,16 @@
           rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.95; // lamp off at night: the bed and the sleeper must still read
         } else if (rl.id === "living") {
           B.Color3.LerpToRef(C("#c4d4f0"), C("#ffd9a8"), rl.level, rl.light.diffuse);
-          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.34;
+          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * (night * 0.34 + day * 0.4); // lamp off by day: the window light still fills the room, hemi alone left it near-black
         } else {
-          rl.light.intensity = rl.level * (0.55 + night * 0.65);
+          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * day * 0.4;
         }
       });
       bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.9 : 1.2);
       const officeOn = things.officeLights !== "off" ? 1 : 0;
       const nearOffice = px > 65 || (cam.inited && cam.x > 65);
       officeLights.forEach((L) => {
-        L.intensity = officeOn && nearOffice ? 0.12 + night * 0.35 : 0;
+        L.intensity = nearOffice ? (officeOn ? 0.12 + night * 0.35 : 0) + day * 0.4 : 0; // day fill through the windows even with the fixtures off
       });
       /* A light switching on or off changes the shader of every mesh it touches, and that recompile is a freeze on a
          scrub or a jump. So the lights of a building switch as one group (home: rooms + bedside, office: its fixtures),
