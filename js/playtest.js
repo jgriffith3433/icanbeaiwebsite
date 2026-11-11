@@ -4387,6 +4387,159 @@ async function tornadoPlaza(options, t) {
   t.progress(1);
 }
 
+/* ---------------- rain-cast: heavy, wet rain (js/rain.js): streaks, splashes, ripples, curtains, lens drops, fog ---------------- */
+// Real input: Take control (Enter / touch), drag the camera level with the sky, cast Rain (R, or a tap on #ability-rain).
+// Setup shortcuts (named): the day bar beside the car, control.place on the apartment roof and then on the plaza, and for
+// the plaza "storm" shot weather.set("storm", 1, "key"). Events: rain-streaks / rain-splashes / rain-ripples / rain-lens /
+// rain-curtains / rain-fog / rain-phone / rain-fps. Metrics: rainStreaks, rainHitsRoof, rainHitsPuddle, rainLensSliding,
+// rainCurtains, rainVisibilityM, rainFpsAvg. { "touch": true } plays it by touch at low quality, 390x844: at most 4000 streaks,
+// no lens drops, fps >= 30.
+async function rainCast(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const P = window.powers || (window.day && window.day.powers);
+  const C = window.day.control;
+  const R = window.rain || (window.day && window.day.rain);
+  const W = window.weather;
+  if (!P || !C || !R || !W) return t.problem("bug", "powers, Take control, weather or js/rain.js isn't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  const day = window.day.today();
+  const outside = carSideMoment(day) || day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  t.event("start-at", `${E().fmtClock(outside.start)} beside the car (setup)`);
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    C.touch(true);
+  }
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: touch ? "touch" : "mouse" }));
+    sound.click();
+    await sleep(200);
+  }
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  t.event("control-taken", touch ? "by touch, low quality" : "Enter");
+  if (C.place) C.place(-21, 0.5, Math.PI / 2); // setup: the apartment roof, where the splashes have roofs and his shoulders
+  await sleep(700);
+  t.scene("Apartment roof, rain");
+  const quality = window.day.look.quality();
+  const low = quality === "low";
+  t.metric("quality", low ? 0 : 1);
+
+  // look level with the sky: drag the camera (one finger on the right half on a phone)
+  const world = window.day.world();
+  const canvas = world.engine.getRenderingCanvas();
+  const rect = canvas.getBoundingClientRect();
+  const cam = world.scene.activeCamera;
+  const pitch = () => (cam.getForwardRay ? cam.getForwardRay(1).direction.y : 0);
+  async function drag(dy) {
+    const x = rect.left + rect.width * (touch ? 0.78 : 0.5), y0 = rect.top + rect.height * 0.5, id = touch ? 31 : 1;
+    const mk = (type, y) => new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, pointerId: id, pointerType: touch ? "touch" : "mouse", isPrimary: true });
+    canvas.dispatchEvent(mk("pointerdown", y0));
+    for (let i = 1; i <= 8; i++) { canvas.dispatchEvent(mk("pointermove", y0 + (dy * i) / 8)); await sleep(30); }
+    canvas.dispatchEvent(mk("pointerup", y0 + dy));
+    await sleep(250);
+  }
+  const p0 = pitch();
+  await drag(-150);
+  if (pitch() < p0 - 0.02) await drag(300); // the other way round
+  t.event("camera-pitch", `forward y ${p0.toFixed(2)} -> ${pitch().toFixed(2)} (drag)`);
+  t.progress(0.15);
+
+  const cost = (window.DAY_CONFIG.powers && window.DAY_CONFIG.powers.costs && window.DAY_CONFIG.powers.costs.rain) || 20;
+  if (P.abilities && P.abilities.reset) P.abilities.reset(100); // setup: full Charge
+  await t.until(() => P.now().pressure + 0.05 >= cost, 8000, `Charge for Rain (${cost})`);
+  const fpsP = fpsWindow(5200);
+  if (touch) await tapEl($("ability-rain")); else await tapKey("r");
+  await t.until(() => W.now().rain > 0.4, 7000, "the rain to come in");
+  t.event("rain-cast", `Rain cast, intensity ${W.now().rain.toFixed(2)}`);
+
+  // 5 s of looking: the streaks, the hits by surface, the lens
+  let m = { alive: 0, roof: 0, puddle: 0, shoulder: 0, ripples: 0, splashes: 0, lens: 0, sliding: 0, curtains: 0, windows: false, drips: 0 };
+  const lens0 = R.info().lens.spawned;
+  const t0 = performance.now();
+  while (performance.now() - t0 < 5000) {
+    await sleep(250);
+    const i = R.info();
+    m.alive = Math.max(m.alive, i.streaks.alive);
+    m.roof = Math.max(m.roof, i.hits.kinds.roof);
+    m.puddle = Math.max(m.puddle, i.hits.kinds.puddle);
+    m.shoulder = Math.max(m.shoulder, i.hits.kinds.shoulder);
+    m.ripples = i.hits.ripples;
+    m.splashes = i.hits.splashes;
+    m.sliding = Math.max(m.sliding, i.lens.sliding);
+    m.lens = Math.max(m.lens, i.lens.drops);
+    m.curtains = Math.max(m.curtains, i.curtains);
+    m.drips = Math.max(m.drips, i.drips);
+    m.windows = i.window.shader;
+    if (i.error) t.problem("bug", `rain frame error: ${i.error}`);
+  }
+  const fps = await fpsP;
+  const info = R.info();
+  const first = W.now();
+  t.metric("rainStreaks", m.alive);
+  t.metric("rainHitsRoof", m.roof);
+  t.metric("rainHitsPuddle", m.puddle);
+  t.metric("rainLensSliding", m.sliding);
+  t.metric("rainCurtains", m.curtains);
+  t.metric("rainVisibilityM", info.fog.visibilityM);
+  t.metric("rainFpsAvg", Math.round(fps.avg * 10) / 10);
+  if (m.alive < 200 || !(first.rainStreaks > 0)) t.problem("bug", `Rain cast shows ${m.alive} velocity-stretched streaks (want 200+)`);
+  else t.event("rain-streaks", `${m.alive} streaks alive (cap ${info.streaks.cap}), stretched along their velocity and leaning with wind ${W.now().wind.toFixed(2)}`);
+  if (m.roof < 3 && m.shoulder < 1) t.problem("bug", `Few splashes on the roof (${m.roof} roof hits, ${m.shoulder} on his shoulders)`);
+  else t.event("rain-splashes", `${m.roof} roof splashes, ${m.shoulder} on his shoulders, ${m.splashes} droplets thrown`);
+  if (m.ripples < 20) t.problem("bug", `Only ${m.ripples} ripples`);
+  else t.event("rain-ripples", `${m.ripples} ripples drawn from the height map, ${m.puddle} in puddles, ${m.drips} drips from gutters and awnings`);
+  if (!low) {
+    if (info.lens.spawned - lens0 < 5 && m.sliding < 5) t.problem("bug", `Looking up into the rain: ${info.lens.spawned - lens0} lens drops, ${m.sliding} sliding at once (want 5+ in 3 s)`);
+    else t.event("rain-lens", `${info.lens.spawned - lens0} lens drops in 5 s, up to ${m.sliding} sliding at once (camera forward y ${pitch().toFixed(2)})`);
+  } else {
+    if (info.lens.enabled || m.lens > 0) t.problem("bug", `Lens drops on low quality (${m.lens})`);
+    else t.event("rain-phone", `no lens drops on low quality; ${m.alive} streaks of ${info.streaks.cap}`);
+  }
+  if (!m.windows) t.problem("warning", "The window-water shader isn't on the facade materials");
+  t.progress(0.55);
+
+  // the plaza in a storm: distant curtains under the cloud deck, a wide shot
+  W.set("storm", 1, "key"); // setup: the held storm
+  if (C.place) C.place(118, 26, Math.PI / 2);
+  await sleep(500);
+  const plazaPitch = world.scene.activeCamera;
+  await drag(touch ? 120 : 140); // back down to a wide, level view of the district
+  t.scene("Plaza, storm");
+  await t.until(() => R.info().curtains >= (low ? 2 : 3), 9000, "the rain curtains").catch(() => {});
+  await sleep(2500);
+  const wide = R.info();
+  const fogBase = 0.022;
+  t.metric("rainCurtains", wide.curtains);
+  t.metric("rainVisibilityM", wide.fog.visibilityM);
+  if (wide.curtains < (low ? 2 : 3)) t.problem("bug", `Plaza storm shows ${wide.curtains} distant curtains (want ${low ? 2 : 3})`);
+  else t.event("rain-curtains", `${wide.curtains} curtains under the cloud deck at 56-118 m, visibility about ${wide.fog.visibilityM} m`);
+  if (wide.fog.mul < 1.3) t.problem("bug", `Heavy rain barely thickens the fog (x${wide.fog.mul})`);
+  else t.event("rain-fog", `fog x${wide.fog.mul} (density ${wide.fog.density.toFixed(3)} vs ${fogBase})`);
+
+  // phone: the budget and frame rate over a storm
+  if (touch) {
+    const fp = await fpsWindow(4500);
+    t.metric("rainPhoneFpsAvg", Math.round(fp.avg * 10) / 10);
+    const worst = Math.max(m.alive, wide.streaks.alive);
+    t.metric("rainPhoneStreaks", worst);
+    if (worst > 4000) t.problem("bug", `Phone rain used ${worst} streak particles (cap 4000)`);
+    if (fp.avg < 30) t.problem("bug", `Phone rain fps averaged ${fp.avg.toFixed(1)} (want >= 30)`);
+    else t.event("rain-fps", `${fp.avg.toFixed(1)} fps avg in a storm at low quality, ${worst} streaks (cap 4000)`);
+  } else {
+    t.event("rain-fps", `${fps.avg.toFixed(1)} fps avg during the Rain cast`);
+  }
+  void plazaPitch;
+  t.progress(1);
+}
+
 /* ---------------- lightning-bolt: the forked bolt, its flash, afterimage, scorch and crowd flinch ---------------- */
 // Real input: Take control (Enter, or a tap on the button on a phone), walk to the avenue, then tap/press Lightning
 // (touch: pointer events on #ability-bolt). Per frame it records the cast frame time, the forks and re-strikes (times
@@ -8801,6 +8954,7 @@ installPlaytest({
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
     { id: "camera-run", title: "Third-person camera: a two-minute walk, climb and cast run (the avenue, the stair, the apartment roof and its parapets, all five verbs and a Tornado) with the camera never inside a building or the ground, never turning over 180 deg/s, framing him and the cast's target together for 1 s or more; taking control blends in; by touch a right-half drag looks and it recentres behind him within 3 s", seconds: 170, tags: ["control", "feel", "phone", "camera"], description: "Load with ?playtest=camera-run ({\"touch\":true} for the phone run). Setup: the day bar beside the car, a full Charge. Real input: Enter, WASD with Shift up the stair and round the roof, mouse drags (one a full-width flick), E R V C X and a held V for the Tornado; by touch a tap on Take control, the stick, one-finger drags on the left and right halves, a tap on Bolt. Events control-taken / take-blend / on-the-roof / cast-framed-<power> / left-half-drag / right-half-drag / recentred / camera-stats; metrics cameraInsideFrames, cameraMaxYawDegPerSec, castFramed.<power>, recentreSeconds. Run at 1280x720 and 390x844 touch." },
     { id: "wind-fog", title: "Wind and fog you can see: a Gust shows ribbons, 10+ swirling leaves and papers, bending trees, flapping awnings and flags, a walker's umbrella flips; Fog rolls ground-fog slices into the street within 5 s and fades the skyline; on a phone, vertex shaders only, 2 slices, fps ≥ 30", seconds: 75, tags: ["powers", "phone", "feel"], description: "Takes control at lunch, stands on the plaza, taps Wind (V / #ability-wind) for a Gust, then Fog (C / #ability-fog). Events wind-gust / wind-ribbons / wind-leaves / wind-bend / wind-cloth / wind-umbrella / fog-cast / fog-roll / fog-skyline / fog-lights / fog-fps. Option {\"touch\":true} for 390x844 low quality by touch." },
+    { id: "rain-cast", title: "Heavy rain: a Rain cast shows velocity-stretched streaks, splashes on the roof and his shoulders, ripples in puddles, 5+ lens drops sliding when the camera looks up, and distant curtains in a plaza storm; on phone at most 4000 streaks, no lens drops, fps ≥ 30", seconds: 60, tags: ["powers", "weather", "phone", "feel"], description: "Day bar beside the car (setup), Sound on, Enter / Take control tap, control.place on the apartment roof (setup), drag the camera level, tap R / #ability-rain. Then weather.set storm and control.place on the plaza (setup) for the curtains. Events rain-cast / rain-streaks / rain-splashes / rain-ripples / rain-lens / rain-curtains / rain-fog / rain-phone / rain-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
@@ -8880,6 +9034,7 @@ installPlaytest({
       else if (id === "five-verbs") await fiveVerbs(options, t);
       else if (id === "wind-fog") await windFog(options, t);
       else if (id === "tornado-plaza") await tornadoPlaza(options, t);
+      else if (id === "rain-cast") await rainCast(options, t);
       else if (id === "lightning-bolt") await lightningBolt(options, t);
       else if (id === "camera-run") await cameraRun(options, t);
       else if (id === "voice") await voice(options, t);
