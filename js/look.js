@@ -372,6 +372,10 @@ export function installLook(world) {
 
   const neonMats = [];
   const neonHex = ["#3ecbff", "#ff4d8d", "#8eb6ff"];
+  const boardMat = new B.StandardMaterial("neon-board", scene);
+  boardMat.diffuseColor = new B.Color3(0.16, 0.18, 0.21);
+  boardMat.emissiveColor = new B.Color3(0.05, 0.055, 0.065);
+  boardMat.specularColor = B.Color3.Black();
   blocks.forEach((b, i) => {
     /* Not on a block with a roof ramp: the ramp climbs the north face where the bar hangs, so the bar read as a teal slab
        floating beside (and cutting into) the ramp. */
@@ -389,6 +393,13 @@ export function installLook(world) {
     mat.metadata = { base };
     neonMats.push(mat);
     const w = Math.min(3.4, b.w * 0.38);
+    /* A dark backing board behind the bar and its tick: bare, a lit bar on a dim wall read as a slab hanging in the air
+       (the playtest saw pink and teal ones floating beside the ramp). Its front stands 9.5 cm off the wall, 2.5 cm clear of the
+       shopfront band's plane (7 cm), its back inside the band/wall; the bar (5.5 to 10.5 cm) stands proud of it. */
+    const board = B.MeshBuilder.CreateBox("neonboard-" + b.id, { width: w + 0.5, height: 0.72, depth: 0.035 }, scene);
+    board.position.set(b.x - 0.05, y - 0.18, b.z + b.d / 2 + 0.0775);
+    board.material = boardMat;
+    board.isPickable = false;
     const bar = B.MeshBuilder.CreateBox("neon-" + b.id, { width: w, height: 0.14, depth: 0.05 }, scene);
     bar.position.set(b.x, y, faceZ);
     bar.material = mat;
