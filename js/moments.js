@@ -3,15 +3,19 @@
    1. You take over: the camera starts wide and pushes in to his shoulder
       (control.js `push`) while one line, in his own voice, shows on screen.
    2. The day ends: when the clock rolls into the next day, a card in his
-      voice recaps three events from the log. Words in day.config.js `moments`.
+      voice speaks two deeds of the day, one caption line at a time (the deeds
+      he did under control, from day.memory; the log's rows when he did none).
+      Words in day.config.js `moments`, lines in `voice.spoken` `recap-*`.
    Skip: the Skip button, a tap, Esc/Enter (day-end card), or any movement
    (take-over push). Events `day:moment` start / skip / end for analytics.
    `day.moments`: now(), recap(), pickEvents(), takeover(), skip().
    ========================================================================== */
 
+import { factsFrom, deedsFrom } from "./deeds.js";
+
 const DEF = {
   takeover: { push: { from: 15, secs: 1.5, fov: 0.22 }, lineSecs: 3.2, skip: "Skip", lines: ["Okay. My turn."] },
-  dayEnd: { kicker: "Small Weather", title: "That was the day.", intro: "Here's what I remember.", outro: "Same again tomorrow.", outroPlayed: "Tomorrow I'd like the sky again.", skip: "Skip", hint: "Esc to skip", secs: 12, events: 3 },
+  dayEnd: { kicker: "Small Weather", title: "That was the day.", intro: "Here's what I remember.", outro: "Same again tomorrow.", outroPlayed: "Tomorrow I'd like the sky again.", skip: "Skip", hint: "Esc to skip", secs: 12, events: 3, speakDeeds: 2, lineSecs: 3.8 },
 };
 
 export function startMoments() {
@@ -43,13 +47,15 @@ export function startMoments() {
 .mo-end .intro{margin:0 0 20px;color:rgba(246,241,232,.7)}
 .mo-end ol{list-style:none;margin:0 0 22px;padding:0;display:flex;flex-direction:column;gap:12px;max-width:30em;width:100%}
 .mo-end li{display:flex;gap:14px;align-items:baseline;text-align:left;padding:12px 16px;border-radius:14px;background:rgba(246,241,232,.07);border:1px solid rgba(246,241,232,.12);opacity:0;transform:translateY(8px);animation:mo-in .6s ease forwards}
-.mo-end li:nth-child(2){animation-delay:.7s}.mo-end li:nth-child(3){animation-delay:1.4s}
+.mo-end li{display:none}.mo-end li.on{display:flex;font:600 clamp(1.15rem,3.4vw,1.7rem)/1.3 Fraunces,Georgia,serif;animation-delay:0s}
+.mo-end ol{min-height:4.6em;justify-content:center}
 .mo-end li.note{border-color:rgba(240,194,122,.5)}
 .mo-end time{flex:none;min-width:4.4em;font:600 .85rem Outfit,system-ui,sans-serif;color:#f0c27a;font-variant-numeric:tabular-nums}
-.mo-end .outro{margin:0 0 22px;font:600 clamp(1.1rem,2.8vw,1.5rem)/1.3 Fraunces,Georgia,serif;opacity:0;animation:mo-in .6s ease 2.1s forwards}
+.mo-end .outro{margin:0 0 22px;font:600 clamp(1.1rem,2.8vw,1.5rem)/1.3 Fraunces,Georgia,serif;opacity:0;transition:opacity .6s ease}
+.mo-end .outro.on{opacity:1}
 .mo-end .hint{margin:10px 0 0;font-size:.78rem;color:rgba(246,241,232,.55)}
 @keyframes mo-in{to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.mo-end li,.mo-end .outro{animation-duration:.01s;animation-delay:0s}}
+@media (prefers-reduced-motion:reduce){.mo-end li,.mo-end .outro{animation-duration:.01s;animation-delay:0s;transition:none}}
 `;
   document.head.appendChild(style);
 
@@ -143,6 +149,25 @@ export function startMoments() {
   let lastKey = "";
   let lastNotes = [];
 
+  /* The deeds he did under control on the sim day (day:memory `deed` events, js/memory.js), as DEED_ORDER names. */
+  const dayFacts = {}; // sim day key -> facts
+  window.addEventListener("day:memory", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action !== "deed" || !d.kind) return;
+    const k = day.now().key;
+    const one = factsFrom({ deeds: { [d.kind]: 1 }, zones: d.zone ? { [d.zone]: { [d.power || d.kind]: 1 } } : {} });
+    const f = dayFacts[k] || (dayFacts[k] = {});
+    Object.keys(one).forEach((n) => (f[n] = (f[n] || 0) + one[n]));
+  });
+  const spokenOf = (group) => {
+    const pool = ((window.DAY_CONFIG && window.DAY_CONFIG.voice && window.DAY_CONFIG.voice.spoken) || {})[group];
+    return Array.isArray(pool) && pool.length ? pool[0] : null;
+  };
+  /** The day's deeds with a line to speak: [{ kind, text }], most telling first (at most n). */
+  function pickDeeds(key, n) {
+    return deedsFrom(dayFacts[key] || {}).map((kind) => ({ kind, text: spokenOf("recap-" + kind) })).filter((x) => x.text).slice(0, n);
+  }
+
   /* Three events from the log: rows of the day that was (not micro-steps), spread early / middle / late;
      the player's own note (taking over, letting go...) wins the middle slot when there is one. */
   function pickEvents(dayObj, notes, n) {
@@ -163,9 +188,20 @@ export function startMoments() {
     for (let i = 0; i < rows.length && out.length < n; i++) add(rows[i].start, rows[i].text);
     return out.sort((a, b) => a.start - b.start);
   }
-  function recap(via, dayObj, notes) {
+  const timers = [];
+  const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id; };
+  function recap(via, dayObj, notes, key) {
     if (endUp) return false;
-    const events = pickEvents(dayObj || lastDay, notes || lastNotes);
+    const want = D.speakDeeds || 2;
+    // two deeds of the day: the ones he did under control (spoken), then the log's rows (a quiet day)
+    const deeds = pickDeeds(key || lastKey, want).map((x) => ({ start: null, text: x.text, note: true, deed: x.kind }));
+    let events = deeds;
+    if (events.length < want) {
+      const rows = pickEvents(dayObj || lastDay, [], 6).filter((r) => !events.some((e) => e.text === r.text));
+      const early = rows.slice(0, 1), late = rows.slice(-1);
+      (events.length ? late : early.concat(late)).forEach((r) => { if (events.length < want && !events.some((e) => e.text === r.text)) events.push({ start: r.start, text: r.text, note: false }); });
+    }
+    events = events.slice(0, want);
     if (!events.length) return false;
     if (lineUp) endLine("skip", "day-end");
     shown = events;
@@ -175,7 +211,8 @@ export function startMoments() {
       const li = document.createElement("li");
       if (e.note) li.className = "note";
       const t = document.createElement("time");
-      t.textContent = clockOf(e.start);
+      t.textContent = e.start == null ? "" : clockOf(e.start);
+      if (e.start == null) t.hidden = true;
       const s = document.createElement("span");
       s.textContent = e.text;
       li.appendChild(t);
@@ -186,8 +223,22 @@ export function startMoments() {
     endAt = performance.now();
     end.classList.remove("leaving");
     end.hidden = false;
-    emit("day-end", "start", { via: via || "roll", events: events.map((e) => e.text), times: events.map((e) => clockOf(e.start)) });
-    endTimer = setTimeout(() => closeEnd("end", "auto"), (D.secs || 12) * 1000);
+    const nDeeds = events.filter((e) => e.deed).length;
+    emit("day-end", "start", { via: via || "roll", events: events.map((e) => e.text), times: events.map((e) => (e.start == null ? "" : clockOf(e.start))), deeds: nDeeds, kinds: events.map((e) => e.deed || null) });
+    // one caption line at a time: each shows (and is spoken, for a deed) in turn, then the outro
+    const lis = [...listEl.children];
+    const lineMs = (D.lineSecs || 3.8) * 1000;
+    const showLine = (i) => {
+      lis.forEach((li, j) => li.classList.toggle("on", j === i));
+      if (i >= lis.length) { end.querySelector(".outro").classList.add("on"); return; }
+      const e = events[i];
+      emit("day-end", "line", { index: i, text: e.text, deed: e.deed || null, spoken: !!e.deed });
+      if (e.deed && day.voice && day.voice.say) day.voice.say("recap-" + e.deed, { force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "dayend" });
+      later(() => showLine(i + 1), lineMs);
+    };
+    end.querySelector(".outro").classList.remove("on");
+    showLine(0);
+    endTimer = setTimeout(() => closeEnd("end", "auto"), Math.max((D.secs || 12) * 1000, (events.length + 1) * lineMs + 1500));
     try { end.querySelector("#day-end-skip").focus({ preventScroll: true }); } catch (e) { /* old browser */ }
     return true;
   }
@@ -195,6 +246,7 @@ export function startMoments() {
     if (!endUp) return false;
     endUp = false;
     clearTimeout(endTimer);
+    timers.splice(0).forEach(clearTimeout);
     end.classList.add("leaving");
     setTimeout(() => { if (!endUp) end.hidden = true; }, 620);
     if (document.activeElement && end.contains(document.activeElement)) document.activeElement.blur();
@@ -213,7 +265,7 @@ export function startMoments() {
   // The clock rolls into the next day while it plays (a jump on the day bar doesn't count).
   day.watch((info) => {
     if (lastKey && info.key !== lastKey && !info.jumped && !botElsewhere && day.now().mode !== "pause" && !html.classList.contains("title-up")) {
-      recap("roll", lastDay, lastNotes);
+      recap("roll", lastDay, lastNotes, lastKey);
     }
     if (info.key !== lastKey) { lastKey = info.key; lastNotes = []; }
     lastDay = info.day;
@@ -225,6 +277,7 @@ export function startMoments() {
     takeover,
     recap: (via) => recap(via || "api"),
     pickEvents,
+    pickDeeds: (key, n) => pickDeeds(key || day.now().key, n || D.speakDeeds || 2),
     skip: () => endLine("skip", "api") || closeEnd("skip", "api"),
     now: () => ({ line: lineUp, text: lineText, recap: endUp, events: shown, pushing: !!(day.control && day.control.pushing && day.control.pushing()), log: log.slice() }),
   };

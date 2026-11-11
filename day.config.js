@@ -275,7 +275,9 @@ window.DAY_CONFIG = {
       skip: "Skip",
       hint: "Esc to skip",
       secs: 12,
-      events: 3,
+      events: 3, // the most log rows js/moments.js picks from (pickEvents)
+      speakDeeds: 2, // two deeds he did, spoken and shown one caption line at a time (js/moments.js)
+      lineSecs: 3.8, // each caption line
     },
   },
 
@@ -398,6 +400,34 @@ window.DAY_CONFIG = {
         "It is pouring and he is thirsty. He sees the joke and keeps it to himself.",
       ] },
     },
+    /* Warmer barks over the days he has been out playing with the sky (day.memory.skyDays(): real days with a deed).
+       Tier 1 from 1 day, tier 2 from 3, tier 3 from 6: the sky-curious count. A tier's line for the same need or weather
+       replaces the plain one (and is used once a day like the rest); a state with no line there keeps the plain pool. */
+    warm: [
+      { from: 1, weather: {
+        rain: ["Rain again. He is beginning to expect it."],
+        clear: ["Clear sky. He checks it twice, to be sure it's staying."],
+      }, needs: {
+        boredom: ["He looks at the sky instead of the wall. It's more interesting."],
+      } },
+      { from: 3, weather: {
+        rain: ["Rain. He turns his face up a little, and no one sees."],
+        storm: ["A storm, and he is almost glad of the company."],
+        wind: ["Wind. He leans into it like an old friend."],
+      }, needs: {
+        stress: ["His shoulders drop. He has somewhere to put it now."],
+        boredom: ["He catches himself waiting for weather."],
+      } },
+      { from: 6, weather: {
+        rain: ["Rain. He knows its moods by now, and it knows his."],
+        storm: ["The storm comes in the way a friend does. He doesn't get up."],
+        fog: ["Fog. He has walked this street in worse and loved it."],
+        clear: ["Clear sky. The city is as he left it. He nods at it."],
+      }, needs: {
+        energy: ["He is tired the good way. The kind the sky earns."],
+        stress: ["He breathes out. The sky has never asked him for a thing."],
+      } },
+    ],
     weather: {
       rain: [
         "Rain. He lets it be a minute before he moves.",
@@ -617,6 +647,9 @@ window.DAY_CONFIG = {
       gust: 70,
       tornado: 70,
       letgo: 55,
+      memory: 45, // the autopilot's memory steps (`say` on a step)
+      deed: 58, // the Let go line that names the deed
+      recap: 95, // the day-end card's deeds
       glide: 40,
       "weather-storm": 35,
       "weather-rain": 35,
@@ -689,6 +722,30 @@ window.DAY_CONFIG = {
         "I type. The sky waits.",
         "Coffee's cold. Forecast isn't.",
       ],
+      /* On Let go, one line naming the deed he just did (day.memory.justDid(), most telling first), and at the day's end
+         one `recap-` line per deed the card speaks. Short: the phone's caption is one line. */
+      "deed-birdie": ["Birdie's tomatoes drank well."],
+      "deed-botched": ["I missed a neighbour's ask. Noted."],
+      "deed-flood": ["Park's soaked. Lawn will thank me."],
+      "deed-roofs": ["Roofs were good. I'll go back."],
+      "deed-storm": ["I called a storm. Felt right."],
+      "deed-wind": ["The bins will remember that gale."],
+      "deed-fog": ["Left the street in fog. Quiet."],
+      "deed-sun": ["I opened the sky. Warm out."],
+      "deed-rain": ["Rain's still on the road."],
+      "deed-rescue": ["Everyone got down. Good."],
+      "deed-answered": ["A neighbour said thanks. Nice."],
+      "recap-birdie": ["I gave Birdie her rain today."],
+      "recap-botched": ["I let a neighbour down today."],
+      "recap-flood": ["I drowned the park. It's green."],
+      "recap-roofs": ["I spent the day up on the roofs."],
+      "recap-storm": ["I called a storm. It came."],
+      "recap-wind": ["I pushed the street around."],
+      "recap-fog": ["I put the street in fog."],
+      "recap-sun": ["I opened the sky for a minute."],
+      "recap-rain": ["I made it rain today."],
+      "recap-rescue": ["I got people down safe."],
+      "recap-answered": ["Somebody thanked me today."],
     },
     lines: [
       // powers (fallback files while spoken dialogue clips land)
@@ -1615,6 +1672,20 @@ window.DAY_CONFIG = {
       },
     },
 
+    /* Birdie's pots and the apt block's stair, on the pavement west of his house (the memory steps use them):
+       the stair is the city's own ramp up the north face (city.blocks apt: x -28.5 at the ground to -17 at the roof, z 7.2). */
+    pots: {
+      label: "Birdie's pots",
+      building: "street",
+      camera: { alpha: 1.35, beta: 1.0, radius: 11 },
+      spots: {
+        birdiePots: [-21, 10.9, 180],
+        aptStairFoot: [-28.5, 7.2, 90],
+        aptStairTop: [-17.3, 7.2, 90],
+        aptRoof: [-19.5, 3.2, 90],
+      },
+    },
+
     /* ---------------- the street (car only) ---------------- */
     road: {
       label: "On the road",
@@ -1821,6 +1892,8 @@ window.DAY_CONFIG = {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
         look: { skin: "#e0b794", top: "#f2c230", pants: "#4a5a3a", shoes: "#5a3a22", hair: "#7a5a3a", bun: true, coat: 0.5, hat: { type: "straw", brim: 0.62, color: "#c9a85a", band: "#4f9a5b" }, carry: "basket" },
         stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5, "sit"], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
+        /* What she remembers when he walks up (voiced; once a day each): `helped` after he answered her ask, `botched` after he left it. */
+        remember: { helped: "Small Weather. My tomatoes are still talking about that rain.", botched: "The tomatoes got by without you. Barely." },
         beats: [
           { id: "birdie-ask", kind: "ask", from: 7, to: 11.5, ability: "rain", text: "There you are. My tomatoes are sulking. A little rain, if you've got any?", reward: null },
           { id: "birdie-thanks", kind: "thanks", text: "Look at them drink. Bless you.", reward: { score: 50, pressure: 25, label: "for the tomatoes" } },
@@ -1831,6 +1904,7 @@ window.DAY_CONFIG = {
         id: "dex", name: "Dex Moreno", role: "Courier, the shop", home: "the shop, mid avenue", scale: 1, color: "#ff7a1a",
         look: { skin: "#8a5a3c", top: "#ff7a1a", pants: "#24262c", shoes: "#e8e8e8", build: 1.1, hat: { type: "helmet", color: "#e8e8e8" }, carry: "parcel" },
         stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5, "sit"], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
+        remember: { helped: "Hey, sun break. The parcels stayed dry. I haven't forgotten.", botched: "The parcels came out soggy. No hard feelings. Some." },
         beats: [
           { id: "dex-ask", kind: "ask", from: 7, to: 15, ability: "sunbreak", text: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.", reward: null },
           { id: "dex-thanks", kind: "thanks", text: "Dry as a bone. I owe you a delivery.", reward: { score: 50, pressure: 25, label: "for the dry parcels" } },
@@ -1841,6 +1915,7 @@ window.DAY_CONFIG = {
         id: "quill", name: "Ines Quill", role: "Stargazer, the annex", home: "the annex, east end", scale: 1.1, color: "#7a5cd6",
         look: { skin: "#e3c4a8", top: "#7a5cd6", pants: "#1c1c2a", shoes: "#1c1c2a", hair: "#2a2038", glasses: "#9fd4ff", coat: 0.55, carry: "telescope" },
         stops: [[0, 154, 9.8], [6.5, 154, 9.8, "inside"], [16.5, 154, 9.8]],
+        remember: { helped: "That blue is still on my sensor. Thank you.", botched: "No bolt, no photograph. I stayed up anyway." },
         beats: [
           { id: "quill-ask", kind: "ask", from: 17, to: 5, ability: "bolt", text: "Thirty nights and no lightning in my lens. One bolt, if you would. Not at me.", reward: null },
           { id: "quill-thanks", kind: "thanks", text: "Got it. Look at that blue.", reward: { score: 50, pressure: 25, label: "for the photograph" } },
@@ -1935,6 +2010,13 @@ window.DAY_CONFIG = {
         { at: "counter", hand: "phone", fill: true, micro: { pools: ["phone"], every: "20-40s" }, do: ["He waits for the coffee, looking at the phone.", "The toaster ticks."] },
         { at: "counter", hand: "cook", for: "15-30s", do: "Toast up. A little butter." },
         { at: "counter", hand: "drink", for: "2-3m", body: { hunger: -0.35, thirst: -0.25, energy: +0.2 }, do: ["Coffee and toast, eaten standing.", "A bite of toast. A sip of coffee."] },
+        {
+          remembers: "birdieRain",
+          steps: [
+            { go: "birdiePots", hand: "drink", do: "He takes his coffee out and walks over to Birdie's pots." },
+            { at: "birdiePots", hand: "nod", for: "18-28s", say: "Birdie's pots. Quick hello.", do: ["Birdie waves from her tomatoes. He waves back.", "The tomatoes are still dark with rain. Birdie waves."] },
+          ],
+        },
         { at: "kitchenSink", hand: "wash", for: "15-30s", set: { mug: "sink" }, do: "He rinses the mug. It stays in the sink." },
         { at: "kitchenSink", hand: "reach", for: "1-2s", set: { kitchenLight: "off" }, do: "Kitchen light off." },
         { go: "entryTable", do: "To the front door." },
@@ -1944,6 +2026,8 @@ window.DAY_CONFIG = {
         { at: "frontDoorOut", hand: "reach", for: "3-5s", set: { frontDoor: "open" }, do: "Small Weather opens the front door and steps out." },
         { at: "frontDoorOut", hand: "reach", for: "3-6s", set: { frontDoor: "locked" }, do: "He locks it from outside." },
         { chance: 0.45, at: "frontDoorOut", hand: "reach", for: "2-3s", do: "He tugs the handle. Locked. He knew that." },
+        /* what the city remembers (js/memory.js facts; `remembers`): these only appear after he has been out playing */
+        { remembers: "storm", at: "frontDoorOut", hand: "face", for: "8-14s", say: "Checking what's left of that sky.", do: "He stops on the step and checks the sky before the car." },
         { go: "carSideHome", hand: "hold", do: "He walks to the car." },
         { at: "carSideHome", hand: "reach", for: "2-4s", set: { car: "unlocked" }, do: "Unlock." },
         { at: "carSideHome", pose: "sitCar", hand: "hold", for: "8-15s", set: { carrying: "bag on the seat" }, do: "He gets in. Bag on the passenger seat." },
@@ -2125,6 +2209,8 @@ window.DAY_CONFIG = {
       title: "Phone at the table",
       chapter: "lunch",
       steps: [
+        { remembers: "botched", at: "lunchSeat", pose: "sitChair", hand: "phone", for: "25-40s", say: "Not looking out that window.", do: "He keeps his eyes on the phone. Someone out there is still waiting on him." },
+        { remembers: "answered", at: "lunchSeat", pose: "sitChair", hand: "phone", for: "15-25s", say: "Someone said thanks today.", do: "He reads the thanks again, and puts the phone face down for a second." },
         { at: "lunchSeat", pose: "sitChair", hand: "phone", fill: true, set: { phone: "in hand" }, body: { boredom: -0.2 },
           micro: { pools: ["phone"], every: "30s-1.5m" }, do: ["He scrolls.", "Phone. Scrolling.", "He sends another text."] },
         { pose: "sitChair", hand: "reach", for: "2-4s", set: { phone: "pocket" }, do: "Phone away." },
@@ -2179,6 +2265,7 @@ window.DAY_CONFIG = {
           micro: { pools: ["idle"], every: "20-40s" },
           do: ["He stops at the window and looks out.", "Clouds over the parking lot."],
         },
+        { remembers: "storm", at: "hallEnd", for: "30-50s", say: "Those clouds were mine.", do: "He stays at the window a while longer. The clouds are his." },
         { go: "elevatorCall", activity: "walk", do: "He walks the length of the hall." },
         { at: "elevatorCall", for: "20-40s", do: "He reads a notice on the wall." },
         { go: "hallMid", activity: "walk", do: "He heads back." },
@@ -2355,6 +2442,7 @@ window.DAY_CONFIG = {
         { drive: "backOutWork", reverse: true, for: "15-25s", do: "He backs out of the spot." },
         { drive: "lotExit", for: "25-40s", set: { headlights: "on" }, do: "Out of the lot. Headlights on; the sky is getting dim." },
         { drive: "roadWorkW", for: "15-25s", do: "Onto the road." },
+        { remembers: "parkFlood", pose: "sitCar", hand: "wheel", for: "6-10s", say: "The park's still green from me.", do: "He slows at the corner and looks across at the park. Still green." },
         { drive: "signalW", for: "10-16s", micro: { pools: ["driving", "mind"], every: "1.5-4m" }, do: ["The drive home.", "Along the avenue.", "He follows the car ahead."] },
         { pose: "sitCar", hand: "wheel", fill: true, micro: DRIVE_MICRO, do: ["The light near home. A long line.", "He waits."] },
       ],
@@ -2419,6 +2507,24 @@ window.DAY_CONFIG = {
           for: "4-8s",
           do: "He skips the mailbox. Snow.",
         },
+        {
+          remembers: "birdieRain",
+          steps: [
+            { go: "birdiePots", hand: "hold", do: "He passes Birdie's pots on the way in." },
+            { at: "birdiePots", hand: "nod", for: "12-20s", say: "Evening, Birdie.", do: "Birdie is packing up for the night. They nod to each other." },
+          ],
+        },
+        {
+          remembers: "roofRide",
+          steps: [
+            { go: "aptStairFoot", hand: "hold", do: "He walks down the pavement to the apartment stair." },
+            { go: "aptStairTop", hand: "hold", do: "He climbs the stair to the roof." },
+            { go: "aptRoof", hand: "none", do: "He steps out onto the roof." },
+            { at: "aptRoof", hand: "none", for: "50s-1m", say: "One minute up there. Just one.", do: "He stands on the roof for a minute while the sky goes dark. Nobody is asking him for anything." },
+            { go: "aptStairTop", hand: "hold", do: "He heads back down." },
+            { go: "aptStairFoot", hand: "hold", do: "Down the stair." },
+          ],
+        },
         { go: "frontDoorOut", hand: "hold", do: "He walks to the front door." },
         { at: "frontDoorOut", hand: "reach", for: "4-10s", set: { frontDoor: "open" }, do: "He finds the right key and unlocks it." },
         { at: "frontDoorIn", hand: "reach", for: "3-5s", set: { frontDoor: "locked" }, do: "Inside. He locks the door." },
@@ -2457,6 +2563,7 @@ window.DAY_CONFIG = {
       title: "Texting on the couch",
       chapter: "tv",
       steps: [
+        { remembers: "storm", at: "couch", pose: "sitCouch", hand: "none", for: "30-45s", say: "I can still smell that storm.", do: "He mutes the television and watches the sky through the window." },
         { at: "couch", pose: "sitCouch", hand: "phone", fill: true, set: { phone: "in hand" }, micro: { pools: ["phone"], every: "40s-1.5m" },
           do: ["Phone out. A text thread.", "He types a reply.", "He waits for the reply."] },
         { pose: "sitCouch", hand: "reach", for: "2-4s", set: { phone: "on the cushion" }, do: "Phone on the cushion." },
@@ -2557,6 +2664,7 @@ window.DAY_CONFIG = {
       steps: [
         { at: "pcChair", pose: "sitChair", hand: "type", for: "10-20s", set: { pc: "on" }, do: "He opens it." },
         { at: "pcChair", pose: "sitChair", hand: "none", for: "10-30s", do: "He waits for it to wake." },
+        { remembers: "answered", at: "pcChair", pose: "sitChair", hand: "type", for: "20-30s", say: "Somebody got their picture.", do: "He opens a photo someone sent of the sky. He looks at it longer than he means to." },
         { pose: "sitChair", hand: "type", fill: true, activity: "sit", body: { boredom: -0.3 }, micro: { pools: ["computer", "mind", "phone"], every: "2-6m" },
           do: ["On the computer.", "He reads an article.", "A video.", "He browses.", "He looks something up."] },
       ],
@@ -2792,6 +2900,17 @@ window.DAY_CONFIG = {
       { do: "Thirsty. He'll get water later.", for: "3-5s", when: { thirst: ">0.55" }, likes: { thirst: 2 } },
       { do: "Hungry. Not yet.", for: "3-5s", when: { hunger: ">0.6" }, likes: { hunger: 2 } },
       { do: "Motivated for a minute. He starts the next thing early.", for: "20-40s", when: { energy: ">0.6" } },
+      {
+        remembers: "storm",
+        do: "He walks to the window and watches the clouds. He called those.",
+        weight: 8,
+        max: 1,
+        steps: [
+          { go: "officeWindow", do: "He gets up and walks to the window." },
+          { at: "officeWindow", for: "40s-1m", say: "Still thinking about that storm.", do: "He watches the clouds for a while." },
+          { go: "$back", do: "Back to the chair." },
+        ],
+      },
       {
         do: "He walks to the window, looks out, and comes back.",
         max: 1,

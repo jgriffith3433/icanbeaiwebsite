@@ -46,6 +46,21 @@
 
   /* ---------------- days ---------------- */
   const cache = new Map();
+  /* What the city remembers (js/memory.js) goes into the day's build as `facts`: steps with `remembers` appear or not.
+     It is read at load, when he is let go (his day takes in what you did together) and when the memory is shifted or
+     reset, never mid-control, so the day under his feet doesn't change while you play. */
+  let memFacts = {};
+  let memSig = "";
+  function readFacts() {
+    const m = window.day && window.day.memory;
+    const f = (m && m.facts && m.facts()) || {};
+    const sig = JSON.stringify(Object.keys(f).sort().map((k) => [k, f[k]]));
+    if (sig === memSig) return false;
+    memFacts = Object.assign({}, f);
+    memSig = sig;
+    cache.clear();
+    return true;
+  }
   function keyOf(d) {
     const p = (n) => String(n).padStart(2, "0");
     return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
@@ -62,7 +77,7 @@
     if (cache.has(key)) return cache.get(key);
     let day;
     try {
-      day = E.build(cfg, key);
+      day = E.build(cfg, key, memFacts);
     } catch (err) {
       console.error(err);
       day = { errors: ["The engine stopped: " + err.message], warnings: [], actions: [], segments: [], blocks: [] };
@@ -630,6 +645,15 @@
   // keep the pill out of control and episodes: hide it when either starts, show it again after
   window.addEventListener("day:control", () => setTimeout(paintUpdate, 0));
   window.addEventListener("day:episode", () => setTimeout(paintUpdate, 0));
+
+  window.addEventListener("day:control", (e) => {
+    const a = e && e.detail && e.detail.action;
+    if ((a === "let-go" || a === "letgo") && readFacts()) { barKey = null; rowIdx = -1; }
+  });
+  window.addEventListener("day:memory", (e) => {
+    const a = e && e.detail && e.detail.action;
+    if ((a === "shift" || a === "apply") && (!window.day.control || window.day.control.mode() === "schedule") && readFacts()) { barKey = null; rowIdx = -1; }
+  });
 
   /* for tinkering in the console */
   window.day = {

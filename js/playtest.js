@@ -7075,7 +7075,7 @@ async function momentsScenario(options, t) {
   await back();
   t.progress(0.45);
 
-  // Day end 1: the clock rolls into the next day; three events from the log; Skip closes it.
+  // Day end 1: the clock rolls into the next day; two deeds (the log's rows on a quiet day), one caption line at a time; Skip closes it.
   async function rollDay() {
     scrubTo(window.day.dayEnd - 3);
     await sleep(600);
@@ -7088,7 +7088,7 @@ async function momentsScenario(options, t) {
   const items = [...document.querySelectorAll("#day-end-events li")].map((li) => li.textContent);
   t.event("dayend-recap", `recap ${d1.recap ? "showing" : "NOT showing"}, ${items.length} events: ${items.join(" | ")}`);
   if (!d1.recap) { t.problem("blocker", "The day's end shows no recap"); return; }
-  if (items.length !== 3) t.problem("blocker", `The recap has ${items.length} events, not 3`);
+  if (items.length !== 2) t.problem("blocker", `The recap has ${items.length} events, not 2`);
   if (!boxOf($("day-end"))) t.problem("bug", "The recap card isn't on screen");
   await sleep(2600);
   await clickEl($("day-end-skip"));
@@ -7105,6 +7105,117 @@ async function momentsScenario(options, t) {
   t.event("dayend-esc", `Esc ${M.now().recap ? "did not skip" : "skipped"} the recap`);
   if (M.now().recap) t.problem("bug", "Esc doesn't skip the recap");
   t.event("moments-log", evs.map((e) => `${e.moment}:${e.action}${e.via ? "(" + e.via + ")" : ""}`).join(" "));
+  t.progress(1);
+}
+
+
+/* ---------------- remembers: Let go names the deed, and his day takes it in ---------------- */
+// ?playtest=remembers ({"touch":true} for the 390x844 touch run). Real input: Enter / a tap on Take control, WASD to Birdie
+// (on touch the stick can't be driven by a bot: control.place puts him there), R / the rain call, Esc / a tap on Let go.
+// Setup shortcuts: the clock, memory.note (deeds as if done: roofs, storm, a botched ask, a thanked one).
+async function remembersScenario(options, t) {
+  t.scene("Morning, Birdie's pots");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const C = window.day.control, M = window.day.memory, V = window.day.voice, N = window.day.neighbors, P = window.powers || window.day.powers;
+  if (!C || !M || !V || !N || !P) { t.problem("blocker", "control, memory, voice, neighbors or powers isn't installed"); return; }
+  const touch = !!(options && options.touch);
+  if (touch) { try { C.touch(true); } catch (e) { /* desktop */ } }
+  forcePublicView();
+  M.reset();
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") !== "true") await clickEl(sound);
+  const plays = [];
+  window.addEventListener("day:voice", (e) => { if (e.detail && e.detail.action === "play") plays.push(e.detail); });
+  const cfg = window.DAY_CONFIG;
+  const mins = () => window.day.now().minutes;
+
+  // 1. Take control at 8:05, walk to Birdie's pots, answer her ask with rain, let go.
+  scrubTo(8 * 60 + 5);
+  clickSpeed(1);
+  await sleep(600);
+  if (touch) await clickEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  if (touch && C.place) C.place(-22.5, 10.2, 0, {});
+  else await goTo(-22.5, 10.2, t, { sprint: true, progress: 0.2, ms: 20000, close: 1.5 });
+  await t.until(() => N.now().people.find((p) => p.id === "birdie").asking, 8000, "Birdie's ask").catch(() => t.problem("bug", "Birdie never asked"));
+  await t.until(() => P.now().energy + 0.05 >= 20, 20000, "Charge for rain").catch(() => {});
+  const score0 = N.now().score;
+  if (touch) P.command("rain", "touch"); else pressKey("r");
+  await t.until(() => N.now().score > score0, 8000, "Birdie's thanks").catch(() => t.problem("bug", "Rain on Birdie paid nothing"));
+  t.event("helped-birdie", `facts ${JSON.stringify(M.facts())}`);
+  const letAt = mins();
+  const before = plays.length;
+  if (touch) await clickEl($("control")); else pressKey("Escape");
+  await t.until(() => C.mode() !== "control", 4000, "Let go");
+  const line = await t.until(() => plays.slice(before).find((p) => /^deed-/.test(p.group)), 1500, "the deed line at Let go").catch(() => null);
+  if (!line) t.problem("blocker", `Let go spoke no line naming the deed (last: ${JSON.stringify(V.now().last)})`);
+  else t.event("letgo-deed", `${line.group}: "${line.text}"${line.file ? "" : " (caption only: no clip yet)"}`);
+  if (line && !/Birdie/.test(line.text)) t.problem("bug", `The Let go line doesn't name Birdie: ${line.text}`);
+
+  // the caption: one line, under the status card, over no control
+  await sleep(300);
+  const cap = $("voice-caption");
+  const r = boxOf(cap);
+  if (!r) t.problem("bug", "The Let go caption isn't on screen");
+  else {
+    const lineH = parseFloat(getComputedStyle(cap).lineHeight) || 20;
+    const status = boxOf(document.querySelector(".panel.now"));
+    t.event("letgo-caption", `${Math.round(r.width)}x${Math.round(r.height)} at y ${Math.round(r.top)}; "${cap.textContent}"`);
+    if (r.height > lineH * 1.9 + 16) t.problem("bug", `The Let go caption wraps onto more than one line (${Math.round(r.height)} px tall)`);
+    if (status && r.top < status.bottom) t.problem("bug", "The Let go caption sits over the status card");
+    hudRects().forEach((h) => { if (h.el !== cap && !cap.contains(h.el) && !(h.r.right <= r.left || h.r.left >= r.right || h.r.bottom <= r.top || h.r.top >= r.bottom)) t.problem("bug", `The Let go caption covers ${h.name}`); });
+  }
+  await t.until(() => C.mode() === "schedule", 30000, "him back on his day").catch(() => {});
+
+  // 2. His day took it in: the rebuilt day has the detour past her pots within 5 game minutes of Let go.
+  const day = window.day.today();
+  const pots = day.actions.find((a) => a.say && /Birdie's pots/.test(a.say) && a.start > letAt - 0.5);
+  if (!pots) t.problem("blocker", "His rebuilt day has no detour past Birdie's pots after her rain");
+  else {
+    const gap = pots.start - letAt;
+    t.event("detour-planned", `Let go ${E().fmtClock(letAt)}, the detour starts ${E().fmtClock(pots.start)} (${gap.toFixed(1)} game minutes)`);
+    if (gap > 5) t.problem("bug", `The detour starts ${gap.toFixed(1)} game minutes after Let go (more than 5)`);
+    window.day.speed(10);
+    await t.until(() => mins() >= pots.start + 0.2, 60000, "the clock to reach the detour");
+    const fr = window.day.now().frame;
+    const d = Math.hypot(fr.person.x + 21, fr.person.z - 10.9);
+    t.event("detour-seen", `at ${fr.person.x.toFixed(1)},${fr.person.z.toFixed(1)}, ${d.toFixed(1)} m from the pots, "${fr.action.text}"`);
+    if (d > 4) t.problem("bug", `He isn't at Birdie's pots when the detour runs (${d.toFixed(1)} m off)`);
+    await t.until(() => plays.some((p) => p.group === "memory"), 6000, "the detour line").then(() => t.event("detour-voiced", plays.filter((p) => p.group === "memory").map((p) => p.text).join(" | "))).catch(() => t.problem("bug", "The detour spoke no line"));
+    clickSpeed(1);
+  }
+
+  // 3. More deeds (setup shortcuts) and the days they change: at least three memory behaviours show.
+  t.scene("What else he remembers");
+  M.note("roofRide", "shop"); M.note("power", "avenue", "storm"); M.note("askBotched", "botched", "dex"); M.note("askAnswered", "answered", "quill");
+  window.dispatchEvent(new CustomEvent("day:control", { detail: { action: "let-go", via: "playtest" } }));
+  const d2 = window.day.today();
+  const shown = [...new Set(d2.actions.filter((a) => a.say).map((a) => a.say))];
+  t.event("memory-behaviours", `${shown.length} memory steps in today's day: ${shown.join(" | ")}`);
+  t.metric("memoryBehaviours", shown.length);
+  if (shown.length < 3) t.problem("blocker", `Only ${shown.length} memory behaviours show after his deeds (wanted 3 or more)`);
+  const slipped = d2.blocks.some((b, i) => Math.abs(b.start - day.blocks[i].start) > 1e-6);
+  if (slipped) t.problem("bug", "A block starts at a different time because of what he remembers");
+
+  // 4. Neighbors greet him by what he did (voiced), and the day end speaks two deeds, one line at a time.
+  t.scene("Dex remembers, then the day ends");
+  scrubTo(window.day.dayEnd - 3);
+  await sleep(500);
+  const speeds = $("speeds");
+  await clickEl([...speeds.children].find((x) => x.dataset.speed === "1200") || speeds.lastElementChild);
+  const mo = window.day.moments;
+  await t.until(() => mo.now().recap, 20000, "the day-end card").catch(() => t.problem("blocker", "No day-end card"));
+  const ev = mo.now().events || [];
+  t.event("dayend-deeds", `${ev.length} lines: ${ev.map((e) => e.text).join(" | ")}`);
+  if (ev.length !== 2) t.problem("blocker", `The day-end card speaks ${ev.length} lines, not 2`);
+  const lis = [...document.querySelectorAll("#day-end-events li")];
+  await sleep(500);
+  const visible = lis.filter((li) => getComputedStyle(li).display !== "none").length;
+  if (visible !== 1) t.problem("bug", `${visible} day-end lines on screen at once, not one`);
+  await clickEl($("day-end-skip"));
+  checkHud(t, "remembers");
   t.progress(1);
 }
 
@@ -7408,6 +7519,7 @@ installPlaytest({
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
     { id: "slice", title: "Vertical slice: walk from the driveway to Birdie, answer her rain, see the lawn drink, the park path, bandstand pigeons and creak, the pond coin toss; reports quality.maxQuietSeconds and quality.textOnlyBeats", seconds: 200, tags: ["slice", "story"], description: "Real WASD, R for Birdie, Y at the pond." },
     { id: "memory", title: "The city remembers: rain on the park turns the lawn green, a bolt on the avenue leaves a scorch; a same-day reload shows both again, a day on they're fainter, three days on the city is back to default; with marks present on low quality the frame rate stays over 30", seconds: 150, tags: ["memory", "retention", "phone"], description: "Day bar beside the car (setup), Enter, the store cleared and a full Charge (setup). Real keys: WASD with Shift to the park, R, WASD to the avenue, E, Esc. day.memory.reload() stands in for a page reload and day.memory.shiftDays(1 / 3) for the date moving on (setup). Events memory-park / -rain / -bolt / -reload / -plus1 / -plus3 / -low; metrics memoryLowFps, memoryDecalsLow. Option {\"touch\":true} for 390x844 touch." },
+    { id: "remembers", title: "Help Birdie, press Let go: he names the deed aloud, and his day detours past her pots within 5 game minutes; more deeds show more memory steps; the day end speaks two deeds one line at a time", seconds: 150, tags: ["story", "characters", "memory"], description: "Day bar 8:05 (setup), Enter, W to Birdie, R, Esc; checks the caption (one line, under the status card, over no control), the rebuilt day and the detour; memory.note adds deeds (setup); then the clock rolls at 1200x for the day-end card. {\"touch\":true} for 390x844 touch (taps; control.place stands in for the stick)." },
     { id: "neighbors", title: "Walk the avenue to Birdie, Dex and Ines Quill: each asks for a weather ability in a speech bubble, answering it pays a thank-you and a reward, and a later surprise pays more", seconds: 260, tags: ["neighbors", "story"], description: "Day bar beside the car (setup), Enter, then real WASD/Shift to each neighbor and R, X, E for their asks; the day bar jumps to each surprise hour. Events found-<id>, beat-ask-<id>, beat-thanks-<id>, reward-<id>, beat-surprise-<id>." },
     { id: "neighbor-bodies", title: "Peoplekit bodies: slowed walk clips for Birdie, Dex and Ines (stride matches speed), ask wave and thanks cheer gestures, rain hunch and sun eye-shield, foot-slide detectors clean over a full day", seconds: 320, tags: ["neighbors", "quality"], description: "Day bar + Enter (setup). Real WASD to each neighbour; R/X/E for asks. Events slow-clip / gait-step / gesture-ask-* / gesture-thanks-* / weather-pose-rain / weather-pose-sun / foot-slide-clean; metric quality.footSlideFails." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
@@ -7474,6 +7586,7 @@ installPlaytest({
       else if (id === "charge-log-pause") await chargeLogPause(options, t);
       else if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);
+      else if (id === "remembers") await remembersScenario(options, t);
       else if (id === "analytics") await analytics(options, t);
       else if (id === "control") await control(options, t);
       else if (id === "storm-ride") await stormRide(options, t);

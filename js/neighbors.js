@@ -71,7 +71,7 @@ function install() {
   try { total = (JSON.parse(localStorage.getItem(key)) || {}).score | 0; } catch (e) { /* private mode */ }
   let dayKey = null;
   const st = {}; // id -> { stage, askOpen, askAt, shown: [{beat, until}], missed }
-  const fresh = () => people.forEach((p) => (st[p.id] = { stage: 0, doneBeats: [], bubble: null, bubbleUntil: 0, thanksAt: 0, askOpen: false }));
+  const fresh = () => people.forEach((p) => (st[p.id] = { stage: 0, doneBeats: [], bubble: null, bubbleUntil: 0, thanksAt: 0, askOpen: false, remembered: false }));
   fresh();
   let dayScore = 0;
   const events = [];
@@ -244,6 +244,20 @@ function install() {
     if (p.__pos.inside) return;
     const near = distTo(p, here) < (cfg.near || 9);
     const beats = p.beats || [];
+    // what he remembers (day.memory facts, today and yesterday): a voiced greeting the first time he walks up each day,
+    // `helped` after he answered their ask, `botched` after he left it; not while an ask of theirs is open or answered today
+    const rem = p.remember;
+    if (rem && near && !s.remembered && !s.askOpen && !s.thanksAt && !s.bubble && !s.doneBeats.includes(`${p.id}-ask`)) {
+      const f = (day.memory && day.memory.facts && day.memory.facts()) || {};
+      const tone = f[`answered.${p.id}`] ? "helped" : f[`botched.${p.id}`] ? "botched" : null;
+      if (tone && rem[tone]) {
+        s.remembered = true;
+        say(p, { id: `${p.id}-remember-${tone}`, kind: "remember", text: rem[tone] }, 7);
+        p.__gestureWant = tone === "helped" ? "thanks" : null; // a wave for the ones he helped
+        emit("remember", { id: p.id, tone });
+        return;
+      }
+    }
     // the surprise has its own window and needs only the clock and him being close
     const sur = beats.find((b) => b.kind === "surprise");
     if (sur && !s.doneBeats.includes(sur.id) && near && inWindow(h, sur.from, sur.to) && !s.askOpen && !s.thanksAt) {

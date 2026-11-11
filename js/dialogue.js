@@ -64,6 +64,16 @@ export function dialogueLines(config) {
   });
   const people = (C.neighbors && C.neighbors.list) || [];
   people.forEach((p) => (p.beats || []).forEach((b) => add(neighborWho(p), b.text, `neighbor:${b.id}`)));
+  // What they remember of him (neighbors.list[].remember: helped / botched): their voice, same as their beats.
+  people.forEach((p) => Object.keys(p.remember || {}).forEach((tone) => add(neighborWho(p), p.remember[tone], `neighbor:${p.id}-remember-${tone}`)));
+  // The autopilot's memory steps (`say` on a spine step or a pool entry with `remembers`): his voice.
+  const walk = (steps, where) => (steps || []).forEach((st) => {
+    if (!st) return;
+    if (st.say) add("He", st.say, `memory:${where}`);
+    walk(st.steps, where);
+  });
+  (C.spine || []).forEach((b) => b && walk(b.steps, `${b.time}`));
+  Object.keys(C.pools || {}).forEach((pn) => (C.pools[pn] || []).forEach((e) => e && (e.say ? add("He", e.say, `memory:${pn}`) : null) || (e && walk(e.steps, pn))));
   // Small Weather's spoken bark table (voice.spoken): first-person lines for the voice director.
   const spoken = (C.voice && C.voice.spoken) || {};
   Object.keys(spoken).forEach((group) => {
@@ -111,6 +121,7 @@ export function startDialogue(dayApi, opts) {
   const people = (C.neighbors && C.neighbors.list) || [];
   const beats = new Map();
   people.forEach((p) => (p.beats || []).forEach((b) => beats.set(b.id, { who: neighborWho(p), text: b.text })));
+  people.forEach((p) => Object.keys(p.remember || {}).forEach((tone) => beats.set(`${p.id}-remember-${tone}`, { who: neighborWho(p), text: p.remember[tone] })));
 
   let present = new Set(o.files || []);
   let current = null;

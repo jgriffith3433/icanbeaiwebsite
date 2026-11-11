@@ -62,6 +62,8 @@ function byGroup(lines) {
 function priorityOf(c, group) {
   const p = c.priorities || {};
   if (p[group] != null) return p[group];
+  const head = String(group).split("-")[0]; // deed-birdie, recap-flood: the group's family
+  if (head !== group && p[head] != null) return p[head];
   return 10;
 }
 
@@ -110,6 +112,11 @@ export function startVoice(dayApi) {
 .voice-caption{z-index:36;display:flex;align-items:center;justify-content:center;gap:10px;max-width:min(88vw,28em);padding:8px 16px;border-radius:999px;background:rgba(10,13,22,.7);border:1px solid rgba(126,200,255,.32);backdrop-filter:blur(8px);color:#f6f1e8;font:600 clamp(.95rem,2.2vw,1.15rem)/1.25 Fraunces,Georgia,serif;text-shadow:0 2px 12px rgba(0,0,0,.55);pointer-events:none;opacity:1;transition:opacity .35s ease}
 .voice-caption[hidden]{display:none}
 .voice-caption.leaving{opacity:0}
+.voice-caption span{min-width:0}
+@media (max-width:700px){.voice-caption b{display:none}.voice-caption{max-width:92vw;padding:8px 14px;font-size:.92rem}.voice-caption span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+html.touch-ui .voice-caption b{display:none}
+html.touch-ui .voice-caption{max-width:92vw;padding:8px 14px;font-size:.92rem}
+html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .voice-caption b{font:600 .65rem/1 Outfit,system-ui,sans-serif;letter-spacing:.28em;text-transform:uppercase;color:#7ec8ff}
 `;
   document.head.appendChild(style);
@@ -429,7 +436,12 @@ export function startVoice(dayApi) {
     const d = (e && e.detail) || {};
     if (d.action === "take" && day.coldopen && day.coldopen.active && day.coldopen.active()) return; // the opening has its own line
     if (d.action === "take") say("take", { force: true, via: d.via || "control" });
-    else if (d.action === "let-go") say("letgo", { force: true, via: d.via || "control" });
+    else if (d.action === "let-go") {
+      // One line naming the deed he just did (day.memory.justDid(), most telling first); the plain line when he did none.
+      const deeds = (day.memory && day.memory.justDid && day.memory.justDid()) || [];
+      const named = deeds.length ? say("deed-" + deeds[0], { force: true, ignoreLineCooldown: true, via: d.via || "control", deed: deeds[0] }) : null;
+      if (!named) say("letgo", { force: true, via: d.via || "control" });
+    }
   }
 
   function onNeighbor(e) {
@@ -448,9 +460,24 @@ export function startVoice(dayApi) {
 
   function onMoment(e) {
     const d = (e && e.detail) || {};
-    if ((d.moment === "day-end" || d.moment === "dayend") && (d.action === "start" || d.action === "show")) {
+    // a day end with deeds speaks them itself (js/moments.js, `recap-` lines); the plain line is for the quiet day
+    if ((d.moment === "day-end" || d.moment === "dayend") && (d.action === "start" || d.action === "show") && !d.deeds) {
       say("dayend", { force: true, via: "dayend" });
     }
+  }
+
+  /* The autopilot's memory steps carry a `say` (day.config.js, a step with `remembers`): he says it as the step starts,
+     at a pace a person could hear (not while the clock races or is paused, nor after a jump into the middle of it). */
+  let sayKey = "";
+  function memoryStep() {
+    const n = day.now && day.now();
+    const a = n && n.frame && n.frame.action;
+    if (!a || !a.say) return;
+    const k = n.key + ":" + a.i;
+    if (k === sayKey) return;
+    sayKey = k;
+    if (n.mode === "pause" || n.speed > 60 || n.minutes - a.start > 0.6) return;
+    say("memory", { text: a.say, ignoreCooldown: true, via: "memory" });
   }
 
   function tick() {
@@ -472,6 +499,7 @@ export function startVoice(dayApi) {
       floating = false;
     }
     if (C && C.mode && C.mode() === "schedule") {
+      memoryStep();
       const now = performance.now() / 1000;
       const every = cfg().dayEvery;
       if (now - dayRollAt >= every) {
