@@ -138,7 +138,7 @@
     sun.autoCalcShadowZBounds = false;
     sun.shadowMinZ = 1;
     sun.shadowMaxZ = 90;
-    const shadows = new B.ShadowGenerator(1024, sun);
+    let shadows = new B.ShadowGenerator(1024, sun); // js/render-pipeline.js swaps it for a cascaded one (stage.setShadows)
     shadows.usePercentageCloserFiltering = true;
     shadows.filteringQuality = B.ShadowGenerator.QUALITY_LOW;
     shadows.bias = 0.0018;
@@ -2468,6 +2468,9 @@
         sun,
         hemi,
         pipeline,
+        camera,
+        get shadows() { return shadows; },
+        setShadows(g) { if (g) shadows = g; }, // js/render-pipeline.js: the cascaded generator takes over, casters carried across
         road: roadM,
         bedsideFill,
         bedroomLight: (roomLights.find((rl) => rl.id === "bedroom") || {}).light || null,
