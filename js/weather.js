@@ -1075,7 +1075,10 @@ export function startWeather(world, dayApi) {
     const low = isLowTier();
     live.tier = low ? "phone" : "desktop";
     const tierScale = low ? 0.24 : 1;
-    const cap = (ps, n) => (ps && !ps.__dead ? n * (ps.__gpu ? 1 : 0.34) * tierScale : 0);
+    /* the camera inside a cutaway room: no rain, snow, dust, mist or motes there */
+    const indoors = !!(world.indoorsAt && world.indoorsAt(x, z));
+    live.indoors = indoors;
+    const cap = (ps, n) => (ps && !ps.__dead && !indoors ? n * (ps.__gpu ? 1 : 0.34) * tierScale : 0);
     if (rainPs && !rainPs.__dead) {
       rainPs.emitter.set(x, yBase + 14, z);
       rainPs.emitRate = cap(rainPs, look.rain * 4200);
