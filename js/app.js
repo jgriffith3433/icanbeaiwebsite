@@ -24,6 +24,7 @@ import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to powe
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
+import "./coldopen.js"; // a new player's first Play: the roof at dusk, one prompt, the first bolt (before title.js calls it)
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
 import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build

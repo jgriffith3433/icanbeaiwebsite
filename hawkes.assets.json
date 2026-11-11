@@ -1329,6 +1329,36 @@
    }
   },
   {
+   "id": "sfx-weather-soundscape",
+   "note": "Batched urban rooftop weather soundscape loops (job j_37c19844f0f4, Stable Audio 3): light roof rain patter, heavy downpour, rooftop gutter trickle, umbrella rain patter, flapping canvas awnings, and sunny rooftop birds.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Urban rooftop weather soundscape loops",
+      "duration": 8,
+      "loop": true,
+      "variants": [
+       "Soft light rain pattering gently on a gravel and tar city rooftop, steady delicate raindrops, seamless ambient loop, no thunder, no music",
+       "Heavy torrential downpour rain roaring on urban streets and roofs, thick dense sheet of water falling, seamless ambient loop, no thunder, no music",
+       "Rainwater trickling, gurgling and splashing down a metal rooftop gutter and drainpipe, close steady water flow, seamless ambient loop, no music",
+       "Raindrops tapping and drumming rapidly on taut fabric umbrellas on a city sidewalk, crisp close fabric rain patter, seamless ambient loop, no music",
+       "Canvas shop awnings and rooftop tarps flapping, snapping and billowing in gusty city street wind, rhythmic cloth flutter, seamless ambient loop, no music",
+       "Warm sunny city morning rooftop ambience with cheerful sparrows and songbirds chirping across open air and distant gentle breeze, seamless ambient loop, no music"
+      ]
+     }
+    }
+   ],
+   "files": {
+    "rainRoof": "audio/sfx/rain-roof-light.mp3",
+    "rainDownpour": "audio/sfx/rain-downpour.mp3",
+    "gutter": "audio/sfx/rain-gutter.mp3",
+    "umbrella": "audio/sfx/rain-umbrella.mp3",
+    "awning": "audio/sfx/wind-awning.mp3",
+    "birds": "audio/sfx/sun-birds.mp3"
+   }
+  },
+  {
    "id": "dlg-birdie-1s29egk",
    "note": "Spoken line (dry-park:start), Birdie: \"There you are. My tomatoes are sulking. The whole lawn is.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
@@ -3837,33 +3867,60 @@
    }
   },
   {
-   "id": "sfx-weather-soundscape",
-   "note": "Batched urban rooftop weather soundscape loops (job j_37c19844f0f4, Stable Audio 3): light roof rain patter, heavy downpour, rooftop gutter trickle, umbrella rain patter, flapping canvas awnings, and sunny rooftop birds.",
+   "id": "dlg-he-ohbz70",
+   "note": "Spoken line (coldopen:he), He: \"That storm isn't mine. The rod on the shop roof is.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
-     "tool": "audio.sfx",
+     "tool": "audio.voice",
      "params": {
-      "text": "Urban rooftop weather soundscape loops",
-      "duration": 8,
-      "loop": true,
-      "variants": [
-       "Soft light rain pattering gently on a gravel and tar city rooftop, steady delicate raindrops, seamless ambient loop, no thunder, no music",
-       "Heavy torrential downpour rain roaring on urban streets and roofs, thick dense sheet of water falling, seamless ambient loop, no thunder, no music",
-       "Rainwater trickling, gurgling and splashing down a metal rooftop gutter and drainpipe, close steady water flow, seamless ambient loop, no music",
-       "Raindrops tapping and drumming rapidly on taut fabric umbrellas on a city sidewalk, crisp close fabric rain patter, seamless ambient loop, no music",
-       "Canvas shop awnings and rooftop tarps flapping, snapping and billowing in gusty city street wind, rhythmic cloth flutter, seamless ambient loop, no music",
-       "Warm sunny city morning rooftop ambience with cheerful sparrows and songbirds chirping across open air and distant gentle breeze, seamless ambient loop, no music"
-      ]
-     }
+      "provider": "elevenlabs",
+      "text": "That storm isn't mine. The rod on the shop roof is.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
     }
    ],
    "files": {
-    "rainRoof": "audio/sfx/rain-roof-light.mp3",
-    "rainDownpour": "audio/sfx/rain-downpour.mp3",
-    "gutter": "audio/sfx/rain-gutter.mp3",
-    "umbrella": "audio/sfx/rain-umbrella.mp3",
-    "awning": "audio/sfx/wind-awning.mp3",
-    "birds": "audio/sfx/sun-birds.mp3"
+    "audio": "audio/dialogue/dlg-he-ohbz70.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-na1dln",
+   "note": "Spoken line (coldopen:birdie), Birdie: \"Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-na1dln.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-15gfxux",
+   "note": "Spoken line (coldopen:after), He: \"Rain. I can do that.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain. I can do that.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-15gfxux.mp3"
    }
   }
  ]

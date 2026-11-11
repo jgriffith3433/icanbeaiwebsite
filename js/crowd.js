@@ -601,6 +601,7 @@ export function installCrowd(world) {
 
   function startReaction(kind) {
     rKind = kind;
+    try { window.dispatchEvent(new CustomEvent("day:crowd", { detail: { action: "reaction", kind } })); } catch (e) { /* node */ }
     for (let i = 0; i < MAXP; i++) {
       const p = people[i];
       p.rdelay = rng() * 0.6;

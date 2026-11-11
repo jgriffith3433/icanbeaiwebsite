@@ -421,12 +421,13 @@ export function startVoice(dayApi) {
   function onWeather(e) {
     const d = (e && e.detail) || {};
     if (!d.state) return;
-    if (d.via === "power") return;
+    if (d.via === "power" || d.via === "cell") return; // "cell" = the opening's storm nobody called
     say(`weather-${d.state}`, { via: d.via || "weather" });
   }
 
   function onControl(e) {
     const d = (e && e.detail) || {};
+    if (d.action === "take" && day.coldopen && day.coldopen.active && day.coldopen.active()) return; // the opening has its own line
     if (d.action === "take") say("take", { force: true, via: d.via || "control" });
     else if (d.action === "let-go") say("letgo", { force: true, via: d.via || "control" });
   }

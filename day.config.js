@@ -202,6 +202,31 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     THE COLD OPEN (js/coldopen.js) — a new player's first Play: no card, no step list. The title closes and he is
+     the player's in the same frame, standing on the apartment roof at dusk while a storm cell he didn't call rolls
+     in. He says one line; a ring marks the shop roof's lightning rod and the only prompt is "Hold E" ("Hold the
+     bolt" on touch). The bolt: hit-stop, flash, the lamps flicker, the street looks up, Birdie calls up from the
+     avenue. Returning players (icanbe.opening or icanbe.tutorial kept) go straight into the day.
+     ------------------------------------------------------------------------ */
+  coldopen: {
+    keys: ["icanbe.opening", "icanbe.tutorial"], // either one set = a returning player
+    clock: "19:00", // dusk: the lamps are coming on
+    spot: { x: -21, z: 0.5, yaw: 1.5708, from: 14 }, // the apartment roof (block "apt", roof 6.16 m), facing east down the avenue
+    camera: { alpha: 3.1416, beta: 1.22, radius: 5.6, from: 24, fov: 0.32, secs: 2.6 }, // lands behind him over his shoulder
+    rod: { x: 50, z: 0.5, roofY: 3.3, height: 2.2 }, // the shop roof's lightning rod
+    cell: { state: "rain", intensity: 0.75 }, // the cell nobody called (weather via "cell")
+    holdSec: 0.55, // how long the bolt is held before it goes
+    firstLine: 1.4, // seconds after he lands before he speaks
+    reactDelay: 1.0, // seconds from the look-up to Birdie's call
+    prompt: { keys: "Hold E", touch: "Hold the bolt" },
+    lines: {
+      he: ["He", "That storm isn't mine. The rod on the shop roof is."],
+      birdie: ["Birdie", "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain."],
+      after: ["He", "Rain. I can do that."],
+    },
+  },
+
+  /* ------------------------------------------------------------------------
      OPENING — the first Play only (js/opening.js), skippable
      ------------------------------------------------------------------------
      Small Weather on screen (his model) with a few plain lines, then he is

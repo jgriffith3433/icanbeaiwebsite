@@ -670,7 +670,22 @@ export function installCityscape(w) {
     skyMat.diffuseColor.set(fogV.r * 0.55 + 0.16 * dayK, fogV.g * 0.6 + 0.18 * dayK, fogV.b * 0.65 + 0.22 * dayK);
   });
 
+  /* the lamps stutter for a moment (the opening's first bolt: `day.cityscape.flicker(secs)`); the 0.3 s tick above restores them */
+  let flickerLeft = 0;
+  let flickerOn = false;
+  scene.onBeforeRenderObservable.add(() => {
+    if (flickerLeft <= 0) { flickerOn = false; return; }
+    flickerLeft -= scene.getEngine().getDeltaTime() / 1000;
+    flickerOn = true;
+    const k = Math.random() < 0.45 ? 0.12 : 1;
+    const l = lit.lamps;
+    headM.emissiveColor.set(l * 1.5 * k, l * 1.35 * k, l * 1.05 * k);
+    poolM.emissiveColor.set(l * 0.85 * k, l * 0.85 * k, l * 0.85 * k);
+  });
+
   const api = {
+    flicker(secs) { flickerLeft = Math.max(flickerLeft, secs || 1.2); return true; },
+    flickering: () => flickerOn,
     /* the city audit (js/city-audit.js; scripts/check-city.mjs runs the same under the NullEngine): floating or sunk props,
        coplanar faces, bad normals, the walkable roofs' AC colliders. `day.cityscape.audit()` -> { failures, counts } */
     audit() {

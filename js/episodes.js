@@ -1962,6 +1962,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       lastControl = "control";
       declinedTake = false;
       if (cfg.offerOnTake === false) return;
+      if (window.day.coldopen && window.day.coldopen.active && window.day.coldopen.active()) return; // the cold open first: no offer
       // The first-visit card is the only prompt until it is skipped or finished.
       if (window.day.tutorial && window.day.tutorial.blocking && window.day.tutorial.blocking()) return;
       if (active || !offer.hidden) return;
