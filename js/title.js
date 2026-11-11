@@ -42,7 +42,10 @@ export function startTitle() {
 .title-screen.leaving{opacity:0;pointer-events:none}
 .title-screen .kicker{margin:0;font:600 .8rem/1 Outfit,system-ui,sans-serif;letter-spacing:.32em;text-transform:uppercase;color:#7ec8ff;text-shadow:0 0 18px rgba(126,200,255,.55)}
 .title-screen h1{margin:10px 0 0;font:600 clamp(2.6rem,7vw,5.2rem)/0.98 Fraunces,Georgia,serif;letter-spacing:-.01em;text-shadow:0 4px 30px rgba(0,0,0,.55)}
-.title-screen .line{margin:14px 0 0;max-width:30em;color:rgba(246,241,232,.84);font-size:1.05rem;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+.title-screen .daily{margin:12px 0 0;max-width:30em;color:#f0c27a;font:600 1.02rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.7);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.title-screen .daily[hidden],.title-screen .yday[hidden]{display:none}
+.title-screen .yday{margin:4px 0 0;max-width:30em;color:rgba(246,241,232,.72);font:500 .9rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.7);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.title-screen .line{margin:10px 0 0;max-width:30em;color:rgba(246,241,232,.84);font-size:1.05rem;text-shadow:0 2px 12px rgba(0,0,0,.6)}
 .title-screen .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
 .title-screen button{appearance:none;min-height:48px;min-width:44px;padding:12px 28px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:rgba(14,16,22,.55);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s,border-color .15s,transform .15s}
 .title-screen button:hover{background:rgba(126,200,255,.16);border-color:rgba(126,200,255,.6)}
@@ -65,10 +68,12 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   el.hidden = true;
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", `${cfg.kicker}: ${cfg.name}`);
-  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><p class="kicker"></p><h1></h1><p class="line"></p><div class="actions"><button type="button" class="play" id="title-play"></button><button type="button" class="episodes" id="title-episodes"></button></div><div class="foot"><button type="button" id="title-music" aria-pressed="true"></button><span class="hint"></span></div>`;
+  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><p class="kicker"></p><h1></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="line"></p><div class="actions"><button type="button" class="play" id="title-play"></button><button type="button" class="episodes" id="title-episodes"></button></div><div class="foot"><button type="button" id="title-music" aria-pressed="true"></button><span class="hint"></span></div>`;
   el.querySelector(".kicker").textContent = cfg.kicker;
   el.querySelector("h1").textContent = cfg.name;
   el.querySelector(".line").textContent = cfg.line;
+  const dailyEl = el.querySelector("#title-daily");
+  const ydayEl = el.querySelector("#title-yday");
   const playBtn = el.querySelector("#title-play");
   const epBtn = el.querySelector("#title-episodes");
   const musicBtn = el.querySelector("#title-music");
@@ -109,6 +114,17 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     const night = day.score && day.score.isNight ? day.score.isNight(m / 60) : h >= 20 || h < 6;
     clockEl.textContent = `Live · ${((h + 11) % 12) + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"} · ${night ? cfg.night : cfg.day}`;
   }
+  /* Today's request (js/daily.js) in one line under the name, and yesterday's when it was answered. */
+  function paintDaily() {
+    const d = day.daily;
+    const t = d && d.line ? d.line() : "";
+    const y = d && d.yesterdayLine ? d.yesterdayLine() : "";
+    dailyEl.textContent = t;
+    dailyEl.hidden = !t;
+    ydayEl.textContent = y;
+    ydayEl.hidden = !y;
+  }
+  window.addEventListener("day:daily", () => { if (up) paintDaily(); });
   function emit(action, extra) {
     const detail = Object.assign({ action }, extra || {});
     log.push(Object.assign({ t: performance.now() }, detail));
@@ -131,6 +147,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     camera(true);
     paintMusic();
     paintClock();
+    paintDaily();
     clearInterval(clockTimer);
     clockTimer = setInterval(paintClock, 1000); // the clock text only: no fetches
     try { playBtn.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
@@ -220,6 +237,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
       showing: up,
       seconds: up ? (performance.now() - shownAt) / 1000 : 0,
       music: musicWanted,
+      daily: dailyEl.hidden ? "" : dailyEl.textContent,
+      yesterday: ydayEl.hidden ? "" : ydayEl.textContent,
       sound: soundOn(),
       camera: !!(day.world && day.world() && day.world().titleShotOn && day.world().titleShotOn()),
       log: log.slice(),

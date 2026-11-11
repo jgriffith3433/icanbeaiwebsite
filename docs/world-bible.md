@@ -286,6 +286,14 @@ Letting go hands him back as someone who noticed what you did together. Deeds (m
 - **Barks warm** over the days he has played with the sky (`barks.warm`: from 1, 3 and 6 days).
 - **The day-end card** speaks two deeds of the day (`recap-<deed>`), one caption line at a time; a quiet day shows two log rows.
 
+## Today's request (js/daily.js, config `daily`)
+
+- **Areas:** the title screen (one line under his name), and wherever the asker stands: Birdie's stoop at the apt block, the shop stoop (Dex, Hollis), the annex (Ines), the plaza stalls (Odile, Pim, Gus), the crosswalk (Nell) and the paper stand (Ravi) on the avenue.
+- **Landmarks:** the reward each answer leaves for the rest of that real day: bunting on two posts (Birdie, Odile, Hollis, Nell), a string of glowing lanterns (Dex, Pim, Gus, Ravi, Hollis), spinning pinwheels (Dex, Gus, Nell, Ravi) and an easel with Ines's photograph of the weather he called (fog, wind, sun).
+- **Who lives here:** Birdie, Dex and Ines ask three times each across the 21-day cycle; Odile, Pim, Gus, Hollis, Nell and Ravi (the people he helped in the lunch storm and the plaza market) ask twice each and stand at their spot all day while the ask is theirs. Same voices as their story lines; the thanks keeps each one's own turn of phrase.
+- **What happens:** each real local date one ask is picked (date times 5 modulo 21, so no ask repeats in any 21 dates): a weather moment at a place and in a time window ("Fog over the plaza at dusk for Ines's photo", "Wind to spin the annex turbines before 6 PM"). The title says it. A "!" over the asker (a 52 px tap target) says it again and the asker says it aloud, voiced, when he walks up. Calling the power inside the place and window answers it: a voiced thanks, Charge handed back, askAnswered and dailyAnswered in day.memory (so the neighbors' remembered greetings and his Let go line follow), and the reward stays until the date turns. Next day the title adds "Yesterday: you brought Dex the sun". When the daily ask is a neighbor's, that neighbor's usual morning ask gives way to it.
+- **Story beats:** the retention loop: a neighbour you know asks for one thing, you do it, and the street keeps the thanks. No new canon: citizens keep their episode names, Birdie's pots and Ines's sensor stay as they are.
+
 ## Turning points (js/moments.js `play`, `moments.turning` in day.config.js)
 
 Each episode's big beat is seen and heard in the city, not read as a toast: a short moment (8 s at most, skippable with Skip, a tap or Esc) where the camera leaves him, orbits the place and the event happens there, a music sting swells, and the episode's own voiced line is the one caption.
