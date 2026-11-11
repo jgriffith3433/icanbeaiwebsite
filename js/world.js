@@ -2304,6 +2304,17 @@
       return feetCache.y;
     }
 
+    /** True inside a cutaway building (home, office): weather particles stay off there. */
+    function indoorsAt(x, z) {
+      for (const k of Object.keys(cfg.buildings || {})) {
+        const b = cfg.buildings[k];
+        if (!b || !b.bounds) continue;
+        const o = b.origin || [0, 0];
+        if (x > b.bounds[0] + o[0] && x < b.bounds[2] + o[0] && z > b.bounds[1] + o[1] && z < b.bounds[3] + o[1]) return true;
+      }
+      return false;
+    }
+
     let crowdRef = null; // js/crowd.js sets it: the district's people and cars
 
     /** What the street is doing for the weather (playtest / console). */
@@ -2474,6 +2485,7 @@
       rooms,
       spots,
       streetNow,
+      indoorsAt,
       get crowd() { return crowdRef; },
       set crowd(v) { crowdRef = v; },
     };
