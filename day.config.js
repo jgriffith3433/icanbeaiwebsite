@@ -895,7 +895,7 @@ window.DAY_CONFIG = {
         id: "tutorial",
         tutorial: true,
         title: "Learn the weather",
-        tagline: "Five abilities, one at a time. Skip any time.",
+        tagline: "Lightning, Rain, Wind, Fog and Sun, one at a time.",
         goals: [
           { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Tap E for Lightning. Hold E to call a Storm." },
           { id: "rain", kind: "ability", power: "rain", label: "Call Rain", prompt: "Press R. Rain, just here, just for a moment.", after: "bolt" },
