@@ -33,15 +33,20 @@ export function installSlice(day, world) {
   strip.isPickable = false;
   const wallM = mat("slice-tomato-m", "#c23a2a", 0.25);
   const leafM = mat("slice-leaf-m", "#3f7a3a");
-  for (let i = 0; i < 9; i++) {
-    for (let j = 0; j < 3; j++) {
+  /* The wall stays west of the roof ramp (x -28.5..-17, z 6.475..8.2): the ramp's slab and its wedge fill that part of
+     the north face, so the vines and fruit that used to run along it were buried in the wedge and poked through the
+     ramp, and clipped into him as he walked up (playtest: "lower body passes into the green wall and red slab").
+     The panels are solid from the wall out (flush at z 6.5, so the facade's window panes behind them are covered, not
+     poking through), and the fruit sits on them. */
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
       const f = B.MeshBuilder.CreateSphere("slice-tom", { diameter: 0.34, segments: 4 }, scene);
-      f.position.set(-28 + i * 1.4 + (j % 2) * 0.3, 0.9 + j * 0.8, 6.62);
+      f.position.set(-31.5 + i * 0.8 + (j % 2) * 0.2, 0.9 + j * 0.8, 6.78);
       f.material = wallM;
       f.isPickable = false;
     }
-    const l = B.MeshBuilder.CreateBox("slice-vine", { width: 0.9, height: 2.6, depth: 0.08 }, scene);
-    l.position.set(-28 + i * 1.4, 1.6, 6.55);
+    const l = B.MeshBuilder.CreateBox("slice-vine", { width: 0.7, height: 3.5, depth: 0.2 }, scene);
+    l.position.set(-31.5 + i * 0.8, 0.08 + 1.75, 6.6);
     l.material = leafM;
     l.isPickable = false;
   }
