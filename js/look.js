@@ -319,7 +319,10 @@ export function installLook(world) {
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
      overwrite world.js's StandardMaterial (which already had an emissive) with the shared sidewalk concrete
      (emissive 0), so after dusk the vertical rampend/rampside read as a black slab in smoke. */
-  mats.rampLit = pbr("rampLit", maps.concrete, { roughness: 0.86, wet: true, coat: 0.38, bump: 0.32 });
+  /* No clear coat (wet: false): the ramp is a narrow strip tilted ~28 degrees, so the mirror coat that ability weather
+     turns on (lightning, rain) stretched the lamps and sky into long diagonal smears across it (the playtest saw them in
+     smoke right after the first bolt). It still darkens with the rain through the shared surface loop. */
+  mats.rampLit = pbr("rampLit", maps.concrete, { roughness: 0.8, bump: 0.32 });
   mats.rampLit.emissiveColor = new B.Color3(0.16, 0.19, 0.22);
   mats.rampLit.albedoColor = new B.Color3(1.1, 1.12, 1.14);
 
