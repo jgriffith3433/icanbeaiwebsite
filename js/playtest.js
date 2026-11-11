@@ -6652,6 +6652,10 @@ async function titleScenario(options, t) {
 
   // Play starts the game: the title goes, the HUD is back and he's the player's.
   t.scene("Play");
+  // This bot's tab keeps the cold open quiet (a real new player gets it: he is the player's in the click), so the
+  // text opening would run instead and take control only when it ends. This scenario is about the title's Play, so
+  // set it up as a returning player's: Play takes control in the same click.
+  if (window.day.opening && window.day.opening.pending()) { try { localStorage.setItem("icanbe.opening", "playtest"); } catch (e) { /* private mode */ } }
   await clickEl(play);
   await t.until(() => !T.now().showing, 3000, "the title to close").catch(() => {});
   await t.until(() => window.day.control && window.day.control.mode() === "control", 5000, "Play to take control").catch(() => {});
