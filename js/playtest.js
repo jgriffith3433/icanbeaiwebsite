@@ -6312,6 +6312,9 @@ async function quietUi(options, t) {
   if (window.day.title && window.day.title.quiet) window.day.title.quiet();
   const size = `${innerWidth}x${innerHeight}`;
   const phone = innerWidth <= 700;
+  // Say plainly which page this is: the review judges the public view, and needs the timeline to show the run used it.
+  forcePublicView();
+  t.event("view-public", `playing ${location.pathname}${location.search} at ${size}; html classes: ${document.documentElement.className.replace(/\s+/g, " ").trim()}`);
   // Requests: the page must make no index.html fetch (the old 10-minute reload loop is gone).
   const fetched = [];
   const realFetch = window.fetch;
