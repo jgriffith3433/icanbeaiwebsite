@@ -657,7 +657,7 @@ export function installCityscape(w) {
     shopMat.emissiveColor.set(shops * 1.1, shops * 1.1, shops * 1.1);
     // by day the far towers get their own fill (the sun and hemisphere light barely reach them, so they were black slabs at noon):
     // a tint of the horizon colour that fades out as the windows come on, plus the windows' own emissive map at night
-    const fillK = Math.max(0, 1 - windows) * (0.25 + 0.3 * w.day);
+    const fillK = Math.max(0, 1 - windows) * (0.4 + 0.35 * w.day); // the grade (js/render-pipeline.js) darkens mids a little: keep the far towers readable
     skyMat.emissiveColor.set(windows * 1.3 + scene.fogColor.r * fillK, windows * 1.3 + scene.fogColor.g * fillK, windows * 1.3 + scene.fogColor.b * fillK);
     skyMat.ambientColor.set(1.2, 1.25, 1.35);
     headM.emissiveColor.set(lamps * 1.5, lamps * 1.35, lamps * 1.05);
@@ -671,7 +671,7 @@ export function installCityscape(w) {
     // by day the far towers take the scene's fog like every other building (else they stay dark slabs against the pale sky);
     // once the windows come on, fog goes off so the far lights stay bright
     skyMat.fogEnabled = windows < 0.3;
-    skyMat.diffuseColor.set(fogV.r * 0.55 + 0.16 * dayK, fogV.g * 0.6 + 0.18 * dayK, fogV.b * 0.65 + 0.22 * dayK);
+    skyMat.diffuseColor.set(fogV.r * 0.6 + 0.2 * dayK, fogV.g * 0.65 + 0.22 * dayK, fogV.b * 0.7 + 0.26 * dayK);
   });
 
   /* the lamps stutter for a moment (the opening's first bolt: `day.cityscape.flicker(secs)`); the 0.3 s tick above restores them */

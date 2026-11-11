@@ -570,11 +570,15 @@ export function installLook(world) {
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     engine.setHardwareScalingLevel(low ? 1 : 1 / Math.min(dpr, 1.5));
     if (pipeline) {
-      pipeline.bloomEnabled = !low;
+      // Low (phones) keeps the tonemap, the grade and a half-res bloom; FXAA stays high-only (js/render-pipeline.js does the rest:
+      // one 1024 shadow cascade, no SSAO, no aberration).
+      pipeline.bloomEnabled = true;
+      pipeline.bloomKernel = low ? 16 : 24;
+      pipeline.bloomScale = 0.5;
       pipeline.samples = 1;
       pipeline.fxaaEnabled = !low;
     }
-    if (sun) sun.shadowEnabled = !low;
+    if (sun) sun.shadowEnabled = true;
     if (glow) {
       glow.intensity = low ? 0.35 : 0.55;
       glow.blurKernelSize = 16;
