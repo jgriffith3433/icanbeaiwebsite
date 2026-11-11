@@ -2101,11 +2101,8 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       const chapter = (fr && (fr.chapter || (fr.action && fr.action.chapter))) || "";
       const minutes = (day.now && day.now().minutes) || 0;
       const inCar = !!(fr && fr.person && fr.person.inCar);
-      const tut = list.find((e) => e.tutorial);
-      if (tut && !botQuiet && !tutorialDone()) {
-        showOffer(tut);
-        return;
-      }
+      // "Learn the weather" is practice now, in the Episodes menu only: the street's neighbors teach each verb by asking
+      // for it out loud (js/street.js), so no card is offered to a new player.
       const ep = matchEpisode(list, chapter, minutes, { inCar, arc: loadArc() });
       if (ep) showOffer(ep);
     } else if (action === "let-go") {

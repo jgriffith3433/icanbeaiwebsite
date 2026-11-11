@@ -32,7 +32,7 @@ export function startTitle() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "street-teaches") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");

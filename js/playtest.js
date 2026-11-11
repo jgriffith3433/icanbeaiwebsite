@@ -5944,12 +5944,22 @@ async function tutorialEpisode(options, t) {
     await t.until(() => C.mode() === "control", 5000, "Take control");
     await sleep(400);
     const offer = $("episode-offer");
-    if (!offer || offer.hidden) {
-      t.problem("bug", "Taking control didn't offer the tutorial episode");
+    // The street's neighbors teach now: "Learn the weather" is never offered by itself, only practised from the Episodes menu.
+    if (offer && !offer.hidden && /Learn the weather/.test(offer.textContent)) {
+      t.problem("bug", "Taking control offered the tutorial episode by itself (it is practice in the Episodes menu now)");
+      offer.querySelector("button.decline").click();
+    } else t.event("tutorial-not-offered", "no offer card on take control");
+    const menuBtn = $("episodes");
+    if (menuBtn) menuBtn.click();
+    await sleep(300);
+    const row = $("ep-row-tutorial");
+    const startBtn = row && (row.querySelector("button") || row);
+    if (!row || row.dataset.locked === "true") {
+      t.problem("bug", "The tutorial isn't startable from the Episodes menu");
       Ep.start("tutorial", "playtest");
     } else {
-      t.event("tutorial-offer", (offer.querySelector("h2") || {}).textContent || "offered");
-      offer.querySelector("button.accept").click();
+      t.event("tutorial-menu", "started from the Episodes menu");
+      startBtn.click();
     }
     await t.until(() => Ep.now() && Ep.now().id === "tutorial", 4000, "the tutorial running");
   }
@@ -7031,7 +7041,7 @@ async function coldStart(options, t) {
   on("day:power", (d) => { if (d.action === "bolt" && d.power === "bolt") stamp("bolt"); });
   on("day:crowd", (d) => { if (d.kind === "lookup") stamp("lookup"); });
   on("day:story", (d) => { if (d.action === "say" && d.who === "Birdie") stamp("birdie-say"); });
-  on("day:dialogue", (d) => { if (d.action === "say" && d.who === "Birdie") stamp("birdie-voice"); });
+  on("day:voice", (d) => { if (d.action === "play" && d.who === "Birdie") stamp("birdie-voice"); }); // she is voiced through js/voice.js speakAs
   on("day:voice", (d) => { if (d.action === "play") stamp("voice-" + (T["voice-first"] == null ? "first" : "next")); });
   on("day:coldopen", (d) => {
     if (d.action === "landed") stamp("landed");
@@ -7147,6 +7157,205 @@ async function coldStart(options, t) {
   t.event("cold-start-free", `${since().toFixed(1)}s after Play: HUD ${free ? "back" : "STILL HIDDEN"}, cold open ${D.coldopen.now().phase}`);
   if (!free) t.problem("bug", "The HUD never came back after the first bolt");
   checkHud(t, "cold-start");
+  t.progress(1);
+}
+
+/* ---------------- street-teaches: after the cold open, Rain, Sun, Fog and Wind each unlock on a neighbor's voiced ask ---------------- */
+// Needs ?playtest=street-teaches. Setup (named): every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate
+// recorded. Real input: a click (a tap on a phone) on Play, the prompt's own hold for the first bolt, then the keys (the
+// buttons on the thumb arc, the stick, on a phone) to answer each neighbor: Birdie (Rain), Dex (Sun break), Ines (Fog, then a gust).
+// Events street-ask / -unlock / -thanks / -arc / -done / -caption; metrics secondsToAllFive, secondsToRain/Sun/Fog/Wind.
+async function streetTeaches(options, t) {
+  t.scene("The street teaches");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const C = D.control;
+  const phone = C && C.state ? !!C.state().touch : innerWidth <= 700;
+  t.event("street-setup", `${innerWidth}x${innerHeight}, ${phone ? "touch" : "keyboard and mouse"}`);
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  if (!D.coldopen || !D.street) { t.problem("blocker", "The cold open or the street's lesson isn't installed (js/coldopen.js, js/street.js)"); return; }
+  D.street.reset();
+  D.coldopen.arm();
+  const vibes = [];
+  try { navigator.vibrate = (p) => { vibes.push(p); return true; }; } catch (e) { /* read-only */ }
+  D.title.show("playtest");
+  await sleep(700);
+
+  const A = window.powers.abilities;
+  let tPlay = 0;
+  const since = () => (performance.now() - tPlay) / 1000;
+  const evs = [];
+  const voices = [];
+  const waiters = [];
+  const note = () => { for (let i = waiters.length - 1; i >= 0; i--) if (waiters[i].test()) { const w = waiters.splice(i, 1)[0]; clearTimeout(w.to); w.res(true); } };
+  const waitFor = (test, ms) => new Promise((res) => {
+    if (test()) return res(true);
+    const w = { test, res, to: setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0) waiters.splice(i, 1); res(false); }, ms) };
+    waiters.push(w);
+  });
+  window.addEventListener("day:street", (e) => { evs.push(Object.assign({ t: since() }, e.detail)); note(); });
+  window.addEventListener("day:voice", (e) => { const d = e.detail || {}; if (d.action === "play") voices.push(Object.assign({ t: since() }, d)); note(); });
+  const has = (action, id) => evs.find((e) => e.action === action && (!id || e.id === id));
+  const T = {};
+
+  // the cold open: Play, then the prompt's own hold
+  const playBtn = $("title-play");
+  tPlay = performance.now();
+  if (phone) await tapEl(playBtn); else await clickEl(playBtn);
+  if (!(await waitFor(() => C.mode() === "control", 4000))) { t.problem("blocker", "Play didn't hand him over"); return; }
+  const locked = () => ["rain", "sunbreak", "fog", "wind"].filter((id) => A.isLocked(id));
+  if (locked().length !== 4) t.problem("bug", `After Play the four verbs should be locked, but locked are: ${locked().join(", ") || "none"}`);
+  const eps = $("episode-offer");
+  await t.until(() => D.coldopen.now().phase === "waiting", 8000, "the cold open's prompt").catch(() => {});
+  await sleep(600);
+  if (phone) {
+    const b = $("coldopen-bolt");
+    const r = b.getBoundingClientRect();
+    touchOn(b, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+    await sleep(900);
+    touchOn(b, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+  } else {
+    keyDown("e");
+    await sleep(900);
+    keyUp("e");
+  }
+  t.progress(0.1);
+
+  const keyFor = (id) => String((A.get(id) || {}).key || "").toLowerCase();
+  const arcCheck = (id, label) => {
+    const slot = $("ability-" + id);
+    const r = slot && slot.getBoundingClientRect();
+    const shown = !!(slot && hudVisible(slot));
+    const glow = !!(slot && (slot.classList.contains("st-new") || slot.classList.contains("unlocked-now")));
+    const cap = $("voice-caption");
+    const cr = cap && hudVisible(cap) ? cap.getBoundingClientRect() : null;
+    const over = cr ? [...document.querySelectorAll(".abilitybar .ab")].filter((el) => hudVisible(el) && boxesOverlap(cr, el.getBoundingClientRect())).map((el) => el.id) : [];
+    t.event("street-arc", `${label}: ${id} button ${shown ? Math.round(r.width) + "x" + Math.round(r.height) : "NOT SHOWN"}, glow ${glow}, vibrations ${vibes.length}, caption ${cr ? "up" : "gone"}${over.length ? ", OVER " + over.join(",") : ""}`);
+    if (!shown) t.problem("bug", `${label}: the ${id} button didn't join the bar when it unlocked`);
+    else if (r.width < 44 || r.height < 44) t.problem("bug", `${label}: the ${id} button is ${Math.round(r.width)}x${Math.round(r.height)} (44 px at least)`);
+    if (!glow) t.problem("bug", `${label}: the ${id} button has no unlock glow`);
+    if (over.length) t.problem("bug", `${label}: the speaker caption overlaps the verb bar (${over.join(", ")})`);
+  };
+
+  const walkOn = async (x, z, tag) => {
+    // out along the pavement strip (z about 10), then to within casting range of whoever asked
+    const sideZ = 10;
+    const go = async (tx, tz, close, ms) => {
+      if (!phone) return goTo(tx, tz, t, { sprint: true, ms, close, progress: 0.5 });
+      const st = $("stick");
+      const rr = st.getBoundingClientRect();
+      const cx = rr.left + rr.width / 2;
+      const cy = rr.top + rr.height / 2;
+      const started = simNow();
+      let down = false;
+      try {
+        while (simNow() - started < ms / 1000) {
+          const s = C.state();
+          const dx = tx - s.x;
+          const dz = tz - s.z;
+          const d = Math.hypot(dx, dz);
+          if (d < close) return true;
+          const cam = world().camera;
+          const fx = -Math.cos(cam.alpha);
+          const fz = -Math.sin(cam.alpha);
+          const f = (dx * fx + dz * fz) / (d || 1);
+          const r = (dx * fz - dz * fx) / (d || 1);
+          const px = cx + r * 60;
+          const py = cy - f * 60;
+          if (!down) { touchOn(st, "pointerdown", cx, cy); down = true; }
+          touchOn(st, "pointermove", px, py);
+          await sleep(160);
+        }
+        return false;
+      } finally {
+        if (down) touchOn(st, "pointerup", cx, cy);
+      }
+    };
+    await go(C.state().x, sideZ, 1.5, 9000);
+    for (let k = 0; k < 14; k++) {
+      const s = C.state();
+      if (Math.abs(s.x - x) < 5) break;
+      if (!(await go(s.x + Math.max(-22, Math.min(22, x - s.x)), sideZ, 1.5, 14000))) break;
+    }
+    t.event("street-walk", `${tag}: he is at ${C.state().x.toFixed(0)},${C.state().z.toFixed(0)}`);
+  };
+  const cast = async (id) => {
+    const target = D.street.cueAt();
+    if (phone) await tapEl($("ability-" + id)); else pressKey(keyFor(id));
+    t.event("street-cast", `${id} at ${C.state().x.toFixed(0)},${C.state().z.toFixed(0)}, the cue at ${target ? target.x.toFixed(0) + "," + target.z.toFixed(0) : "none"}`);
+  };
+
+  const stagesList = [
+    { id: "rain", verb: "rain", cast: "rain", who: "Birdie" },
+    { id: "sun", verb: "sunbreak", cast: "sunbreak", who: "Dex" },
+    { id: "fog", verb: "fog", cast: "fog", who: "Ines" },
+    { id: "wind", verb: "wind", cast: "wind", who: "Ines" },
+  ];
+  for (let i = 0; i < stagesList.length; i++) {
+    const st = stagesList[i];
+    const asked = await waitFor(() => !!has("ask", st.id), i === 0 ? 30000 : 30000);
+    if (!asked) { t.problem("blocker", `${st.who} never asked for ${st.verb} (stage ${D.street.now().stage}, phase ${D.street.now().phase})`); return; }
+    T[st.id] = Math.round(since() * 10) / 10;
+    // the ask is a voiced line (a day:voice play event) from that neighbor, in the last 2 s, captioned
+    await sleep(300);
+    const said = voices.filter((v) => v.positional && v.who === st.who && Math.abs(v.t - has("ask", st.id).t) < 2.5 || (v.who === st.who && st.id === "wind" && v.t > (has("thanks", "fog") || { t: 0 }).t - 0.5));
+    const ask = has("ask", st.id);
+    t.event("street-ask", `${st.who} asks for ${st.verb} at ${T[st.id]}s: ${ask.close ? "in person" : ask.inside ? "from a window" : "called down the street"}, voice event ${said.length ? "fired (" + (said[0].file ? "clip" : "caption only, no clip") + ")" : "MISSING"}`);
+    if (!said.length) t.problem("bug", `${st.who}'s ask for ${st.verb} had no voice event`);
+    if (A.isLocked(st.verb)) t.problem("bug", `${st.verb} is still locked after ${st.who}'s ask`);
+    const later = stagesList.slice(i + 1).filter((o) => !A.isLocked(o.verb));
+    if (i < 2 && later.length) t.problem("bug", `${later.map((o) => o.verb).join(", ")} opened before it was asked for`);
+    t.event("street-unlock", `${st.verb} unlocked ${T[st.id]}s after Play (the cue ${D.street.now().cue ? "is up" : "is MISSING"})`);
+    if (!D.street.now().cue) t.problem("bug", `No world-space cue marks ${st.who} for ${st.verb}`);
+    arcCheck(st.verb, st.who);
+    const w = $("episode-offer");
+    if ((w && !w.hidden) || ($("tutorial") && hudVisible($("tutorial")))) t.problem("bug", "A card is up during the street's lesson (it teaches by voice, not by text)");
+    // rain comes while the cold open's gate is still on: wait for it to come off
+    if (i === 0) await t.until(() => D.coldopen.now().phase === "done", 12000, "the cold open to hand him the sky").catch(() => {});
+    const cue = D.street.cueAt();
+    if (cue) await walkOn(cue.x, cue.z, st.who);
+    // close enough: a cast near them answers
+    const now = C.state();
+    const cue2 = D.street.cueAt() || cue;
+    if (cue2 && Math.hypot(now.x - cue2.x, now.z - cue2.z) > 16) {
+      const s2 = C.state();
+      await goTo(cue2.x, 10, t, { sprint: true, ms: 12000, close: 6, progress: 0.6 });
+      t.event("street-close", `${st.who}: ${Math.hypot(C.state().x - cue2.x, C.state().z - cue2.z).toFixed(0)} m away (was ${Math.hypot(s2.x - cue2.x, s2.z - cue2.z).toFixed(0)})`);
+    }
+    await sleep(500);
+    await cast(st.cast);
+    const thanked = await waitFor(() => !!has("thanks", st.id), 6000);
+    if (!thanked) {
+      t.problem("bug", `Casting ${st.verb} near ${st.who} didn't answer the ask`);
+      await cast(st.cast);
+      if (!(await waitFor(() => !!has("thanks", st.id), 6000))) return;
+    }
+    await sleep(400);
+    const thanks = voices.filter((v) => v.positional && v.who === st.who && v.t >= has("thanks", st.id).t - 0.3);
+    t.event("street-thanks", `${st.who} thanks him ${(has("thanks", st.id).t - T[st.id]).toFixed(1)}s after the ask, voice event ${thanks.length ? "fired" : "MISSING"}`);
+    if (!thanks.length) t.problem("bug", `${st.who}'s thanks had no voice event`);
+    t.progress(0.15 + 0.2 * (i + 1));
+    // the next neighbor's line must wait for this one to finish (no overlap), and never talk over Small Weather
+    if (i === stagesList.length - 1) break;
+  }
+  const done = await waitFor(() => D.street.now().done, 12000);
+  T.all = Math.round(since() * 10) / 10;
+  t.metric("secondsToAllFive", T.all);
+  ["rain", "sun", "fog", "wind"].forEach((k) => T[k] != null && t.metric("secondsTo" + k[0].toUpperCase() + k.slice(1), T[k]));
+  t.event("street-done", `all five verbs open ${T.all}s after Play (${done ? "lesson done" : "lesson still open"}); locked now: ${["bolt", "rain", "sunbreak", "fog", "wind"].filter((id) => A.isLocked(id)).join(", ") || "none"}`);
+  if (T.all > 360) t.problem("bug", `All five verbs took ${T.all}s (the limit is 360 s)`);
+  if (["bolt", "rain", "sunbreak", "fog", "wind"].some((id) => A.isLocked(id))) t.problem("bug", "A verb is still locked after the street's lesson");
+  // no two voices at once: every neighbor line began after the last one's clip ended or was cut (one speaker at a time)
+  const overlaps = voices.filter((v, i) => i > 0 && v.t - voices[i - 1].t < 0.2 && v.id !== voices[i - 1].id);
+  if (overlaps.length) t.problem("polish", `${overlaps.length} voice lines began within 0.2 s of another`);
+  if (vibes.length < 4) t.problem("bug", `Only ${vibes.length} vibrations for four unlocks`);
+  checkHud(t, "street-teaches");
+  // practice: the tutorial episode is still in the Episodes menu
+  const row = $("ep-row-tutorial");
+  t.event("street-practice", row ? "Learn the weather is still in the Episodes menu" : "Learn the weather is gone from the Episodes menu");
   t.progress(1);
 }
 
@@ -7708,6 +7917,7 @@ installPlaytest({
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
+    { id: "street-teaches", title: "The street teaches: after the cold open's bolt, Rain, Sun break, Fog and Wind each unlock on a neighbor's voiced ask (Birdie, Dex, Ines) with a cue on the target, a glow, a vibrate and a voiced thanks, and no text card", seconds: 330, tags: ["first-minute", "phone", "voice", "neighbors", "abilities"], description: "Load with ?playtest=street-teaches. Setup: every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate recorded. Real input: Play, the bolt's hold, then keys (taps on the thumb arc and the stick on a phone) to answer each neighbor in turn. Events street-ask / -unlock / -arc / -cast / -thanks / -done / -practice; metrics secondsToRain, secondsToSun, secondsToFog, secondsToWind, secondsToAllFive. Run at 1280x720 and 390x844 touch." },
     { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, holds the bolt at the shop roof's rod within 30 s, and the street looks up and Birdie calls up in her voice, with under 25 words on screen before the first cast", seconds: 60, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (E held; the Bolt button held on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
     { id: "quiet-ui", title: "The quiet page: ?view=public shows the city, the status card, one Time control, Take control and Episodes (no log, Body, Things or config text, no overlaps, six HUD regions at most); the Time control opens the day bar and speeds by click or tap and closes on take-over; the title and the Episodes menu clear the caption, ability bar and hint; the menu starts the tutorial; no index.html fetch, no question in control", seconds: 75, tags: ["hud", "menus", "smoke"], description: "Load with ?playtest=quiet-ui&view=public. Real input: clicks on the Time control, a speed, Enter, Episodes and the tutorial row. Events no-dev-text / time-control / hud-regions / episodes-clear / time-drawer-open / drawer-closed-on-take / title-exclusive / menu-exclusive / episode-from-menu / no-question-in-control / no-index-fetch. Run at 1280x720 and 390x844." },
@@ -7770,8 +7980,8 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "quiet-ui"].includes(id)) forcePublicView();
-      if (id !== "title" && id !== "cold-start" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (["smoke", "hud-layout", "phone", "cold-start", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
+      if (id !== "title" && id !== "cold-start" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
@@ -7779,6 +7989,7 @@ installPlaytest({
       else if (id === "barks") await barksScenario(options, t);
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "cold-start") await coldStart(options, t);
+      else if (id === "street-teaches") await streetTeaches(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
       else if (id === "hud-layout") await hudLayoutScenario(options, t);
