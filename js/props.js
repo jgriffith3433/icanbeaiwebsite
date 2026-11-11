@@ -266,6 +266,7 @@ export function installProps(ctx) {
   const solid = new Part(); // lit by the scene, vertex colours
   const warm = new Part(); // glows with the lamps: globes, tower faces, bus stop panels, string lights
   const colliders = [];
+  const conductors = []; // tall things a bolt prefers (js/powers.js reads them through info().conductors)
   const stats = { trees: 0, benches: 0, hydrants: 0, bins: 0, busStops: 0, signs: 0, parkLamps: 0, plazaLamps: 0, roofUnits: 0, landmarks: 0, planters: 0 };
   const clear = (x, z, r) => !blocked(x - r, z - r, x + r, z + r, 0.15);
   const clearIn = (x, z, r) => !hitsSolid(x - r, z - r, x + r, z + r, 0.15); // inside the park or plaza, which cityscape keeps free of lots
@@ -693,6 +694,7 @@ export function installProps(ctx) {
     stats.roofUnits++;
   }
   function antenna(x, y, z, tall) {
+    conductors.push({ x, y: y + tall + 0.4, z, kind: "antenna" });
     roof.frame(x, z, 0);
     roof.bbox(0, y, 0, 0.12, tall, 0.12, METAL, 0.02);
     roof.bbox(0, y + tall * 0.7, 0, 1.4, 0.08, 0.08, METAL, 0.015);
@@ -824,7 +826,7 @@ export function installProps(ctx) {
   return {
     update,
     info() {
-      return { ...stats, meshes: meshes.length, colliders: colliders.length, signKinds: SIGNS.length, lit: { ...state }, plaza: { ...R.plaza }, needle: { ...R.needle }, tank: { ...R.tank } };
+      return { ...stats, meshes: meshes.length, colliders: colliders.length, signKinds: SIGNS.length, lit: { ...state }, plaza: { ...R.plaza }, needle: { ...R.needle }, conductors: conductors.slice(), tank: { ...R.tank } };
     },
   };
 }

@@ -460,6 +460,11 @@ export function installCrowd(world) {
     if (scares.length && fright(p, dt)) run = true;
     else if (p.flee > 0) { p.flee -= dt; run = true; }
     // reaction blend: in after its small delay, out fast once the ability weather is gone
+    if (p.flinch > 0) { // stopped by a bolt
+      p.flinch -= dt;
+      p.phase += dt * 3;
+      return;
+    }
     if (rKind) {
       if (p.rdelay > 0) p.rdelay -= dt;
       else p.rk = Math.min(1, p.rk + dt / 0.25);
@@ -597,6 +602,25 @@ export function installCrowd(world) {
       lights: sky.night > 0.25 || sky.dusk > 0.45 || rain || fog,
     };
     return wxK;
+  }
+
+  /* A bolt cracks (js/lightning.js): everyone within its radius stops and flinches for a moment, the near ones longest. */
+  let flinching = 0;
+  if (typeof window !== "undefined" && window.addEventListener) {
+    window.addEventListener("day:crowd", (e) => {
+      const d = (e && e.detail) || {};
+      if (d.action !== "flinch") return;
+      const R = d.radius || 40;
+      flinching = 0;
+      for (let i = 0; i < MAXP; i++) {
+        const p = people[i];
+        if (!p || !p.active) continue;
+        const dd = Math.hypot(p.x - d.x, p.z - d.z);
+        if (dd > R) continue;
+        p.flinch = 0.45 + (1 - dd / R) * 0.7 + rng() * 0.3;
+        flinching++;
+      }
+    });
   }
 
   function startReaction(kind) {
@@ -927,7 +951,7 @@ export function installCrowd(world) {
     Object.assign(info, {
       people: active, cars: nCars, targetPeople: targetP, targetCars: targetC, walking, waiting, crossing, entering, leaving,
       moving: sampleMoved, stopped, near: { people: nearP, cars: nearC }, phase: phaseAt(phases, hourNow), scale: Math.round(budgetScale() * 100) / 100,
-      reaction: rKind, reacting, lookingUp, hats, cheering, running: rKind === "rain" ? reacting : 0,
+      reaction: rKind, flinching, reacting, lookingUp, hats, cheering, running: rKind === "rain" ? reacting : 0,
       quality, umbrellas: umbs, wipers: wxK.raining ? nCars : 0, carSpeed: nCars ? sumV / nCars : 0, hour: Math.round(hourNow * 100) / 100,
     });
   }

@@ -4000,6 +4000,104 @@ async function fiveVerbs(options, t) {
   t.progress(1);
 }
 
+/* ---------------- lightning-bolt: the forked bolt, its flash, afterimage, scorch and crowd flinch ---------------- */
+// Real input: Take control (Enter, or a tap on the button on a phone), walk to the avenue, then tap/press Lightning
+// (touch: pointer events on #ability-bolt). Per frame it records the cast frame time, the forks and re-strikes (times
+// from the tap), the frames the flash light is up, the afterimage's burn-out, the scorch's heat over 10 s and whether
+// the crowd flinched. Events: bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush /
+// bolt-crowd / bolt-conductor / bolt-frame. { "touch": true } plays it by touch at low quality (390x844).
+async function lightningBolt(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const P = window.powers || (window.day && window.day.powers);
+  const C = window.day.control;
+  if (!P || !P.boltFx || !C) return t.problem("bug", "powers (js/lightning.js) or Take control isn't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const day = window.day.today();
+  const outside = carSideMoment(day) || day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  if (touch) { try { window.day.look.quality("low"); } catch (e) { /* */ } C.touch(true); }
+  const sound = $("sound");
+  if (sound) { sound.click(); await sleep(150); }
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  t.event("control-taken", touch ? "by touch, low quality" : "Enter");
+  const reached = await goTo(-2.2, street.z - 1.8, t, { close: 1.6, ms: 20000, run: true, progress: 0.15 });
+  if (!reached) t.problem("bug", "He didn't reach the avenue");
+  const quality = window.day.look.quality();
+  t.metric("quality", quality);
+  t.scene("Lightning");
+  await t.until(() => P.now().pressure >= 24, 15000, "Charge for Lightning").catch(() => {});
+
+  // one cast, watched frame by frame for 0.7 s
+  const samples = [];
+  let tapAt = 0;
+  let stop = false;
+  let last = performance.now();
+  const loop = (now) => {
+    if (stop) return;
+    const b = P.now().bolt;
+    samples.push({ ms: tapAt ? now - tapAt : -1, dt: now - last, forks: b.forks, restrikes: b.restrikes, id: b.id, lit: b.litFrames, flashFrames: b.flashFrames, after: b.afterimage, afterVisible: b.afterVisible });
+    last = now;
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+  const crowdBefore = window.day.crowd && window.day.crowd.info ? window.day.crowd.info().flinching || 0 : 0;
+  const idBefore = P.now().bolt.id;
+  tapAt = performance.now();
+  if (touch) await tapEl($("ability-bolt")); else await tapKey("e", 90);
+  await sleep(750);
+  stop = true;
+  const b = P.now().bolt;
+  const castFrames = samples.filter((s2) => s2.ms >= 0 && s2.ms < 500);
+  const worst = castFrames.reduce((m, s2) => Math.max(m, s2.dt), 0);
+  t.metric("cast-frame-ms-max", Math.round(worst));
+  if (b.id === idBefore) return t.problem("bug", "Lightning didn't strike");
+  const limit = touch ? 50 : 100;
+  if (worst > limit) t.problem("bug", `The cast frame took ${Math.round(worst)} ms (limit ${limit} ms${touch ? " at 390x844" : ""})`);
+  else t.event("bolt-frame", `worst cast frame ${Math.round(worst)} ms`);
+  const maxForks = castFrames.reduce((m, s2) => Math.max(m, s2.forks), 0);
+  t.metric("bolt-forks", maxForks);
+  const maxFork = quality === "low" ? 3 : 6;
+  if (maxForks < (quality === "low" ? 1 : 3) || maxForks > maxFork) t.problem("bug", `The bolt had ${maxForks} forks (${quality} wants ${quality === "low" ? "1-3" : "3-6"})`);
+  else t.event("bolt-forks", `${maxForks} forks (${quality})`);
+  const reStrikes = [];
+  castFrames.forEach((s2, i) => { if (i && s2.restrikes > castFrames[i - 1].restrikes) reStrikes.push(Math.round(s2.ms)); });
+  t.metric("bolt-restrikes", b.restrikes);
+  if (b.restrikes < 2 || reStrikes.some((ms) => ms > 400)) t.problem("bug", `Re-strikes: ${b.restrikes} (at ${reStrikes.join(", ")} ms after the tap; want 2+ within 400 ms)`);
+  else t.event("bolt-restrikes", `${b.restrikes} re-strikes at ${reStrikes.join(", ")} ms`);
+  if (b.litFrames < 2) t.problem("bug", `The flash lit the facades for ${b.litFrames} frames (want 2+)`);
+  else t.event("bolt-flash", `facades within 40 m lit for ${b.litFrames} frames, peak ${b.flashPeak.toFixed(2)}`);
+  const afterSeen = castFrames.some((s2) => s2.afterVisible && s2.after > 0.05);
+  if (!afterSeen || b.afterVisible) t.problem("bug", "The afterimage didn't show and burn out");
+  else t.event("bolt-afterimage", "camera-facing afterimage burned out within 0.5 s");
+  if (b.conductor) t.event("bolt-conductor", `struck the ${b.conductor}`);
+  const crowdAfter = window.day.crowd && window.day.crowd.info ? window.day.crowd.info().flinching || 0 : 0;
+  t.metric("crowd-flinching", crowdAfter);
+  if (crowdAfter > crowdBefore || crowdAfter > 0) t.event("bolt-crowd", `${crowdAfter} people flinched`);
+  else t.event("bolt-crowd", "nobody within 40 m to flinch here");
+
+  const d0 = b.decals[b.decals.length - 1];
+  if (!d0) return t.problem("bug", "No scorch decal after the strike");
+  t.event("bolt-flush", `decal ${(0.012 * 1000).toFixed(0)} mm on the surface normal (${d0.normal.map((n) => n.toFixed(2)).join(", ")}), zOffset ${d0.zOffset}`);
+  if (d0.zOffset > -1) t.problem("bug", "The scorch decal has no depth offset (z-fighting risk)");
+  t.event("bolt-scorch", `glowing, heat ${d0.heat.toFixed(2)}`);
+  t.progress(0.7);
+  // the scorch cools: orange now, black by 10 s
+  await sleep(10300);
+  const d1 = P.now().bolt.decals[0];
+  t.metric("scorch-heat-10s", d1 ? Math.round(d1.heat * 100) / 100 : 0);
+  if (!d1 || d1.black) t.event("bolt-scorch", "turned black within 10 s");
+  else t.problem("bug", `The scorch was still glowing at 10 s (heat ${d1.heat.toFixed(2)})`);
+  t.progress(1);
+}
+
 /* ---------------- voice: DoD Eric lines on powers, weather, episode open/close ---------------- */
 // Real input: Sound (pointer), Enter, weather keys 1–7 with gaps for cooldown, bolts for chance/cooldown skips,
 // one forced power bark, Esc for the score-card close. Events: voice-play / voice-skip.
@@ -8084,6 +8182,7 @@ installPlaytest({
     { id: "weather-audio", title: "Rooftop weather soundscape and footsteps: Sound on (real click), Take control (sting), climb apt roof, walk across gravel, metal, tar and puddle surfaces, then cycle clear/sun, clouds, rain (light roof patter vs heavy downpour, gutters, umbrella), storm (distance-delayed thunder crack and rolling thunder), fog, wind (3D-panned gusts and flapping awnings) and snow (muffled city) with equal-power crossfades", seconds: 150, tags: ["weather", "audio"], description: "Day bar outside, confirms silence, turns Sound on with a pointer, Enter, climbs apt rooftop, walks gravel/metal/tar/puddle zones, cycles keys 1–7 on the roof. Logs footstep-*, rain-layers, thunder-delay, loop-seams, music-* and soundscape levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
+    { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
@@ -8158,6 +8257,7 @@ installPlaytest({
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "five-verbs") await fiveVerbs(options, t);
+      else if (id === "lightning-bolt") await lightningBolt(options, t);
       else if (id === "voice") await voice(options, t);
       else if (id === "voice-director") await voiceDirector(options, t);
       else if (id === "spoken-dialogue") await spokenDialogue(options, t);

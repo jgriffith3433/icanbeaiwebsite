@@ -10,6 +10,7 @@
    meter with no scene, so npm test can spend it dry. startPowers() is the page.
    ========================================================================== */
 
+import * as boltFx from "./lightning.js";
 import { createAbilities, startAbilityBar, VERB_IDS } from "./abilities.js";
 
 /** All spendable effects (verbs + hold depths). The bar shows VERB_IDS only. */
@@ -228,6 +229,9 @@ export function startPowers(world, dayApi) {
   const shaken = { a: 0, b: 0 };
   let strike = null;
   let strikeSnap = null;
+  let strikeConductor = null;
+  let strikeInfo = null;
+  let strikeSurfaceY = 0;
   let gustFx = null;
   let tornado = null;
   let blocked = null;
@@ -399,45 +403,10 @@ export function startPowers(world, dayApi) {
   const boltMat = new B.StandardMaterial("power-bolt", scene);
   boltMat.disableLighting = true;
   boltMat.emissiveColor = new B.Color3(1.1, 1.35, 1.65);
-  const boltParts = [0, 1, 2, 3].map((i) => {
-    const m = B.MeshBuilder.CreateBox("strike-bolt-" + i, { width: 0.14, height: 1, depth: 0.14 }, scene);
-    m.material = boltMat;
-    m.isPickable = false;
-    m.setEnabled(false);
-    return m;
-  });
-  const impact = B.MeshBuilder.CreateSphere("strike-impact", { diameter: 0.7, segments: 8 }, scene);
-  impact.material = boltMat;
-  impact.isPickable = false;
-  impact.setEnabled(false);
-  const scorchMat = new B.StandardMaterial("power-scorch", scene);
-  /* A soft burn mark, not a hard black disc: a radial alpha fade (dark centre, feathered edge), blended over the ground
-     with a depth offset so it never z-fights, and faded out over its last seconds (mesh.visibility). */
-  const scorchTex = new B.DynamicTexture("power-scorch-tex", { width: 128, height: 128 }, scene, true);
-  {
-    const c = scorchTex.getContext();
-    const g = c.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, "rgba(20,17,14,0.62)");
-    g.addColorStop(0.45, "rgba(24,20,16,0.4)");
-    g.addColorStop(1, "rgba(24,20,16,0)");
-    c.fillStyle = g;
-    c.fillRect(0, 0, 128, 128);
-    scorchTex.hasAlpha = true;
-    scorchTex.update();
-  }
-  scorchMat.diffuseTexture = scorchTex;
-  scorchMat.useAlphaFromDiffuseTexture = true;
-  scorchMat.transparencyMode = B.Material.MATERIAL_ALPHABLEND;
-  scorchMat.disableLighting = true;
-  scorchMat.emissiveColor = new B.Color3(1, 1, 1);
-  scorchMat.specularColor = new B.Color3(0, 0, 0);
-  scorchMat.disableDepthWrite = true;
-  scorchMat.zOffset = -2;
-  const scorches = [];
   const flashLight = new B.PointLight("strike-flash", B.Vector3.Zero(), scene);
   flashLight.diffuse = new B.Color3(0.75, 0.86, 1);
   flashLight.intensity = 0;
-  flashLight.range = 28;
+  flashLight.range = 48; // reaches the facades within 40 m of a strike
   /* Stays enabled at intensity 0: enabling a light changes the light count of every material it reaches, and that
      recompile froze the page for ~290 ms on the first bolt. Enabled from the start, the warm-up compiles with it. */
 
@@ -486,8 +455,7 @@ export function startPowers(world, dayApi) {
      that are never drawn. A failed warm-up only means the old first-use compile, so it is not an error. */
   const warmProbe = (mesh, mat) => { mesh.material = mat; mesh.isPickable = false; mesh.setEnabled(false); return mesh; };
   const warmList = [
-    [boltParts[0], boltMat], [cloud, cloudMat], [gustMesh, gustMat], [funnelBits[0], funMat],
-    [warmProbe(B.MeshBuilder.CreateDisc("scorch-probe", { radius: 1.1, tessellation: 24 }, scene), scorchMat), scorchMat],
+    [cloud, cloudMat], [gustMesh, gustMat], [funnelBits[0], funMat],
     [warmProbe(B.MeshBuilder.CreateBox("blackout-probe", { size: 1 }, scene), blackoutMat), blackoutMat],
   ];
   setTimeout(() => {
@@ -522,9 +490,15 @@ export function startPowers(world, dayApi) {
 
   const glow = (scene.effectLayers || []).find((l) => l.name === "glow");
   if (glow && glow.addIncludedOnlyMesh) {
-    boltParts.forEach((m) => glow.addIncludedOnlyMesh(m));
-    glow.addIncludedOnlyMesh(impact);
   }
+
+  const fx = boltFx.createBoltFx(B, scene, {
+    glow,
+    flashLight,
+    camera: () => world.camera,
+    quality: () => (day.look && day.look.quality ? day.look.quality() : window.look && window.look.quality ? window.look.quality() : "high"),
+  });
+  setTimeout(() => fx.warm(), 0);
 
   let cloudR = 0;
   let cloudTarget = 0;
@@ -677,23 +651,18 @@ export function startPowers(world, dayApi) {
   function bolt(via) {
     if (mode() !== "control") return false;
     if (!gauge.spend("bolt")) return refuse("bolt", via);
-    const aim = groundAim();
+    const aim = snapToConductor(groundAim());
     const p = who();
     throwFor = 0.55;
     flash = 1;
+    hitstop = Math.max(hitstop, 0.06); // the world holds its breath for the crack
     const dist = Math.hypot(aim.x - (world.camera ? world.camera.position.x : p.x), aim.z - (world.camera ? world.camera.position.z : p.z));
     const delay = thunderDelay(dist);
     shake = Math.max(shake, 0.02 + 0.03 * (1 - Math.min(1, dist / 36)));
     showBolt(aim);
+    strikeConductor = aim.conductor || null;
     const wxb = wx();
     if (wxb && wxb.set) wxb.set("storm", 0.85, "power"); // the strike brings a storm; js/weather.js eases it out
-    const scorch = B.MeshBuilder.CreateDisc("scorch", { radius: 1.1, tessellation: 24 }, scene);
-    scorch.rotation.x = Math.PI / 2; // lies flat, face up
-    scorch.position.set(aim.x, aim.y + 0.02, aim.z);
-    scorch.material = scorchMat;
-    scorch.isPickable = false;
-    scorches.push({ mesh: scorch, until: age + 14 });
-    flashLight.position.set(aim.x, aim.y + 1.4, aim.z);
     const hit = nearestStructure(window.DAY_CONFIG || {}, aim.x, aim.z);
     if (hit) beginBlackout(hit);
     const car = nearestCar(aim.x, aim.z);
@@ -714,16 +683,18 @@ export function startPowers(world, dayApi) {
     strike = {
       id: (strike ? strike.id : 0) + 1,
       x: aim.x,
-      y: aim.y,
+      y: strikeSurfaceY,
       z: aim.z,
-      aimX: aim.x,
-      aimZ: aim.z,
+      aimX: aim.aimX != null ? aim.aimX : aim.x,
+      aimZ: aim.aimZ != null ? aim.aimZ : aim.z,
       delay,
       dist: Math.round(dist * 10) / 10,
       thunder: false,
       alarm: alarmed,
       blackout: hit ? hit.id : null,
       knocked,
+      conductor: strikeConductor ? strikeConductor.kind : null,
+      forks: strikeInfo ? strikeInfo.forks : 0,
       at: age,
       flashAt: typeof performance !== "undefined" ? performance.now() : Date.now(),
     };
@@ -841,19 +812,31 @@ export function startPowers(world, dayApi) {
     return fn(via || "key");
   }
 
+  /* A bolt prefers a tall conductor (an antenna, the Needle) within 3 m of where it was aimed. */
+  function snapToConductor(aim) {
+    const list = (day.cityscape && day.cityscape.info && day.cityscape.info().props && day.cityscape.info().props.conductors) || [];
+    const c = boltFx.pickConductor(list, aim.x, aim.z, 3);
+    return c ? { x: c.x, y: c.y, z: c.z, conductor: c, aimX: aim.x, aimZ: aim.z } : aim;
+  }
+  /* The surface under the strike: its height and normal (a roof or the street), so the scorch lies flush on it. */
+  function surfaceAt(x, y, z, reach) {
+    try {
+      const ray = new B.Ray(new B.Vector3(x, y + (reach ? 0 : 2.5), z), new B.Vector3(0, -1, 0), reach || 6);
+      const hit = scene.pickWithRay(ray, (m) => m.isPickable !== false && m.isEnabled() && !/^(strike-|power-|cast-|funnel|debris|mem-)/.test(m.name));
+      if (hit && hit.hit && hit.pickedPoint) {
+        const n = hit.getNormal(true);
+        if (n && n.y > 0.55 && (reach || Math.abs(hit.pickedPoint.y - y) < 1.2)) return { y: hit.pickedPoint.y, normal: { x: n.x, y: n.y, z: n.z } };
+      }
+    } catch (err) { /* the resting height */ }
+    return { y: y, normal: { x: 0, y: 1, z: 0 } };
+  }
   function showBolt(aim) {
-    const top = aim.y + 15;
-    const jag = [0, (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 1.6, 0];
-    const jagz = [0, (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 1.6, 0];
-    boltParts.forEach((m, i) => {
-      const y0 = top + ((aim.y - top) * i) / boltParts.length;
-      const y1 = top + ((aim.y - top) * (i + 1)) / boltParts.length;
-      m.position.set(aim.x + jag[i], (y0 + y1) / 2, aim.z + jagz[i]);
-      m.scaling.y = Math.max(0.4, Math.abs(y1 - y0));
-      m.setEnabled(true);
-    });
-    impact.position.set(aim.x, aim.y + 0.4, aim.z);
-    impact.setEnabled(true);
+    const c = aim.conductor || null;
+    const under = c ? surfaceAt(c.x, c.y - 4, c.z, 140) : surfaceAt(aim.x, aim.y, aim.z);
+    const tipY = c ? c.y : under.y;
+    const info = fx.strike({ x: aim.x, y: tipY, z: aim.z }, tipY + 48, { normal: under.normal, conductor: c, decalY: under.y });
+    strikeInfo = info;
+    strikeSurfaceY = under.y;
   }
 
   function beginBlackout(hit) {
@@ -1397,11 +1380,8 @@ html.touch-ui.in-control .side{display:none}
     castFor = Math.max(0, castFor - dt);
     throwFor = Math.max(0, throwFor - dt);
     flash = Math.max(0, flash - dt * 3.1);
-    flashLight.intensity = flash * 36;
-    if (flash < 0.05) {
-      boltParts.forEach((m) => m.setEnabled(false));
-      impact.setEnabled(false);
-    } else if (impact.isEnabled()) impact.scaling.setAll(0.6 + flash * 1.4);
+    fx.update(dt);
+    flashLight.intensity = Math.max(flash * 36, fx.lightI());
 
     if (flash > 0) {
       const c = scene.clearColor;
@@ -1505,12 +1485,6 @@ html.touch-ui.in-control .side{display:none}
         beepAlarm();
       }
     }
-    for (let i = scorches.length - 1; i >= 0; i--) {
-      if (age > scorches[i].until) {
-        scorches[i].mesh.dispose();
-        scorches.splice(i, 1);
-      } else scorches[i].mesh.visibility = Math.min(1, (scorches[i].until - age) / 4);
-    }
 
     for (let i = fxList.length - 1; i >= 0; i--) {
       const f = fxList[i];
@@ -1595,6 +1569,7 @@ html.touch-ui.in-control .side{display:none}
       flash,
       aim: aim ? { x: aim.x, z: aim.z, y: aim.y } : null,
       strike: strike ? Object.assign({}, strike) : null,
+      bolt: fx.info(),
       gust: gustFx ? { id: gustFx.id, pushes: gustFx.pushes, dirX: gustFx.dirX, dirZ: gustFx.dirZ, alive: gustMesh.isEnabled() } : null,
       tornado: tornado
         ? { x: tornado.x, z: tornado.z, axis: tornado.axis, dir: tornado.dir, life: tornado.life, travelled: Math.hypot(tornado.x - tornado.startX, tornado.z - tornado.startZ) }
@@ -1612,6 +1587,7 @@ html.touch-ui.in-control .side{display:none}
     now,
     pose,
     command,
+    boltFx: fx,
     abilities: abil,
     /** The opening's hooks: aim every bolt at {x,y,z} (null = back to the reticle); gate(fn(name, via) -> bool) (null = open). */
     aimAt(pt) { aimOverride = pt ? { x: pt.x, y: pt.y, z: pt.z } : null; return aimOverride; },
