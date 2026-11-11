@@ -99,6 +99,24 @@ st = { ...st, grounded: true, y: 0 };
 frames(2);
 ok((heard().land || 0) >= 1, 'landing from 3 m makes no sound');
 
+// Rooftop surfaces: gravel, metal, tar, and puddle splash
+window.DAY_CONFIG = {
+  city: {
+    blocks: [
+      { id: 'apt', x: -24, z: 0.5, w: 16, d: 12, h: 6.16, stair: { x0: -28.5, x1: -17, z: 7.2, w: 1.45 } },
+    ],
+  },
+};
+ok(day.sfx.surfaceAt(-24, 6.16, 0.5, false) === 'gravel', 'apt roof centre is gravel');
+ok(day.sfx.surfaceAt(-21, 6.16, 0.5, false) === 'metal', 'apt roof east grating is metal');
+ok(day.sfx.surfaceAt(-28.2, 6.16, -0.2, false) === 'tar', 'apt roof west membrane is tar');
+ok(day.sfx.surfaceAt(-26.2, 6.16, 2.1, false) === 'puddle', 'apt roof drain basin is puddle');
+for (const surf of ['gravel', 'metal', 'tar', 'puddle']) {
+  day.sfx.step(surf);
+  ok((heard()['step-' + surf] || 0) >= 1, `rooftop footstep on ${surf} did not play`);
+  ok((day.sfx.info().surfaces[surf] || 0) >= 1, `rooftop surface counter for ${surf} did not increment`);
+}
+
 // The city: birds by day, cars when the crowd has cars (rain here, so no birds yet).
 frames(60 * 20);
 ok((heard().car || 0) >= 1, 'no passing cars in 20 s with 20 cars about');

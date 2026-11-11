@@ -358,7 +358,6 @@ export function startWeather(world, dayApi) {
   };
   let flash = 0;
   let nextFlash = 0.65;
-  const thunderQueue = [];
   let booted = false;
   let lastWall = typeof performance !== "undefined" ? performance.now() : 0;
   const noted = { state: null };
@@ -803,19 +802,27 @@ export function startWeather(world, dayApi) {
       master.connect(analyser);
       analyser.connect(ctx.destination);
       const buffer = noiseBuffer(ctx);
-      function layer(type, freq) {
+      function layer(type, freq, withPan) {
         const src = ctx.createBufferSource();
         src.buffer = buffer;
         src.loop = true;
         const filter = ctx.createBiquadFilter();
         filter.type = type;
         filter.frequency.value = freq;
+        const panner = withPan && ctx.createStereoPanner ? ctx.createStereoPanner() : null;
         const gain = ctx.createGain();
         gain.gain.value = 0;
         src.connect(filter);
-        filter.connect(gain);
+        if (panner) {
+          filter.connect(panner);
+          panner.connect(gain);
+        } else {
+          filter.connect(gain);
+        }
         gain.connect(master);
         src.start();
+        gain.filter = filter;
+        gain.panner = panner;
         return gain;
       }
       audio = {
@@ -824,9 +831,13 @@ export function startWeather(world, dayApi) {
         analyser,
         buffer,
         data: new Uint8Array(analyser.fftSize),
-        air: layer("highpass", 1600),
+        air: layer("lowpass", 2400),
         rain: layer("bandpass", 1500),
-        wind: layer("lowpass", 480),
+        rainRoof: layer("highpass", 2300),
+        gutter: layer("bandpass", 920),
+        umbrella: layer("bandpass", 1850, true),
+        wind: layer("lowpass", 480, true),
+        awning: layer("bandpass", 280, true),
         hush: layer("lowpass", 240),
         snow: layer("bandpass", 620),
         rumble: layer("lowpass", 110),
@@ -840,26 +851,92 @@ export function startWeather(world, dayApi) {
     const btn = document.getElementById("sound");
     return !!(btn && btn.getAttribute("aria-pressed") === "true");
   }
-  function thunder() {
-    // Sampled crack from js/score.js when its files are in; else the procedural rumble.
-    if (day.score && day.score.crack && day.score.crack()) return;
+  function thunderDelay(distance) {
+    const d = Math.max(0, Number(distance) || 0);
+    return Math.min(2.2, Math.max(0.06, Math.round((0.06 + d / 85) * 1000) / 1000));
+  }
+  const pendingThunder = [];
+  let flashCounter = 0;
+  function scheduleFlash(distOverride, panOverride) {
+    flash = 1;
+    live.flashes++;
+    flashCounter++;
+    // Alternate between close cracks (8..18m) and rolling distant thunder (42..125m) unless specified
+    const defaultDist = flashCounter % 2 === 1 ? 11 + (flashCounter % 5) * 1.5 : 48 + ((flashCounter * 19) % 72);
+    const dist = distOverride != null ? Math.max(1, Number(distOverride)) : defaultDist;
+    const pan = panOverride != null ? Math.max(-1, Math.min(1, Number(panOverride))) : Math.sin(flashCounter * 1.9) * 0.75;
+    const delay = thunderDelay(dist);
+    const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const entry = {
+      dist: Math.round(dist * 10) / 10,
+      delay,
+      left: delay,
+      pan: Math.round(pan * 100) / 100,
+      flashAt: nowMs,
+      kind: dist < 22 ? "near" : "far",
+    };
+    live.lastFlash = {
+      dist: entry.dist,
+      expectedDelay: entry.delay,
+      pan: entry.pan,
+      kind: entry.kind,
+      at: Math.round(nowMs),
+    };
+    live.lastStrikeDist = entry.dist;
+    live.lastThunderDelay = entry.delay;
+    pendingThunder.push(entry);
+    if (typeof CustomEvent === "function" && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent("day:lightning", { detail: { flashes: live.flashes, distance: entry.dist, delay: entry.delay } }));
+    }
+    return entry;
+  }
+  function thunder(th) {
+    const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const meta = th || { dist: 14, delay: thunderDelay(14), pan: 0, flashAt: nowMs - 220, kind: "near" };
+    const near = meta.kind === "near" || meta.dist < 22;
+    const actualDelay = Math.max(0, Math.round(((nowMs - (meta.flashAt || nowMs)) / 1000) * 1000) / 1000);
+    live.thunders++;
+    live.lastThunder = {
+      kind: near ? "near" : "far",
+      dist: meta.dist,
+      expectedDelay: meta.delay,
+      actualDelay: actualDelay || meta.delay,
+      pan: meta.pan || 0,
+      at: Math.round(nowMs),
+    };
+    live.lastStrikeDist = meta.dist;
+    live.lastThunderDelay = meta.delay;
+    if (typeof CustomEvent === "function" && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent("day:thunder", { detail: { thunders: live.thunders, delay: meta.delay, distance: meta.dist } }));
+    }
+    // Sampled crack from js/score.js when its files are in; plus procedural rumble/crack.
+    if (day.score && day.score.crack) {
+      day.score.crack(near ? "near" : "far", meta);
+    }
     if (!audio || !soundOn()) return;
     const t = audio.ctx.currentTime;
     const src = audio.ctx.createBufferSource();
     src.buffer = audio.buffer;
     const filter = audio.ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(220, t);
-    filter.frequency.exponentialRampToValueAtTime(50, t + 1.5);
+    filter.type = near ? "bandpass" : "lowpass";
+    filter.frequency.setValueAtTime(near ? 420 : 190, t);
+    filter.frequency.exponentialRampToValueAtTime(near ? 65 : 42, t + (near ? 1.2 : 1.9));
     const g = audio.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.85, t + 0.04);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
+    g.gain.exponentialRampToValueAtTime(near ? 0.92 : 0.68, t + (near ? 0.018 : 0.08));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (near ? 1.35 : 2.1));
     src.connect(filter);
-    filter.connect(g);
+    if (audio.ctx.createStereoPanner && meta.pan) {
+      const p = audio.ctx.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, meta.pan));
+      filter.connect(p);
+      p.connect(g);
+    } else {
+      filter.connect(g);
+    }
     g.connect(audio.master);
     src.start(t);
-    src.stop(t + 1.8);
+    src.stop(t + (near ? 1.45 : 2.2));
   }
   const soundBtn = document.getElementById && document.getElementById("sound");
   if (soundBtn) soundBtn.addEventListener("click", () => ensureAudio());
@@ -1102,29 +1179,15 @@ export function startWeather(world, dayApi) {
     if (L.lightning > 0.35) {
       nextFlash -= dt;
       if (nextFlash <= 0) {
-        flash = 1;
-        live.flashes++;
         nextFlash = 1.35 + Math.random() * 1.25;
-        const dist = Math.round(42 + ((live.flashes * 37) % 86) + Math.random() * 16);
-        const delay = Number((0.22 + dist / 195).toFixed(3));
-        live.lastStrikeDist = dist;
-        live.lastThunderDelay = delay;
-        thunderQueue.push({ delay, left: delay, dist, flash: live.flashes });
-        if (typeof CustomEvent === "function" && window.dispatchEvent) {
-          window.dispatchEvent(new CustomEvent("day:lightning", { detail: { flashes: live.flashes, distance: dist, delay } }));
-        }
+        scheduleFlash();
       }
     } else nextFlash = Math.min(nextFlash, 0.65);
-    for (let qi = thunderQueue.length - 1; qi >= 0; qi--) {
-      const item = thunderQueue[qi];
-      item.left -= dt;
-      if (item.left <= 0) {
-        thunderQueue.splice(qi, 1);
-        live.thunders++;
-        thunder();
-        if (typeof CustomEvent === "function" && window.dispatchEvent) {
-          window.dispatchEvent(new CustomEvent("day:thunder", { detail: { thunders: live.thunders, delay: item.delay, distance: item.dist } }));
-        }
+    for (let i = pendingThunder.length - 1; i >= 0; i--) {
+      pendingThunder[i].left -= dt;
+      if (pendingThunder[i].left <= 0) {
+        const th = pendingThunder.splice(i, 1)[0];
+        thunder(th);
       }
     }
     flash = Math.max(0, flash - dt * (flash > 0.4 ? 4.5 : 7.5));
@@ -1321,16 +1384,35 @@ export function startWeather(world, dayApi) {
     // Adaptive beds + sampled rain/wind/city hum (js/score.js). Procedural noise stays as a
     // fallback when the Gen files aren't there yet, and as a soft under-layer for hush/snow.
     const scored = day.score && day.score.tick ? day.score.tick(L, dt) : null;
+    const scape = (scored && scored.soundscape) || null;
     if (audio) {
       const on = soundOn();
       if (on && audio.ctx.state === "suspended") audio.ctx.resume();
       const gust = 0.45 + 0.55 * Math.abs(Math.sin(windT * 0.45));
       const sampleDrive = !!(scored && scored.driving);
-      const proc = sampleDrive ? 0.18 : 1; // soft under-layer when samples carry the bed
-      audio.master.gain.value = on ? 0.34 * (sampleDrive ? 0.55 : 1) : 0;
-      audio.air.gain.value = L.sound.air * 0.22 * (sampleDrive ? 0.25 : 1);
-      audio.rain.gain.value = L.sound.rain * 0.55 * proc;
-      audio.wind.gain.value = L.sound.wind * 0.4 * gust * proc;
+      const proc = sampleDrive ? 0.22 : 1; // soft under-layer when samples carry the bed
+      audio.master.gain.value = on ? 0.36 * (sampleDrive ? 0.62 : 1) : 0;
+      audio.air.gain.value = L.sound.air * 0.24 * (sampleDrive ? 0.3 : 1);
+      if (audio.air.filter && scape && scape.cityToneHz) {
+        audio.air.filter.frequency.value = scape.cityToneHz;
+      }
+      audio.rain.gain.value = L.sound.rain * 0.52 * proc;
+      if (audio.rainRoof && scape) audio.rainRoof.gain.value = (scape.rainRoof || 0) * 0.38 * proc;
+      if (audio.gutter && scape) {
+        const trickle = 0.65 + 0.35 * Math.sin(windT * 5.2);
+        audio.gutter.gain.value = (scape.gutter || 0) * 0.32 * trickle * proc;
+      }
+      if (audio.umbrella && scape) {
+        audio.umbrella.gain.value = (scape.umbrella || 0) * 0.3 * proc;
+        if (audio.umbrella.panner) audio.umbrella.panner.pan.value = scape.umbrellaPan || 0;
+      }
+      audio.wind.gain.value = L.sound.wind * 0.42 * gust * proc;
+      if (audio.wind.panner && scape) audio.wind.panner.pan.value = scape.windPan || 0;
+      if (audio.awning && scape) {
+        const flap = 0.4 + 0.6 * Math.abs(Math.sin(windT * 6.5));
+        audio.awning.gain.value = (scape.awning || 0) * 0.34 * flap * proc;
+        if (audio.awning.panner) audio.awning.panner.pan.value = scape.awningPan || 0;
+      }
       audio.hush.gain.value = L.sound.hush * 0.3;
       audio.snow.gain.value = (L.sound.snow || 0) * 0.35;
       audio.rumble.gain.value = L.sound.thunder * 0.28 * (sampleDrive ? 0.35 : 1);
@@ -1343,6 +1425,8 @@ export function startWeather(world, dayApi) {
       const procHeard = Math.sqrt(s / audio.data.length);
       const scoreHeard = (day.score && day.score.now && day.score.now().heard) || 0;
       live.heard = Math.max(procHeard, scoreHeard);
+    } else if (day.score && day.score.now) {
+      live.heard = day.score.now().heard || 0;
     }
     const hex = (n) => Math.round(Math.min(1, Math.max(0, n)) * 255).toString(16).padStart(2, "0");
     live.sky = "#" + hex(scratch.mixed.r) + hex(scratch.mixed.g) + hex(scratch.mixed.b);
@@ -1379,6 +1463,7 @@ export function startWeather(world, dayApi) {
   };
 
   function apiNow() {
+    const scNow = day.score && day.score.now ? day.score.now() : null;
     return Object.assign(weather.now(), {
       sky: live.sky,
       gloss: live.gloss,
@@ -1389,6 +1474,9 @@ export function startWeather(world, dayApi) {
       lastThunderDelay: live.lastThunderDelay,
       lastStrikeDist: live.lastStrikeDist,
       flashLight: live.flashLight,
+      lastFlash: live.lastFlash || null,
+      lastThunder: live.lastThunder || (scNow && scNow.lastThunder) || null,
+      soundscape: (scNow && scNow.soundscape) || null,
       particles: live.particles,
       puddles: live.puddles,
       ripples: live.ripples,
@@ -1407,6 +1495,8 @@ export function startWeather(world, dayApi) {
     now: apiNow,
     set: (state, intensity, via) => weather.set(state, intensity, via),
     sunbreak: () => weather.sunbreak(),
+    triggerFlash: (dist, pan) => scheduleFlash(dist, pan),
+    thunderDelay,
     forecast: (dateKey, minutes) => forecastAt(dateKey, minutes, cfg.forecast),
     /** The wheel, for a phone tap the playtest sends as a pointer. */
     open: (on) => openWheel(on !== false),
