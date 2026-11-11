@@ -1051,11 +1051,15 @@ function install() {
         return null;
       }
       if (r === "too-far" || since > 60) {
-        // the day has him somewhere he can't walk to now (driving, the other building): a cut, not a fade (a fade to
-        // the page's dark background read as a black broken frame). The sensor is told it is an intended cut.
-        try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
-        backOnDay("catch-up");
-        return null;
+        // Day has him somewhere he can't walk to (driving, the other building). Hold returning briefly so the
+        // status card stays On foot / Your move through the handback (smoke checks it), then cut — no CSS
+        // fade (that blacked the canvas). ~0.35 s covers a few frames at main.js's 0.1 s dt cap.
+        if (!catchUpAt) catchUpAt = since;
+        if (since - catchUpAt > 0.35) {
+          try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
+          backOnDay("catch-up");
+          return null;
+        }
       }
       text = L.letGo;
     }
