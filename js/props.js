@@ -105,6 +105,77 @@ class Part {
     this.quad([x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], [0, 1, 0], col);
     return this;
   }
+  /* one triangle or quad, wound to face along n (the same handedness as box()), flipped if given the other way */
+  poly(pts, n, col) {
+    const a = pts[0], b = pts[1], c = pts[2];
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const v = [c[0] - b[0], c[1] - b[1], c[2] - b[2]];
+    const cr = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const p = cr[0] * n[0] + cr[1] * n[1] + cr[2] * n[2] < 0 ? pts : pts.slice().reverse();
+    const base = this.pos.length / 3;
+    const m = this.wn(n[0], n[1], n[2]);
+    p.forEach((q) => {
+      const w = this.w(q[0], q[1], q[2]);
+      this.pos.push(w[0], w[1], w[2]);
+      this.nrm.push(m[0], m[1], m[2]);
+      this.col.push(col[0], col[1], col[2], 1);
+    });
+    this.idx.push(base, base + 1, base + 2);
+    if (p.length === 4) this.idx.push(base, base + 2, base + 3);
+  }
+  /* the bevelled kit's box: a chamfer of `bev` on the vertical and top edges (the foot stays square on its surface).
+     Same footprint and bounds as box(), so colliders and the audit see the same prim; normals point out on every facet. */
+  bbox(x, y0, z, w, h, d, col, bev) {
+    bev = Math.min(bev == null ? 0.06 : bev, w * 0.3, d * 0.3, h * 0.3);
+    if (!(bev > 0.004)) return this.box(x, y0, z, w, h, d, col);
+    const lo = [x - w / 2, y0, z - d / 2];
+    const hi = [x + w / 2, y0 + h, z + d / 2];
+    this.prim(lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
+    const pt = (s, i) => (s < 0 ? (i === 0 ? lo[0] : i === 1 ? lo[1] : lo[2]) : i === 0 ? hi[0] : i === 1 ? hi[1] : hi[2]);
+    const inn = (s, i) => (i === 1 && s < 0 ? lo[1] : pt(s, i) - s * bev); // the foot stays square: it sits on the roof
+    const S = [-1, 1];
+    // faces
+    for (let ax = 0; ax < 3; ax++) {
+      const a1 = (ax + 1) % 3, a2 = (ax + 2) % 3;
+      for (const s of S) {
+        if (ax === 1 && s < 0) continue;
+        const mk = (u, v) => { const q = [0, 0, 0]; q[ax] = pt(s, ax); q[a1] = u; q[a2] = v; return q; };
+        const n = [0, 0, 0]; n[ax] = s;
+        this.poly([mk(inn(-1, a1), inn(-1, a2)), mk(inn(1, a1), inn(-1, a2)), mk(inn(1, a1), inn(1, a2)), mk(inn(-1, a1), inn(1, a2))], n, col);
+      }
+    }
+    // edge strips: along axis ax, between the faces at (sa on a1) and (sb on a2)
+    const k = Math.SQRT1_2;
+    for (let ax = 0; ax < 3; ax++) {
+      const a1 = (ax + 1) % 3, a2 = (ax + 2) % 3;
+      for (const sa of S) for (const sb of S) {
+        if ((a1 === 1 && sa < 0) || (a2 === 1 && sb < 0)) continue;
+        const mk = (t, o1, o2) => { const q = [0, 0, 0]; q[ax] = t; q[a1] = o1; q[a2] = o2; return q; };
+        const t0 = inn(-1, ax), t1 = inn(1, ax);
+        const n = [0, 0, 0]; n[a1] = sa * k; n[a2] = sb * k;
+        this.poly([mk(t0, pt(sa, a1), inn(sb, a2)), mk(t1, pt(sa, a1), inn(sb, a2)), mk(t1, inn(sa, a1), pt(sb, a2)), mk(t0, inn(sa, a1), pt(sb, a2))], n, col);
+      }
+    }
+    // corners
+    const r = 1 / Math.sqrt(3);
+    for (const sx of S) for (const sy of S) for (const sz of S) {
+      if (sy < 0) continue;
+      this.poly([[pt(sx, 0), inn(sy, 1), inn(sz, 2)], [inn(sx, 0), pt(sy, 1), inn(sz, 2)], [inn(sx, 0), inn(sy, 1), pt(sz, 2)]], [sx * r, sy * r, sz * r], col);
+    }
+    return this;
+  }
+  /* a drum with a chamfered rim at the top and foot: radius r, height h */
+  drum(x, y0, z, r, h, seg, col, bev) {
+    bev = Math.min(bev == null ? 0.07 : bev, r * 0.4, h * 0.3);
+    this.prim(x - r, y0, z - r, x + r, y0 + h, z + r);
+    const was = this.prim;
+    this.prim = () => {};
+    this.cyl(x, y0, z, r - bev, r, bev, seg, col, false);
+    this.cyl(x, y0 + bev, z, r, r, h - 2 * bev, seg, col, false);
+    this.cyl(x, y0 + h - bev, z, r, r - bev, bev, seg, col, true);
+    this.prim = was;
+    return this;
+  }
   /* a (tapered) cylinder or cone: radii r0 at the bottom, r1 at the top */
   cyl(x, y0, z, r0, r1, h, seg, col, cap) {
     const rm = Math.max(r0, r1);
@@ -429,7 +500,7 @@ export function installProps(ctx) {
     // flowerbeds
     [[-11, 24, "#d85a7a"], [-5, 24, "#e6b84a"], [-11, 64, "#9a6ad8"], [-5, 64, "#e6b84a"], [4, 45, "#d85a7a"]].forEach(([x, z, c]) => {
       if (!clearIn(x, z, 0.8)) return;
-      solid.box(x, LAWN_TOP, z, 2.6, 0.22, 1.3, hex("#5b4636"));
+      solid.bbox(x, LAWN_TOP, z, 2.6, 0.22, 1.3, hex("#5b4636"), 0.04);
       for (let k = 0; k < 7; k++) solid.ball(x - 1.1 + k * 0.37, LAWN_TOP + 0.3, z + ((k % 2) - 0.5) * 0.5, 0.17, 1, hex(c), 4);
       stats.planters++;
     });
@@ -514,7 +585,7 @@ export function installProps(ctx) {
     });
     [[pl.x0 + 1.4, pcz], [pl.x1 - 1.4, pcz]].forEach(([x, z]) => {
       solid.frame(0, 0, 0); // back to world coordinates: the box used the last lamp's frame and stood 100 m away
-      solid.box(x, 0.07, z, 1.6, 0.5, 1.6, hex("#5b4636"));
+      solid.bbox(x, 0.07, z, 1.6, 0.5, 1.6, hex("#5b4636"), 0.05);
       tree(x, z, 0.7);
       colliders.pop();
       colliders.push({ x, y: 0.5, z, w: 1.6, h: 1, d: 1.6 });
@@ -567,60 +638,91 @@ export function installProps(ctx) {
   /* ---------------- rooftops ---------------- */
   const roof = new Part();
   const GREY = [hex("#7b848d"), hex("#6a7078"), hex("#8a8f94")];
+  /* the bevelled kit: every piece is built from Part.bbox / Part.drum (chamfered, normals out). On low quality (phones)
+     the small detail (louvres, the fan grille, tank ribs, antenna spars) is left off and drums use fewer sides, so the
+     merged roof mesh stays small; the footprints and the AC collider boxes are the same at both levels. */
+  const lowKit = (() => {
+    try {
+      const lk = world.look || (window.day && window.day.look);
+      return !!(lk && lk.quality && lk.quality() === "low");
+    } catch (e) { return false; }
+  })();
+  const SEG = lowKit ? 8 : 12;
   function acUnit(x, y, z, yaw) {
     roof.frame(x, z, yaw);
     const body = GREY[Math.floor(rng() * GREY.length)];
     const trim = [body[0] * 0.7, body[1] * 0.7, body[2] * 0.7];
     const pipe = hex("#b07a4f");
-    roof.box(0, y, 0, 1.5, 0.08, 1.1, trim); // plinth the same footprint, so the collider stays right
-    roof.box(0, y + 0.08, 0, 1.46, 0.78, 1.06, body); // casing, set in 2 cm so the plinth and lid read as parts
-    roof.box(0, y + 0.86, 0, 1.5, 0.04, 1.1, trim); // lid
-    // fan well on the lid: four raised walls round a dark floor, with a grille across it
-    roof.box(-0.35, y + 0.9, 0.36, 0.8, 0.07, 0.05, trim);
-    roof.box(-0.35, y + 0.9, -0.36, 0.8, 0.07, 0.05, trim);
-    roof.box(-0.73, y + 0.9, 0, 0.05, 0.07, 0.67, trim);
-    roof.box(0.03, y + 0.9, 0, 0.05, 0.07, 0.67, trim);
-    roof.cyl(-0.35, y + 0.9, 0, 0.3, 0.3, 0.01, 8, DARK);
-    roof.box(-0.35, y + 0.93, 0, 0.7, 0.015, 0.03, trim);
-    roof.box(-0.35, y + 0.93, 0, 0.03, 0.015, 0.6, trim);
-    // louvres on both long faces and the front
-    for (let i = 0; i < 5; i++) {
-      const ly = y + 0.2 + i * 0.1;
-      roof.box(-0.2, ly, 0.54, 0.8, 0.04, 0.03, DARK);
-      roof.box(-0.2, ly, -0.54, 0.8, 0.04, 0.03, DARK);
+    roof.bbox(0, y, 0, 1.5, 0.08, 1.1, trim, 0.025); // plinth the same footprint, so the collider stays right
+    roof.bbox(0, y + 0.08, 0, 1.46, 0.78, 1.06, body, 0.07); // casing, set in 2 cm so the plinth and lid read as parts
+    roof.bbox(0, y + 0.86, 0, 1.5, 0.05, 1.1, trim, 0.02); // lid
+    // fan well on the lid: a ring wall round a dark floor
+    roof.drum(-0.35, y + 0.91, 0, 0.34, 0.06, SEG, trim, 0.015);
+    roof.cyl(-0.35, y + 0.915, 0, 0.29, 0.29, 0.01, SEG, DARK);
+    if (!lowKit) {
+      roof.bbox(-0.35, y + 0.93, 0, 0.56, 0.02, 0.04, trim, 0.008);
+      roof.bbox(-0.35, y + 0.935, 0, 0.04, 0.02, 0.56, trim, 0.008);
+      // louvres on both long faces
+      for (let i = 0; i < 5; i++) {
+        const ly = y + 0.2 + i * 0.1;
+        roof.bbox(-0.2, ly, 0.54, 0.8, 0.05, 0.03, DARK, 0.012);
+        roof.bbox(-0.2, ly, -0.54, 0.8, 0.05, 0.03, DARK, 0.012);
+      }
+    } else {
+      roof.bbox(-0.2, y + 0.2, 0.54, 0.8, 0.45, 0.03, DARK, 0.012);
+      roof.bbox(-0.2, y + 0.2, -0.54, 0.8, 0.45, 0.03, DARK, 0.012);
     }
     // service panel with its handle, and a copper line out of the side
-    roof.box(0.5, y + 0.2, 0.54, 0.38, 0.4, 0.03, trim);
-    roof.box(0.5, y + 0.4, 0.56, 0.1, 0.03, 0.02, DARK);
-    roof.box(0.76, y + 0.3, -0.2, 0.08, 0.04, 0.04, pipe);
-    roof.box(0.8, y + 0.08, -0.2, 0.04, 0.26, 0.04, pipe);
+    roof.bbox(0.5, y + 0.2, 0.54, 0.38, 0.4, 0.03, trim, 0.01);
+    roof.bbox(0.5, y + 0.4, 0.56, 0.1, 0.03, 0.02, DARK, 0.006);
+    roof.bbox(0.76, y + 0.3, -0.2, 0.08, 0.04, 0.04, pipe, 0.012);
+    roof.bbox(0.8, y + 0.08, -0.2, 0.04, 0.26, 0.04, pipe, 0.012);
     stats.roofUnits++;
   }
   function waterTank(x, y, z) {
     roof.frame(x, z, 0);
-    [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]].forEach(([dx, dz]) => roof.box(dx, y, dz, 0.14, 1.6, 0.14, hex("#4a3b30")));
-    roof.cyl(0, y + 1.6, 0, 1.2, 1.2, 2.0, 10, hex("#8a6a4c"), true);
-    roof.cyl(0, y + 3.6, 0, 1.3, 0.05, 0.6, 10, hex("#5b4636"), false);
-    roof.box(0, y + 1.6, 0, 2.6, 0.1, 2.6, hex("#4a3b30"));
+    const wood = hex("#4a3b30");
+    [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]].forEach(([dx, dz]) => roof.bbox(dx, y, dz, 0.16, 1.6, 0.16, wood, 0.03));
+    roof.bbox(0, y + 1.6, 0, 2.6, 0.12, 2.6, wood, 0.04);
+    roof.drum(0, y + 1.72, 0, 1.2, 1.88, SEG, hex("#8a6a4c"), 0.1); // the barrel
+    if (!lowKit) {
+      roof.drum(0, y + 2.3, 0, 1.23, 0.07, SEG, hex("#3c3027"), 0.02); // iron hoops
+      roof.drum(0, y + 3.0, 0, 1.23, 0.07, SEG, hex("#3c3027"), 0.02);
+    }
+    roof.cyl(0, y + 3.6, 0, 1.3, 0.12, 0.6, SEG, hex("#5b4636"), true); // the conical lid, overhanging the barrel
     stats.roofUnits++;
   }
   function antenna(x, y, z, tall) {
     roof.frame(x, z, 0);
-    roof.box(0, y, 0, 0.12, tall, 0.12, METAL);
-    roof.box(0, y + tall * 0.7, 0, 1.4, 0.08, 0.08, METAL);
-    roof.box(0, y + tall * 0.85, 0, 0.9, 0.08, 0.08, METAL);
+    roof.bbox(0, y, 0, 0.12, tall, 0.12, METAL, 0.02);
+    roof.bbox(0, y + tall * 0.7, 0, 1.4, 0.08, 0.08, METAL, 0.015);
+    roof.bbox(0, y + tall * 0.85, 0, 0.9, 0.08, 0.08, METAL, 0.015);
+    if (!lowKit) {
+      roof.drum(0, y, 0, 0.2, 0.12, 8, DARK, 0.03); // the foot flange
+      roof.bbox(0, y + tall, 0, 0.06, 0.4, 0.06, METAL, 0.01); // the whip
+    }
     stats.roofUnits++;
   }
   function dish(x, y, z, yaw) {
     roof.frame(x, z, yaw);
-    roof.box(0, y, 0, 0.1, 0.9, 0.1, METAL);
-    roof.cyl(0, y + 0.9, 0.2, 0.55, 0.12, 0.2, 8, hex("#d8dde0"), true);
+    roof.bbox(0, y, 0, 0.1, 0.9, 0.1, METAL, 0.02);
+    roof.cyl(0, y + 0.9, 0.2, 0.55, 0.12, 0.2, SEG, hex("#d8dde0"), true);
     stats.roofUnits++;
   }
   function vent(x, y, z) {
     roof.frame(x, z, 0);
-    roof.cyl(0, y, 0, 0.3, 0.3, 0.8, 6, METAL);
-    roof.cyl(0, y + 0.8, 0, 0.5, 0.05, 0.2, 6, DARK, false);
+    roof.drum(0, y, 0, 0.3, 0.8, Math.max(8, SEG), METAL, 0.05);
+    roof.drum(0, y + 0.8, 0, 0.5, 0.14, Math.max(8, SEG), DARK, 0.04); // the rain cap
+    stats.roofUnits++;
+  }
+  /* a stair bulkhead: the little hut where a stair comes out on a flat roof (filler roofs only: the walkable ones keep the ramp) */
+  function stairHut(x, y, z, yaw) {
+    roof.frame(x, z, yaw);
+    const wall = hex("#8d8a82");
+    roof.bbox(0, y, 0, 2.4, 2.3, 2.0, wall, 0.08);
+    roof.bbox(0, y + 2.3, 0, 2.6, 0.14, 2.2, hex("#5d6168"), 0.05); // the cap, overhanging
+    roof.bbox(0, y, 1.0, 0.9, 1.7, 0.06, hex("#3b4a5c"), 0.02); // the door
+    roof.bbox(0, y + 1.7, 1.0, 1.06, 0.07, 0.1, hex("#5d6168"), 0.02); // its lintel
     stats.roofUnits++;
   }
   fillers.forEach((f) => {
@@ -633,6 +735,7 @@ export function installProps(ctx) {
       if (k > 0.25 && k < 0.6) waterTank(f.x - qx, f.h, f.z - qz * (rng() < 0.5 ? -1 : 1));
       if (k > 0.55 && k < 0.8) dish(f.x + qx, f.h, f.z - qz, rng() * 6);
       if (k > 0.8) vent(f.x - qx, f.h, f.z + qz);
+      if (f.w >= 11 && f.d >= 11 && Math.abs(Math.sin(f.x * 12.9898 + f.z * 78.233)) < 0.35) stairHut(f.x, f.h, f.z, 0); // dead centre, clear of the corner units (own hash: the rng sequence is untouched)
       if (f.h > 24 && rng() < 0.6) antenna(f.x + f.w * 0.3, f.h, f.z + f.d * 0.3, 6 + rng() * 5);
     }
   });
