@@ -74,9 +74,9 @@ const day = {};
 const api = startDialogue(day, { files: lines.map((L) => L.file), Audio: FakeAudio, soundOn: () => sound });
 ok(day.dialogue === api, 'day.dialogue is not set');
 const beatOf = new Map();
-(cfg.neighbors.list || []).forEach((p) => (p.beats || []).forEach((b) => beatOf.set(b.id, b)));
+(cfg.neighbors.list || []).forEach((p) => { (p.beats || []).forEach((b) => beatOf.set(b.id, b)); Object.keys(p.remember || {}).forEach((t) => beatOf.set(`${p.id}-remember-${t}`, { text: p.remember[t] })); });
 let unplayed = [];
-const storyish = lines.filter((L) => !String(L.where || '').startsWith('voice:'));
+const storyish = lines.filter((L) => !/^(voice|memory):/.test(String(L.where || '')));
 storyish.forEach((L) => {
   const before = played.length;
   if (L.where.startsWith('neighbor:')) {
@@ -89,7 +89,7 @@ storyish.forEach((L) => {
   if (played.length !== before + 1 || a.src !== L.file) unplayed.push(L.id);
 });
 // voice.spoken clips are played by the voice director, not day:story — still speak() them once each.
-lines.filter((L) => String(L.where || '').startsWith('voice:')).forEach((L) => {
+lines.filter((L) => /^(voice|memory):/.test(String(L.where || ''))).forEach((L) => {
   const before = played.length;
   api.speak(L.who, L.text);
   if (played.length !== before + 1 || played[played.length - 1].src !== L.file) unplayed.push(L.id);

@@ -276,3 +276,12 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 - **Who lives here:** Birdie's tomatoes answer her rain; the pigeons and the crowd are unchanged. No new characters.
 - **What happens:** the deeds he does under control (asks answered or botched, each power by zone, rescues, scars, endings) are kept by real local date in `icanbe.memory`. Marks are full for the rest of that real day and fade over 3 real days; 20 decals at most, 6 on a phone.
 - **Story beats:** none new. The city simply shows what he did, the way the Goose's bell pile does: come back later the same day and it's still there.
+
+## He remembers (Let go, his day, the neighbors; js/deeds.js, js/schedule.js `remembers`)
+
+Letting go hands him back as someone who noticed what you did together. Deeds (memory.js) become **facts** (`birdieRain`, `parkFlood`, `storm`, `roofRide`, `botched`, `answered`, `botched.dex`...) for today and yesterday.
+- **Let go:** he says one first-person line naming the deed just done (`voice.spoken` `deed-<birdie|botched|flood|roofs|storm|wind|fog|sun|rain|rescue|answered>`), most telling first; a phone shows it on one line.
+- **His day changes** (a step or pool entry with `remembers`, spoken through its `say`; time only from `fill` steps, so no block ever starts late): morning, he steps out with his coffee to Birdie's pots after her rain (she waves) and checks the sky on the step after a storm; at the desk he walks to the window to watch the clouds; lunch, he keeps his eyes off the window after a botched ask and rereads a thanks; the drive home slows by the green park; at dusk home, after roof riding, a minute up on the apt roof (the city's stair), and a nod to Birdie packing up; on the couch he mutes the TV to watch the sky; at the computer he opens a photo someone sent.
+- **Birdie, Dex and Ines** each have a voiced greeting for each tone (`remember: { helped, botched }`), once a day when he walks up: Birdie's tomatoes still talk about the rain; Dex's parcels stayed dry, or came out soggy "no hard feelings, some"; Ines still has the blue on her sensor, or stayed up anyway.
+- **Barks warm** over the days he has played with the sky (`barks.warm`: from 1, 3 and 6 days).
+- **The day-end card** speaks two deeds of the day (`recap-<deed>`), one caption line at a time; a quiet day shows two log rows.

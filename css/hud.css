@@ -184,6 +184,14 @@ html:not(.in-control) .voice-caption { bottom: calc(var(--tl) + 88px); }
 html.touch-ui.in-control .voice-caption {
   bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px));
 }
+/* phone, just let go (and watching): the one-line caption floats in the open middle of the screen: below the status card
+   (top), above Episodes / weather (bottom-left, up to ~300px), Take control and the timeline, clear of the verb arc */
+@media (min-height: 521px) {
+  html.touch-ui:not(.in-control) .voice-caption { bottom: max(452px, calc(env(safe-area-inset-bottom) + 440px)); width: max-content; }
+}
+@media (max-width: 700px) and (min-height: 521px) {
+  html:not(.in-control) .voice-caption { bottom: max(452px, calc(env(safe-area-inset-bottom) + 440px)); width: max-content; }
+}
 @media (orientation: landscape) and (max-height: 520px) {
   html.touch-ui .voice-caption { bottom: max(140px, calc(env(safe-area-inset-bottom) + 128px)); }
 }

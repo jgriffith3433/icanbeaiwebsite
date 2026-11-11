@@ -3335,6 +3335,329 @@
    }
   },
   {
+   "id": "dlg-birdie-c7cfld",
+   "note": "Spoken line (neighbor:birdie-remember-helped), Birdie: \"Small Weather. My tomatoes are still talking about that rain.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather. My tomatoes are still talking about that rain.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-c7cfld.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-12lakam",
+   "note": "Spoken line (neighbor:birdie-remember-botched), Birdie: \"The tomatoes got by without you. Barely.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The tomatoes got by without you. Barely.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-12lakam.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-11igepj",
+   "note": "Spoken line (neighbor:dex-remember-helped), Dex: \"Hey, sun break. The parcels stayed dry. I haven't forgotten.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Hey, sun break. The parcels stayed dry. I haven't forgotten.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-11igepj.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-yjo3yx",
+   "note": "Spoken line (neighbor:dex-remember-botched), Dex: \"The parcels came out soggy. No hard feelings. Some.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The parcels came out soggy. No hard feelings. Some.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-yjo3yx.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1rzzf4n",
+   "note": "Spoken line (neighbor:quill-remember-helped), Ines: \"That blue is still on my sensor. Thank you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That blue is still on my sensor. Thank you.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1rzzf4n.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-3nbety",
+   "note": "Spoken line (neighbor:quill-remember-botched), Ines: \"No bolt, no photograph. I stayed up anyway.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "No bolt, no photograph. I stayed up anyway.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-3nbety.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1thw15y",
+   "note": "Spoken line (memory:8:05), He: \"Birdie's pots. Quick hello.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Birdie's pots. Quick hello.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1thw15y.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-b2827e",
+   "note": "Spoken line (memory:8:05), He: \"Checking what's left of that sky.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Checking what's left of that sky.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-b2827e.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1orw5fh",
+   "note": "Spoken line (memory:12:32), He: \"Not looking out that window.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Not looking out that window.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1orw5fh.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1uotf4x",
+   "note": "Spoken line (memory:12:32), He: \"Someone said thanks today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Someone said thanks today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1uotf4x.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1myc45z",
+   "note": "Spoken line (memory:12:46), He: \"Those clouds were mine.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Those clouds were mine.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1myc45z.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ajx16g",
+   "note": "Spoken line (memory:18:00), He: \"The park's still green from me.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The park's still green from me.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ajx16g.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-rykvlj",
+   "note": "Spoken line (memory:18:52), He: \"Evening, Birdie.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Evening, Birdie.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-rykvlj.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-iry5oh",
+   "note": "Spoken line (memory:18:52), He: \"One minute up there. Just one.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "One minute up there. Just one.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-iry5oh.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-v86v20",
+   "note": "Spoken line (memory:19:35), He: \"I can still smell that storm.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I can still smell that storm.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-v86v20.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1tjav48",
+   "note": "Spoken line (memory:21:00), He: \"Somebody got their picture.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Somebody got their picture.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1tjav48.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1i5mla7",
+   "note": "Spoken line (memory:desk), He: \"Still thinking about that storm.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Still thinking about that storm.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1i5mla7.mp3"
+   }
+  },
+  {
    "id": "dlg-he-fx9i4c",
    "note": "Spoken line (voice:take), He: \"Alright. My turn.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
@@ -3864,6 +4187,424 @@
    ],
    "files": {
     "audio": "audio/dialogue/dlg-he-1hjhu12.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1dc005t",
+   "note": "Spoken line (voice:deed-birdie), He: \"Birdie's tomatoes drank well.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Birdie's tomatoes drank well.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1dc005t.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-nf1e1t",
+   "note": "Spoken line (voice:deed-botched), He: \"I missed a neighbour's ask. Noted.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I missed a neighbour's ask. Noted.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-nf1e1t.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-5pez1x",
+   "note": "Spoken line (voice:deed-flood), He: \"Park's soaked. Lawn will thank me.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Park's soaked. Lawn will thank me.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-5pez1x.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-18vhzgm",
+   "note": "Spoken line (voice:deed-roofs), He: \"Roofs were good. I'll go back.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Roofs were good. I'll go back.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-18vhzgm.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ce0idh",
+   "note": "Spoken line (voice:deed-storm), He: \"I called a storm. Felt right.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I called a storm. Felt right.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ce0idh.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1nhba6o",
+   "note": "Spoken line (voice:deed-wind), He: \"The bins will remember that gale.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The bins will remember that gale.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1nhba6o.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1q7m31y",
+   "note": "Spoken line (voice:deed-fog), He: \"Left the street in fog. Quiet.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Left the street in fog. Quiet.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1q7m31y.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1fqey5f",
+   "note": "Spoken line (voice:deed-sun), He: \"I opened the sky. Warm out.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I opened the sky. Warm out.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1fqey5f.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-16g3do6",
+   "note": "Spoken line (voice:deed-rain), He: \"Rain's still on the road.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain's still on the road.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-16g3do6.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-fj1qfm",
+   "note": "Spoken line (voice:deed-rescue), He: \"Everyone got down. Good.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Everyone got down. Good.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-fj1qfm.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1knhdsb",
+   "note": "Spoken line (voice:deed-answered), He: \"A neighbour said thanks. Nice.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "A neighbour said thanks. Nice.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1knhdsb.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-14eih53",
+   "note": "Spoken line (voice:recap-birdie), He: \"I gave Birdie her rain today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I gave Birdie her rain today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-14eih53.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-v378bx",
+   "note": "Spoken line (voice:recap-botched), He: \"I let a neighbour down today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I let a neighbour down today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-v378bx.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1a3wnst",
+   "note": "Spoken line (voice:recap-flood), He: \"I drowned the park. It's green.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I drowned the park. It's green.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1a3wnst.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-hoootk",
+   "note": "Spoken line (voice:recap-roofs), He: \"I spent the day up on the roofs.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I spent the day up on the roofs.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-hoootk.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1cnuntr",
+   "note": "Spoken line (voice:recap-storm), He: \"I called a storm. It came.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I called a storm. It came.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1cnuntr.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1rmm1jp",
+   "note": "Spoken line (voice:recap-wind), He: \"I pushed the street around.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I pushed the street around.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1rmm1jp.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ftpb2t",
+   "note": "Spoken line (voice:recap-fog), He: \"I put the street in fog.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I put the street in fog.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ftpb2t.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-zsv71m",
+   "note": "Spoken line (voice:recap-sun), He: \"I opened the sky for a minute.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I opened the sky for a minute.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-zsv71m.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-jx5yvk",
+   "note": "Spoken line (voice:recap-rain), He: \"I made it rain today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I made it rain today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-jx5yvk.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1l7hux7",
+   "note": "Spoken line (voice:recap-rescue), He: \"I got people down safe.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I got people down safe.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1l7hux7.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1xjq77g",
+   "note": "Spoken line (voice:recap-answered), He: \"Somebody thanked me today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Somebody thanked me today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1xjq77g.mp3"
    }
   },
   {

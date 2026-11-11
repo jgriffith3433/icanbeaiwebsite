@@ -183,13 +183,19 @@
 
   /* ---------------- build a day ---------------- */
 
-  function build(cfg, dateKey) {
+  function build(cfg, dateKey, facts) {
+    /* `facts` is what the city remembers (js/memory.js `facts()`): { birdieRain: 1, "park.rain": 2, roofRide: 3 ... }.
+       A step or pool entry with `remembers: "name"` (any of an array; "a+b" = both) is in the day only when those are
+       true. Memory steps draw from their own random stream and the other steps' streams are per block, so what the
+       city remembers never moves another step, and `fill` steps give them their time (the spine never slips). */
+    facts = facts || {};
     const errors = [];
     const warnings = [];
     const dayStart = parseClock(cfg.dayStart || "7:30");
     const dayEnd = dayStart + 1440;
     const seedText = cfg.seed === "date" || cfg.seed == null ? "date:" + dateKey : "fixed:" + cfg.seed;
-    const rng = makeRng(hash(seedText));
+    let rng = makeRng(hash(seedText));
+    let memRng = makeRng(hash(seedText + ":memory"));
     const { spots, rooms } = buildPlaces(cfg, errors);
     const pools = cfg.pools || {};
     const speed = (cfg.person && cfg.person.walkSpeed) || 1.2;
@@ -335,6 +341,7 @@
         block: ctx.block.title,
         chapter: ctx.block.chapter,
         kind: o.kind || "spine",
+        say: o.say || null,
       });
       S.t = end;
     }
@@ -424,7 +431,7 @@
         if (step.micro) {
           runMicro(step, remaining, { pose, poseSpec: step.pose, hand, yaw, activity, textOf, anchor: S.place ? spots[S.place] : null });
         } else {
-          push(remaining, { text: textOf(), pose, hand, yaw, kind: ctx.kind, activity });
+          push(remaining, { text: textOf(), pose, hand, yaw, kind: ctx.kind, activity, say: step.say });
         }
         S.pose = pose;
       }
@@ -453,7 +460,7 @@
       if (step.micro) {
         runMicro(step, d, { pose: "sitCar", hand, yaw: S.yaw, activity: step.activity || "drive", textOf, anchor: null });
       } else {
-        push(d, { text: textOf(), pose: "sitCar", hand, kind: ctx.kind, activity: step.activity || "drive" });
+        push(d, { text: textOf(), pose: "sitCar", hand, kind: ctx.kind, activity: step.activity || "drive", say: step.say });
       }
       ctx.drive = savedDrive;
       const end = along(path, 1);
@@ -512,12 +519,25 @@
       return true;
     }
 
+    function remembersOk(r) {
+      if (r == null) return true;
+      return (Array.isArray(r) ? r : [r]).some((k) => String(k).split("+").every((f) => (facts[f.trim()] || 0) > 0));
+    }
+    /* run fn on the memory stream when the step is a memory step, so the main stream stays where it was */
+    function withMem(step, fn) {
+      if (!step || !step.__mem) return fn();
+      const keep = rng;
+      rng = memRng;
+      try { return fn(); } finally { memRng = rng; rng = keep; }
+    }
+
     function eligible(entry, key, last) {
       if (entry === last) return false;
       if (entry.max != null && (S.uses[key] || 0) >= entry.max) return false;
       if (entry.after && S.t < parseClock(entry.after, dayStart)) return false;
       if (entry.before && S.t >= parseClock(entry.before, dayStart)) return false;
       if (!whenOk(entry.when)) return false;
+      if (!remembersOk(entry.remembers)) return false;
       return true;
     }
 
@@ -640,17 +660,28 @@
 
     /* ---------- blocks ---------- */
 
-    function expand(steps, where) {
+    function expand(steps, where, mem) {
       const out = [];
       (steps || []).forEach((s, i) => {
         if (!s || typeof s !== "object") {
           report(`${where}: step ${i + 1} is empty. Check for a stray comma.`);
           return;
         }
-        if (s.chance != null && rng() >= s.chance) return;
+        const isMem = !!mem || s.remembers != null;
+        if (!remembersOk(s.remembers)) return;
+        if (s.chance != null) {
+          if (isMem) {
+            const keep = rng;
+            rng = memRng;
+            const skip = rng() >= s.chance;
+            memRng = rng;
+            rng = keep;
+            if (skip) return;
+          } else if (rng() >= s.chance) return;
+        }
         if (!whenOk(s.when)) return;
-        if (s.steps) out.push(...expand(s.steps, where));
-        else out.push(s);
+        if (s.steps) out.push(...expand(s.steps, where, isMem));
+        else out.push(isMem ? Object.assign({}, s, { __mem: true }) : s);
       });
       return out;
     }
@@ -675,7 +706,7 @@
           /* a walk lasts as long as the walk; anything done on arrival is its own step */
           if (s.for) warnings.push(`${where}: "for" is ignored on a "go" step. The walk takes as long as walking takes.`);
           d = Math.max(walk, 2 / 60);
-        } else if (s.for) d = sample(dur(s.for, where, [1, 1]));
+        } else if (s.for) d = withMem(s, () => sample(dur(s.for, where, [1, 1])));
         else d = Math.max(walk, 5 / 60);
         return { step: s, d, min: walk };
       });
@@ -709,7 +740,7 @@
       items.forEach((it, idx) => {
         ctx.where = `${where}, step ${idx + 1} ("${String(pick(it.step.do) || it.step.go || it.step.at || "").slice(0, 40)}")`;
         const d = idx === items.length - 1 ? tEnd - S.t : it.d;
-        runStep(it.step, Math.max(0, d), null);
+        withMem(it.step, () => runStep(it.step, Math.max(0, d), null));
       });
       if (tEnd - S.t > EPS) {
         ctx.where = where;
@@ -751,7 +782,9 @@
       if (b.end - b.t <= 0) report(`${b.where}: starts after the next block. Check the times are in order.`);
     });
 
-    blocks.forEach((b) => {
+    blocks.forEach((b, bi) => {
+      rng = makeRng(hash(`${seedText}#block${bi}`)); // one stream per block: a changed block never shifts the next
+      memRng = makeRng(hash(`${seedText}#memory${bi}`));
       ctx = { block: b, where: b.where, drive: null, rate: null, kind: "spine" };
       S.t = b.t;
       const W = Math.max(0, b.end - b.t);

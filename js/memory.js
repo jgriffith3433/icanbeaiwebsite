@@ -8,6 +8,7 @@
    day it was made and fades over 3 real days after (strength 1 - days/3); at most 20 decals are kept, 6 are drawn on
    low quality (phones). `day.memory`: today(), since(days), marks(), shiftDays(n) (the playtest's clock), now().
    ========================================================================== */
+import { FACT_DAYS, factsFrom, DEED_ORDER, deedsFrom } from "./deeds.js";
 const B = typeof window !== "undefined" ? window.BABYLON : null;
 
 export const KEY = "icanbe.memory";
@@ -119,6 +120,8 @@ export function sinceDays(store, todayKey, days) {
   return out;
 }
 
+export { FACT_DAYS, factsFrom, DEED_ORDER, deedsFrom };
+
 /* ---------------------------------- the page ---------------------------------- */
 export function installMemory(day, world) {
   if (!day || !world || !world.scene || !B) return null;
@@ -228,8 +231,19 @@ export function installMemory(day, world) {
   }
 
   /* ---- recording ---- */
+  /* deeds since he was last taken (what "the deed just done" is at Let go) */
+  let session = {};
+  let factsCache = null;
+  const addSession = (kind, zone, power) => {
+    const one = { deeds: {}, zones: {} };
+    addDeed({ days: { x: one } }, "x", kind, zone, power);
+    const f = factsFrom({ deeds: one.deeds, zones: one.zones });
+    Object.keys(f).forEach((k) => (session[k] = (session[k] || 0) + f[k]));
+  };
   function record(kind, zone, power, mark) {
     const t = today();
+    addSession(kind, zone, power);
+    factsCache = null;
     addDeed(store, t, kind, zone, power);
     if (mark) addMark(store, t, Object.assign({ at: Date.now() }, mark));
     prune(store, t);
@@ -270,8 +284,8 @@ export function installMemory(day, world) {
   });
   window.addEventListener("day:neighbor", (e) => {
     const d = e.detail || {};
-    if (d.action === "beat-done" && d.kind === "ask") record("askAnswered", undefined, d.id);
-    else if (d.action === "beat-missed") record("askBotched", undefined, d.id);
+    if (d.action === "beat-done" && d.kind === "ask") record("askAnswered", "answered", d.id);
+    else if (d.action === "beat-missed") record("askBotched", "botched", d.id);
     else if (d.action === "reward" && d.id === "birdie") record("birdieRain", "park", "rain");
     else if (d.action === "reward") record("neighborReward", undefined, d.id);
   });
@@ -286,6 +300,23 @@ export function installMemory(day, world) {
     else if (d.action === "hurt") record("scar", undefined, d.piece);
   });
   window.addEventListener("day:quality", () => apply("quality"));
+  window.addEventListener("day:control", (e) => {
+    const d = e.detail || {};
+    if (d.action === "take") { session = {}; roofSecs = 0; }
+  });
+
+  /* Roof riding: standing on a walkable roof (the apt block, the shop, the annex) under control counts a deed per 12 s up there. */
+  const ROOFS = [[-32, -5.5, -16, 6.5, 6.16], [42, -5.5, 58, 6.5, 3.3], [149, -5.5, 165, 6.5, 5.72]];
+  let roofSecs = 0;
+  scene.onBeforeRenderObservable.add(() => {
+    const me = who();
+    if (!me) { roofSecs = 0; return; }
+    const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
+    const up = ROOFS.some((r) => me.x >= r[0] && me.x <= r[2] && me.z >= r[1] && me.z <= r[3] && me.y >= r[4] - 1);
+    if (!up) return;
+    roofSecs += dt;
+    if (roofSecs >= 12) { roofSecs = 0; record("roofRide", zoneOf(me.x, me.z)); }
+  });
 
   const api = {
     today: () => {
@@ -297,6 +328,7 @@ export function installMemory(day, world) {
     now: () => Object.assign({}, nowInfo, { shift, total: Object.keys(store.days).reduce((n, k) => n + store.days[k].marks.length, 0) }),
     /** The playtest's clock: today is `n` real days on (kept for the session, so a reload keeps it). Rebuilds the marks. */
     shiftDays(n) {
+      factsCache = null;
       shift = Number(n) || 0;
       try { sessionStorage.setItem(SHIFT_KEY, String(shift)); } catch (e) { /* private mode */ }
       apply("shift");
@@ -304,9 +336,19 @@ export function installMemory(day, world) {
       return today();
     },
     /** What a page reload does: read the store back from localStorage and rebuild the marks (the playtest can't reload mid-run). */
-    reload() { try { store = parse(localStorage.getItem(KEY)); } catch (e) { store = emptyStore(); } shift = readShift(); apply("reload"); return nowInfo; },
+    reload() { factsCache = null; try { store = parse(localStorage.getItem(KEY)); } catch (e) { store = emptyStore(); } shift = readShift(); apply("reload"); return nowInfo; },
+    /** What he remembers: the deeds of today and yesterday as `remembers` names (see factsFrom). Cached until the next deed. */
+    facts: () => (factsCache || (factsCache = factsFrom(sinceDays(store, today(), FACT_DAYS)))),
+    /** The deeds of this take-over (since Take control), as DEED_ORDER names, most telling first. */
+    justDid: () => deedsFrom(session),
+    /** The deeds of today, as DEED_ORDER names. */
+    todayDeeds: () => { const d = store.days[today()]; return d ? deedsFrom(factsFrom({ deeds: d.deeds, zones: d.zones })) : []; },
+    /** How many real days he has been taken out to play with the sky (days with at least one deed, kept for 14): the barks' warmth. */
+    skyDays: () => Object.keys(store.days).filter((k) => Object.keys(store.days[k].deeds).length > 0).length,
+    /** For the playtest: write a deed as if he had done it (named setup shortcut). */
+    note: (kind, zone, power) => { record(kind, zone, power); return api.facts(); },
     apply: () => apply("api"),
-    reset() { store = emptyStore(); save(); apply("reset"); },
+    reset() { store = emptyStore(); session = {}; factsCache = null; save(); apply("reset"); },
   };
   day.memory = api;
   apply("load");
