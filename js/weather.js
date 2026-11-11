@@ -280,7 +280,7 @@ export function createWeather(opt) {
     if (via !== "forecast") {
       manual = true;
       holdLeft = 0;
-      powerLeft = via === "power" ? holdSec : 0;
+      powerLeft = via === "power" ? holdSec * (state === "rain" ? 2.4 : 1) : 0; // a Rain cast stays long enough to soak the street
       if (opt.onSet) opt.onSet({ state, intensity: targetIntensity, via: via || "set" });
     }
     return true;
@@ -659,10 +659,14 @@ export function startWeather(world, dayApi) {
     rainPs.maxEmitBox.set(18, 2, 18);
     rainPs.minLifeTime = 0.45;
     rainPs.maxLifeTime = 0.75;
-    rainPs.minSize = 0.12;
-    rainPs.maxSize = 0.28;
-    rainPs.color1.set(0.75, 0.84, 0.95, 0.55);
-    rainPs.color2.set(0.85, 0.9, 1, 0.28);
+    rainPs.minSize = 0.1;
+    rainPs.maxSize = 0.22;
+    rainPs.minScaleX = 0.16; // thin, long streaks: stretched along the velocity, so they lean with the wind
+    rainPs.maxScaleX = 0.26;
+    rainPs.minScaleY = 2.6;
+    rainPs.maxScaleY = 4.2;
+    rainPs.color1.set(0.75, 0.84, 0.95, 0.6);
+    rainPs.color2.set(0.85, 0.9, 1, 0.3);
   }
   if (splashPs) {
     splashPs.minEmitBox.set(-14, 0, -14);
@@ -1121,7 +1125,9 @@ export function startWeather(world, dayApi) {
     const cap = (ps, n) => (ps && !ps.__dead && !indoors ? n * (ps.__gpu ? 1 : 0.34) * tierScale : 0);
     if (rainPs && !rainPs.__dead) {
       rainPs.emitter.set(x, yBase + 14, z);
-      rainPs.emitRate = cap(rainPs, look.rain * 4200);
+      // js/rain.js RAIN_BUDGET: at most 4000 streaks alive on a phone (rate x mean life 0.6 s), 9000 on a desktop
+      rainPs.emitRate = Math.min(cap(rainPs, look.rain * 6200), (low ? 4000 : 9000) / 0.6);
+      live.rainStreaks = Math.round(rainPs.emitRate * 0.6);
       rainPs.direction1.set(-0.35 - wx, -1, -0.15);
       rainPs.direction2.set(0.25 - wx * 0.7, -1, 0.2);
       rainPs.minEmitPower = 16 + look.wind * 6;
@@ -1531,6 +1537,7 @@ export function startWeather(world, dayApi) {
       snowMeshes: live.snowMeshes,
       tier: live.tier,
       activeParticles: live.activeParticles,
+      rainStreaks: live.rainStreaks || 0,
     });
   }
   const api = {

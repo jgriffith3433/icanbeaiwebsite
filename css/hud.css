@@ -256,3 +256,6 @@ html.cold-open .ep-btn, html.cold-open .power-reticle, html.cold-open .pressure,
 html.touch-ui .co-prompt { left: auto; right: var(--safe-r); transform: none; bottom: calc(var(--safe-b) + 232px); }
 html.touch-ui .co-say { bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px)); }
 html.title-up .co-prompt, html.title-up .co-bolt, html.title-up .co-say { visibility: hidden; }
+
+/* ---- the rain's lens: drops on the camera (js/rain.js). Not a control: it never takes a touch or a click. ---- */
+#rain-lens { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; display: none; }
