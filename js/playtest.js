@@ -2564,6 +2564,124 @@ async function city(options, t) {
   t.progress(1);
 }
 
+/* ---------------- render-grade: the picture's grade, light and shadows from the apt roof ---------------- */
+// Setup shortcuts (named): the day bar to each hour (scrubTo), control.place onto the apt roof, a full Charge, and on the phone
+// control.touch. Everything else is real input: Take control (Enter, or a tap on the phone), the Lightning key (or a tap on its slot).
+// It reads day.render.info() (the LUT, the effects, the casters) and what each grade does to a few swatches, so the four hours
+// can be told apart without pixels, and times how long a Storm takes to move the grade.
+async function renderGrade(options, t) {
+  const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  t.scene("Apt roof");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.render && window.day.look && window.day.control && window.day.weather, 8000, "the render pipeline (js/render-pipeline.js)");
+  const R = window.day.render, C = window.day.control, W = window.day.weather, P = window.powers || window.day.powers;
+  const refill = () => { if (P && P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  if (touch && C.touch) C.touch(true);
+  window.day.title && window.day.title.quiet && window.day.title.quiet();
+  scrubTo(12 * 60);
+  await sleep(500);
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  C.place(-21, 0.5, 1.5708, { from: 14, alpha: 4.1, beta: 1.15, radius: 11 }); // the apartment roof, looking east along the avenue
+  await sleep(900);
+  await t.until(() => W.now().state === "clear" || W.now().intensity < 0.2, 6000, "a calm sky").catch(() => {});
+
+  const info0 = R.info();
+  t.event("render-effects", `${info0.quality}: ${info0.effects.join(", ")}; ${info0.tonemapping} tonemap, ${info0.lutCount} grade LUTs (${info0.luts.join(", ")}), bloom on ${info0.bloom && info0.bloom.source} at ${info0.bloom && info0.bloom.threshold}, shadows ${info0.shadows.generator} x${info0.shadows.cascades} at ${info0.shadows.mapSize}, ssao ${info0.ssao}`);
+  if (info0.errors.length) t.problem("bug", `The render pipeline reported: ${info0.errors.join("; ")}`);
+  if (info0.tonemapping !== "ACES") t.problem("bug", `Tonemapping is ${info0.tonemapping}, not ACES`);
+  if (!info0.bloom || !info0.bloom.enabled) t.problem("bug", "Bloom is off");
+  if (!info0.effects.includes("grade-lut")) t.problem("bug", "The colour-grade LUT isn't applied");
+  if (info0.lutCount < 5) t.problem("bug", `Only ${info0.lutCount} grade LUTs`);
+  if (touch) {
+    // the phone keeps tonemap, grade and half-res bloom with one 1024 cascade and no SSAO
+    if (info0.quality !== "low") t.problem("bug", `The phone is on ${info0.quality} quality`);
+    if (info0.ssao) t.problem("bug", "SSAO is on at low quality");
+    if (info0.shadows.cascades !== 1 || info0.shadows.mapSize !== 1024) t.problem("bug", `Low quality shadows are ${info0.shadows.cascades} cascade(s) at ${info0.shadows.mapSize}, expected one at 1024`);
+    if (!info0.bloom.enabled || info0.bloom.scale > 0.5) t.problem("bug", "The phone's bloom isn't half-res");
+    t.metric("phone.shadowCascades", info0.shadows.cascades);
+  } else {
+    if (info0.quality === "high") {
+      if (!info0.ssao) t.problem("bug", "SSAO2 is off at high quality");
+      if (info0.shadows.cascades !== 2) t.problem("bug", `High quality has ${info0.shadows.cascades} shadow cascade(s), expected 2`);
+      if (!info0.fxaa) t.problem("bug", "FXAA is off at high quality");
+    }
+  }
+  t.progress(0.1);
+
+  // four hours, four grades
+  const swatches = [[0.5, 0.5, 0.5], [0.8, 0.8, 0.8], [0.2, 0.25, 0.35], [0.7, 0.55, 0.4]];
+  const read = (label) => ({ label, lut: R.info().lut.name, out: swatches.map((c) => R.gradeOf(c)) });
+  const dist = (a, b) => { let d = 0; a.out.forEach((c, i) => c.forEach((v, k) => (d += Math.abs(v - b.out[i][k])))); return d / (a.out.length * 3); };
+  const seen = [];
+  for (const [label, minutes] of [["07:00", 7 * 60], ["12:00", 12 * 60], ["18:30", 18 * 60 + 30], ["22:00", 22 * 60]]) {
+    t.scene("Roof at " + label);
+    scrubTo(minutes);
+    await sleep(2800); // the grade fades in over about 4 s
+    const clock = window.day.now().minutes;
+    if (Math.abs(clock - minutes) > 15) t.problem("bug", `${label}: the clock reads ${Math.floor(clock / 60)}:${String(Math.floor(clock % 60)).padStart(2, "0")}`);
+    const r = read(label);
+    seen.push(r);
+    const i = R.info();
+    t.event("render-grade-" + label.replace(":", ""), `${label}: LUT ${r.lut}, exposure ${i.exposure}, moon ${i.shadows.moon}, mid grey -> ${r.out[0].map((v) => v.toFixed(2)).join("/")}, ${i.shadows.casters} shadow casters`);
+    if (label === "12:00") {
+      const g = i.shadows.groups;
+      const sk = i.skyline;
+      t.event("render-noon-shadows", `casters: him ${g.player}, props ${g.props}, neighbours ${g.neighbours}, crowd ${g.crowd}, buildings ${g.buildings}; skyline fill ${sk ? sk.fill : "?"} against sky ${sk ? sk.sky : "?"}`);
+      if (g.player < 1) t.problem("bug", "Small Weather doesn't cast a shadow at noon");
+      if (g.props < 1) t.problem("bug", "Rooftop props don't cast shadows");
+      if (i.shadows.pcf !== true) t.problem("bug", "Shadows aren't soft (no PCF)");
+      if (sk && sk.ratio < 0.6) t.problem("bug", `The skyline is a dark slab at noon (fill ${sk.fill} against a sky of ${sk.sky})`);
+    }
+    if (label === "22:00" && !touch && i.shadows.moon < 0.2) t.problem("warning", `No moonlight shadows at 22:00 (moon ${i.shadows.moon})`);
+    t.progress(0.1 + 0.12 * seen.length);
+  }
+  let alike = 0;
+  for (let a = 0; a < seen.length; a++) for (let b = a + 1; b < seen.length; b++) {
+    const d = dist(seen[a], seen[b]);
+    if (d < 0.02) { alike++; t.problem("bug", `${seen[a].label} and ${seen[b].label} grade alike (${d.toFixed(3)})`); }
+  }
+  t.event("render-grades-distinct", `${seen.map((s) => s.label + " " + s.lut).join(", ")}; ${alike ? alike + " pairs alike" : "4 distinct grades"}`);
+
+  // a Storm shifts the grade within 4 s (and drains the warmth)
+  t.scene("Noon, then a Storm");
+  scrubTo(12 * 60);
+  await sleep(2800);
+  await t.until(() => W.now().state === "clear" || W.now().intensity < 0.2, 8000, "a calm sky before the Storm").catch(() => {});
+  const before = read("noon");
+  const warmth = (r) => r.out[3][0] - r.out[3][2];
+  refill();
+  const t0 = performance.now();
+  if (touch) await tapEl($("ability-bolt")); else pressKey("e");
+  let shifted = -1;
+  while (performance.now() - t0 < 6000) {
+    await sleep(120);
+    if (dist(before, read("storm")) > 0.03) { shifted = (performance.now() - t0) / 1000; break; }
+  }
+  const after = read("storm");
+  t.event("render-storm-shift", `Storm cast: grade moved ${dist(before, after).toFixed(3)} in ${shifted < 0 ? ">6" : shifted.toFixed(1)} s (LUT ${before.lut} -> ${after.lut}); warm swatch ${warmth(before).toFixed(2)} -> ${warmth(after).toFixed(2)}`);
+  if (shifted < 0 || shifted > 4) t.problem("bug", `A Storm cast took ${shifted < 0 ? "more than 6" : shifted.toFixed(1)} s to shift the grade (needs 4 s or less)`);
+  if (warmth(after) >= warmth(before) - 0.02) t.problem("bug", "The Storm didn't drain the warmth from the city");
+  t.metric("render.stormShiftSec", shifted < 0 ? 6 : Math.round(shifted * 10) / 10);
+  await sleep(2500); // hold it: the footage shows the cool teal city
+  t.progress(0.82);
+
+  // frame rate on the roof (the phone's budget is 30 fps)
+  const samples = [];
+  const obs = window.day.world().scene.onAfterRenderObservable.add(() => samples.push(window.day.world().engine.getDeltaTime()));
+  await sleep(4000);
+  window.day.world().scene.onAfterRenderObservable.remove(obs);
+  const fps = samples.length ? 1000 / (samples.reduce((a, b) => a + b, 0) / samples.length) : 0;
+  t.metric(touch ? "phone.fpsAvg" : "render.fpsAvg", Math.round(fps * 10) / 10);
+  t.event("render-fps", `${touch ? "phone" : "desktop"} ${R.info().quality}: ${fps.toFixed(0)} fps over ${samples.length} frames in the storm`);
+  if (touch && fps < 30) t.problem("bug", `The phone averages ${fps.toFixed(1)} fps in the storm (needs 30)`);
+  else if (!touch && fps < 20) t.problem("warning", `Desktop averages ${fps.toFixed(1)} fps with the full pipeline`);
+  const end = R.info();
+  if (touch && !(end.effects.includes("tonemap") && end.effects.includes("grade-lut") && end.effects.includes("bloom"))) t.problem("bug", `The phone lost an effect: ${end.effects.join(", ")}`);
+  checkHud(t, "render-grade");
+  t.progress(1);
+}
+
 /* ---------------- look: the city at noon, dusk and night, then the phone quality setting ---------------- */
 // Day bar to the sidewalk (setup), then real keys walk him in front of a block. Scrub holds the clock
 // (a scrub leaves the day paused) so the three times stay put for the shot. The quality button is a real click.
@@ -2637,8 +2755,8 @@ async function look(options, t) {
   await sleep(300);
   const low = window.day.look.info();
   if (low.quality !== "low") t.problem("bug", `Quality toggle left it on ${low.quality}`);
-  if (low.bloom) t.problem("bug", "Low quality left bloom on");
-  if (low.shadows) t.problem("bug", "Low quality left the shadow map on");
+  if (!low.bloom) t.problem("bug", "Low quality dropped the half-res bloom (it stays on)");
+  if (!low.shadows) t.problem("bug", "Low quality dropped the shadow cascade (one 1024 cascade stays on)");
   if (low.samples > 1) t.problem("bug", `Low quality left MSAA at ${low.samples}`);
   const samples = [];
   const obs = world().scene.onAfterRenderObservable.add(() => samples.push(world().engine.getDeltaTime()));
@@ -6987,7 +7105,7 @@ async function firstVisit(options, t) {
     t.event("quality-auto", `now ${look.quality} (${look.qualityHow}), auto would pick ${look.auto}`);
     const phoneSized = innerWidth <= 700 || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
     if (phoneSized && look.qualityHow === "auto" && look.quality !== "low") t.problem("bug", `A phone-sized window auto-picked ${look.quality}`);
-    if (phoneSized && look.quality === "low" && (look.bloom || look.shadows)) t.problem("bug", "Low quality left bloom or shadows on");
+    if (phoneSized && look.quality === "low" && !(look.bloom && look.shadows)) t.problem("bug", "Low quality dropped the half-res bloom or the shadow cascade");
   }
   const samples = [];
   const obs = world() && world().scene.onAfterRenderObservable.add(() => samples.push(world().engine.getDeltaTime()));
@@ -8392,6 +8510,7 @@ installPlaytest({
       else if (id === "model") await model(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
+      else if (id === "render-grade") await renderGrade(options, t);
       else if (id === "photos") await photos(options, t);
       else if (id === "fill-out") await fillOut(options, t);
       else if (id === "city-audit") await cityAudit(options, t);

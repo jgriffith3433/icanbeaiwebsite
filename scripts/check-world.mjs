@@ -99,7 +99,7 @@ ok(world.stage.bedroomLight && world.stage.bedroomLight.intensity > 0.35, `bedro
 world.update(sandbox.DayEngine.frame(day, 12 * 60), 0.016, { snap: true });
 world.look.quality('low');
 const low = world.look.info();
-ok(low.quality === 'low' && low.bloom === false && low.shadows === false && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
+ok(low.quality === 'low' && low.bloom === true && low.shadows === true && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
 world.look.quality('high');
 ok(world.look.info().bloom === true, 'high quality left bloom off');
 
