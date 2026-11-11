@@ -956,7 +956,6 @@ function install() {
     }
     pushEnd();
     cameraGive();
-    document.documentElement.classList.remove("catching-up");
     day.note(how === "catch-up" ? L.catchUp : L.back);
     mark("back", { how });
     syncUi();
@@ -997,15 +996,11 @@ function install() {
         return null;
       }
       if (r === "too-far" || since > 60) {
-        // the day has him somewhere he can't walk to now (driving, the other building): a quick fade
-        if (!catchUpAt) {
-          catchUpAt = since;
-          document.documentElement.classList.add("catching-up");
-        }
-        if (since - catchUpAt > 0.45) {
-          backOnDay("catch-up");
-          return null;
-        }
+        // the day has him somewhere he can't walk to now (driving, the other building): a cut, not a fade (a fade to
+        // the page's dark background read as a black broken frame). The sensor is told it is an intended cut.
+        try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
+        backOnDay("catch-up");
+        return null;
       }
       text = L.letGo;
     }

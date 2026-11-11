@@ -872,10 +872,6 @@ html.touch-ui .weather-wheel {
 }
 html.touch-ui .weather-wheel button { width: 64px; height: 64px; min-width: 44px; min-height: 44px; }
 
-/* catching up with his day: a quick fade */
-#view { transition: opacity 0.35s ease; }
-.catching-up #view { opacity: 0; }
-
 /* ---------- a newer build is out: a small pill, never in control or an episode (js/main.js) ---------- */
 .update-pill {
   z-index: 5;
