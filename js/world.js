@@ -627,6 +627,7 @@
     bedsideFill.range = 8;
     bedsideFill.setEnabled(false);
     const officeLights = [];
+    let officePowerK = 1; // Part 2's brown-out and the moment that brings the office lights back (js/episodes.js)
     if (cfg.buildings.office && cfg.buildings.office.bounds) {
       const o = cfg.buildings.office.origin;
       [[6, -1.2], [12, -1.2], [9, 3]].forEach((p, i) => {
@@ -1646,6 +1647,80 @@
       titleShot = on ? Object.assign({}, TITLE_SHOT, typeof on === "object" ? on : {}) : null;
       return !!titleShot;
     }
+    /* js/moments.js's cut-away camera for a turning-point moment: orbits a point in the city (target, alpha, beta, radius
+       each go from a start to an end value over `secs`, eased), on top of the day's camera and the player's. It stays out
+       of geometry: the radius is cut back by the big boxes (clearRadius) and the colliders, it never goes under the
+       ground or into a solid, and it counts any frame it still is (`cineInfo().inside`). Ending it puts the camera back
+       where it was (the player's orbit camera picks up from the same alpha, beta, radius and fov, with no snap). */
+    let cine = null;
+    function setCineShot(spec) {
+      if (!spec) {
+        if (cine) {
+          camera.alpha = cine.save.alpha;
+          camera.beta = cine.save.beta;
+          camera.radius = cine.save.radius;
+          camera.target.copyFrom(cine.save.target);
+          camera.fov = cine.save.fov;
+          cam.inited = false;
+          cam.user = 0;
+          cine.over = true;
+          cineLast = { frames: cine.frames, inside: cine.inside, minClear: cine.minClear, t: cine.t };
+        }
+        cine = null;
+        return false;
+      }
+      const two = (v, d) => (Array.isArray(v) ? v : [v == null ? d : v, v == null ? d : v]);
+      cine = {
+        t: 0, secs: spec.secs || 6, frames: 0, inside: 0, minClear: 99,
+        tx: two(spec.tx), ty: two(spec.ty), tz: two(spec.tz),
+        alpha: two(spec.alpha, -1.2), beta: two(spec.beta, 1.0), radius: two(spec.radius, 18), fov: spec.fov || 0,
+        save: { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(), fov: camera.fov },
+      };
+      return true;
+    }
+    let cineLast = null;
+    function cineInside(p) {
+      if (p.y < (surfaceAt ? surfaceAt(p.x, p.z) : 0) + 0.35 && p.y < 4) return true;
+      for (let i = 0; i < solids.length; i++) {
+        const q = solids[i];
+        if (q.roll || q.yaw || q.pitch) continue;
+        if (Math.abs(p.x - q.x) < q.w / 2 + 0.2 && Math.abs(p.y - q.y) < q.h / 2 + 0.2 && Math.abs(p.z - q.z) < q.d / 2 + 0.2) return true;
+      }
+      return false;
+    }
+    function cineStep(dt) {
+      const c = cine;
+      c.t += dt;
+      const k = Math.min(1, c.t / c.secs);
+      const e = k * k * (3 - 2 * k);
+      const lerp = (v) => v[0] + (v[1] - v[0]) * e;
+      const tx = lerp(c.tx), ty = lerp(c.ty), tz = lerp(c.tz);
+      const a = lerp(c.alpha), b = lerp(c.beta);
+      let r = lerp(c.radius);
+      const sb = Math.sin(b);
+      const dx = Math.cos(a) * sb, dy = Math.cos(b), dz = Math.sin(a) * sb;
+      r = clearRadius(tx, ty, tz, dx, dy, dz, r, 0.9);
+      const pl = physics;
+      if (pl && pl.plugin && pl.plugin.raycast && B.PhysicsRaycastResult) {
+        const res = cine.res || (cine.res = new B.PhysicsRaycastResult());
+        const from = new B.Vector3(tx + dx * 0.05, ty + dy * 0.05, tz + dz * 0.05);
+        pl.plugin.raycast(from, new B.Vector3(tx + dx * (r + 0.4), ty + dy * (r + 0.4), tz + dz * (r + 0.4)), res);
+        if (res.hasHit) r = Math.max(2.5, Math.min(r, B.Vector3.Distance(from, res.hitPoint) - 0.8));
+      }
+      camera.target.set(tx, ty, tz);
+      camera.alpha = a;
+      camera.beta = b;
+      camera.radius = r;
+      if (c.fov) camera.fov = c.save.fov + c.fov * (1 - e);
+      cam.inited = false;
+      cam.user = 0;
+      sun.position.set(tx - sun.direction.x * 40, 40, tz - sun.direction.z * 40);
+      const pos = { x: tx + dx * r, y: ty + dy * r, z: tz + dz * r };
+      c.frames++;
+      c.minClear = Math.min(c.minClear, pos.y - (surfaceAt ? surfaceAt(pos.x, pos.z) : 0));
+      if (cineInside(pos)) c.inside++;
+    }
+
     /* How far a camera at target + dir * r can sit before a building is in the way: a ray from the target
        against the town's big boxes (buildings and blocks; not trees, lamps, lips or ramps), minus a margin.
        Doesn't need Havok, so the automatic camera and the player's both use it. Returns r if clear. */
@@ -1739,7 +1814,7 @@
       const officeOn = things.officeLights !== "off" ? 1 : 0;
       const nearOffice = px > 65 || (cam.inited && cam.x > 65);
       officeLights.forEach((L) => {
-        L.intensity = nearOffice ? (officeOn ? 0.12 + night * 0.35 : 0) + day * 0.4 : 0; // day fill through the windows even with the fixtures off
+        L.intensity = nearOffice ? (officeOn ? (0.12 + night * 0.35) * officePowerK : 0) + day * 0.4 * (0.35 + 0.65 * officePowerK) : 0; // day fill through the windows even with the fixtures off
       });
       /* A light switching on or off changes the shader of every mesh it touches, and that recompile is a freeze on a
          scrub or a jump. So the lights of a building switch as one group (home: rooms + bedside, office: its fixtures),
@@ -1985,6 +2060,7 @@
         elevatorDoors.r.position.x = elevatorDoors.cx + elevatorDoors.w + elevatorDoors.open * elevatorDoors.w * 1.6;
       }
 
+      if (cine) { cineStep(dt); return; }
       /* camera: the player's orbit camera while he's theirs; the automatic one picks up from where it is */
       if (player) {
         cam.x = camera.target.x;
@@ -2473,6 +2549,11 @@
         cam.user = 0;
       },
       titleShot: setTitleShot,
+      officePower: (k) => { officePowerK = Math.max(0, Math.min(1, k)); return officePowerK; },
+      officePowerNow: () => officePowerK,
+      cineShot: setCineShot,
+      cineOn: () => !!cine,
+      cineInfo: () => (cine ? { frames: cine.frames, inside: cine.inside, minClear: cine.minClear, t: cine.t } : cineLast),
       titleShotOn: () => !!titleShot,
       person: me.root, // read by the playtest
       car: myCar.root,

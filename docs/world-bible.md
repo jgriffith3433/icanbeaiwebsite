@@ -285,3 +285,13 @@ Letting go hands him back as someone who noticed what you did together. Deeds (m
 - **Birdie, Dex and Ines** each have a voiced greeting for each tone (`remember: { helped, botched }`), once a day when he walks up: Birdie's tomatoes still talk about the rain; Dex's parcels stayed dry, or came out soggy "no hard feelings, some"; Ines still has the blue on her sensor, or stayed up anyway.
 - **Barks warm** over the days he has played with the sky (`barks.warm`: from 1, 3 and 6 days).
 - **The day-end card** speaks two deeds of the day (`recap-<deed>`), one caption line at a time; a quiet day shows two log rows.
+
+## Turning points (js/moments.js `play`, `moments.turning` in day.config.js)
+
+Each episode's big beat is seen and heard in the city, not read as a toast: a short moment (8 s at most, skippable with Skip, a tap or Esc) where the camera leaves him, orbits the place and the event happens there, a music sting swells, and the episode's own voiced line is the one caption.
+- **Part 1, the drought breaks (the park):** the high camera over the lawn as the rain lands; the straw lawn greens, Birdie: "Look at them drink. Bless you."
+- **Part 2, the roofs have power (the annex and the office):** the blades spin up, the lamps stutter, then the office lights come back from their brown-out; Ines: "They're turning. Do you see how they turn?"
+- **Part 3, the Tank is full (the Storm Tank):** the glass gauge flares full and the Board's horn on its post by the gauge lights and pulses; the Board: "Reservoir level: full." (or "...And the sky is not done." when scarred).
+- **Rooftop storm, the twist (the shop roof and the avenue):** the rain stops, the fog comes in and the lamps stutter, junk in the avenue; Ines: "That wasn't rain. That was something clearing its throat." He: "It's moving. Not passing."
+- **Hurricane drive, the bridge closes (the bridge):** the camera down the avenue, the gate arm swings down as the Board warns "The bridge will close on high wind."
+The stings are synthesized (`score.momentSting`): warm swell and rain shimmer, rising saws, low brass and the Board's two flat tones, a minor cluster and thunder, two far tolls. The episode's clock waits while a moment plays.
