@@ -148,8 +148,11 @@ export function startAbilityBar(abilities, onPress) {
 .abilitybar .charge.refused .refuse{display:block}
 .abilitybar .charge.refused .et{display:none}
 /* phone: five tap buttons above the power pad, right-aligned; the stick, jump and pad are untouched */
-html.touch-ui .abilitybar{align-items:stretch;gap:4px;width:calc(5 * var(--abw) + 4 * 5px);--abw:min(54px,calc((100vw - 44px) / 5));font-size:.62rem}
-html.touch-ui .abilitybar .row{gap:5px}
+html.touch-ui .abilitybar{align-items:flex-end;gap:4px;width:calc(var(--abw) + 10px);--abw:min(54px,calc((100vw - 44px) / 5));font-size:.62rem}
+html.touch-ui .abilitybar .row{gap:5px;flex-direction:column}
+html.touch-ui .abilitybar .ab{height:46px}
+html.touch-ui .abilitybar .charge{width:calc(var(--abw) + 10px);align-self:flex-end}
+@media (orientation:landscape) and (max-height:520px){html.touch-ui .abilitybar{width:calc(5 * var(--abw) + 4 * 5px)}html.touch-ui .abilitybar .row{flex-direction:row}html.touch-ui .abilitybar .charge{width:100%;align-self:stretch}}
 html.touch-ui .abilitybar .ab{width:var(--abw);height:54px;min-width:44px;min-height:44px;border-radius:10px;gap:0;justify-content:flex-end;padding-bottom:6px}
 html.touch-ui .abilitybar .ab[data-touch="0"]{display:none}
 html.touch-ui .abilitybar .ab .k{display:none}
