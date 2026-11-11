@@ -202,6 +202,31 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     THE COLD OPEN (js/coldopen.js) — a new player's first Play: no card, no step list. The title closes and he is
+     the player's in the same frame, standing on the apartment roof at dusk while a storm cell he didn't call rolls
+     in. He says one line; a ring marks the shop roof's lightning rod and the only prompt is "Hold E" ("Hold the
+     bolt" on touch). The bolt: hit-stop, flash, the lamps flicker, the street looks up, Birdie calls up from the
+     avenue. Returning players (icanbe.opening or icanbe.tutorial kept) go straight into the day.
+     ------------------------------------------------------------------------ */
+  coldopen: {
+    keys: ["icanbe.opening", "icanbe.tutorial"], // either one set = a returning player
+    clock: "19:00", // dusk: the lamps are coming on
+    spot: { x: -21, z: 0.5, yaw: 1.5708, from: 14 }, // the apartment roof (block "apt", roof 6.16 m), facing east down the avenue
+    camera: { alpha: 3.1416, beta: 1.22, radius: 5.6, from: 24, fov: 0.32, secs: 2.6 }, // lands behind him over his shoulder
+    rod: { x: 50, z: 0.5, roofY: 3.3, height: 2.2 }, // the shop roof's lightning rod
+    cell: { state: "rain", intensity: 0.75 }, // the cell nobody called (weather via "cell")
+    holdSec: 0.55, // how long the bolt is held before it goes
+    firstLine: 1.4, // seconds after he lands before he speaks
+    reactDelay: 1.0, // seconds from the look-up to Birdie's call
+    prompt: { keys: "Hold E", touch: "Hold the bolt" },
+    lines: {
+      he: ["He", "That storm isn't mine. The rod on the shop roof is."],
+      birdie: ["Birdie", "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain."],
+      after: ["He", "Rain. I can do that."],
+    },
+  },
+
+  /* ------------------------------------------------------------------------
      OPENING — the first Play only (js/opening.js), skippable
      ------------------------------------------------------------------------
      Small Weather on screen (his model) with a few plain lines, then he is
@@ -241,6 +266,38 @@ window.DAY_CONFIG = {
       skip: "Skip",
       lines: ["Okay. My turn.", "Finally. Let's see the sky.", "All right. Where to?"],
     },
+    /* TURNING POINTS: each episode's big beat plays as a short, skippable moment (js/moments.js `play`, started by
+       js/episodes.js) in place of the toast and log line it stands for: a cut-away camera that orbits the place
+       (never into geometry), the event happening in the world, a music sting (score.momentSting, synthesized), and the
+       episode's own spoken lines (`say.key`: the lines at `play[].i`, one caption line each; the rest of that key is spent
+       with it, or after it when `rest`). 8 s at most. Skip: the button, a tap, or Esc. `on` is the beat in js/episodes.js. */
+    turning: {
+      "dry-park": {
+        on: "goal:rain-park", title: "The drought breaks", secs: 7, sting: "drought", fx: "lawn", rest: true,
+        say: { key: "goal:rain-park", play: [{ i: 0, at: 1.2 }] },
+        shot: { tx: -2, ty: 2, tz: 44, alpha: [-1.95, -1.3], beta: [1.0, 1.1], radius: [30, 19], fov: 0.1 },
+      },
+      "still-blades": {
+        on: "goal:turn", title: "The roofs have power", secs: 7, sting: "turbines", fx: "turbines",
+        say: { key: "goal:turn", play: [{ i: 0, at: 2.2, caption: "Do you see how they turn?" }] },
+        shot: { tx: 146, ty: 5, tz: 1, alpha: [-1.05, -1.5], beta: [0.95, 1.05], radius: [32, 25], fov: 0.08 },
+      },
+      "low-tank": {
+        on: "goal:fill", title: "The Tank is full", secs: 8, sting: "tank", fx: "gauge",
+        say: { key: "end:clean", scarredKey: "end:scarred", play: [{ i: 0, at: 1.6, caption: "Reservoir level: full." }] },
+        shot: { tx: 190, ty: 5.5, tz: 35.4, alpha: [-1.45, -1.85], beta: [1.3, 1.25], radius: [27, 17] },
+      },
+      "lunch": {
+        on: "twist", title: "The storm turns", secs: 8, sting: "twist", fx: "fog",
+        say: { key: "twist", play: [{ i: 0, at: 0.9, caption: "That was something clearing its throat." }, { i: 2, at: 4.9 }] },
+        shot: { tx: 66, ty: 3, tz: 10, alpha: [3.0, 3.5], beta: [1.0, 1.1], radius: [24, 30], fov: 0.06 },
+      },
+      "commute-home": {
+        on: "twist", title: "The bridge is closing", secs: 8, sting: "bridge", fx: "gate",
+        say: { key: "twist", play: [{ i: 0, at: 0.8, caption: "The bridge will close on high wind." }] },
+        shot: { tx: 10, ty: 2.5, tz: 12.6, alpha: [3.05, 2.6], beta: [1.05, 1.15], radius: [24, 16] },
+      },
+    },
     dayEnd: {
       kicker: "Small Weather",
       title: "That was the day.",
@@ -250,7 +307,9 @@ window.DAY_CONFIG = {
       skip: "Skip",
       hint: "Esc to skip",
       secs: 12,
-      events: 3,
+      events: 3, // the most log rows js/moments.js picks from (pickEvents)
+      speakDeeds: 2, // two deeds he did, spoken and shown one caption line at a time (js/moments.js)
+      lineSecs: 3.8, // each caption line
     },
   },
 
@@ -373,6 +432,34 @@ window.DAY_CONFIG = {
         "It is pouring and he is thirsty. He sees the joke and keeps it to himself.",
       ] },
     },
+    /* Warmer barks over the days he has been out playing with the sky (day.memory.skyDays(): real days with a deed).
+       Tier 1 from 1 day, tier 2 from 3, tier 3 from 6: the sky-curious count. A tier's line for the same need or weather
+       replaces the plain one (and is used once a day like the rest); a state with no line there keeps the plain pool. */
+    warm: [
+      { from: 1, weather: {
+        rain: ["Rain again. He is beginning to expect it."],
+        clear: ["Clear sky. He checks it twice, to be sure it's staying."],
+      }, needs: {
+        boredom: ["He looks at the sky instead of the wall. It's more interesting."],
+      } },
+      { from: 3, weather: {
+        rain: ["Rain. He turns his face up a little, and no one sees."],
+        storm: ["A storm, and he is almost glad of the company."],
+        wind: ["Wind. He leans into it like an old friend."],
+      }, needs: {
+        stress: ["His shoulders drop. He has somewhere to put it now."],
+        boredom: ["He catches himself waiting for weather."],
+      } },
+      { from: 6, weather: {
+        rain: ["Rain. He knows its moods by now, and it knows his."],
+        storm: ["The storm comes in the way a friend does. He doesn't get up."],
+        fog: ["Fog. He has walked this street in worse and loved it."],
+        clear: ["Clear sky. The city is as he left it. He nods at it."],
+      }, needs: {
+        energy: ["He is tired the good way. The kind the sky earns."],
+        stress: ["He breathes out. The sky has never asked him for a thing."],
+      } },
+    ],
     weather: {
       rain: [
         "Rain. He lets it be a minute before he moves.",
@@ -479,15 +566,21 @@ window.DAY_CONFIG = {
     aim: 3.6, // metres past him the reticle rests, along the camera
     cone: 52, // gust half-angle, degrees
     reach: 11, // gust length, metres
-    costs: { storm: 40, bolt: 24, gust: 16, tornado: 48, rain: 18, gale: 20, fog: 16, sunbreak: 22 },
-    keys: { storm: "f", bolt: "e", gust: "g", tornado: "t", rain: "r", gale: "v", fog: "c", sunbreak: "x" },
+    // Five verbs on the bar: Lightning (hold → Storm), Rain, Wind (tap Gust / hold Gale / full Tornado), Fog, Sun.
+    // Storm/gust/gale/tornado stay as spend ids for those hold depths. G aliases a Wind tap (Gust).
+    costs: { storm: 40, bolt: 24, gust: 16, tornado: 48, rain: 18, gale: 20, fog: 16, sunbreak: 22, wind: 16 },
+    keys: { bolt: "e", rain: "r", wind: "v", fog: "c", sunbreak: "x", gust: "g" },
+    windHold: 0.55,
+    windFull: 1.35,
+    tapMax: 0.28,
     // js/abilities.js: the bar's cooldown sweep. Seconds before the next call, and how long it lasts.
-    cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8, rain: 4, gale: 5, fog: 4, sunbreak: 6 },
-    durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4, rain: 3, gale: 3, fog: 3, sunbreak: 3 },
-    names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado", rain: "Rain", gale: "Gale", fog: "Fog", sunbreak: "Sun break" },
+    cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8, rain: 4, gale: 5, fog: 4, sunbreak: 6, wind: 2 },
+    durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4, rain: 3, gale: 3, fog: 3, sunbreak: 3, wind: 0 },
+    names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado", rain: "Rain", gale: "Gale", fog: "Fog", sunbreak: "Sun", wind: "Wind" },
     lines: {
       cooling: "Not ready yet.",
       gather: "The sky draws in over him.",
+      windGather: "The air tightens in his hands.",
       storm: "He calls the storm down.",
       bolt: "Lightning. Where he aimed.",
       gust: "A hard gust. The air lifts under him.",
@@ -586,6 +679,9 @@ window.DAY_CONFIG = {
       gust: 70,
       tornado: 70,
       letgo: 55,
+      memory: 45, // the autopilot's memory steps (`say` on a step)
+      deed: 58, // the Let go line that names the deed
+      recap: 95, // the day-end card's deeds
       glide: 40,
       "weather-storm": 35,
       "weather-rain": 35,
@@ -658,6 +754,30 @@ window.DAY_CONFIG = {
         "I type. The sky waits.",
         "Coffee's cold. Forecast isn't.",
       ],
+      /* On Let go, one line naming the deed he just did (day.memory.justDid(), most telling first), and at the day's end
+         one `recap-` line per deed the card speaks. Short: the phone's caption is one line. */
+      "deed-birdie": ["Birdie's tomatoes drank well."],
+      "deed-botched": ["I missed a neighbour's ask. Noted."],
+      "deed-flood": ["Park's soaked. Lawn will thank me."],
+      "deed-roofs": ["Roofs were good. I'll go back."],
+      "deed-storm": ["I called a storm. Felt right."],
+      "deed-wind": ["The bins will remember that gale."],
+      "deed-fog": ["Left the street in fog. Quiet."],
+      "deed-sun": ["I opened the sky. Warm out."],
+      "deed-rain": ["Rain's still on the road."],
+      "deed-rescue": ["Everyone got down. Good."],
+      "deed-answered": ["A neighbour said thanks. Nice."],
+      "recap-birdie": ["I gave Birdie her rain today."],
+      "recap-botched": ["I let a neighbour down today."],
+      "recap-flood": ["I drowned the park. It's green."],
+      "recap-roofs": ["I spent the day up on the roofs."],
+      "recap-storm": ["I called a storm. It came."],
+      "recap-wind": ["I pushed the street around."],
+      "recap-fog": ["I put the street in fog."],
+      "recap-sun": ["I opened the sky for a minute."],
+      "recap-rain": ["I made it rain today."],
+      "recap-rescue": ["I got people down safe."],
+      "recap-answered": ["Somebody thanked me today."],
     },
     lines: [
       // powers (fallback files while spoken dialogue clips land)
@@ -807,16 +927,16 @@ window.DAY_CONFIG = {
         id: "tutorial",
         tutorial: true,
         title: "Learn the weather",
-        tagline: "Five abilities, one at a time. Skip any time.",
+        tagline: "Lightning, Rain, Wind, Fog and Sun, one at a time.",
         goals: [
-          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Press E to throw Lightning where the reticle is." },
+          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Tap E for Lightning. Hold E to call a Storm." },
           { id: "rain", kind: "ability", power: "rain", label: "Call Rain", prompt: "Press R. Rain, just here, just for a moment.", after: "bolt" },
-          { id: "gale", kind: "ability", power: "gale", label: "Call a Gale", prompt: "Press V. A gale shoves bins and umbrellas down the street.", after: "rain" },
-          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Press C. Fog rolls in off the street.", after: "gale" },
+          { id: "wind", kind: "ability", power: "wind", label: "Call Wind", prompt: "Tap V for a Gust. Hold V for a Gale; hold longer for a Tornado.", after: "rain" },
+          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Press C. Fog rolls in off the street.", after: "wind" },
           { id: "sunbreak", kind: "ability", power: "sunbreak", label: "Break the Sun through", prompt: "Press X. The clouds split.", after: "fog" },
         ],
         lines: {
-          start: "Five abilities. He learns them one at a time.",
+          start: "Five verbs. He learns them one at a time.",
           done: "That's all five. The sky is his.",
           skip: "Skipped. Every ability is open.",
           unlock: "New ability: {name}. Key {key}.",
@@ -861,8 +981,8 @@ window.DAY_CONFIG = {
         market: { open: false },
         strain: { budget: 4 },
         goals: [
-          { id: "rain-park", kind: "ability-in", power: "rain", zone: "park", label: "Rain on the park (R, near Birdie)" },
-          { id: "sun-market", kind: "ability-in", power: "sunbreak", zone: "market", after: "rain-park", label: "Sun break over the market (X)" },
+          { id: "rain-park", kind: "ability-in", power: "rain", zone: "park", label: "Rain on the park, near Birdie" },
+          { id: "sun-market", kind: "ability-in", power: "sunbreak", zone: "market", after: "rain-park", label: "Sun over the market" },
           { id: "stalls", kind: "stay", zone: "market", seconds: 20, after: "sun-market", label: "Stay while the stalls fill" },
         ],
         lines: {
@@ -975,9 +1095,9 @@ window.DAY_CONFIG = {
           },
         ],
         goals: [
-          { id: "shelter", kind: "help", piece: "shelter", count: 3, label: "Shelter the plaza: Sun break near each (X)" },
-          { id: "rescue", kind: "help", piece: "rescue", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop (E)" },
-          { id: "street", kind: "help", piece: "street", count: 2, after: "rescue", label: "Clear the street: Gale or Gust near each (V / G)" },
+          { id: "shelter", kind: "help", piece: "shelter", count: 3, label: "Shelter the plaza: Sun near each" },
+          { id: "rescue", kind: "help", piece: "rescue", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop" },
+          { id: "street", kind: "help", piece: "street", count: 2, after: "rescue", label: "Clear the street: Wind near each" },
         ],
         lines: {
           start: "Lunch break. A storm nobody called.",
@@ -1034,7 +1154,7 @@ window.DAY_CONFIG = {
         strain: { budget: 7 },
         goals: [
           { id: "ines", kind: "reach", x: 154, z: 9.8, r: 8, label: "Find Ines at the annex" },
-          { id: "turn", kind: "wind-time", zone: "roofs", seconds: 10, after: "ines", label: "Keep a gale on the roof (V)" },
+          { id: "turn", kind: "wind-time", zone: "roofs", seconds: 10, after: "ines", label: "Keep Wind on the roof" },
           { id: "stalls-stand", kind: "intact", after: "turn", label: "Leave every stall standing" },
         ],
         lines: {
@@ -1178,10 +1298,10 @@ window.DAY_CONFIG = {
           },
         ],
         goals: [
-          { id: "debris", kind: "help", piece: "debris", count: 2, label: "Clear the road: Gale or Gust near each (V / G)" },
-          { id: "underpass", kind: "help", piece: "underpass", count: 2, after: "debris", label: "Drain the underpass: Sun break near each (X)" },
-          { id: "bus", kind: "help", piece: "bus", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it (E)" },
-          { id: "bridge", kind: "help", piece: "bridge", count: 2, after: "bus", label: "Hold the bridge open: Fog near each (C)" },
+          { id: "debris", kind: "help", piece: "debris", count: 2, label: "Clear the road: Wind near each" },
+          { id: "underpass", kind: "help", piece: "underpass", count: 2, after: "debris", label: "Drain the underpass: Sun near each" },
+          { id: "bus", kind: "help", piece: "bus", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it" },
+          { id: "bridge", kind: "help", piece: "bridge", count: 2, after: "bus", label: "Hold the bridge open: Fog near each" },
           { id: "home", kind: "reach", spot: "parkHome", r: 8, after: "bridge", label: "Get home" },
         ],
         lines: {
@@ -1253,8 +1373,8 @@ window.DAY_CONFIG = {
         gauge: { x: 190, z: 35.4, h: 10 },
         strain: { budget: 6, costs: { bolt: 1, rain: 1, gale: 1, sunbreak: 1, fog: 1, gust: 1, tornado: 2, storm: 2 }, stackSec: 0 },
         goals: [
-          { id: "charge", kind: "ability-in", power: "bolt", zone: "tank", count: 2, label: "Charge the mast: Lightning at the Tank (E)" },
-          { id: "fill", kind: "weather-time", states: ["rain"], zone: "tank", seconds: 5, after: "charge", label: "Rain on the Tank until the gauge fills (R)" },
+          { id: "charge", kind: "ability-in", power: "bolt", zone: "tank", count: 2, label: "Charge the mast: Lightning at the Tank" },
+          { id: "fill", kind: "weather-time", states: ["rain"], zone: "tank", seconds: 5, after: "charge", label: "Rain on the Tank until the gauge fills" },
         ],
         lines: {
           start: "The Storm Tank. The gauge needle lies at the bottom.",
@@ -1584,6 +1704,20 @@ window.DAY_CONFIG = {
       },
     },
 
+    /* Birdie's pots and the apt block's stair, on the pavement west of his house (the memory steps use them):
+       the stair is the city's own ramp up the north face (city.blocks apt: x -28.5 at the ground to -17 at the roof, z 7.2). */
+    pots: {
+      label: "Birdie's pots",
+      building: "street",
+      camera: { alpha: 1.35, beta: 1.0, radius: 11 },
+      spots: {
+        birdiePots: [-21, 10.9, 180],
+        aptStairFoot: [-28.5, 7.2, 90],
+        aptStairTop: [-17.3, 7.2, 90],
+        aptRoof: [-19.5, 3.2, 90],
+      },
+    },
+
     /* ---------------- the street (car only) ---------------- */
     road: {
       label: "On the road",
@@ -1785,11 +1919,42 @@ window.DAY_CONFIG = {
       here: "here",
       inside: "at home",
     },
+    /* THE STREET TEACHES (js/street.js): after the cold open's bolt, Rain, Sun break, Fog and Wind are locked and each
+       arrives because a neighbor asks for it out loud, in their own voice, one after another. A step: `who` (neighbor id),
+       `unlock` (the verb's ability id), `answer` (the powers that answer it, called within `range` m of the target),
+       `ask` (spoken when he is within `near` m of them and they're outside), `call` (spoken from a window or down the
+       street: the neighbor is inside, or far away), `thanks` (1.1 s after the answer, in person or called), `then`
+       (a follow-up ask that the next verb answers; Ines: Fog, then a Wind gust to clear it). `spot` is where the cue
+       stands when they are inside. Birdie's call is the cold open's own line (coldopen.lines.birdie) and unlocks Rain.
+       Voice clips: Hawkes Gen audio.voice in their voices (scripts/sync-dialogue.mjs lists them). */
+    teach: {
+      storageKey: "icanbe.street",
+      gap: 4.5, // s from a thanks to the next neighbor's call
+      near: 14, // m: closer than this and they ask in person
+      range: 18, // m: how close he must be to answer
+      nag: 40, // s: an unanswered call is said once more
+      steps: [
+        { id: "rain", who: "birdie", unlock: "rain", answer: ["rain"], color: [0.45, 0.7, 1], spot: { x: -21, z: 9.5 },
+          call: null, // the cold open's line is her call
+          thanks: "Look at them drink. Bless you." },
+        { id: "sun", who: "dex", unlock: "sunbreak", answer: ["sunbreak"], color: [1, 0.8, 0.35], spot: { x: 46, z: 9.8 },
+          ask: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.",
+          call: "Small Weather! Down by the shop. My parcels are soaked. A sun break?",
+          thanks: "Dry as a bone. I owe you a delivery." },
+        { id: "fog", who: "quill", unlock: "fog", answer: ["fog"], color: [0.78, 0.7, 1], spot: { x: 154, z: 9.8 },
+          ask: "The streetlights are drowning my stars. Could you soften them with some fog?",
+          call: "Small Weather! The annex, up the avenue. The streetlights are drowning my stars. Fog, please?",
+          thanks: "Lovely. Too lovely. I can't see through it. A gust, to clear a window?",
+          then: { unlock: "wind", answer: ["gust", "gale", "tornado"], color: [0.55, 1, 0.8], thanks: "There. Orion, sharp as a pin. Thank you." } },
+      ],
+    },
     list: [
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
         look: { skin: "#e0b794", top: "#f2c230", pants: "#4a5a3a", shoes: "#5a3a22", hair: "#7a5a3a", bun: true, coat: 0.5, hat: { type: "straw", brim: 0.62, color: "#c9a85a", band: "#4f9a5b" }, carry: "basket" },
         stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5, "sit"], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
+        /* What she remembers when he walks up (voiced; once a day each): `helped` after he answered her ask, `botched` after he left it. */
+        remember: { helped: "Small Weather. My tomatoes are still talking about that rain.", botched: "The tomatoes got by without you. Barely." },
         beats: [
           { id: "birdie-ask", kind: "ask", from: 7, to: 11.5, ability: "rain", text: "There you are. My tomatoes are sulking. A little rain, if you've got any?", reward: null },
           { id: "birdie-thanks", kind: "thanks", text: "Look at them drink. Bless you.", reward: { score: 50, pressure: 25, label: "for the tomatoes" } },
@@ -1800,6 +1965,7 @@ window.DAY_CONFIG = {
         id: "dex", name: "Dex Moreno", role: "Courier, the shop", home: "the shop, mid avenue", scale: 1, color: "#ff7a1a",
         look: { skin: "#8a5a3c", top: "#ff7a1a", pants: "#24262c", shoes: "#e8e8e8", build: 1.1, hat: { type: "helmet", color: "#e8e8e8" }, carry: "parcel" },
         stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5, "sit"], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
+        remember: { helped: "Hey, sun break. The parcels stayed dry. I haven't forgotten.", botched: "The parcels came out soggy. No hard feelings. Some." },
         beats: [
           { id: "dex-ask", kind: "ask", from: 7, to: 15, ability: "sunbreak", text: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.", reward: null },
           { id: "dex-thanks", kind: "thanks", text: "Dry as a bone. I owe you a delivery.", reward: { score: 50, pressure: 25, label: "for the dry parcels" } },
@@ -1810,12 +1976,162 @@ window.DAY_CONFIG = {
         id: "quill", name: "Ines Quill", role: "Stargazer, the annex", home: "the annex, east end", scale: 1.1, color: "#7a5cd6",
         look: { skin: "#e3c4a8", top: "#7a5cd6", pants: "#1c1c2a", shoes: "#1c1c2a", hair: "#2a2038", glasses: "#9fd4ff", coat: 0.55, carry: "telescope" },
         stops: [[0, 154, 9.8], [6.5, 154, 9.8, "inside"], [16.5, 154, 9.8]],
+        remember: { helped: "That blue is still on my sensor. Thank you.", botched: "No bolt, no photograph. I stayed up anyway." },
         beats: [
           { id: "quill-ask", kind: "ask", from: 17, to: 5, ability: "bolt", text: "Thirty nights and no lightning in my lens. One bolt, if you would. Not at me.", reward: null },
           { id: "quill-thanks", kind: "thanks", text: "Got it. Look at that blue.", reward: { score: 50, pressure: 25, label: "for the photograph" } },
           { id: "quill-surprise", kind: "surprise", from: 20.5, to: 5, text: "Look up. My charts and your weather agree: tonight you're the brightest thing out.", reward: { score: 100, pressure: 60, label: "and a star named for him" } },
         ],
       },
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
+     DAILY (js/daily.js) — a neighbour asks for one specific bit of weather today. The ask is picked from the
+     real local date: index = (days since 1970 * step) mod pool size, with `step` coprime to the pool's size, so
+     no ask repeats within any run of `pool.length` (21) dates. It shows on the title ("Today: ...", and
+     "Yesterday: ..." under it when yesterday's was answered), is spoken by the neighbour (voiced) when he comes
+     within `near` m, and is answered by calling its `power` (bolt, rain, wind = gust/gale/tornado, fog,
+     sunbreak) inside `place` ({ x, z, r }) between `from` and `to` (day-clock hours, wrapping past midnight).
+     The asker is Birdie, Dex or Ines (their figures, `who` is their neighbors id) or a citizen from the
+     episodes (a figure stands at `stand` all day). Answering plays the `thanks` line in their voice, records
+     askAnswered + dailyAnswered in day.memory and leaves `reward` standing at `at` until the date turns.
+     reward.kind: bunting (flags on two posts), lanterns (glowing string), pinwheels (three spinning stakes),
+     photo (an easel with their picture). State: localStorage icanbe.daily. Voice: `name` is the speaker in
+     dialogue.cast, clips are dlg-<name>-<hash>.mp3 (js/dialogue.js picks up `ask` and `thanks`).
+     ------------------------------------------------------------------------ */
+  daily: {
+    storageKey: "icanbe.daily",
+    step: 5, // coprime to 21: consecutive dates walk the pool five apart (checked in scripts/check-daily.mjs)
+    near: 12, // m: how close he must be for the neighbour to say it aloud
+    pressure: 30, // Charge handed back for answering
+    lines: {
+      today: "Today: ",
+      yesterday: "Yesterday: ",
+      thanksToast: "{name}: thank you. It stays up all day.",
+      wrongHour: "{name} asked for it {when}.",
+      wrongPlace: "{name} wanted it {where}.",
+      tap: "Tap to hear it",
+    },
+    /* Citizens from the episodes stand at `stand` with this look all day while theirs is the ask. */
+    citizens: {
+      odile: { name: "Odile", x: 109.5, z: 27, scale: 1, color: "#d9604a", look: { skin: "#c58b68", top: "#d9604a", pants: "#2a2a34", shoes: "#2a2a34", hair: "#3a2a22", bun: true } },
+      pim: { name: "Pim", x: 118, z: 31, scale: 0.95, color: "#4a7fc0", look: { skin: "#e3c4a8", top: "#4a7fc0", pants: "#24262c", shoes: "#e8e8e8", hair: "#1c1c2a" } },
+      gus: { name: "Gus", x: 126.5, z: 25.5, scale: 1, color: "#a65bb5", look: { skin: "#d2a584", top: "#a65bb5", pants: "#4a4a52", shoes: "#5a3a22", hair: "#cfcfd6", hat: { type: "straw", brim: 0.5, color: "#b8a070", band: "#a65bb5" } } },
+      hollis: { name: "Hollis", x: 51.5, z: 9.6, scale: 1.05, color: "#e0a53c", look: { skin: "#a8734f", top: "#e0a53c", pants: "#3a3a2a", shoes: "#5a3a22", hat: { type: "helmet", color: "#e0a53c" } } },
+      nell: { name: "Nell", x: 78, z: 9.6, scale: 0.95, color: "#4f9a5b", look: { skin: "#e0b794", top: "#4f9a5b", pants: "#2a2a34", shoes: "#2a2a34", hair: "#6a3a22" } },
+      ravi: { name: "Ravi", x: 90, z: 15.6, scale: 1, color: "#d9a05a", look: { skin: "#a8734f", top: "#d9a05a", pants: "#24262c", shoes: "#24262c", hair: "#1c1c2a" } },
+    },
+    pool: [
+      /* Birdie (the apt block's stoop, -21, 9.5): bunting */
+      { id: "birdie-rain-park", who: "birdie", name: "Birdie", power: "rain", from: 7, to: 14, place: { x: -2, z: 44, r: 30, name: "the park" }, rewardWhere: "her stoop",
+        title: "Birdie wants rain on the park this morning", did: "you rained on Birdie's park",
+        ask: "The park lawn has gone to straw. Rain on it before noon? All of it, if you can.",
+        thanks: "Look at that green come back. I'm hanging flags.",
+        reward: { kind: "bunting", at: [-21, 9.5], color: "#f2c230" } },
+      { id: "birdie-fog-pots", who: "birdie", name: "Birdie", power: "fog", from: 5.5, to: 10, place: { x: -21, z: 9.5, r: 22, name: "by the apt block" }, rewardWhere: "her stoop",
+        title: "Birdie wants fog over her pots at dawn", did: "you brought Birdie fog",
+        ask: "Snapdragons love a cool grey morning. Fog over my pots, early, while it's quiet?",
+        thanks: "They're soaking it up. Cool and grey. Bunting's going up.",
+        reward: { kind: "bunting", at: [-21, 9.5], color: "#9fd4c2" } },
+      { id: "birdie-wind-park", who: "birdie", name: "Birdie", power: "wind", from: 12, to: 18, place: { x: -2, z: 44, r: 30, name: "the park" }, rewardWhere: "her stoop",
+        title: "Birdie wants wind over the park this afternoon", did: "you sent Birdie a breeze",
+        ask: "The seed heads need a good shake. Some wind over the park this afternoon?",
+        thanks: "Seeds everywhere. Next spring is going to be a riot.",
+        reward: { kind: "bunting", at: [-21, 9.5], color: "#e0703a" } },
+      /* Dex (the shop stoop, 46, 9.8): lanterns and pinwheels */
+      { id: "dex-sun-shop", who: "dex", name: "Dex", power: "sunbreak", from: 7, to: 15, place: { x: 46, z: 9.8, r: 22, name: "at the shop" }, rewardWhere: "the shop",
+        title: "Dex wants a sun break over the shop", did: "you brought Dex the sun",
+        ask: "My parcel racks are soaked. A sun break over the shop before lunch? Two minutes is plenty.",
+        thanks: "Bone dry. I'm putting lanterns up. House rules.",
+        reward: { kind: "lanterns", at: [46, 9.8], color: "#ffb04a" } },
+      { id: "dex-wind-avenue", who: "dex", name: "Dex", power: "wind", from: 14, to: 18.5, place: { x: 80, z: 12.6, r: 40, name: "on the avenue" }, rewardWhere: "the shop",
+        title: "Dex wants a tailwind on the avenue after lunch", did: "you gave Dex a tailwind",
+        ask: "Last drop of the day is all uphill. A tailwind on the avenue, if you've got one?",
+        thanks: "Tailwind! Fastest run I've ever done. Pinwheels for the stoop.",
+        reward: { kind: "pinwheels", at: [46, 9.8], color: "#ff7a1a" } },
+      { id: "dex-bolt-rod", who: "dex", name: "Dex", power: "bolt", from: 17, to: 23, place: { x: 53, z: 3, r: 18, name: "at the shop rod" }, rewardWhere: "the shop",
+        title: "Dex wants a bolt on the shop rod at dusk", did: "you lit up Dex's shop rod",
+        ask: "Nobody's ever struck that rod on my watch. A bolt on it at dusk? Not near the parcels.",
+        thanks: "The whole shop hummed. I felt that in my teeth.",
+        reward: { kind: "lanterns", at: [46, 9.8], color: "#9fd4ff" } },
+      /* Ines (the annex, 154, 9.8): photographs */
+      { id: "quill-fog-plaza", who: "quill", name: "Ines", power: "fog", from: 17, to: 21, place: { x: 118, z: 26, r: 22, name: "over the plaza" }, rewardWhere: "her window",
+        title: "Ines wants fog over the plaza at dusk", did: "you brought Ines fog for her photo",
+        ask: "Fog over the plaza at dusk. I want the clock tower wading in cloud. For a photograph.",
+        thanks: "Got it. The tower is wading. This one goes up in my window.",
+        reward: { kind: "photo", at: [154, 9.8], power: "fog" } },
+      { id: "quill-wind-annex", who: "quill", name: "Ines", power: "wind", from: 12, to: 18, place: { x: 154, z: 9, r: 24, name: "at the annex" }, rewardWhere: "her window",
+        title: "Ines wants wind to spin the annex turbines by 6 PM", did: "you spun Ines's turbines",
+        ask: "The annex turbines have stalled. Wind on the roof before six, if you would.",
+        thanks: "They're turning. Listen to the annex hum. I have it on film.",
+        reward: { kind: "photo", at: [154, 9.8], power: "wind" } },
+      { id: "quill-sun-tank", who: "quill", name: "Ines", power: "sunbreak", from: 8, to: 16, place: { x: 190, z: 44, r: 26, name: "at the Storm Tank" }, rewardWhere: "her window",
+        title: "Ines wants a sun break on the Storm Tank", did: "you put gold on the Storm Tank for Ines",
+        ask: "I need the Storm Tank in a sun break. Gold on the glass. A minute, no more.",
+        thanks: "Gold on the glass. I got it. It's going in my window.",
+        reward: { kind: "photo", at: [154, 9.8], power: "sunbreak" } },
+      /* Citizens from the episodes */
+      { id: "odile-sun-plaza", who: "odile", name: "Odile", power: "sunbreak", from: 10, to: 16, place: { x: 118, z: 26, r: 22, name: "over the plaza" }, rewardWhere: "her stall",
+        title: "Odile wants a sun break over the plaza at midday", did: "you dried out Odile's chairs",
+        ask: "My chairs are damp and so are my customers. A sun break over the plaza, please!",
+        thanks: "Dry chairs! Flags on the stall, I insist.",
+        reward: { kind: "bunting", at: [109.5, 27], color: "#d9604a" } },
+      { id: "odile-wind-plaza", who: "odile", name: "Odile", power: "wind", from: 7, to: 11, place: { x: 118, z: 26, r: 22, name: "over the plaza" }, rewardWhere: "her stall",
+        title: "Odile wants a gust over the plaza this morning", did: "you blew Odile's pastries down the avenue",
+        ask: "Nobody's buying. Push the smell of the pastries down the avenue, a gust over the plaza?",
+        thanks: "Smell that? That's the queue coming. Bunting for you.",
+        reward: { kind: "bunting", at: [109.5, 27], color: "#f0c27a" } },
+      { id: "pim-rain-plaza", who: "pim", name: "Pim", power: "rain", from: 18, to: 23, place: { x: 118, z: 28, r: 22, name: "on the plaza" }, rewardWhere: "his stall",
+        title: "Pim wants a little rain on the plaza tonight", did: "you rained on Pim's noodle queue",
+        ask: "Rain makes people hungry. A little on the plaza tonight and my line goes round the fountain.",
+        thanks: "Look at that queue! Lanterns for the stall.",
+        reward: { kind: "lanterns", at: [118, 31], color: "#6aa8ff" } },
+      { id: "pim-bolt-plaza", who: "pim", name: "Pim", power: "bolt", from: 19, to: 23.5, place: { x: 118, z: 28, r: 24, name: "over the plaza" }, rewardWhere: "his stall",
+        title: "Pim wants a bolt over the plaza after dark", did: "you lit up Pim's plaza",
+        ask: "One bolt over the plaza. People stop and look, and looking people get hungry.",
+        thanks: "Ha! The whole queue jumped. Free bowl for you, any night.",
+        reward: { kind: "lanterns", at: [118, 31], color: "#c8b0ff" } },
+      { id: "gus-fog-plaza", who: "gus", name: "Gus", power: "fog", from: 5.5, to: 10, place: { x: 118, z: 26, r: 22, name: "over the plaza" }, rewardWhere: "the bench",
+        title: "Gus wants fog on the plaza at dawn", did: "you brought Gus the old fog",
+        ask: "Forty years back the plaza woke up in fog like soup. Could you? Early?",
+        thanks: "There it is. Forty years, gone in a breath.",
+        reward: { kind: "lanterns", at: [126.5, 25.5], color: "#d8e4ea" } },
+      { id: "gus-wind-kite", who: "gus", name: "Gus", power: "wind", from: 13, to: 18, place: { x: 118, z: 26, r: 22, name: "over the plaza" }, rewardWhere: "the bench",
+        title: "Gus wants wind over the plaza for his kite", did: "you flew Gus's kite",
+        ask: "I've a kite that hasn't left the ground since March. Wind over the plaza this afternoon?",
+        thanks: "Up she goes! Look at her climb!",
+        reward: { kind: "pinwheels", at: [126.5, 25.5], color: "#a65bb5" } },
+      { id: "hollis-rain-shop", who: "hollis", name: "Hollis", power: "rain", from: 7, to: 13, place: { x: 50, z: 3, r: 22, name: "on the shop roof" }, rewardWhere: "the shop",
+        title: "Hollis wants rain on the shop roof this morning", did: "you tested Hollis's roof",
+        ask: "I patched the shop roof last week. I need to know it holds. Rain on the shop, please.",
+        thanks: "Not one drip. That goes on the invoice.",
+        reward: { kind: "bunting", at: [51.5, 9.6], color: "#e0a53c" } },
+      { id: "hollis-sun-shop", who: "hollis", name: "Hollis", power: "sunbreak", from: 12, to: 17, place: { x: 50, z: 3, r: 22, name: "on the shop roof" }, rewardWhere: "the shop",
+        title: "Hollis wants a sun break on the shop roof", did: "you cured Hollis's tar",
+        ask: "Tar cures better in the sun. A sun break on the shop roof this afternoon?",
+        thanks: "Flat as a pancake and hard as a rock. Lanterns for the ladder.",
+        reward: { kind: "lanterns", at: [51.5, 9.6], color: "#ffd27a" } },
+      { id: "nell-sun-crossing", who: "nell", name: "Nell", power: "sunbreak", from: 13, to: 18, place: { x: 78, z: 10, r: 22, name: "at the crosswalk" }, rewardWhere: "the crossing",
+        title: "Nell wants a sun break at the crosswalk after school", did: "you lit up Nell's crosswalk",
+        ask: "The kids cross here after school. A sun break at the crosswalk, so drivers can see them?",
+        thanks: "Bright as a bell. There'll be flags on the crossing.",
+        reward: { kind: "bunting", at: [78, 9.6], color: "#4f9a5b" } },
+      { id: "nell-rain-chalk", who: "nell", name: "Nell", power: "rain", from: 6, to: 11, place: { x: 78, z: 10, r: 22, name: "at the crosswalk" }, rewardWhere: "the crossing",
+        title: "Nell wants rain at the crosswalk this morning", did: "you washed Nell's chalk away",
+        ask: "The children chalked the whole crossing. Rain on it this morning, and tomorrow's a clean slate?",
+        thanks: "Clean slate. Lovely. Pinwheels, from the kids.",
+        reward: { kind: "pinwheels", at: [78, 9.6], color: "#4f9a5b" } },
+      { id: "ravi-wind-avenue", who: "ravi", name: "Ravi", power: "wind", from: 11, to: 16, place: { x: 90, z: 12.6, r: 26, name: "on the avenue" }, rewardWhere: "his stand",
+        title: "Ravi wants a gust on the avenue at midday", did: "you dried Ravi's newspapers",
+        ask: "My newspapers are stuck together with damp. A gust on the avenue and they'll dry in a minute.",
+        thanks: "Pages flapping. Dry as toast. Pinwheels for the stand.",
+        reward: { kind: "pinwheels", at: [90, 15.6], color: "#d9a05a" } },
+      { id: "ravi-bolt-avenue", who: "ravi", name: "Ravi", power: "bolt", from: 17, to: 23, place: { x: 90, z: 12.6, r: 30, name: "over the avenue" }, rewardWhere: "his stand",
+        title: "Ravi wants a bolt over the avenue at dusk", did: "you won Ravi's bet",
+        ask: "I bet Gus you can't call a bolt on command. One over the avenue tonight?",
+        thanks: "I owe Gus a coffee. Worth every drop.",
+        reward: { kind: "lanterns", at: [90, 15.6], color: "#9fd4ff" } },
     ],
   },
 
@@ -1904,6 +2220,13 @@ window.DAY_CONFIG = {
         { at: "counter", hand: "phone", fill: true, micro: { pools: ["phone"], every: "20-40s" }, do: ["He waits for the coffee, looking at the phone.", "The toaster ticks."] },
         { at: "counter", hand: "cook", for: "15-30s", do: "Toast up. A little butter." },
         { at: "counter", hand: "drink", for: "2-3m", body: { hunger: -0.35, thirst: -0.25, energy: +0.2 }, do: ["Coffee and toast, eaten standing.", "A bite of toast. A sip of coffee."] },
+        {
+          remembers: "birdieRain",
+          steps: [
+            { go: "birdiePots", hand: "drink", do: "He takes his coffee out and walks over to Birdie's pots." },
+            { at: "birdiePots", hand: "nod", for: "18-28s", say: "Birdie's pots. Quick hello.", do: ["Birdie waves from her tomatoes. He waves back.", "The tomatoes are still dark with rain. Birdie waves."] },
+          ],
+        },
         { at: "kitchenSink", hand: "wash", for: "15-30s", set: { mug: "sink" }, do: "He rinses the mug. It stays in the sink." },
         { at: "kitchenSink", hand: "reach", for: "1-2s", set: { kitchenLight: "off" }, do: "Kitchen light off." },
         { go: "entryTable", do: "To the front door." },
@@ -1913,6 +2236,8 @@ window.DAY_CONFIG = {
         { at: "frontDoorOut", hand: "reach", for: "3-5s", set: { frontDoor: "open" }, do: "Small Weather opens the front door and steps out." },
         { at: "frontDoorOut", hand: "reach", for: "3-6s", set: { frontDoor: "locked" }, do: "He locks it from outside." },
         { chance: 0.45, at: "frontDoorOut", hand: "reach", for: "2-3s", do: "He tugs the handle. Locked. He knew that." },
+        /* what the city remembers (js/memory.js facts; `remembers`): these only appear after he has been out playing */
+        { remembers: "storm", at: "frontDoorOut", hand: "face", for: "8-14s", say: "Checking what's left of that sky.", do: "He stops on the step and checks the sky before the car." },
         { go: "carSideHome", hand: "hold", do: "He walks to the car." },
         { at: "carSideHome", hand: "reach", for: "2-4s", set: { car: "unlocked" }, do: "Unlock." },
         { at: "carSideHome", pose: "sitCar", hand: "hold", for: "8-15s", set: { carrying: "bag on the seat" }, do: "He gets in. Bag on the passenger seat." },
@@ -2094,6 +2419,8 @@ window.DAY_CONFIG = {
       title: "Phone at the table",
       chapter: "lunch",
       steps: [
+        { remembers: "botched", at: "lunchSeat", pose: "sitChair", hand: "phone", for: "25-40s", say: "Not looking out that window.", do: "He keeps his eyes on the phone. Someone out there is still waiting on him." },
+        { remembers: "answered", at: "lunchSeat", pose: "sitChair", hand: "phone", for: "15-25s", say: "Someone said thanks today.", do: "He reads the thanks again, and puts the phone face down for a second." },
         { at: "lunchSeat", pose: "sitChair", hand: "phone", fill: true, set: { phone: "in hand" }, body: { boredom: -0.2 },
           micro: { pools: ["phone"], every: "30s-1.5m" }, do: ["He scrolls.", "Phone. Scrolling.", "He sends another text."] },
         { pose: "sitChair", hand: "reach", for: "2-4s", set: { phone: "pocket" }, do: "Phone away." },
@@ -2148,6 +2475,7 @@ window.DAY_CONFIG = {
           micro: { pools: ["idle"], every: "20-40s" },
           do: ["He stops at the window and looks out.", "Clouds over the parking lot."],
         },
+        { remembers: "storm", at: "hallEnd", for: "30-50s", say: "Those clouds were mine.", do: "He stays at the window a while longer. The clouds are his." },
         { go: "elevatorCall", activity: "walk", do: "He walks the length of the hall." },
         { at: "elevatorCall", for: "20-40s", do: "He reads a notice on the wall." },
         { go: "hallMid", activity: "walk", do: "He heads back." },
@@ -2324,6 +2652,7 @@ window.DAY_CONFIG = {
         { drive: "backOutWork", reverse: true, for: "15-25s", do: "He backs out of the spot." },
         { drive: "lotExit", for: "25-40s", set: { headlights: "on" }, do: "Out of the lot. Headlights on; the sky is getting dim." },
         { drive: "roadWorkW", for: "15-25s", do: "Onto the road." },
+        { remembers: "parkFlood", pose: "sitCar", hand: "wheel", for: "6-10s", say: "The park's still green from me.", do: "He slows at the corner and looks across at the park. Still green." },
         { drive: "signalW", for: "10-16s", micro: { pools: ["driving", "mind"], every: "1.5-4m" }, do: ["The drive home.", "Along the avenue.", "He follows the car ahead."] },
         { pose: "sitCar", hand: "wheel", fill: true, micro: DRIVE_MICRO, do: ["The light near home. A long line.", "He waits."] },
       ],
@@ -2388,6 +2717,24 @@ window.DAY_CONFIG = {
           for: "4-8s",
           do: "He skips the mailbox. Snow.",
         },
+        {
+          remembers: "birdieRain",
+          steps: [
+            { go: "birdiePots", hand: "hold", do: "He passes Birdie's pots on the way in." },
+            { at: "birdiePots", hand: "nod", for: "12-20s", say: "Evening, Birdie.", do: "Birdie is packing up for the night. They nod to each other." },
+          ],
+        },
+        {
+          remembers: "roofRide",
+          steps: [
+            { go: "aptStairFoot", hand: "hold", do: "He walks down the pavement to the apartment stair." },
+            { go: "aptStairTop", hand: "hold", do: "He climbs the stair to the roof." },
+            { go: "aptRoof", hand: "none", do: "He steps out onto the roof." },
+            { at: "aptRoof", hand: "none", for: "50s-1m", say: "One minute up there. Just one.", do: "He stands on the roof for a minute while the sky goes dark. Nobody is asking him for anything." },
+            { go: "aptStairTop", hand: "hold", do: "He heads back down." },
+            { go: "aptStairFoot", hand: "hold", do: "Down the stair." },
+          ],
+        },
         { go: "frontDoorOut", hand: "hold", do: "He walks to the front door." },
         { at: "frontDoorOut", hand: "reach", for: "4-10s", set: { frontDoor: "open" }, do: "He finds the right key and unlocks it." },
         { at: "frontDoorIn", hand: "reach", for: "3-5s", set: { frontDoor: "locked" }, do: "Inside. He locks the door." },
@@ -2426,6 +2773,7 @@ window.DAY_CONFIG = {
       title: "Texting on the couch",
       chapter: "tv",
       steps: [
+        { remembers: "storm", at: "couch", pose: "sitCouch", hand: "none", for: "30-45s", say: "I can still smell that storm.", do: "He mutes the television and watches the sky through the window." },
         { at: "couch", pose: "sitCouch", hand: "phone", fill: true, set: { phone: "in hand" }, micro: { pools: ["phone"], every: "40s-1.5m" },
           do: ["Phone out. A text thread.", "He types a reply.", "He waits for the reply."] },
         { pose: "sitCouch", hand: "reach", for: "2-4s", set: { phone: "on the cushion" }, do: "Phone on the cushion." },
@@ -2526,6 +2874,7 @@ window.DAY_CONFIG = {
       steps: [
         { at: "pcChair", pose: "sitChair", hand: "type", for: "10-20s", set: { pc: "on" }, do: "He opens it." },
         { at: "pcChair", pose: "sitChair", hand: "none", for: "10-30s", do: "He waits for it to wake." },
+        { remembers: "answered", at: "pcChair", pose: "sitChair", hand: "type", for: "20-30s", say: "Somebody got their picture.", do: "He opens a photo someone sent of the sky. He looks at it longer than he means to." },
         { pose: "sitChair", hand: "type", fill: true, activity: "sit", body: { boredom: -0.3 }, micro: { pools: ["computer", "mind", "phone"], every: "2-6m" },
           do: ["On the computer.", "He reads an article.", "A video.", "He browses.", "He looks something up."] },
       ],
@@ -2761,6 +3110,17 @@ window.DAY_CONFIG = {
       { do: "Thirsty. He'll get water later.", for: "3-5s", when: { thirst: ">0.55" }, likes: { thirst: 2 } },
       { do: "Hungry. Not yet.", for: "3-5s", when: { hunger: ">0.6" }, likes: { hunger: 2 } },
       { do: "Motivated for a minute. He starts the next thing early.", for: "20-40s", when: { energy: ">0.6" } },
+      {
+        remembers: "storm",
+        do: "He walks to the window and watches the clouds. He called those.",
+        weight: 8,
+        max: 1,
+        steps: [
+          { go: "officeWindow", do: "He gets up and walks to the window." },
+          { at: "officeWindow", for: "40s-1m", say: "Still thinking about that storm.", do: "He watches the clouds for a while." },
+          { go: "$back", do: "Back to the chair." },
+        ],
+      },
       {
         do: "He walks to the window, looks out, and comes back.",
         max: 1,

@@ -77,7 +77,7 @@ html.touch-ui .tools { position: fixed; top: var(--safe-t); right: max(12px, env
 /* ---------- Let go / Take control (centre, above the bottom row) ---------- */
 .control-btn { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tl) + 32px); }
 html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(--above-a); }
-.preview-public .control-btn { bottom: var(--safe-b); }
+.preview-public .control-btn { bottom: 40px; }
 @media (max-width: 700px) {
   .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
 }
@@ -114,51 +114,70 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-hint { bottom: calc
 .hud-left .weather-btn, .hud-left #weather-chip { order: 3; }
 .hud-left .pressure { order: 4; }
 .nb-panel { position: fixed; left: var(--safe-l); bottom: calc(var(--l1) + 100px); }
-.preview-public .hud-left { bottom: 78px; }
+.preview-public .hud-left { bottom: 40px; }
 /* phone: the column hangs top-left (weather, Pressure, Neighbors, Episodes), clear of the tools column */
 @media (max-width: 700px) {
   .hud-left { bottom: auto; top: var(--safe-t); flex-direction: column; left: max(12px, env(safe-area-inset-left)); }
   .in-control .hud-left .ep-btn { order: 5; }
 }
 html.touch-ui .hud-left { bottom: auto; top: var(--safe-t); flex-direction: column; left: max(12px, env(safe-area-inset-left)); }
+/* phone, not in control: the top-left is the status card, so Episodes sits bottom-left above the timeline (beside Take control) */
+@media (max-width: 700px) {
+  html:not(.in-control):not(.preview-public) .hud-left { top: auto; bottom: 156px; flex-direction: column-reverse; }
+}
+html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; bottom: 156px; flex-direction: column-reverse; }
 
-/* ---------- bottom row: the ability bar, the power pad ---------- */
+/* ---------- bottom row: the ability bar (five verbs; phone = arc + Charge ring) ---------- */
 .abilitybar { position: fixed; left: 50%; bottom: var(--safe-b); transform: translateX(-50%); }
 html:not(.preview-public):not(.touch-ui) .abilitybar { bottom: var(--row-a); }
+/* phone: verb arc on the right edge above the thumb zone (Jump), clear of the character */
 html.touch-ui .abilitybar {
-  left: auto; right: max(12px, env(safe-area-inset-right));
-  bottom: max(252px, calc(env(safe-area-inset-bottom) + 240px)); transform: none;
+  left: auto; right: max(8px, env(safe-area-inset-right));
+  bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); transform: none;
 }
-.powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; }
-/* phone: the controls legend sits above the stick, left of the power pad */
-html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 250px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
-html.touch-ui .powerpad { right: max(12px, env(safe-area-inset-right)); bottom: max(150px, calc(env(safe-area-inset-bottom) + 138px)); }
+.powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; display: none !important; }
+/* phone: the controls legend shows once, then fades */
+html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 160px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
+.control-hint.hint-faded { opacity: 0; visibility: hidden; transition: opacity .6s ease; }
+html.touch-ui .powerpad { display: none !important; }
 
 /* ---------- centre cards: tutorial, Episodes HUD, toasts, the take-over line, the episode line ---------- */
 .tutorial { position: fixed; left: 50%; transform: translateX(-50%); bottom: 202px; top: auto; }
 html.in-control .tutorial { bottom: 232px; }
 .preview-public .tutorial { bottom: max(72px, calc(env(safe-area-inset-bottom) + 62px)); }
 .preview-public.in-control .tutorial { bottom: 116px; }
-html.touch-ui.in-control .tutorial { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); }
-html.touch-ui.in-control:not(.preview-public) .tutorial { bottom: max(338px, calc(env(safe-area-inset-bottom) + 326px)); }
+html.touch-ui.in-control .tutorial { bottom: max(300px, calc(env(safe-area-inset-bottom) + 288px)); }
+html.touch-ui.in-control:not(.preview-public) .tutorial { bottom: max(290px, calc(env(safe-area-inset-bottom) + 278px)); }
 /* desktop, in control: top centre (the memory "HUD z-order" convention), clear of the bottom row */
 html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { top: 156px; bottom: auto; }
 
 .ep-hud { position: fixed; right: 18px; top: 88px; }
 @media (min-width: 900px) { html:has(.side:not([hidden])) .ep-hud { right: calc(var(--gutter, 18px) + var(--side-w) + 12px); } }
-/* phone portrait: under the weather chip and Pressure (top-left column), right-aligned, never taller than the room above the ability row */
+/* phone: Light show / episode card collapses to a top strip so the character and verb arc stay clear */
 @media (max-width: 700px) {
-  .ep-hud { right: max(12px, env(safe-area-inset-right)); top: max(132px, calc(env(safe-area-inset-top) + 126px)); width: min(280px, calc(100vw - 24px)); max-height: calc(100vh - 132px - 470px); overflow: hidden; }
+  .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: max(52px, calc(env(safe-area-inset-top) + 44px)); width: min(420px, calc(100vw - 24px)); max-height: 88px; overflow: hidden; }
+  html.touch-ui .ep-hud .ep-card { padding: 8px 12px; border-radius: 12px; }
+  html.touch-ui .ep-hud h3 { font-size: 0.82rem; margin: 0 0 2px; }
+  html.touch-ui .ep-hud .tag { display: none; }
+  html.touch-ui .ep-hud ul { display: flex; flex-wrap: wrap; gap: 4px 10px; max-height: 36px; overflow: hidden; }
+  html.touch-ui .ep-hud li { margin: 0; font-size: 0.68rem; }
 }
-/* phone landscape: top centre, between the left column and the right controls, above the ability bar */
 @media (orientation: landscape) and (max-height: 520px) {
-  html.touch-ui .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: calc(var(--safe-t) + 50px); width: min(260px, 34vw); max-height: calc(100vh - var(--safe-t) - 50px - 160px); overflow: hidden; }
+  html.touch-ui .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: calc(var(--safe-t) + 8px); width: min(480px, 70vw); max-height: 72px; overflow: hidden; }
 }
 .ep-say { position: fixed; left: 50%; bottom: max(96px, calc(env(safe-area-inset-bottom) + 88px)); }
 .ep-toast { position: fixed; left: 50%; top: max(64px, calc(env(safe-area-inset-top) + 56px)); }
 .nb-toast { position: fixed; left: 50%; top: max(110px, calc(env(safe-area-inset-top) + 100px)); }
 .mo-line { position: fixed; left: 50%; bottom: max(230px, calc(env(safe-area-inset-bottom) + 210px)); transform: translateX(-50%); }
 html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); } /* above the ability bar */
+/* a turning-point moment (js/moments.js `play`): one caption line and Skip at the bottom, in the thumb's reach; the rest of the HUD steps aside */
+.mo-cine { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(36px, calc(env(safe-area-inset-bottom) + 28px)); width: min(94vw, 40em); z-index: 39; }
+.mo-cine-tap { position: fixed; inset: 0; z-index: 38; }
+html.cine-up .hud, html.cine-up .side, html.cine-up .hud-left, html.cine-up .abilitybar, html.cine-up .powerpad, html.cine-up .touchpad,
+html.cine-up .control-btn, html.cine-up .control-hint, html.cine-up .public-toggle, html.cine-up .version-tag, html.cine-up .update-pill,
+html.cine-up .quality-btn, html.cine-up .voices-btn, html.cine-up .tutorial, html.cine-up .nb-btn, html.cine-up .ep-btn, html.cine-up .ep-hud,
+html.cine-up .ep-say, html.cine-up .ep-toast, html.cine-up .nb-toast, html.cine-up .nb-layer, html.cine-up .power-reticle, html.cine-up .pressure,
+html.cine-up #weather-btn, html.cine-up .mo-line, html.cine-up .voice-caption, html.cine-up .ep-offer, html.cine-up .co-bolt { visibility: hidden; }
 
 /* voice director caption: above the ability bar, never over it */
 .voice-caption {
@@ -171,7 +190,16 @@ html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-
 html:not(.in-control) .voice-caption { bottom: calc(var(--tl) + 88px); }
 .preview-public .voice-caption { bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); }
 html.touch-ui.in-control .voice-caption {
-  bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px));
+  /* above the verb arc (it stands 168px up and is 210px tall, on the right): a speaker's line never sits over a verb */
+  bottom: max(392px, calc(env(safe-area-inset-bottom) + 380px));
+}
+/* phone, just let go (and watching): the one-line caption floats in the open middle of the screen: below the status card
+   (top), above Episodes / weather (bottom-left, up to ~300px), Take control and the timeline, clear of the verb arc */
+@media (min-height: 521px) {
+  html.touch-ui:not(.in-control) .voice-caption { bottom: max(452px, calc(env(safe-area-inset-bottom) + 440px)); width: max-content; }
+}
+@media (max-width: 700px) and (min-height: 521px) {
+  html:not(.in-control) .voice-caption { bottom: max(452px, calc(env(safe-area-inset-bottom) + 440px)); width: max-content; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
   html.touch-ui .voice-caption { bottom: max(140px, calc(env(safe-area-inset-bottom) + 128px)); }
@@ -179,9 +207,52 @@ html.touch-ui.in-control .voice-caption {
 
 /* ---------- phone landscape (short window): the ability bar and the tutorial sit between the stick and the pad ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
-  html.touch-ui .abilitybar { right: auto; left: max(164px, calc(env(safe-area-inset-left) + 150px)); bottom: max(60px, calc(env(safe-area-inset-bottom) + 54px)); }
-  html.touch-ui.in-control:not(.preview-public) .tutorial { left: max(164px, calc(env(safe-area-inset-left) + 150px)); transform: none; bottom: max(146px, calc(env(safe-area-inset-bottom) + 140px)); }
+  html.touch-ui .abilitybar { right: max(8px, env(safe-area-inset-right)); left: auto; bottom: max(56px, calc(env(safe-area-inset-bottom) + 48px)); }
+  html.touch-ui.in-control:not(.preview-public) .tutorial { left: 50%; transform: translateX(-50%); bottom: max(146px, calc(env(safe-area-inset-bottom) + 140px)); }
 }
 
 /* ---------- bubbles ---------- */
 .nb-layer { position: fixed; inset: 0; }
+
+/* ---------- the public view (a real host, or ?view=public) ----------
+   Watching: one row along the bottom: Episodes left, Take control centre, the Time control right; the status card and the
+   tools (Sound, Settings) are the top bar. On a phone Take control rises a row so the three never touch.
+   In control (desktop): Let go, the hint, the caption and the tutorial stack above the ability bar, never over it. */
+:root { --pub-a: calc(var(--safe-b) + var(--row-a-h)); }
+.preview-public .hud.bottom { left: auto; right: var(--safe-r); bottom: 40px; width: auto; }
+.preview-public .time-drawer { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; width: min(560px, calc(100vw - var(--safe-l) - var(--safe-r))); }
+html.preview-public:not(.in-control) .hud-left { top: auto; bottom: 40px; left: var(--safe-l); flex-direction: column-reverse; }
+html.touch-ui.preview-public:not(.in-control) .control-btn { bottom: 92px; }
+@media (max-width: 700px) { html.preview-public:not(.in-control) .control-btn { bottom: 92px; } }
+html.preview-public.in-control:not(.touch-ui) .control-btn { bottom: calc(var(--pub-a) + 8px); }
+html.preview-public.in-control:not(.touch-ui) .control-hint { bottom: calc(var(--pub-a) + 56px); }
+html.preview-public.in-control:not(.touch-ui) .voice-caption { bottom: calc(var(--pub-a) + 104px); }
+html.preview-public.in-control:not(.touch-ui) .tutorial { top: 96px; bottom: auto; }
+
+/* ---------- "New version" pill: top centre; on a phone just above Take control ---------- */
+.update-pill { position: fixed; left: 50%; transform: translateX(-50%); top: var(--safe-t); }
+@media (max-width: 700px) { .update-pill { top: auto; bottom: 148px; } }
+html.touch-ui .update-pill { top: auto; bottom: 148px; }
+
+/* ---------- one thing at a time: the title, the Episodes menu and the in-play HUD never show together ----------
+   Re-showing the title or opening Episodes from play hides what belongs to play (caption, ability bar, hint, ...). */
+html.title-up .voice-caption, html.title-up .abilitybar, html.title-up .powerpad, html.title-up .touchpad, html.title-up .pressure,
+html.title-up #weather-btn, html.title-up .ep-hud, html.title-up .mo-line, html.title-up .ep-say, html.title-up .ep-toast, html.title-up .nb-layer,
+html.ep-menu-up .voice-caption, html.ep-menu-up .abilitybar, html.ep-menu-up .powerpad, html.ep-menu-up .touchpad, html.ep-menu-up .pressure,
+html.ep-menu-up #weather-btn, html.ep-menu-up .control-hint, html.ep-menu-up .tutorial, html.ep-menu-up .ep-hud, html.ep-menu-up .mo-line,
+html.ep-menu-up .ep-say, html.ep-menu-up .ep-toast, html.ep-menu-up .nb-layer, html.ep-menu-up .update-pill { visibility: hidden; }
+
+/* ---------- the cold open (js/coldopen.js): a new player's first bolt, nothing on screen but the one prompt ----------
+   html.cold-open hides the whole HUD (header, side panel, timeline, weather, Pressure, abilities, hints, Let go) until the
+   first bolt has landed. On a phone only the stick and Jump stay, plus the big Bolt button over the right thumb; the prompt
+   sits above it. */
+html.cold-open .hud, html.cold-open .side, html.cold-open .hud-left, html.cold-open .abilitybar, html.cold-open .powerpad,
+html.cold-open .control-btn, html.cold-open .control-hint, html.cold-open .public-toggle, html.cold-open .version-tag,
+html.cold-open .update-pill, html.cold-open .quality-btn, html.cold-open .voices-btn, html.cold-open .tutorial, html.cold-open .nb-btn,
+html.cold-open .ep-btn, html.cold-open .power-reticle, html.cold-open .pressure, html.cold-open #weather-btn, html.cold-open .mo-line, html.cold-open .nb-layer { visibility: hidden; }
+.co-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); z-index: 37; }
+.co-bolt { position: fixed; right: var(--safe-r); bottom: calc(var(--safe-b) + 124px); z-index: 37; }
+.co-say { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); z-index: 37; }
+html.touch-ui .co-prompt { left: auto; right: var(--safe-r); transform: none; bottom: calc(var(--safe-b) + 232px); }
+html.touch-ui .co-say { bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px)); }
+html.title-up .co-prompt, html.title-up .co-bolt, html.title-up .co-say { visibility: hidden; }

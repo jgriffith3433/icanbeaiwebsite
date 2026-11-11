@@ -627,6 +627,7 @@
     bedsideFill.range = 8;
     bedsideFill.setEnabled(false);
     const officeLights = [];
+    let officePowerK = 1; // Part 2's brown-out and the moment that brings the office lights back (js/episodes.js)
     if (cfg.buildings.office && cfg.buildings.office.bounds) {
       const o = cfg.buildings.office.origin;
       [[6, -1.2], [12, -1.2], [9, 3]].forEach((p, i) => {
@@ -794,7 +795,7 @@
       box("armL", 0.2, 0.55, 0.9, -1.15, 0.5, -0.12, cm2, n);
       box("armR", 0.2, 0.55, 0.9, 1.15, 0.5, -0.12, cm2, n);
       box("throwpillow", 0.38, 0.32, 0.12, 0.8, 0.75, -0.35, mat("#c9a04f"), n);
-      box("rugL", 3.4, 0.015, 2.6, 0, FLOOR + 0.008, 1.4, mat("#6e5a48"), n, false).receiveShadows = true;
+      box("rugL", 3.4, 0.015, 2.6, 0, FLOOR + 0.008, 1.4, mat("#6e5a48"), n).receiveShadows = true; /* cast true: joins the room lights' includedOnlyMeshes (false left it hemi-only and black); furnitureSet still skips it as a shadow caster */
       box("ctable", 1.0, 0.06, 0.55, 0, 0.45, 1.3, woodLight, n);
       [[-0.45, 1.1], [0.45, 1.1], [-0.45, 1.5], [0.45, 1.5]].forEach((p, i) => box("ctl" + i, 0.05, 0.4, 0.05, p[0], 0.23, p[1], woodLight, n));
       const remote = box("remote", 0.05, 0.02, 0.18, 0.3, 0.49, 1.25, dark, n);
@@ -1646,6 +1647,80 @@
       titleShot = on ? Object.assign({}, TITLE_SHOT, typeof on === "object" ? on : {}) : null;
       return !!titleShot;
     }
+    /* js/moments.js's cut-away camera for a turning-point moment: orbits a point in the city (target, alpha, beta, radius
+       each go from a start to an end value over `secs`, eased), on top of the day's camera and the player's. It stays out
+       of geometry: the radius is cut back by the big boxes (clearRadius) and the colliders, it never goes under the
+       ground or into a solid, and it counts any frame it still is (`cineInfo().inside`). Ending it puts the camera back
+       where it was (the player's orbit camera picks up from the same alpha, beta, radius and fov, with no snap). */
+    let cine = null;
+    function setCineShot(spec) {
+      if (!spec) {
+        if (cine) {
+          camera.alpha = cine.save.alpha;
+          camera.beta = cine.save.beta;
+          camera.radius = cine.save.radius;
+          camera.target.copyFrom(cine.save.target);
+          camera.fov = cine.save.fov;
+          cam.inited = false;
+          cam.user = 0;
+          cine.over = true;
+          cineLast = { frames: cine.frames, inside: cine.inside, minClear: cine.minClear, t: cine.t };
+        }
+        cine = null;
+        return false;
+      }
+      const two = (v, d) => (Array.isArray(v) ? v : [v == null ? d : v, v == null ? d : v]);
+      cine = {
+        t: 0, secs: spec.secs || 6, frames: 0, inside: 0, minClear: 99,
+        tx: two(spec.tx), ty: two(spec.ty), tz: two(spec.tz),
+        alpha: two(spec.alpha, -1.2), beta: two(spec.beta, 1.0), radius: two(spec.radius, 18), fov: spec.fov || 0,
+        save: { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, target: camera.target.clone(), fov: camera.fov },
+      };
+      return true;
+    }
+    let cineLast = null;
+    function cineInside(p) {
+      if (p.y < (surfaceAt ? surfaceAt(p.x, p.z) : 0) + 0.35 && p.y < 4) return true;
+      for (let i = 0; i < solids.length; i++) {
+        const q = solids[i];
+        if (q.roll || q.yaw || q.pitch) continue;
+        if (Math.abs(p.x - q.x) < q.w / 2 + 0.2 && Math.abs(p.y - q.y) < q.h / 2 + 0.2 && Math.abs(p.z - q.z) < q.d / 2 + 0.2) return true;
+      }
+      return false;
+    }
+    function cineStep(dt) {
+      const c = cine;
+      c.t += dt;
+      const k = Math.min(1, c.t / c.secs);
+      const e = k * k * (3 - 2 * k);
+      const lerp = (v) => v[0] + (v[1] - v[0]) * e;
+      const tx = lerp(c.tx), ty = lerp(c.ty), tz = lerp(c.tz);
+      const a = lerp(c.alpha), b = lerp(c.beta);
+      let r = lerp(c.radius);
+      const sb = Math.sin(b);
+      const dx = Math.cos(a) * sb, dy = Math.cos(b), dz = Math.sin(a) * sb;
+      r = clearRadius(tx, ty, tz, dx, dy, dz, r, 0.9);
+      const pl = physics;
+      if (pl && pl.plugin && pl.plugin.raycast && B.PhysicsRaycastResult) {
+        const res = cine.res || (cine.res = new B.PhysicsRaycastResult());
+        const from = new B.Vector3(tx + dx * 0.05, ty + dy * 0.05, tz + dz * 0.05);
+        pl.plugin.raycast(from, new B.Vector3(tx + dx * (r + 0.4), ty + dy * (r + 0.4), tz + dz * (r + 0.4)), res);
+        if (res.hasHit) r = Math.max(2.5, Math.min(r, B.Vector3.Distance(from, res.hitPoint) - 0.8));
+      }
+      camera.target.set(tx, ty, tz);
+      camera.alpha = a;
+      camera.beta = b;
+      camera.radius = r;
+      if (c.fov) camera.fov = c.save.fov + c.fov * (1 - e);
+      cam.inited = false;
+      cam.user = 0;
+      sun.position.set(tx - sun.direction.x * 40, 40, tz - sun.direction.z * 40);
+      const pos = { x: tx + dx * r, y: ty + dy * r, z: tz + dz * r };
+      c.frames++;
+      c.minClear = Math.min(c.minClear, pos.y - (surfaceAt ? surfaceAt(pos.x, pos.z) : 0));
+      if (cineInside(pos)) c.inside++;
+    }
+
     /* How far a camera at target + dir * r can sit before a building is in the way: a ray from the target
        against the town's big boxes (buildings and blocks; not trees, lamps, lips or ramps), minus a margin.
        Doesn't need Havok, so the automatic camera and the player's both use it. Returns r if clear. */
@@ -1701,7 +1776,9 @@
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
       hemi.intensity = 0.46 + day * 0.4; // dusk/night floor: the street and people must stay readable; the shaded faces of the city's buildings must still read in the morning
       B.Color3.LerpToRef(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
-      B.Color3.LerpToRef(C("#3a4258"), C("#3a362c"), day, hemi.groundColor);
+      // Vertical faces get half this ground colour: keep the dusk/night floor bright enough that brick facades and
+      // the street beside the apt ramp don't go near-black before weather.js can lift it with cover.
+      B.Color3.LerpToRef(C("#586878"), C("#3a362c"), day, hemi.groundColor);
       if (!scene.metadata || !scene.metadata.dayLook) {
         const ipc = pipeline.imageProcessing && pipeline.imageProcessing.imageProcessingConfiguration;
         if (ipc) ipc._exposure = 0.84 + day * 0.1;
@@ -1728,16 +1805,16 @@
           rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.95; // lamp off at night: the bed and the sleeper must still read
         } else if (rl.id === "living") {
           B.Color3.LerpToRef(C("#c4d4f0"), C("#ffd9a8"), rl.level, rl.light.diffuse);
-          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * night * 0.34;
+          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * (night * 0.34 + day * 0.4); // lamp off by day: the window light still fills the room, hemi alone left it near-black
         } else {
-          rl.light.intensity = rl.level * (0.55 + night * 0.65);
+          rl.light.intensity = rl.level * (0.55 + night * 0.65) + (1 - rl.level) * day * 0.4;
         }
       });
       bedsideFill.intensity = night * (things.bedroomLamp === "on" ? 0.9 : 1.2);
       const officeOn = things.officeLights !== "off" ? 1 : 0;
       const nearOffice = px > 65 || (cam.inited && cam.x > 65);
       officeLights.forEach((L) => {
-        L.intensity = officeOn && nearOffice ? 0.12 + night * 0.35 : 0;
+        L.intensity = nearOffice ? (officeOn ? (0.12 + night * 0.35) * officePowerK : 0) + day * 0.4 * (0.35 + 0.65 * officePowerK) : 0; // day fill through the windows even with the fixtures off
       });
       /* A light switching on or off changes the shader of every mesh it touches, and that recompile is a freeze on a
          scrub or a jump. So the lights of a building switch as one group (home: rooms + bedside, office: its fixtures),
@@ -1983,6 +2060,7 @@
         elevatorDoors.r.position.x = elevatorDoors.cx + elevatorDoors.w + elevatorDoors.open * elevatorDoors.w * 1.6;
       }
 
+      if (cine) { cineStep(dt); return; }
       /* camera: the player's orbit camera while he's theirs; the automatic one picks up from where it is */
       if (player) {
         cam.x = camera.target.x;
@@ -2116,69 +2194,85 @@
           if (r < camera.radius) camera.radius = r;
         }
       }
-      cutawayWalls(!pp.inCar && !!bd);
+      let goalPose = null;
+      if (cam.user <= 0) {
+        const gsb = Math.sin(shot.beta);
+        goalPose = {
+          tx: tx + ox,
+          tz: tz + oz,
+          cx: tx + ox + shot.radius * Math.cos(alphaGoal) * gsb,
+          cz: tz + oz + shot.radius * Math.sin(alphaGoal) * gsb,
+        };
+      }
+      cutawayWalls(!pp.inCar && !!bd, goalPose);
       sun.position.set(cam.x - sun.direction.x * 40, 40, cam.z - sun.direction.z * 40);
     }
 
     /* an interior wall crossing the line from the camera to its target (seen from above) is drawn faint: the
        cutaway never has a wall in front of the room. Colliders stay; only how it looks changes. */
-    function cutawayWalls(on) {
+    function cutawayWalls(on, goal) {
       for (const m of homeFront) if (m.isEnabled() === on) m.setEnabled(!on);
       if (!innerWalls.length) return;
       const tg = camera.target;
       const sb = Math.sin(camera.beta);
-      const cx = tg.x + camera.radius * Math.cos(camera.alpha) * sb;
-      const cz = tg.z + camera.radius * Math.sin(camera.alpha) * sb;
+      const cur = {
+        tx: tg.x,
+        tz: tg.z,
+        cx: tg.x + camera.radius * Math.cos(camera.alpha) * sb,
+        cz: tg.z + camera.radius * Math.sin(camera.alpha) * sb,
+      };
       const now = typeof performance !== "undefined" ? performance.now() : 0;
+      /* 0 = drawn, 1 = ghosted, 2 = gone: how one wall reads from one camera pose */
+      function judge(w, p, mg) {
+        const { tx, tz, cx, cz } = p;
+        /* a wall right under the camera (it sits above the room) fills a corner of the view even when it isn't on the sight line */
+        const ex0 = w.x1 - w.x0;
+        const ez0 = w.z1 - w.z0;
+        const l2 = ex0 * ex0 + ez0 * ez0 || 1;
+        const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
+        if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2 + mg) return 2;
+        /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
+           the near edge of the room even when the sight line misses it */
+        const vx = cx - tx;
+        const vz = cz - tz;
+        const vl = Math.hypot(vx, vz) || 1;
+        const d0 = ((w.x0 - tx) * vx + (w.z0 - tz) * vz) / vl;
+        const d1 = ((w.x1 - tx) * vx + (w.z1 - tz) * vz) / vl;
+        if (Math.min(d0, d1) > 0.3 - mg) return 2;
+        /* a partition that runs toward the camera (one end behind the target, the other well in front of it) shows
+           as a big grey wedge down the side of the view even though the sight line misses it */
+        if (Math.max(d0, d1) > 2 - mg) return 2;
+        const sc = ex0 * (cz - w.z0) - ez0 * (cx - w.x0);
+        const st = ex0 * (tz - w.z0) - ez0 * (tx - w.x0);
+        if (sc * st < 0) {
+          /* the camera and the target are on opposite sides: does the sight line cross the wall's span? */
+          const dx = tx - cx;
+          const dz = tz - cz;
+          const den = dx * ez0 - dz * ex0;
+          if (Math.abs(den) > 1e-6) {
+            const u = ((w.x0 - cx) * dz - (w.z0 - cz) * dx) / den;
+            if (u > -0.15 - mg * 0.1 && u < 1.15 + mg * 0.1) return 1;
+          }
+        }
+        return 0;
+      }
       for (const w of innerWalls) {
-        let hide = false;
-        let near = false;
+        let r = 0;
         /* a wall that was hidden a moment ago stays hidden while the camera is only just clear of the tests below
            (margin `mg`) and for 0.7 s after: a camera that drifts on the edge of a threshold, or is turned by hand
            (the input moves it after this runs), must not flash a solid slab across the view for a frame or two */
         const held = w.hiddenAt != null && now - w.hiddenAt < 700;
         const mg = held ? 1.5 : 0;
         if (on) {
-          /* a wall right under the camera (it sits above the room) fills a corner of the view even when it isn't on the sight line */
-          const ex0 = w.x1 - w.x0;
-          const ez0 = w.z1 - w.z0;
-          const l2 = ex0 * ex0 + ez0 * ez0 || 1;
-          const k = Math.max(0, Math.min(1, ((cx - w.x0) * ex0 + (cz - w.z0) * ez0) / l2));
-          if (Math.hypot(cx - (w.x0 + k * ex0), cz - (w.z0 + k * ez0)) < 4.2 + mg) hide = near = true;
-        }
-        if (on && !hide) {
-          /* a wall wholly on the camera's side of what it looks at (nearer than the target along the view) fills
-             the near edge of the room even when the sight line misses it */
-          const vx = cx - tg.x;
-          const vz = cz - tg.z;
-          const vl = Math.hypot(vx, vz) || 1;
-          const d0 = ((w.x0 - tg.x) * vx + (w.z0 - tg.z) * vz) / vl;
-          const d1 = ((w.x1 - tg.x) * vx + (w.z1 - tg.z) * vz) / vl;
-          if (Math.min(d0, d1) > 0.3 - mg) hide = near = true;
-          /* a partition that runs toward the camera (one end behind the target, the other well in front of it) shows
-             as a big grey wedge down the side of the view even though the sight line misses it */
-          else if (Math.max(d0, d1) > 2 - mg) hide = near = true;
-        }
-        if (on && !hide) {
-          const ex = w.x1 - w.x0;
-          const ez = w.z1 - w.z0;
-          const sc = ex * (cz - w.z0) - ez * (cx - w.x0);
-          const st = ex * (tg.z - w.z0) - ez * (tg.x - w.x0);
-          if (sc * st < 0) {
-            /* the camera and the target are on opposite sides: does the sight line cross the wall's span? */
-            const dx = tg.x - cx;
-            const dz = tg.z - cz;
-            const den = dx * ez - dz * ex;
-            if (Math.abs(den) > 1e-6) {
-              const u = ((w.x0 - cx) * dz - (w.z0 - cz) * dx) / den;
-              hide = u > -0.15 - mg * 0.1 && u < 1.15 + mg * 0.1;
-            }
-          }
+          r = judge(w, cur, mg);
+          /* the camera is gliding to its shot (a room change, a day-bar jump): a wall the shot it's heading for hides
+             never shows on the way, it would flash as a dark slab until the glide ends */
+          if (goal) r = Math.max(r, judge(w, goal, mg));
         }
         /* a wall beside or under the camera is gone, not ghosted: even at 12% its dark slab fills the corner of a night view */
-        if (hide) w.hiddenAt = now;
-        else if (on && held) hide = near = true;
-        const v = hide ? (near ? 0 : 0.12) : 1;
+        if (r) w.hiddenAt = now;
+        else if (on && held) r = 2;
+        const v = r ? (r === 2 ? 0 : 0.12) : 1;
         if (w.mesh.visibility !== v) w.mesh.visibility = v;
         if (w.extra) for (const e of w.extra) if (e.visibility !== v) e.visibility = v;
       }
@@ -2284,6 +2378,17 @@
       feetCache.z = z;
       feetCache.y = g ? (g.y < 0.4 ? g.y : null) : surfaceAt(x, z);
       return feetCache.y;
+    }
+
+    /** True inside a cutaway building (home, office): weather particles stay off there. */
+    function indoorsAt(x, z) {
+      for (const k of Object.keys(cfg.buildings || {})) {
+        const b = cfg.buildings[k];
+        if (!b || !b.bounds) continue;
+        const o = b.origin || [0, 0];
+        if (x > b.bounds[0] + o[0] && x < b.bounds[2] + o[0] && z > b.bounds[1] + o[1] && z < b.bounds[3] + o[1]) return true;
+      }
+      return false;
     }
 
     let crowdRef = null; // js/crowd.js sets it: the district's people and cars
@@ -2444,6 +2549,11 @@
         cam.user = 0;
       },
       titleShot: setTitleShot,
+      officePower: (k) => { officePowerK = Math.max(0, Math.min(1, k)); return officePowerK; },
+      officePowerNow: () => officePowerK,
+      cineShot: setCineShot,
+      cineOn: () => !!cine,
+      cineInfo: () => (cine ? { frames: cine.frames, inside: cine.inside, minClear: cine.minClear, t: cine.t } : cineLast),
       titleShotOn: () => !!titleShot,
       person: me.root, // read by the playtest
       car: myCar.root,
@@ -2456,6 +2566,7 @@
       rooms,
       spots,
       streetNow,
+      indoorsAt,
       get crowd() { return crowdRef; },
       set crowd(v) { crowdRef = v; },
     };

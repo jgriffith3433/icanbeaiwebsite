@@ -4,9 +4,23 @@
    sky tint, light, fog, particles, wet roads, wind and a sound. They blend over a
    few real seconds on top of the time-of-day sky js/world.js already draws.
    With nobody in control, the day follows a forecast seeded by the date. While
-   he's the player's, 1–7, hold Q (a radial), or a tap on a phone sets it.
-   After let-go the set weather holds for a few real seconds, then drifts back.
+   he's the player's, the five verbs call weather; keys 1–7 and hold Q (the
+   radial) are Sky studio, off by default in Settings. After let-go an ability's
+   weather holds for a few real seconds, then drifts back.
    ========================================================================== */
+
+const SKY_STUDIO_KEY = "icanbe.skyStudio";
+export function skyStudioOn() {
+  try { return localStorage.getItem(SKY_STUDIO_KEY) === "on"; } catch (e) { return false; }
+}
+export function setSkyStudio(on, via) {
+  const v = !!on;
+  try { localStorage.setItem(SKY_STUDIO_KEY, v ? "on" : "off"); } catch (e) { /* private mode */ }
+  if (typeof window !== "undefined" && window.dispatchEvent) {
+    window.dispatchEvent(new CustomEvent("day:sky-studio", { detail: { on: v, via: via || "api" } }));
+  }
+  return v;
+}
 
 /* ---- tunables: weather is the player's, never the day's ---- */
 export const AUTOMATIC_WEATHER = false; // true brings back the date-seeded forecast (off: the sky is calm and clear)
@@ -997,23 +1011,27 @@ export function startWeather(world, dayApi) {
     wheel.hidden = !on;
     if (on) paintUi(weather.now());
   }
+  function studio() {
+    return skyStudioOn();
+  }
   function paintUi(n) {
     if (!canUi) return;
     const name = STATE_NAMES[n.state] || n.state;
     btn.textContent = name;
     btn.setAttribute("aria-pressed", wheel.hidden ? "false" : "true");
     STATES.forEach((s) => wedges[s].classList.toggle("on", s === n.state));
-    const on = clock().mode === "control";
+    const on = clock().mode === "control" && studio();
     btn.hidden = !on;
     if (!on) wheel.hidden = true;
   }
   btn.addEventListener("pointerup", (e) => {
-    if (clock().mode !== "control") return;
+    if (clock().mode !== "control" || !studio()) return;
     openWheel(wheel.hidden);
     btn.blur();
     e.preventDefault();
   });
   wheel.addEventListener("pointerup", (e) => {
+    if (!studio()) return;
     const el = e.target.closest && e.target.closest("[data-weather]");
     if (!el) return;
     choose(el.dataset.weather, e.pointerType === "touch" || touchMode() ? "touch" : "wheel");
@@ -1031,6 +1049,7 @@ export function startWeather(world, dayApi) {
   window.addEventListener("keydown", (e) => {
     if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
     if (clock().mode !== "control") return;
+    if (!studio()) return; // keys 1–7 and Q do nothing unless Sky studio is on
     if (e.key === "q" || e.key === "Q") {
       if (!e.repeat) {
         qHeld = true;
@@ -1050,11 +1069,32 @@ export function startWeather(world, dayApi) {
     if (e.key !== "q" && e.key !== "Q") return;
     if (!qHeld) return;
     qHeld = false;
+    if (!studio()) { openWheel(false); return; }
     const el = document.elementFromPoint(pointer.x, pointer.y);
     const w = el && el.closest && el.closest("[data-weather]");
     if (w) choose(w.dataset.weather, "wheel");
     openWheel(false);
   }, true);
+  window.addEventListener("day:sky-studio", () => paintUi(weather.now()));
+  // Settings toggle: Sky studio (keys 1–7 + Q wheel), off by default
+  if (canUi && !document.getElementById("sky-studio")) {
+    const lab = document.createElement("label");
+    lab.id = "sky-studio";
+    lab.className = "sky-studio";
+    lab.innerHTML = `<input type="checkbox" id="sky-studio-toggle"${studio() ? " checked" : ""}/> Sky studio`;
+    lab.title = "Keys 1–7 and hold Q set the sky directly (off by default)";
+    const pop = document.getElementById("settings-pop");
+    (pop || document.body).append(lab);
+    const inp = lab.querySelector("input");
+    inp.addEventListener("change", () => {
+      setSkyStudio(inp.checked, "settings");
+      paintUi(weather.now());
+    });
+    const st = document.createElement("style");
+    st.textContent = `.sky-studio{display:flex;align-items:center;gap:8px;margin:8px 10px;font:600 0.78rem/1.2 system-ui,sans-serif;color:#d5e8ff;cursor:pointer}
+.sky-studio input{width:18px;height:18px;accent-color:#7ec8ff}`;
+    document.head.appendChild(st);
+  }
 
   function isLowTier() {
     if (world.look && world.look.quality && world.look.quality() === "low") return true;
@@ -1075,7 +1115,10 @@ export function startWeather(world, dayApi) {
     const low = isLowTier();
     live.tier = low ? "phone" : "desktop";
     const tierScale = low ? 0.24 : 1;
-    const cap = (ps, n) => (ps && !ps.__dead ? n * (ps.__gpu ? 1 : 0.34) * tierScale : 0);
+    /* the camera inside a cutaway room: no rain, snow, dust, mist or motes there */
+    const indoors = !!(world.indoorsAt && world.indoorsAt(x, z));
+    live.indoors = indoors;
+    const cap = (ps, n) => (ps && !ps.__dead && !indoors ? n * (ps.__gpu ? 1 : 0.34) * tierScale : 0);
     if (rainPs && !rainPs.__dead) {
       rainPs.emitter.set(x, yBase + 14, z);
       rainPs.emitRate = cap(rainPs, look.rain * 4200);
@@ -1499,8 +1542,16 @@ export function startWeather(world, dayApi) {
     thunderDelay,
     forecast: (dateKey, minutes) => forecastAt(dateKey, minutes, cfg.forecast),
     /** The wheel, for a phone tap the playtest sends as a pointer. */
-    open: (on) => openWheel(on !== false),
+    open: (on) => { if (studio() || on === false) openWheel(on !== false); },
     wheel: () => !wheel.hidden,
+    skyStudio(on) {
+      if (on == null) return studio();
+      setSkyStudio(!!on, "api");
+      const inp = typeof document !== "undefined" && document.getElementById("sky-studio-toggle");
+      if (inp) inp.checked = !!on;
+      paintUi(weather.now());
+      return studio();
+    },
   };
   world.__weather = api;
   window.weather = api;

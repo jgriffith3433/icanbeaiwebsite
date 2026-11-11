@@ -62,6 +62,8 @@ function byGroup(lines) {
 function priorityOf(c, group) {
   const p = c.priorities || {};
   if (p[group] != null) return p[group];
+  const head = String(group).split("-")[0]; // deed-birdie, recap-flood: the group's family
+  if (head !== group && p[head] != null) return p[head];
   return 10;
 }
 
@@ -110,6 +112,11 @@ export function startVoice(dayApi) {
 .voice-caption{z-index:36;display:flex;align-items:center;justify-content:center;gap:10px;max-width:min(88vw,28em);padding:8px 16px;border-radius:999px;background:rgba(10,13,22,.7);border:1px solid rgba(126,200,255,.32);backdrop-filter:blur(8px);color:#f6f1e8;font:600 clamp(.95rem,2.2vw,1.15rem)/1.25 Fraunces,Georgia,serif;text-shadow:0 2px 12px rgba(0,0,0,.55);pointer-events:none;opacity:1;transition:opacity .35s ease}
 .voice-caption[hidden]{display:none}
 .voice-caption.leaving{opacity:0}
+.voice-caption span{min-width:0}
+@media (max-width:700px){.voice-caption b{display:none}.voice-caption{max-width:92vw;padding:8px 14px;font-size:.92rem}.voice-caption span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+html.touch-ui .voice-caption b{display:none}
+html.touch-ui .voice-caption{max-width:92vw;padding:8px 14px;font-size:.92rem}
+html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .voice-caption b{font:600 .65rem/1 Outfit,system-ui,sans-serif;letter-spacing:.28em;text-transform:uppercase;color:#7ec8ff}
 `;
   document.head.appendChild(style);
@@ -122,14 +129,16 @@ export function startVoice(dayApi) {
   document.body.appendChild(caption);
   const captionText = caption.querySelector("#voice-caption-text");
 
-  function showCaption(text) {
+  const captionWho = caption.querySelector("b");
+  function showCaption(text, who, secs) {
     if (captionTimer) clearTimeout(captionTimer);
+    captionWho.textContent = who || "Small Weather";
     captionText.textContent = text || "";
     caption.hidden = false;
     caption.classList.remove("leaving");
     live.caption = text || null;
-    const secs = cfg().captionSecs;
-    captionTimer = setTimeout(() => hideCaption(), Math.max(1.2, secs) * 1000);
+    const hold = secs != null ? secs : cfg().captionSecs;
+    captionTimer = setTimeout(() => hideCaption(), Math.max(1.2, hold) * 1000);
   }
   function hideCaption() {
     if (captionTimer) clearTimeout(captionTimer);
@@ -403,6 +412,96 @@ export function startVoice(dayApi) {
     return line;
   }
 
+  /**
+   * A neighbor speaks (their own Gen voice, a clip from audio/dialogue): one speaker-tagged caption, no overlap with
+   * Small Weather or another neighbor (a neighbor's line takes the voice, whatever was playing), and positional:
+   * quieter with distance from the camera and panned to the side they are on. opts: { x, z } (their place in the
+   * world), onend (called when the clip ends, or after the caption's time when it can't play), via.
+   * Returns { id, file, secs } (file null when no clip is in the build or Sound is off: the caption still shows).
+   */
+  let audioCtx = null;
+  function placeVoice(el, opts) {
+    const w = day.world && day.world();
+    const cam = w && w.scene && w.scene.activeCamera;
+    let gain = 1;
+    let pan = 0;
+    if (cam && cam.position && opts.x != null) {
+      const dx = opts.x - cam.position.x;
+      const dz = opts.z - cam.position.z;
+      const d = Math.hypot(dx, dz);
+      gain = Math.max(0.35, Math.min(1, 1.15 - d / 140));
+      const fwd = cam.getForwardRay ? cam.getForwardRay(1).direction : null;
+      if (fwd && d > 1) pan = Math.max(-0.85, Math.min(0.85, (dx * fwd.z - dz * fwd.x) / d)); // right of the view = +
+    }
+    el.volume = Math.min(1, cfg().volume * gain);
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && !el.__pan) {
+        audioCtx = audioCtx || new AC();
+        const src = audioCtx.createMediaElementSource(el);
+        const sp = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+        if (sp) { src.connect(sp); sp.connect(audioCtx.destination); } else src.connect(audioCtx.destination);
+        el.__pan = sp || true;
+      }
+      if (el.__pan && el.__pan.pan) el.__pan.pan.value = pan;
+    } catch (err) {
+      /* no web audio: the volume alone carries the distance */
+    }
+    return { gain, pan };
+  }
+  function speakAs(who, text, opts) {
+    opts = opts || {};
+    const id = lineId(who, text);
+    const file = `audio/dialogue/${id}.mp3`;
+    const have = dialogueFiles.has(file) && !missing[file];
+    const canPlay = have && soundOn() && voicesOn();
+    if (playing) stopCurrent();
+    live.last = { id, group: "neighbor-" + String(who).toLowerCase(), text, file: have ? file : null, via: opts.via || "neighbor", at: performance.now() / 1000 };
+    lastAt = performance.now() / 1000;
+    heard++;
+    live.heard = heard;
+    let secs = Math.max(2.6, Math.min(7, 1.2 + text.length * 0.055));
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (playing && playing.id === id) { playing = null; playPri = 0; live.playing = false; }
+      if (opts.onend) opts.onend();
+    };
+    let a = null;
+    if (canPlay) {
+      a = audioEls[file];
+      if (!a) {
+        a = new Audio(file);
+        a.preload = "auto";
+        a.addEventListener("error", () => { missing[file] = true; });
+        audioEls[file] = a;
+      }
+      a.onended = finish;
+      a.playbackRate = 1;
+    }
+    const where = placeVoice(a || { volume: 1 }, opts);
+    if (a) {
+      try {
+        a.currentTime = 0;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => finish());
+        playing = { id, group: live.last.group, text, file, who, el: a };
+        playPri = 9;
+        live.playing = true;
+        if (isFinite(a.duration) && a.duration > 0) secs = a.duration + 0.4;
+        else a.addEventListener("loadedmetadata", () => { if (!done && isFinite(a.duration)) showCaption(text, who, a.duration + 0.4); }, { once: true });
+      } catch (err) {
+        a = null;
+      }
+    }
+    showCaption(text, who, secs);
+    quietNote(`${who}: ${text}`);
+    if (!a) setTimeout(finish, secs * 1000);
+    emit({ action: "play", id, group: live.last.group, text, file: a ? file : null, who, via: opts.via || "neighbor", positional: true, gain: +where.gain.toFixed(2), pan: +where.pan.toFixed(2), caption: true });
+    return { id, file: a ? file : null, secs };
+  }
+
   function onPower(e) {
     const d = (e && e.detail) || {};
     const power = d.power || d.action;
@@ -421,14 +520,20 @@ export function startVoice(dayApi) {
   function onWeather(e) {
     const d = (e && e.detail) || {};
     if (!d.state) return;
-    if (d.via === "power") return;
+    if (d.via === "power" || d.via === "cell") return; // "cell" = the opening's storm nobody called
     say(`weather-${d.state}`, { via: d.via || "weather" });
   }
 
   function onControl(e) {
     const d = (e && e.detail) || {};
+    if (d.action === "take" && day.coldopen && day.coldopen.active && day.coldopen.active()) return; // the opening has its own line
     if (d.action === "take") say("take", { force: true, via: d.via || "control" });
-    else if (d.action === "let-go") say("letgo", { force: true, via: d.via || "control" });
+    else if (d.action === "let-go") {
+      // One line naming the deed he just did (day.memory.justDid(), most telling first); the plain line when he did none.
+      const deeds = (day.memory && day.memory.justDid && day.memory.justDid()) || [];
+      const named = deeds.length ? say("deed-" + deeds[0], { force: true, ignoreLineCooldown: true, via: d.via || "control", deed: deeds[0] }) : null;
+      if (!named) say("letgo", { force: true, via: d.via || "control" });
+    }
   }
 
   function onNeighbor(e) {
@@ -447,9 +552,24 @@ export function startVoice(dayApi) {
 
   function onMoment(e) {
     const d = (e && e.detail) || {};
-    if ((d.moment === "day-end" || d.moment === "dayend") && (d.action === "start" || d.action === "show")) {
+    // a day end with deeds speaks them itself (js/moments.js, `recap-` lines); the plain line is for the quiet day
+    if ((d.moment === "day-end" || d.moment === "dayend") && (d.action === "start" || d.action === "show") && !d.deeds) {
       say("dayend", { force: true, via: "dayend" });
     }
+  }
+
+  /* The autopilot's memory steps carry a `say` (day.config.js, a step with `remembers`): he says it as the step starts,
+     at a pace a person could hear (not while the clock races or is paused, nor after a jump into the middle of it). */
+  let sayKey = "";
+  function memoryStep() {
+    const n = day.now && day.now();
+    const a = n && n.frame && n.frame.action;
+    if (!a || !a.say) return;
+    const k = n.key + ":" + a.i;
+    if (k === sayKey) return;
+    sayKey = k;
+    if (n.mode === "pause" || n.speed > 60 || n.minutes - a.start > 0.6) return;
+    say("memory", { text: a.say, ignoreCooldown: true, via: "memory" });
   }
 
   function tick() {
@@ -471,6 +591,7 @@ export function startVoice(dayApi) {
       floating = false;
     }
     if (C && C.mode && C.mode() === "schedule") {
+      memoryStep();
       const now = performance.now() / 1000;
       const every = cfg().dayEvery;
       if (now - dayRollAt >= every) {
@@ -520,6 +641,7 @@ export function startVoice(dayApi) {
       spoken: Object.keys(cfg().spoken).length,
     }),
     say,
+    speakAs,
     play: (id, opts) => say(id, Object.assign({ force: true, ignoreCooldown: true, ignoreLineCooldown: true }, opts || {})),
     groups: () => Object.keys(Object.assign({}, groups, cfg().spoken)),
     lines: () => cfg().lines.slice(),

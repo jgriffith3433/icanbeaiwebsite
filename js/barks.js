@@ -50,6 +50,23 @@ export function startBarks() {
     return text;
   }
 
+  /* The sky-curious tiers (day.config.js barks.warm): the days he has been out playing with the sky pick how warm he sounds.
+     The highest tier with an open line for this need or weather wins; lower tiers back it up. */
+  function tierOf() {
+    const m = day.memory;
+    const n = m && m.skyDays ? m.skyDays() : 0;
+    const W = (cfg().warm || []).filter((t) => n >= t.from).sort((a, b) => b.from - a.from);
+    return { days: n, tiers: W, tier: W.length ? (cfg().warm || []).indexOf(W[0]) + 1 : 0 };
+  }
+  function warmLine(kind, key) {
+    const t = tierOf();
+    for (const e of t.tiers) {
+      const text = take(((kind === "need" ? e.needs : e.weather) || {})[key]);
+      if (text) return text;
+    }
+    return null;
+  }
+
   function say(kind, key, text) {
     day.note(text);
     const n = day.now();
@@ -86,7 +103,7 @@ export function startBarks() {
       if (min - lastNeedAt < (C.gap || 25) || since < (C.again || 150)) return;
       const combo = raining() && needs[k + "@rain"];
       let text = combo ? take(combo.lines) : null;
-      if (!text) text = take(spec.lines);
+      if (!text) text = warmLine("need", k) || take(spec.lines);
       if (!text) return;
       needAt[k] = min;
       lastNeedAt = min;
@@ -114,7 +131,7 @@ export function startBarks() {
     const C = cfg();
     const min = day.now().minutes;
     if (min - (weatherAt[q.state] != null ? weatherAt[q.state] : -1e9) < (C.weatherGap || 12)) return;
-    const text = take(C.weather && C.weather[q.state]);
+    const text = warmLine("weather", q.state) || take(C.weather && C.weather[q.state]);
     if (!text) return;
     weatherAt[q.state] = min;
     say("weather", q.state, text);
@@ -153,7 +170,8 @@ export function startBarks() {
   }
 
   day.barks = {
-    now: () => ({ lines: log.length, last: log[log.length - 1] || null, used: usedToday().size }),
+    now: () => { const t = tierOf(); return { lines: log.length, last: log[log.length - 1] || null, used: usedToday().size, skyDays: t.days, tier: t.tier }; },
+    tier: () => tierOf().tier,
     log: () => log.slice(),
     fresh,
     take,

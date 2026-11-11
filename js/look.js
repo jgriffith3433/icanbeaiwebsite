@@ -316,6 +316,15 @@ export function installLook(world) {
     roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.35 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
+  /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
+     overwrite world.js's StandardMaterial (which already had an emissive) with the shared sidewalk concrete
+     (emissive 0), so after dusk the vertical rampend/rampside read as a black slab in smoke. */
+  /* No clear coat (wet: false): the ramp is a narrow strip tilted ~28 degrees, so the mirror coat that ability weather
+     turns on (lightning, rain) stretched the lamps and sky into long diagonal smears across it (the playtest saw them in
+     smoke right after the first bolt). It still darkens with the rain through the shared surface loop. */
+  mats.rampLit = pbr("rampLit", maps.concrete, { roughness: 0.8, bump: 0.32 });
+  mats.rampLit.emissiveColor = new B.Color3(0.16, 0.19, 0.22);
+  mats.rampLit.albedoColor = new B.Color3(1.1, 1.12, 1.14);
 
   function dress(mesh, mat, tile) {
     if (!mesh) return;
@@ -325,10 +334,12 @@ export function installLook(world) {
   }
   const roadName = (n) => n === "road" || n === "lot" || /^ave\d+r\d+$/.test(n) || /^cross\d+r\d+$/.test(n);
   const walkName = (n) => n === "driveway" || n === "parkpath" || /^walk[SN]\d+$/.test(n) || /^ave[SN]\d+_\d+$/.test(n) || /^cross[WE]\d+_\d+$/.test(n) || /ramp$/.test(n) || /ramp(end|side-?[\d.]+)$/.test(n); // the ramp and its closed-off end and side walls (plain flat grey otherwise: read as black slabs)
+  const rampName = (n) => /ramp$/.test(n) || /ramp(end|side-?[\d.]+)$/.test(n);
   scene.meshes.forEach((mesh) => {
     const n = mesh.name || "";
     if (n === "ground") dress(mesh, mats.ground, 4);
     else if (roadName(n)) dress(mesh, mats.asphalt, 2.8);
+    else if (rampName(n)) dress(mesh, mats.rampLit, 2.4);
     else if (walkName(n)) dress(mesh, mats.concrete, 2.4);
   });
   // Weather (js/weather.js) wets stage.road; point it at the visible PBR asphalt, not the old StandardMaterial.
@@ -364,6 +375,10 @@ export function installLook(world) {
 
   const neonMats = [];
   const neonHex = ["#3ecbff", "#ff4d8d", "#8eb6ff"];
+  const boardMat = new B.StandardMaterial("neon-board", scene);
+  boardMat.diffuseColor = new B.Color3(0.16, 0.18, 0.21);
+  boardMat.emissiveColor = new B.Color3(0.05, 0.055, 0.065);
+  boardMat.specularColor = B.Color3.Black();
   blocks.forEach((b, i) => {
     /* Not on a block with a roof ramp: the ramp climbs the north face where the bar hangs, so the bar read as a teal slab
        floating beside (and cutting into) the ramp. */
@@ -381,6 +396,13 @@ export function installLook(world) {
     mat.metadata = { base };
     neonMats.push(mat);
     const w = Math.min(3.4, b.w * 0.38);
+    /* A dark backing board behind the bar and its tick: bare, a lit bar on a dim wall read as a slab hanging in the air
+       (the playtest saw pink and teal ones floating beside the ramp). Its front stands 9.5 cm off the wall, 2.5 cm clear of the
+       shopfront band's plane (7 cm), its back inside the band/wall; the bar (5.5 to 10.5 cm) stands proud of it. */
+    const board = B.MeshBuilder.CreateBox("neonboard-" + b.id, { width: w + 0.5, height: 0.72, depth: 0.035 }, scene);
+    board.position.set(b.x - 0.05, y - 0.18, b.z + b.d / 2 + 0.0775);
+    board.material = boardMat;
+    board.isPickable = false;
     const bar = B.MeshBuilder.CreateBox("neon-" + b.id, { width: w, height: 0.14, depth: 0.05 }, scene);
     bar.position.set(b.x, y, faceZ);
     bar.material = mat;

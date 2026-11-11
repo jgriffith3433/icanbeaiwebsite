@@ -64,6 +64,30 @@ export function dialogueLines(config) {
   });
   const people = (C.neighbors && C.neighbors.list) || [];
   people.forEach((p) => (p.beats || []).forEach((b) => add(neighborWho(p), b.text, `neighbor:${b.id}`)));
+  // Today's request (js/daily.js, config `daily.pool`): each ask and thanks, spoken by the one who asks.
+  ((C.daily && C.daily.pool) || []).forEach((a) => {
+    add(a.name, a.ask, `daily:${a.id}:ask`);
+    add(a.name, a.thanks, `daily:${a.id}:thanks`);
+  });
+  // What they remember of him (neighbors.list[].remember: helped / botched): their voice, same as their beats.
+  people.forEach((p) => Object.keys(p.remember || {}).forEach((tone) => add(neighborWho(p), p.remember[tone], `neighbor:${p.id}-remember-${tone}`)));
+  // The street's lessons (neighbors.teach): the neighbor asks, calls, thanks and follows up in their own voice.
+  const teach = (C.neighbors && C.neighbors.teach) || {};
+  (teach.steps || []).forEach((st) => {
+    const p = people.find((x) => x.id === st.who);
+    if (!p) return;
+    const who = neighborWho(p);
+    [st.ask, st.call, st.thanks].forEach((t) => add(who, t, `street:${st.id}`));
+    if (st.then) add(who, st.then.thanks, `street:${st.id}-then`);
+  });
+  // The autopilot's memory steps (`say` on a spine step or a pool entry with `remembers`): his voice.
+  const walk = (steps, where) => (steps || []).forEach((st) => {
+    if (!st) return;
+    if (st.say) add("He", st.say, `memory:${where}`);
+    walk(st.steps, where);
+  });
+  (C.spine || []).forEach((b) => b && walk(b.steps, `${b.time}`));
+  Object.keys(C.pools || {}).forEach((pn) => (C.pools[pn] || []).forEach((e) => e && (e.say ? add("He", e.say, `memory:${pn}`) : null) || (e && walk(e.steps, pn))));
   // Small Weather's spoken bark table (voice.spoken): first-person lines for the voice director.
   const spoken = (C.voice && C.voice.spoken) || {};
   Object.keys(spoken).forEach((group) => {
@@ -71,6 +95,9 @@ export function dialogueLines(config) {
     if (!Array.isArray(pool)) return;
     pool.forEach((text) => add("He", text, `voice:${group}`));
   });
+  // The cold open's lines ([who, text] pairs in coldopen.lines): his in Eric's voice, Birdie's in hers.
+  const cold = (C.coldopen && C.coldopen.lines) || {};
+  Object.keys(cold).forEach((k) => add(cold[k][0], cold[k][1], `coldopen:${k}`));
   return out;
 }
 
@@ -108,6 +135,7 @@ export function startDialogue(dayApi, opts) {
   const people = (C.neighbors && C.neighbors.list) || [];
   const beats = new Map();
   people.forEach((p) => (p.beats || []).forEach((b) => beats.set(b.id, { who: neighborWho(p), text: b.text })));
+  people.forEach((p) => Object.keys(p.remember || {}).forEach((tone) => beats.set(`${p.id}-remember-${tone}`, { who: neighborWho(p), text: p.remember[tone] })));
 
   let present = new Set(o.files || []);
   let current = null;
@@ -163,11 +191,11 @@ export function startDialogue(dayApi, opts) {
   if (typeof window !== "undefined" && window.addEventListener) {
     window.addEventListener("day:story", (e) => {
       const d = (e && e.detail) || {};
-      if (d.action === "say") speak(d.who, d.text);
+      if (d.action === "say" && !d.positional) speak(d.who, d.text); // a positional line is voiced by js/voice.js speakAs
     });
     window.addEventListener("day:neighbor", (e) => {
       const d = (e && e.detail) || {};
-      if (d.action !== "beat") return;
+      if (d.action !== "beat" || d.positional) return;
       const b = beats.get(d.beat);
       if (b) speak(b.who, b.text);
     });

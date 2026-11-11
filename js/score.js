@@ -650,6 +650,100 @@ export function startScore(dayApi) {
     return false;
   }
 
+  /* The turning-point moments' music stings (js/moments.js `play`): short, synthesized swells on the music bus (so his and
+     the neighbors' voices duck them), one character per beat. No files: nothing to 404, nothing to generate. */
+  const MOMENT_STINGS = {
+    drought: { notes: [146.83, 220, 293.66, 369.99, 440, 587.33], wave: "triangle", stagger: 0.16, attack: 0.9, dur: 6.2, noise: [3200, 0.07, 1.4], gain: 0.12 },
+    turbines: { notes: [110, 164.81, 220, 329.63, 440, 659.25], wave: "sawtooth", stagger: 0.28, attack: 0.35, dur: 5.6, noise: [900, 0.05, 2.2], gain: 0.07, lowpass: 2600 },
+    tank: { notes: [98, 146.83, 196, 246.94, 392], wave: "sine", stagger: 0.3, attack: 1.1, dur: 6.6, noise: [500, 0.05, 2.6], gain: 0.16, beep: [880, 0.5] },
+    twist: { notes: [87.31, 92.5, 130.81, 138.59, 207.65], wave: "sawtooth", stagger: 0.12, attack: 0.5, dur: 6, noise: [260, 0.2, 1.8], gain: 0.07, lowpass: 1500 },
+    bridge: { notes: [164.81, 233.08, 329.63, 466.16], wave: "triangle", stagger: 0.5, attack: 0.08, dur: 6.8, noise: [420, 0.1, 3], gain: 0.12, bell: true },
+  };
+  function momentSting(id) {
+    if (!soundOn()) return false;
+    unlock();
+    if (!ctx || !musicBus) return false;
+    const S = MOMENT_STINGS[id] || MOMENT_STINGS.drought;
+    const t0 = ctx.currentTime + 0.03;
+    const vol = cfg().stingVol != null ? cfg().stingVol : STING_VOL;
+    const bus = ctx.createGain();
+    bus.gain.value = vol * 1.5;
+    let dest = bus;
+    if (S.lowpass && ctx.createBiquadFilter) {
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = S.lowpass;
+      bus.connect(lp);
+      dest = lp;
+    }
+    // the bus is the one thing connected to the music bus; it is dropped when the swell has died
+    (dest === bus ? bus : dest).connect(musicBus);
+    const env = (g, at, peak, atk, dur) => {
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(peak, at + atk);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    };
+    S.notes.forEach((f, i) => {
+      const at = t0 + i * S.stagger;
+      const o = ctx.createOscillator();
+      o.type = S.wave;
+      o.frequency.value = f;
+      if (o.detune) o.detune.value = (i % 2 ? 1 : -1) * 5;
+      const g = ctx.createGain();
+      env(g, at, S.gain, S.attack * (S.bell ? 0.2 : 1), Math.max(0.6, S.dur - i * S.stagger));
+      o.connect(g);
+      g.connect(bus);
+      o.start(at);
+      o.stop(at + S.dur + 0.1);
+    });
+    if (S.bell) { // two far low tolls: the arm coming down
+      [0.15, 2.4].forEach((d) => {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.value = 82.41;
+        const g = ctx.createGain();
+        env(g, t0 + d, 0.3, 0.02, 2.2);
+        o.connect(g);
+        g.connect(bus);
+        o.start(t0 + d);
+        o.stop(t0 + d + 2.4);
+      });
+    }
+    if (S.beep) { // the Board's speaker: two flat tones
+      [0.4, 0.95].forEach((d) => {
+        const o = ctx.createOscillator();
+        o.type = "square";
+        o.frequency.value = S.beep[0];
+        const g = ctx.createGain();
+        env(g, t0 + d, 0.03, 0.01, S.beep[1] * 0.4);
+        o.connect(g);
+        g.connect(bus);
+        o.start(t0 + d);
+        o.stop(t0 + d + 0.5);
+      });
+    }
+    if (S.noise && ctx.createBuffer) {
+      const n = Math.floor(ctx.sampleRate * S.dur);
+      const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = S.noise[0];
+      bp.Q.value = 0.7;
+      const g = ctx.createGain();
+      env(g, t0, S.noise[1], S.noise[2], S.dur);
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(bus);
+      src.start(t0);
+    }
+    live.momentSting = { id, at: typeof performance !== "undefined" ? performance.now() : Date.now(), notes: S.notes.length };
+    return true;
+  }
+
   /** Short whoosh when he starts riding the wind (js/control.js). */
   function whoosh() {
     if (!soundOn()) return false;
@@ -976,6 +1070,7 @@ export function startScore(dayApi) {
       unlocked: live.unlocked,
       on: live.on,
       stingAt: live.stingAt,
+      momentSting: live.momentSting ? Object.assign({}, live.momentSting) : null,
       whooshAt: live.whooshAt || 0,
       heard: live.heard,
       missing: Object.keys(missing).length,
@@ -1027,6 +1122,7 @@ export function startScore(dayApi) {
     tick,
     now,
     sting,
+    momentSting,
     whoosh,
     crack,
     unlock,

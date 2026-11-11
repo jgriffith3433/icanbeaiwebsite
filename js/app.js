@@ -24,11 +24,15 @@ import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to powe
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
+import "./street.js"; // the street teaches: Rain, Sun, Fog and Wind each arrive on a neighbor's voiced ask (starts on the cold open)
+import "./coldopen.js"; // a new player's first Play: the roof at dusk, one prompt, the first bolt (before title.js calls it)
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
 import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build
 import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
+import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
+import "./daily.js"; // today's request: one neighbour asks for one bit of weather, by the real date (before title.js shows it)
 import "./title.js"; // the title screen: the skyline, Play and Episodes (opens first)
 import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause perf & leak monitor (window.hawkesPerf)
 import HavokPhysics from "@babylonjs/havok";

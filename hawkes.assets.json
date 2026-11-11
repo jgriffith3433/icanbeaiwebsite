@@ -1329,6 +1329,36 @@
    }
   },
   {
+   "id": "sfx-weather-soundscape",
+   "note": "Batched urban rooftop weather soundscape loops (job j_37c19844f0f4, Stable Audio 3): light roof rain patter, heavy downpour, rooftop gutter trickle, umbrella rain patter, flapping canvas awnings, and sunny rooftop birds.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Urban rooftop weather soundscape loops",
+      "duration": 8,
+      "loop": true,
+      "variants": [
+       "Soft light rain pattering gently on a gravel and tar city rooftop, steady delicate raindrops, seamless ambient loop, no thunder, no music",
+       "Heavy torrential downpour rain roaring on urban streets and roofs, thick dense sheet of water falling, seamless ambient loop, no thunder, no music",
+       "Rainwater trickling, gurgling and splashing down a metal rooftop gutter and drainpipe, close steady water flow, seamless ambient loop, no music",
+       "Raindrops tapping and drumming rapidly on taut fabric umbrellas on a city sidewalk, crisp close fabric rain patter, seamless ambient loop, no music",
+       "Canvas shop awnings and rooftop tarps flapping, snapping and billowing in gusty city street wind, rhythmic cloth flutter, seamless ambient loop, no music",
+       "Warm sunny city morning rooftop ambience with cheerful sparrows and songbirds chirping across open air and distant gentle breeze, seamless ambient loop, no music"
+      ]
+     }
+    }
+   ],
+   "files": {
+    "rainRoof": "audio/sfx/rain-roof-light.mp3",
+    "rainDownpour": "audio/sfx/rain-downpour.mp3",
+    "gutter": "audio/sfx/rain-gutter.mp3",
+    "umbrella": "audio/sfx/rain-umbrella.mp3",
+    "awning": "audio/sfx/wind-awning.mp3",
+    "birds": "audio/sfx/sun-birds.mp3"
+   }
+  },
+  {
    "id": "dlg-birdie-1s29egk",
    "note": "Spoken line (dry-park:start), Birdie: \"There you are. My tomatoes are sulking. The whole lawn is.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
@@ -3305,6 +3335,1222 @@
    }
   },
   {
+   "id": "dlg-birdie-xup9wn",
+   "note": "Spoken line (daily:birdie-rain-park:ask), Birdie: \"The park lawn has gone to straw. Rain on it before noon? All of it, if you can.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The park lawn has gone to straw. Rain on it before noon? All of it, if you can.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-xup9wn.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-1y8iv51",
+   "note": "Spoken line (daily:birdie-rain-park:thanks), Birdie: \"Look at that green come back. I'm hanging flags.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Look at that green come back. I'm hanging flags.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-1y8iv51.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-1p17dtx",
+   "note": "Spoken line (daily:birdie-fog-pots:ask), Birdie: \"Snapdragons love a cool grey morning. Fog over my pots, early, while it's quiet?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Snapdragons love a cool grey morning. Fog over my pots, early, while it's quiet?",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-1p17dtx.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-fp4vjj",
+   "note": "Spoken line (daily:birdie-fog-pots:thanks), Birdie: \"They're soaking it up. Cool and grey. Bunting's going up.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're soaking it up. Cool and grey. Bunting's going up.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-fp4vjj.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-1inluyl",
+   "note": "Spoken line (daily:birdie-wind-park:ask), Birdie: \"The seed heads need a good shake. Some wind over the park this afternoon?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The seed heads need a good shake. Some wind over the park this afternoon?",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-1inluyl.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-1muz8kj",
+   "note": "Spoken line (daily:birdie-wind-park:thanks), Birdie: \"Seeds everywhere. Next spring is going to be a riot.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Seeds everywhere. Next spring is going to be a riot.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-1muz8kj.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1i2rxic",
+   "note": "Spoken line (daily:dex-sun-shop:ask), Dex: \"My parcel racks are soaked. A sun break over the shop before lunch? Two minutes is plenty.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "My parcel racks are soaked. A sun break over the shop before lunch? Two minutes is plenty.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1i2rxic.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-up7t8",
+   "note": "Spoken line (daily:dex-sun-shop:thanks), Dex: \"Bone dry. I'm putting lanterns up. House rules.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Bone dry. I'm putting lanterns up. House rules.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-up7t8.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-108yiny",
+   "note": "Spoken line (daily:dex-wind-avenue:ask), Dex: \"Last drop of the day is all uphill. A tailwind on the avenue, if you've got one?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Last drop of the day is all uphill. A tailwind on the avenue, if you've got one?",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-108yiny.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-uhf3yz",
+   "note": "Spoken line (daily:dex-wind-avenue:thanks), Dex: \"Tailwind! Fastest run I've ever done. Pinwheels for the stoop.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Tailwind! Fastest run I've ever done. Pinwheels for the stoop.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-uhf3yz.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1frctte",
+   "note": "Spoken line (daily:dex-bolt-rod:ask), Dex: \"Nobody's ever struck that rod on my watch. A bolt on it at dusk? Not near the parcels.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Nobody's ever struck that rod on my watch. A bolt on it at dusk? Not near the parcels.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1frctte.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1gtk1e2",
+   "note": "Spoken line (daily:dex-bolt-rod:thanks), Dex: \"The whole shop hummed. I felt that in my teeth.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The whole shop hummed. I felt that in my teeth.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1gtk1e2.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1ay1704",
+   "note": "Spoken line (daily:quill-fog-plaza:ask), Ines: \"Fog over the plaza at dusk. I want the clock tower wading in cloud. For a photograph.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Fog over the plaza at dusk. I want the clock tower wading in cloud. For a photograph.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1ay1704.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-vl8ikn",
+   "note": "Spoken line (daily:quill-fog-plaza:thanks), Ines: \"Got it. The tower is wading. This one goes up in my window.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Got it. The tower is wading. This one goes up in my window.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-vl8ikn.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1fv9scy",
+   "note": "Spoken line (daily:quill-wind-annex:ask), Ines: \"The annex turbines have stalled. Wind on the roof before six, if you would.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The annex turbines have stalled. Wind on the roof before six, if you would.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1fv9scy.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-sx1typ",
+   "note": "Spoken line (daily:quill-wind-annex:thanks), Ines: \"They're turning. Listen to the annex hum. I have it on film.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're turning. Listen to the annex hum. I have it on film.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-sx1typ.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-zo32rz",
+   "note": "Spoken line (daily:quill-sun-tank:ask), Ines: \"I need the Storm Tank in a sun break. Gold on the glass. A minute, no more.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I need the Storm Tank in a sun break. Gold on the glass. A minute, no more.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-zo32rz.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-2442fg",
+   "note": "Spoken line (daily:quill-sun-tank:thanks), Ines: \"Gold on the glass. I got it. It's going in my window.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Gold on the glass. I got it. It's going in my window.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-2442fg.mp3"
+   }
+  },
+  {
+   "id": "dlg-odile-1p90t54",
+   "note": "Spoken line (daily:odile-sun-plaza:ask), Odile: \"My chairs are damp and so are my customers. A sun break over the plaza, please!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "My chairs are damp and so are my customers. A sun break over the plaza, please!",
+      "voice": "cgSgspJ2msm6clMCkdW9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-odile-1p90t54.mp3"
+   }
+  },
+  {
+   "id": "dlg-odile-643wi8",
+   "note": "Spoken line (daily:odile-sun-plaza:thanks), Odile: \"Dry chairs! Flags on the stall, I insist.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Dry chairs! Flags on the stall, I insist.",
+      "voice": "cgSgspJ2msm6clMCkdW9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-odile-643wi8.mp3"
+   }
+  },
+  {
+   "id": "dlg-odile-1lra0y9",
+   "note": "Spoken line (daily:odile-wind-plaza:ask), Odile: \"Nobody's buying. Push the smell of the pastries down the avenue, a gust over the plaza?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Nobody's buying. Push the smell of the pastries down the avenue, a gust over the plaza?",
+      "voice": "cgSgspJ2msm6clMCkdW9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-odile-1lra0y9.mp3"
+   }
+  },
+  {
+   "id": "dlg-odile-3crmry",
+   "note": "Spoken line (daily:odile-wind-plaza:thanks), Odile: \"Smell that? That's the queue coming. Bunting for you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Smell that? That's the queue coming. Bunting for you.",
+      "voice": "cgSgspJ2msm6clMCkdW9",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-odile-3crmry.mp3"
+   }
+  },
+  {
+   "id": "dlg-pim-1skm6wm",
+   "note": "Spoken line (daily:pim-rain-plaza:ask), Pim: \"Rain makes people hungry. A little on the plaza tonight and my line goes round the fountain.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain makes people hungry. A little on the plaza tonight and my line goes round the fountain.",
+      "voice": "SAz9YHcvj6GT2YYXdXww",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-pim-1skm6wm.mp3"
+   }
+  },
+  {
+   "id": "dlg-pim-6rr613",
+   "note": "Spoken line (daily:pim-rain-plaza:thanks), Pim: \"Look at that queue! Lanterns for the stall.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Look at that queue! Lanterns for the stall.",
+      "voice": "SAz9YHcvj6GT2YYXdXww",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-pim-6rr613.mp3"
+   }
+  },
+  {
+   "id": "dlg-pim-1o8a1zg",
+   "note": "Spoken line (daily:pim-bolt-plaza:ask), Pim: \"One bolt over the plaza. People stop and look, and looking people get hungry.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "One bolt over the plaza. People stop and look, and looking people get hungry.",
+      "voice": "SAz9YHcvj6GT2YYXdXww",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-pim-1o8a1zg.mp3"
+   }
+  },
+  {
+   "id": "dlg-pim-1sadbyh",
+   "note": "Spoken line (daily:pim-bolt-plaza:thanks), Pim: \"Ha! The whole queue jumped. Free bowl for you, any night.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Ha! The whole queue jumped. Free bowl for you, any night.",
+      "voice": "SAz9YHcvj6GT2YYXdXww",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-pim-1sadbyh.mp3"
+   }
+  },
+  {
+   "id": "dlg-gus-1e8gdhp",
+   "note": "Spoken line (daily:gus-fog-plaza:ask), Gus: \"Forty years back the plaza woke up in fog like soup. Could you? Early?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Forty years back the plaza woke up in fog like soup. Could you? Early?",
+      "voice": "pqHfZKP75CvOlQylNhV4",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-gus-1e8gdhp.mp3"
+   }
+  },
+  {
+   "id": "dlg-gus-wh9joe",
+   "note": "Spoken line (daily:gus-fog-plaza:thanks), Gus: \"There it is. Forty years, gone in a breath.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "There it is. Forty years, gone in a breath.",
+      "voice": "pqHfZKP75CvOlQylNhV4",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-gus-wh9joe.mp3"
+   }
+  },
+  {
+   "id": "dlg-gus-1udyaft",
+   "note": "Spoken line (daily:gus-wind-kite:ask), Gus: \"I've a kite that hasn't left the ground since March. Wind over the plaza this afternoon?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I've a kite that hasn't left the ground since March. Wind over the plaza this afternoon?",
+      "voice": "pqHfZKP75CvOlQylNhV4",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-gus-1udyaft.mp3"
+   }
+  },
+  {
+   "id": "dlg-gus-y9bta5",
+   "note": "Spoken line (daily:gus-wind-kite:thanks), Gus: \"Up she goes! Look at her climb!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Up she goes! Look at her climb!",
+      "voice": "pqHfZKP75CvOlQylNhV4",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-gus-y9bta5.mp3"
+   }
+  },
+  {
+   "id": "dlg-hollis-11tkabd",
+   "note": "Spoken line (daily:hollis-rain-shop:ask), Hollis: \"I patched the shop roof last week. I need to know it holds. Rain on the shop, please.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I patched the shop roof last week. I need to know it holds. Rain on the shop, please.",
+      "voice": "IKne3meq5aSn9XLyUdCD",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-hollis-11tkabd.mp3"
+   }
+  },
+  {
+   "id": "dlg-hollis-e7zrka",
+   "note": "Spoken line (daily:hollis-rain-shop:thanks), Hollis: \"Not one drip. That goes on the invoice.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Not one drip. That goes on the invoice.",
+      "voice": "IKne3meq5aSn9XLyUdCD",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-hollis-e7zrka.mp3"
+   }
+  },
+  {
+   "id": "dlg-hollis-1jpjbw0",
+   "note": "Spoken line (daily:hollis-sun-shop:ask), Hollis: \"Tar cures better in the sun. A sun break on the shop roof this afternoon?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Tar cures better in the sun. A sun break on the shop roof this afternoon?",
+      "voice": "IKne3meq5aSn9XLyUdCD",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-hollis-1jpjbw0.mp3"
+   }
+  },
+  {
+   "id": "dlg-hollis-1v4nqhw",
+   "note": "Spoken line (daily:hollis-sun-shop:thanks), Hollis: \"Flat as a pancake and hard as a rock. Lanterns for the ladder.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Flat as a pancake and hard as a rock. Lanterns for the ladder.",
+      "voice": "IKne3meq5aSn9XLyUdCD",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-hollis-1v4nqhw.mp3"
+   }
+  },
+  {
+   "id": "dlg-nell-eit880",
+   "note": "Spoken line (daily:nell-sun-crossing:ask), Nell: \"The kids cross here after school. A sun break at the crosswalk, so drivers can see them?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The kids cross here after school. A sun break at the crosswalk, so drivers can see them?",
+      "voice": "FGY2WhTYpPnrIDTdsKH5",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-nell-eit880.mp3"
+   }
+  },
+  {
+   "id": "dlg-nell-1h4xgan",
+   "note": "Spoken line (daily:nell-sun-crossing:thanks), Nell: \"Bright as a bell. There'll be flags on the crossing.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Bright as a bell. There'll be flags on the crossing.",
+      "voice": "FGY2WhTYpPnrIDTdsKH5",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-nell-1h4xgan.mp3"
+   }
+  },
+  {
+   "id": "dlg-nell-9w4xts",
+   "note": "Spoken line (daily:nell-rain-chalk:ask), Nell: \"The children chalked the whole crossing. Rain on it this morning, and tomorrow's a clean slate?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The children chalked the whole crossing. Rain on it this morning, and tomorrow's a clean slate?",
+      "voice": "FGY2WhTYpPnrIDTdsKH5",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-nell-9w4xts.mp3"
+   }
+  },
+  {
+   "id": "dlg-nell-gmo0xs",
+   "note": "Spoken line (daily:nell-rain-chalk:thanks), Nell: \"Clean slate. Lovely. Pinwheels, from the kids.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Clean slate. Lovely. Pinwheels, from the kids.",
+      "voice": "FGY2WhTYpPnrIDTdsKH5",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-nell-gmo0xs.mp3"
+   }
+  },
+  {
+   "id": "dlg-ravi-13mrirm",
+   "note": "Spoken line (daily:ravi-wind-avenue:ask), Ravi: \"My newspapers are stuck together with damp. A gust on the avenue and they'll dry in a minute.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "My newspapers are stuck together with damp. A gust on the avenue and they'll dry in a minute.",
+      "voice": "iP95p4xoKVk53GoZ742B",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ravi-13mrirm.mp3"
+   }
+  },
+  {
+   "id": "dlg-ravi-3sd6kj",
+   "note": "Spoken line (daily:ravi-wind-avenue:thanks), Ravi: \"Pages flapping. Dry as toast. Pinwheels for the stand.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Pages flapping. Dry as toast. Pinwheels for the stand.",
+      "voice": "iP95p4xoKVk53GoZ742B",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ravi-3sd6kj.mp3"
+   }
+  },
+  {
+   "id": "dlg-ravi-13r84iz",
+   "note": "Spoken line (daily:ravi-bolt-avenue:ask), Ravi: \"I bet Gus you can't call a bolt on command. One over the avenue tonight?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I bet Gus you can't call a bolt on command. One over the avenue tonight?",
+      "voice": "iP95p4xoKVk53GoZ742B",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ravi-13r84iz.mp3"
+   }
+  },
+  {
+   "id": "dlg-ravi-eg0tk9",
+   "note": "Spoken line (daily:ravi-bolt-avenue:thanks), Ravi: \"I owe Gus a coffee. Worth every drop.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I owe Gus a coffee. Worth every drop.",
+      "voice": "iP95p4xoKVk53GoZ742B",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ravi-eg0tk9.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-c7cfld",
+   "note": "Spoken line (neighbor:birdie-remember-helped), Birdie: \"Small Weather. My tomatoes are still talking about that rain.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather. My tomatoes are still talking about that rain.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-c7cfld.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-12lakam",
+   "note": "Spoken line (neighbor:birdie-remember-botched), Birdie: \"The tomatoes got by without you. Barely.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The tomatoes got by without you. Barely.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-12lakam.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-11igepj",
+   "note": "Spoken line (neighbor:dex-remember-helped), Dex: \"Hey, sun break. The parcels stayed dry. I haven't forgotten.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Hey, sun break. The parcels stayed dry. I haven't forgotten.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-11igepj.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-yjo3yx",
+   "note": "Spoken line (neighbor:dex-remember-botched), Dex: \"The parcels came out soggy. No hard feelings. Some.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The parcels came out soggy. No hard feelings. Some.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-yjo3yx.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-1rzzf4n",
+   "note": "Spoken line (neighbor:quill-remember-helped), Ines: \"That blue is still on my sensor. Thank you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That blue is still on my sensor. Thank you.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-1rzzf4n.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-3nbety",
+   "note": "Spoken line (neighbor:quill-remember-botched), Ines: \"No bolt, no photograph. I stayed up anyway.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "No bolt, no photograph. I stayed up anyway.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-3nbety.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-10m2r30",
+   "note": "Spoken line (street:sun), Dex: \"Small Weather! Down by the shop. My parcels are soaked. A sun break?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather! Down by the shop. My parcels are soaked. A sun break?",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-10m2r30.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-se81cu",
+   "note": "Spoken line (street:fog), Ines: \"The streetlights are drowning my stars. Could you soften them with some fog?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The streetlights are drowning my stars. Could you soften them with some fog?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-se81cu.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-bktbmo",
+   "note": "Spoken line (street:fog), Ines: \"Small Weather! The annex, up the avenue. The streetlights are drowning my stars. Fog, please?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather! The annex, up the avenue. The streetlights are drowning my stars. Fog, please?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-bktbmo.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-121n50b",
+   "note": "Spoken line (street:fog), Ines: \"Lovely. Too lovely. I can't see through it. A gust, to clear a window?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Lovely. Too lovely. I can't see through it. A gust, to clear a window?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-121n50b.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-ito856",
+   "note": "Spoken line (street:fog-then), Ines: \"There. Orion, sharp as a pin. Thank you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "There. Orion, sharp as a pin. Thank you.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-ito856.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1thw15y",
+   "note": "Spoken line (memory:8:05), He: \"Birdie's pots. Quick hello.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Birdie's pots. Quick hello.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1thw15y.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-b2827e",
+   "note": "Spoken line (memory:8:05), He: \"Checking what's left of that sky.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Checking what's left of that sky.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-b2827e.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1orw5fh",
+   "note": "Spoken line (memory:12:32), He: \"Not looking out that window.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Not looking out that window.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1orw5fh.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1uotf4x",
+   "note": "Spoken line (memory:12:32), He: \"Someone said thanks today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Someone said thanks today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1uotf4x.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1myc45z",
+   "note": "Spoken line (memory:12:46), He: \"Those clouds were mine.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Those clouds were mine.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1myc45z.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ajx16g",
+   "note": "Spoken line (memory:18:00), He: \"The park's still green from me.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The park's still green from me.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ajx16g.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-rykvlj",
+   "note": "Spoken line (memory:18:52), He: \"Evening, Birdie.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Evening, Birdie.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-rykvlj.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-iry5oh",
+   "note": "Spoken line (memory:18:52), He: \"One minute up there. Just one.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "One minute up there. Just one.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-iry5oh.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-v86v20",
+   "note": "Spoken line (memory:19:35), He: \"I can still smell that storm.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I can still smell that storm.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-v86v20.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1tjav48",
+   "note": "Spoken line (memory:21:00), He: \"Somebody got their picture.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Somebody got their picture.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1tjav48.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1i5mla7",
+   "note": "Spoken line (memory:desk), He: \"Still thinking about that storm.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Still thinking about that storm.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1i5mla7.mp3"
+   }
+  },
+  {
    "id": "dlg-he-fx9i4c",
    "note": "Spoken line (voice:take), He: \"Alright. My turn.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
@@ -3837,33 +5083,478 @@
    }
   },
   {
-   "id": "sfx-weather-soundscape",
-   "note": "Batched urban rooftop weather soundscape loops (job j_37c19844f0f4, Stable Audio 3): light roof rain patter, heavy downpour, rooftop gutter trickle, umbrella rain patter, flapping canvas awnings, and sunny rooftop birds.",
+   "id": "dlg-he-1dc005t",
+   "note": "Spoken line (voice:deed-birdie), He: \"Birdie's tomatoes drank well.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
-     "tool": "audio.sfx",
+     "tool": "audio.voice",
      "params": {
-      "text": "Urban rooftop weather soundscape loops",
-      "duration": 8,
-      "loop": true,
-      "variants": [
-       "Soft light rain pattering gently on a gravel and tar city rooftop, steady delicate raindrops, seamless ambient loop, no thunder, no music",
-       "Heavy torrential downpour rain roaring on urban streets and roofs, thick dense sheet of water falling, seamless ambient loop, no thunder, no music",
-       "Rainwater trickling, gurgling and splashing down a metal rooftop gutter and drainpipe, close steady water flow, seamless ambient loop, no music",
-       "Raindrops tapping and drumming rapidly on taut fabric umbrellas on a city sidewalk, crisp close fabric rain patter, seamless ambient loop, no music",
-       "Canvas shop awnings and rooftop tarps flapping, snapping and billowing in gusty city street wind, rhythmic cloth flutter, seamless ambient loop, no music",
-       "Warm sunny city morning rooftop ambience with cheerful sparrows and songbirds chirping across open air and distant gentle breeze, seamless ambient loop, no music"
-      ]
-     }
+      "provider": "elevenlabs",
+      "text": "Birdie's tomatoes drank well.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
     }
    ],
    "files": {
-    "rainRoof": "audio/sfx/rain-roof-light.mp3",
-    "rainDownpour": "audio/sfx/rain-downpour.mp3",
-    "gutter": "audio/sfx/rain-gutter.mp3",
-    "umbrella": "audio/sfx/rain-umbrella.mp3",
-    "awning": "audio/sfx/wind-awning.mp3",
-    "birds": "audio/sfx/sun-birds.mp3"
+    "audio": "audio/dialogue/dlg-he-1dc005t.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-nf1e1t",
+   "note": "Spoken line (voice:deed-botched), He: \"I missed a neighbour's ask. Noted.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I missed a neighbour's ask. Noted.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-nf1e1t.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-5pez1x",
+   "note": "Spoken line (voice:deed-flood), He: \"Park's soaked. Lawn will thank me.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Park's soaked. Lawn will thank me.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-5pez1x.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-18vhzgm",
+   "note": "Spoken line (voice:deed-roofs), He: \"Roofs were good. I'll go back.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Roofs were good. I'll go back.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-18vhzgm.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ce0idh",
+   "note": "Spoken line (voice:deed-storm), He: \"I called a storm. Felt right.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I called a storm. Felt right.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ce0idh.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1nhba6o",
+   "note": "Spoken line (voice:deed-wind), He: \"The bins will remember that gale.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The bins will remember that gale.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1nhba6o.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1q7m31y",
+   "note": "Spoken line (voice:deed-fog), He: \"Left the street in fog. Quiet.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Left the street in fog. Quiet.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1q7m31y.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1fqey5f",
+   "note": "Spoken line (voice:deed-sun), He: \"I opened the sky. Warm out.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I opened the sky. Warm out.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1fqey5f.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-16g3do6",
+   "note": "Spoken line (voice:deed-rain), He: \"Rain's still on the road.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain's still on the road.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-16g3do6.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-fj1qfm",
+   "note": "Spoken line (voice:deed-rescue), He: \"Everyone got down. Good.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Everyone got down. Good.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-fj1qfm.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1knhdsb",
+   "note": "Spoken line (voice:deed-answered), He: \"A neighbour said thanks. Nice.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "A neighbour said thanks. Nice.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1knhdsb.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-14eih53",
+   "note": "Spoken line (voice:recap-birdie), He: \"I gave Birdie her rain today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I gave Birdie her rain today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-14eih53.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-v378bx",
+   "note": "Spoken line (voice:recap-botched), He: \"I let a neighbour down today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I let a neighbour down today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-v378bx.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1a3wnst",
+   "note": "Spoken line (voice:recap-flood), He: \"I drowned the park. It's green.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I drowned the park. It's green.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1a3wnst.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-hoootk",
+   "note": "Spoken line (voice:recap-roofs), He: \"I spent the day up on the roofs.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I spent the day up on the roofs.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-hoootk.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1cnuntr",
+   "note": "Spoken line (voice:recap-storm), He: \"I called a storm. It came.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I called a storm. It came.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1cnuntr.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1rmm1jp",
+   "note": "Spoken line (voice:recap-wind), He: \"I pushed the street around.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I pushed the street around.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1rmm1jp.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ftpb2t",
+   "note": "Spoken line (voice:recap-fog), He: \"I put the street in fog.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I put the street in fog.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ftpb2t.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-zsv71m",
+   "note": "Spoken line (voice:recap-sun), He: \"I opened the sky for a minute.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I opened the sky for a minute.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-zsv71m.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-jx5yvk",
+   "note": "Spoken line (voice:recap-rain), He: \"I made it rain today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I made it rain today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-jx5yvk.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1l7hux7",
+   "note": "Spoken line (voice:recap-rescue), He: \"I got people down safe.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I got people down safe.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1l7hux7.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1xjq77g",
+   "note": "Spoken line (voice:recap-answered), He: \"Somebody thanked me today.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Somebody thanked me today.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1xjq77g.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-ohbz70",
+   "note": "Spoken line (coldopen:he), He: \"That storm isn't mine. The rod on the shop roof is.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That storm isn't mine. The rod on the shop roof is.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-ohbz70.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-na1dln",
+   "note": "Spoken line (coldopen:birdie), Birdie: \"Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-na1dln.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-15gfxux",
+   "note": "Spoken line (coldopen:after), He: \"Rain. I can do that.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain. I can do that.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-15gfxux.mp3"
    }
   }
  ]

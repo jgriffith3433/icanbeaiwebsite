@@ -14,7 +14,10 @@ ok(b && b.needs && b.weather, "day.config.js has no barks.needs / barks.weather"
 const needLines = Object.values((b && b.needs) || {}).flatMap((n) => n.lines || []);
 const wxLines = Object.values((b && b.weather) || {}).flat();
 const reactLines = Object.values((cfg.weather && cfg.weather.react) || {}).flat().filter((x) => typeof x === "string");
-const all = [...needLines, ...wxLines];
+const warmLines = (b.warm || []).flatMap((t) => [...Object.values(t.needs || {}).flat(), ...Object.values(t.weather || {}).flat()]);
+ok((b.warm || []).length === 3 && b.warm.every((t, i, a) => t.from >= 1 && (!i || t.from > a[i - 1].from)), "barks.warm needs 3 rising tiers");
+ok(warmLines.length >= 12, `warm: ${warmLines.length} lines`);
+const all = [...needLines, ...wxLines, ...warmLines];
 ok(needLines.length >= 6, `needs: ${needLines.length} lines`);
 ok(wxLines.length >= 6, `weather: ${wxLines.length} lines`);
 ok(new Set(all).size >= 12, `only ${new Set(all).size} distinct lines`);

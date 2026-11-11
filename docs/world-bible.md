@@ -96,7 +96,7 @@ Definition of done (all required):
 - **Look / sound:** rooftop props and distinct surface zones (gravel ballast bed, metal grating and AC decks, dark tar membrane seams, and a wet roof-drain puddle basin with gutter pipe); layered weather soundscape (light rain patter on roofs vs heavy downpour, gurgling roof gutters, rain drumming on umbrellas below, 3D-panned wind gusts and flapping canvas awnings, rolling thunder delayed by strike distance vs close cracks, sunlit rooftop birds and brightened city hum, and snow-muffled street tone); Small Weather's footsteps change across gravel, metal, tar, and splash in puddles; storm gather over him on hold F; bolt crack and scorch; updraft float; camera orbit with wall pull-in.
 - **Size:** three stair roofs plus filler rooftops with units; ramps and parapets.
 - **In / out:** north-face stairs; jump/float between; can't Take control while driving.
-- **In:** control movement (run, triple jump, float), rooftop surface zones and surface footsteps (`gravel`, `metal`, `tar`, `puddle`), layered weather soundscape with equal-power loop and state crossfades, Storm/Bolt/Gust/Tornado, lunch Hollis rescue, Part 2 turbines, smoke playtest roof bolt.
+- **In:** control movement (run, triple jump, float), rooftop surface zones and surface footsteps (`gravel`, `metal`, `tar`, `puddle`), layered weather soundscape with equal-power loop and state crossfades, five weather verbs (Lightning/Rain/Wind/Fog/Sun; Storm and Tornado are hold depths), lunch Hollis rescue, Part 2 turbines, smoke playtest roof bolt.
 - **Short:** most filler roofs are props-only (no second stair set pieces); no roof garden or water tower climb verb beyond parkour.
 - **Build:** AC fans spin with wind (code); one extra traverse prop between shop and annex roofs after queue 1.
 
@@ -115,7 +115,7 @@ One far-off steer-by per area (player can aim the camera and walk toward it):
 
 | Area | Landmark | Where | Read from far |
 |---|---|---|---|
-| West Avenue Home Block | Apt crown + Birdie's tomato wall (raised parapet light strip) | apt north face, x ≈ −28..−17 | warm window band and tomato wall readable from mid-avenue; stair wedge |
+| West Avenue Home Block | Apt crown + Birdie's tomato wall (raised parapet light strip) | apt north face, x ≈ −32..−29 (west of the roof ramp, which fills −28.5..−17) | warm window band and tomato wall readable from mid-avenue; stair wedge |
 | The Park | Bandstand with string lights | inside park rect | warm bulbs over the lawn |
 | Shop Strip | Shop roof lightning rod | shop roof | metal rod catches bolts in lunch rescue |
 | Plaza Market | **Clock Tower** | plaza north edge (~tower at plaza) | four lit faces, tallest plaza piece |
@@ -130,7 +130,7 @@ Home Block landmark is a vertical-slice deliverable (crown light strip + tomato 
 ## Who lives here
 
 ### Small Weather (he/him)
-Same storm caller as Dose Of Destruction (`AllTheCharacters/SmallWeather`). Black messy hair, glasses, navy tech jacket with glowing blue seams, cargo pants, glowing boots. Lives a developer's day on autopilot (`day.config.js` spine); player Take control for third-person walk/run/jump/float and weather powers. Voice: DoD Eric, short first-person; log/barks say "He", never "they". Spoken barks (`voice.spoken`, director in `js/voice.js`): take control, let go, each power's first use, rooftop rescue, neighbour thanks, day end, idle — caption clear of the ability bar, no overlap, ~5 min per-line cooldown; Voices mute separate from Sound. **Charge** (ability bar, amber bolt) is what abilities spend — same pool as the Pressure chip; Body panel **Energy** is his fatigue and is never that label. Strain ("Sky") is what the district absorbs in the arc. Reacts with barks to needs and sky changes; crowd answers his *manual* weather. Main character model is always Small Weather, never a placeholder while loading. Live log shows only what has happened; when the clock is held, status and clock say Paused.
+Same storm caller as Dose Of Destruction (`AllTheCharacters/SmallWeather`). Black messy hair, glasses, navy tech jacket with glowing blue seams, cargo pants, glowing boots. Lives a developer's day on autopilot (`day.config.js` spine); player Take control for third-person walk/run/jump/float and weather powers. Voice: DoD Eric, short first-person; log/barks say "He", never "they". Spoken barks (`voice.spoken`, director in `js/voice.js`): take control, let go, each power's first use, rooftop rescue, neighbour thanks, day end, idle — caption clear of the ability bar, no overlap, ~5 min per-line cooldown; Voices mute separate from Sound. **Five verbs, one Charge:** Lightning (E; hold → Storm), Rain (R), Wind (V; tap Gust, hold Gale, full Tornado; G aliases Gust), Fog (C), Sun (X). Only Charge shows on the ability bar (amber bolt); the old Pressure chip is gone; Body panel **Energy** is fatigue only. Keys 1–7 and hold Q are **Sky studio** in Settings (off by default). On a phone the five verbs sit in an arc on the right with Charge as a ring; the Storm/Bolt/Gust/Tornado pad is gone. Strain ("Sky") is what the district absorbs in the arc. Reacts with barks to needs and sky changes; crowd answers his *manual* weather. Main character model is always Small Weather, never a placeholder while loading. Live log shows only what has happened; when the clock is held, status and clock say Paused.
 
 ### Birdie Alvarez
 Gardener, yellow raincoat and straw hat; apt block. Stops: inside overnight, pots at −21,9.5 from 7, park bench −6,22.5 at noon, home by 20. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). Canon: she asks him for rain for her tomatoes. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* 3–4 idle barks/gestures after the ask (wave from pots, lawn-state comment); second day-keyed beat when lawn is damp; readable hat silhouette before Gen model.
@@ -264,3 +264,42 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 - Storm Tank as reservoir, District Board identity, how much the district "knows," and Ines's larger "pulling" hook stay tied to `docs/story-arc-beat-sheet.md` open questions / story-spec recommendations. Playable arc uses the recommendations; bible treats them as **working canon for builds** until J overrides.
 - He/him only for Small Weather; neighbors use his first name in tone, never "they" for him.
 - Main character model is always Small Weather, never a placeholder while loading.
+
+## Cold open (first Play)
+- **Story beat:** dusk on the apt roof (19:00). A storm cell he didn't call rolls in over the avenue; the shop roof's lightning rod is the only thing he says is his. His first bolt lights the avenue: the lamps stutter, the street looks up, Birdie (on the avenue below the apt block) calls up that her tomatoes want rain, and he says "Rain. I can do that." That is the seed of her morning rain ask.
+- **Voice lines:** He "That storm isn't mine. The rod on the shop roof is." / Birdie "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain." / He "Rain. I can do that."
+
+## The city remembers (js/memory.js)
+
+- **Areas:** the park lawn (green after rain), the avenue (scorch, puddles, toppled bins, a leaning sign), roofs and plaza (scorch where a bolt landed), Birdie's tomato wall (fuller after her rain).
+- **Landmarks:** the scorch on the road, the leaning sign by the kerb, the green lawn seen from the bandstand.
+- **Who lives here:** Birdie's tomatoes answer her rain; the pigeons and the crowd are unchanged. No new characters.
+- **What happens:** the deeds he does under control (asks answered or botched, each power by zone, rescues, scars, endings) are kept by real local date in `icanbe.memory`. Marks are full for the rest of that real day and fade over 3 real days; 20 decals at most, 6 on a phone.
+- **Story beats:** none new. The city simply shows what he did, the way the Goose's bell pile does: come back later the same day and it's still there.
+
+## He remembers (Let go, his day, the neighbors; js/deeds.js, js/schedule.js `remembers`)
+
+Letting go hands him back as someone who noticed what you did together. Deeds (memory.js) become **facts** (`birdieRain`, `parkFlood`, `storm`, `roofRide`, `botched`, `answered`, `botched.dex`...) for today and yesterday.
+- **Let go:** he says one first-person line naming the deed just done (`voice.spoken` `deed-<birdie|botched|flood|roofs|storm|wind|fog|sun|rain|rescue|answered>`), most telling first; a phone shows it on one line.
+- **His day changes** (a step or pool entry with `remembers`, spoken through its `say`; time only from `fill` steps, so no block ever starts late): morning, he steps out with his coffee to Birdie's pots after her rain (she waves) and checks the sky on the step after a storm; at the desk he walks to the window to watch the clouds; lunch, he keeps his eyes off the window after a botched ask and rereads a thanks; the drive home slows by the green park; at dusk home, after roof riding, a minute up on the apt roof (the city's stair), and a nod to Birdie packing up; on the couch he mutes the TV to watch the sky; at the computer he opens a photo someone sent.
+- **Birdie, Dex and Ines** each have a voiced greeting for each tone (`remember: { helped, botched }`), once a day when he walks up: Birdie's tomatoes still talk about the rain; Dex's parcels stayed dry, or came out soggy "no hard feelings, some"; Ines still has the blue on her sensor, or stayed up anyway.
+- **Barks warm** over the days he has played with the sky (`barks.warm`: from 1, 3 and 6 days).
+- **The day-end card** speaks two deeds of the day (`recap-<deed>`), one caption line at a time; a quiet day shows two log rows.
+
+## Today's request (js/daily.js, config `daily`)
+
+- **Areas:** the title screen (one line under his name), and wherever the asker stands: Birdie's stoop at the apt block, the shop stoop (Dex, Hollis), the annex (Ines), the plaza stalls (Odile, Pim, Gus), the crosswalk (Nell) and the paper stand (Ravi) on the avenue.
+- **Landmarks:** the reward each answer leaves for the rest of that real day: bunting on two posts (Birdie, Odile, Hollis, Nell), a string of glowing lanterns (Dex, Pim, Gus, Ravi, Hollis), spinning pinwheels (Dex, Gus, Nell, Ravi) and an easel with Ines's photograph of the weather he called (fog, wind, sun).
+- **Who lives here:** Birdie, Dex and Ines ask three times each across the 21-day cycle; Odile, Pim, Gus, Hollis, Nell and Ravi (the people he helped in the lunch storm and the plaza market) ask twice each and stand at their spot all day while the ask is theirs. Same voices as their story lines; the thanks keeps each one's own turn of phrase.
+- **What happens:** each real local date one ask is picked (date times 5 modulo 21, so no ask repeats in any 21 dates): a weather moment at a place and in a time window ("Fog over the plaza at dusk for Ines's photo", "Wind to spin the annex turbines before 6 PM"). The title says it. A "!" over the asker (a 52 px tap target) says it again and the asker says it aloud, voiced, when he walks up. Calling the power inside the place and window answers it: a voiced thanks, Charge handed back, askAnswered and dailyAnswered in day.memory (so the neighbors' remembered greetings and his Let go line follow), and the reward stays until the date turns. Next day the title adds "Yesterday: you brought Dex the sun". When the daily ask is a neighbor's, that neighbor's usual morning ask gives way to it.
+- **Story beats:** the retention loop: a neighbour you know asks for one thing, you do it, and the street keeps the thanks. No new canon: citizens keep their episode names, Birdie's pots and Ines's sensor stay as they are.
+
+## Turning points (js/moments.js `play`, `moments.turning` in day.config.js)
+
+Each episode's big beat is seen and heard in the city, not read as a toast: a short moment (8 s at most, skippable with Skip, a tap or Esc) where the camera leaves him, orbits the place and the event happens there, a music sting swells, and the episode's own voiced line is the one caption.
+- **Part 1, the drought breaks (the park):** the high camera over the lawn as the rain lands; the straw lawn greens, Birdie: "Look at them drink. Bless you."
+- **Part 2, the roofs have power (the annex and the office):** the blades spin up, the lamps stutter, then the office lights come back from their brown-out; Ines: "They're turning. Do you see how they turn?"
+- **Part 3, the Tank is full (the Storm Tank):** the glass gauge flares full and the Board's horn on its post by the gauge lights and pulses; the Board: "Reservoir level: full." (or "...And the sky is not done." when scarred).
+- **Rooftop storm, the twist (the shop roof and the avenue):** the rain stops, the fog comes in and the lamps stutter, junk in the avenue; Ines: "That wasn't rain. That was something clearing its throat." He: "It's moving. Not passing."
+- **Hurricane drive, the bridge closes (the bridge):** the camera down the avenue, the gate arm swings down as the Board warns "The bridge will close on high wind."
+The stings are synthesized (`score.momentSting`): warm swell and rain shimmer, rising saws, low brass and the Board's two flat tones, a minor cluster and thunder, two far tolls. The episode's clock waits while a moment plays.

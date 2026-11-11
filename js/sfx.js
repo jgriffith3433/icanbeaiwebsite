@@ -605,6 +605,11 @@
       default: return undefined;
     }
   });
+  window.addEventListener("day:street", (e) => {
+    const d = e.detail || {};
+    if (d.action === "unlock") S.sparkle(); // a neighbor's ask opened a verb (js/street.js)
+    else if (d.action === "thanks") S.blip();
+  });
   window.addEventListener("day:story", (e) => {
     const d = e.detail || {};
     // a line with its own voice clip (js/dialogue.js) isn't babbled over

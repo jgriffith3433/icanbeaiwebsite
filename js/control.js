@@ -118,11 +118,12 @@ export function createMover(world, cfg) {
   }
 
   /* He's the player's from (x, z): if the day had him in a chair or in bed, he stands up beside it. */
-  function start(x, z, yaw) {
-    const p = freeSpotNear(x, z);
+  function start(x, z, yaw, from) {
+    // `from` (a roof's height + a little): stand on whatever is under that height, not the street (the opening's roof)
+    const p = from != null ? { x, z } : freeSpotNear(x, z);
     s.x = p.x;
     s.z = p.z;
-    s.y = floorAt(p.x, p.z, 2.3);
+    s.y = floorAt(p.x, p.z, from != null ? from : 2.3);
     s.yaw = yaw;
     s.vx = s.vy = s.vz = 0;
     s.grounded = true;
@@ -426,9 +427,10 @@ function install() {
   btn.className = "control-btn";
   const hint = document.createElement("p");
   hint.className = "control-hint";
-  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold in the air to glide) · drag to look · hold F for a storm, E lightning, G a gust (and an updraft), T a tornado · 1–7 or hold Q for the weather · Esc to let go";
+  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold in the air to glide) · drag to look · E Lightning (hold for Storm), R Rain, V Wind (tap Gust, hold Gale, full Tornado), C Fog, X Sun · Esc to let go";
   const HINT_KEYS = hint.textContent;
-  const HINT_TOUCH = "Left stick: move · Jump (tap again in the air) · tap Bolt, Rain, Gale, Fog, Sun break, or Storm, Gust, Tornado · drag to look";
+  const HINT_TOUCH = "Left stick: move · Jump · five verbs on the right (Lightning, Rain, Wind, Fog, Sun) · tap the street to aim · drag to look";
+  const HINT_SEEN_KEY = "icanbe.controlHint";
   const pad = document.createElement("div");
   pad.className = "touchpad";
   pad.hidden = true;
@@ -452,7 +454,17 @@ function install() {
     document.documentElement.classList.toggle("touch-ui", touchMode());
     pad.hidden = !(mode === "control" && touchMode());
     hint.textContent = touchMode() ? HINT_TOUCH : HINT_KEYS;
-    hint.hidden = mode !== "control";
+    let hintSeen = false;
+    try { hintSeen = localStorage.getItem(HINT_SEEN_KEY) === "1"; } catch (e) { /* private */ }
+    hint.hidden = mode !== "control" || hintSeen;
+    if (mode === "control" && !hintSeen) {
+      hint.classList.add("hint-once");
+      clearTimeout(hint._fade);
+      hint._fade = setTimeout(() => {
+        hint.classList.add("hint-faded");
+        try { localStorage.setItem(HINT_SEEN_KEY, "1"); } catch (e) { /* private */ }
+      }, 5500);
+    }
   }
   let lastDriving = null;
 
@@ -470,6 +482,9 @@ function install() {
   let wantRadius = 5.5;
   let lastRadius = null;
   let glidePull = 0;
+  let screenLift = 0; // metres (view space) the orbit target is shifted up on screen, clear of the HUD along the bottom
+  let hudTop = null; // CSS px: top of the lowest-centre HUD piece he would hide behind (hint, Let go, ability bar)
+  let hudAt = 0;
   const camRay = new B.PhysicsRaycastResult();
   const CAM_LIFT = 1.4; // least height of the camera over the surface under it
   const RIDE = Object.assign({
@@ -490,6 +505,8 @@ function install() {
     camera.beta = Math.min(camera.beta, 1.3);
     lastRadius = null;
     glidePull = 0;
+    screenLift = 0;
+    hudAt = 0;
   }
   /* Taken outside (the day's camera is a cutaway shot looking into the house): put the camera along the street,
      on the side with the most room, so he, the street and the sky are what show, not the bedroom behind him. */
@@ -544,9 +561,44 @@ function install() {
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (camera[k] = saved[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
     glidePull = 0;
+    screenLift = 0;
+    camera.targetScreenOffset.y = 0;
+  }
+  /* The orbit camera centres his chest, so at 1280 x 720 his legs and body sit at the bottom centre of the screen,
+     right behind the hint line, Let go and the ability bar (the playtest saw him "lost behind the HUD"). Shift the
+     target up on screen, smoothly, until his feet sit just above the top of that bottom stack. The reference is the
+     damped target, not his feet, so a jump doesn't swing the shot. Phones keep the centre (their pads are at the sides). */
+  function hudLiftGoal() {
+    if (touchMode()) return 0;
+    const cv = world.scene.getEngine().getRenderingCanvas();
+    const ch = cv ? cv.clientHeight : 0;
+    const cw = cv ? cv.clientWidth : 0;
+    if (ch < 300) return 0;
+    const now = performance.now();
+    if (hudTop == null || now - hudAt > 250) {
+      hudAt = now;
+      hudTop = ch;
+      [".control-hint", "#control", "#abilitybar"].forEach((q) => {
+        const el = document.querySelector(q);
+        if (!el || el.hidden || !el.offsetParent) return;
+        const r = el.getBoundingClientRect();
+        if (r.height > 0 && r.left < cw / 2 + 60 && r.right > cw / 2 - 60) hudTop = Math.min(hudTop, r.top);
+      });
+    }
+    if (hudTop >= ch - 40) return 0;
+    const t = camera.target;
+    const feet = new B.Vector3(t.x, t.y - 1.35, t.z);
+    const clip = B.Vector3.TransformCoordinates(feet, world.scene.getTransformMatrix());
+    const d = Math.max(1, B.Vector3.Distance(camera.globalPosition, feet));
+    const pxPerM = ch / 2 / (d * Math.tan((camera.fov || 0.78) / 2));
+    const feetY = (1 - clip.y) / 2 * ch + screenLift * pxPerM; // where they'd be with no shift
+    const headY = feetY - 1.8 * pxPerM;
+    const px = Math.max(0, Math.min(feetY - (hudTop - 12), headY - 56)); // head stays on screen
+    return px / pxPerM;
   }
   /* The take-over push: the camera starts wide and fast-pushes in to his shoulder (js/moments.js asks for it).
      Any move, jump or stick input, or push(null), ends it. */
+  let holdIn = false; // a moment is playing (js/moments.js): he stands still, input is ignored
   const push = { on: false, t: 0, secs: 1.4, extra: 0, fov: 0, baseFov: 0 };
   function pushStart(spec) {
     if (!spec) return pushEnd();
@@ -565,6 +617,7 @@ function install() {
     return true;
   }
   function cameraFollow(dt, look) {
+    if (world.cineOn && world.cineOn()) return; // a moment's cut-away camera (js/moments.js) has the view
     // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
     if (!push.on && lastRadius != null && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
     camera.alpha -= look.x * 2.4 * dt;
@@ -659,6 +712,8 @@ function install() {
     else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(1.5, Math.max(0.35, 45 * dt)));
     else camera.radius = damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
+    screenLift = damp(screenLift, hudLiftGoal(), dt, 3);
+    camera.targetScreenOffset.y = screenLift;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
     const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5)); // 0.15 at 0.5 m and closer
     if (world.person && Math.abs(vis - himVis) > 0.02) setHimVis(vis);
@@ -771,7 +826,9 @@ function install() {
       if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
       if (mode === "schedule") {
         if (e.key === "Enter" && !(e.target && (e.target.tagName === "BUTTON" || e.target.tagName === "A")) && !btn.disabled) {
-          take("key");
+          // Enter on the title is Play (a new player's first Play is the cold open), not a bare take
+          if (day.title && day.title.showing && day.title.showing()) day.title.play("key");
+          else take("key");
           e.preventDefault();
           e.stopImmediatePropagation();
         }
@@ -787,6 +844,13 @@ function install() {
         return;
       }
       if (mode !== "control") return;
+      if (holdIn && e.key === "Escape") {
+        // a turning-point moment is playing: Esc skips it (js/moments.js), it doesn't let him go
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (day.moments && day.moments.skip) day.moments.skip();
+        return;
+      }
       if (e.key === "Escape") {
         letGo("key");
       } else {
@@ -956,7 +1020,6 @@ function install() {
     }
     pushEnd();
     cameraGive();
-    document.documentElement.classList.remove("catching-up");
     day.note(how === "catch-up" ? L.catchUp : L.back);
     mark("back", { how });
     syncUi();
@@ -983,7 +1046,7 @@ function install() {
         ambientAge = 0;
         refreshAmbientUpdrafts();
       }
-      const inp = readInput(gp);
+      const inp = holdIn ? { x: 0, z: 0, sprint: false, jump: 0, hold: false } : readInput(gp);
       if (push.on && (inp.jump || inp.x || inp.z)) pushEnd();
       mover.step(dt, inp);
       simT += dt;
@@ -997,12 +1060,12 @@ function install() {
         return null;
       }
       if (r === "too-far" || since > 60) {
-        // the day has him somewhere he can't walk to now (driving, the other building): a quick fade
-        if (!catchUpAt) {
-          catchUpAt = since;
-          document.documentElement.classList.add("catching-up");
-        }
-        if (since - catchUpAt > 0.45) {
+        // Day has him somewhere he can't walk to (driving, the other building). Hold returning briefly so the
+        // status card stays On foot / Your move through the handback (smoke checks it), then cut — no CSS
+        // fade (that blacked the canvas). ~0.35 s covers a few frames at main.js's 0.1 s dt cap.
+        if (!catchUpAt) catchUpAt = since;
+        if (since - catchUpAt > 0.35) {
+          try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
           backOnDay("catch-up");
           return null;
         }
@@ -1079,13 +1142,19 @@ function install() {
     /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */
     avatar: () => avatar,
     // Playtest hook: stand him at x,z (street level) while he's the player's, so a scenario needn't walk a slow bot there.
-    place: (x, z, yaw) => {
+    // opts (the cold open's roof): { from: ray start height, alpha, beta, radius: the camera behind him }
+    place: (x, z, yaw, opts) => {
       if (mode !== "control") return null;
-      const r = mover.start(x, z, yaw == null ? s.yaw : yaw);
+      const o = opts || {};
+      const r = mover.start(x, z, yaw == null ? s.yaw : yaw, o.from);
       // A placement is a cut, not a walk: the camera's target would glide metres to him (a visible camera jump) and could be left
       // facing the wall he now stands at. Snap it to him, frame the side with the most room, and tell the playtest it was intended.
       camera.target.set(s.x, s.y + 1.35, s.z);
-      frameOutdoors({}, { x: s.x, z: s.z });
+      if (o.alpha != null) {
+        camera.alpha = o.alpha;
+        if (o.beta != null) camera.beta = o.beta;
+        if (o.radius != null) wantRadius = o.radius;
+      } else frameOutdoors({}, { x: s.x, z: s.z });
       lastRadius = null;
       try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
       return r;
@@ -1094,6 +1163,7 @@ function install() {
     log: () => log.slice(),
     take: () => take("console"),
     push: (spec) => pushStart(spec),
+    hold: (on) => { holdIn = !!on; return holdIn; },
     pushing: () => push.on,
     letGo: () => letGo("console"),
     spawnUpdraft: (x, z, opt) => {

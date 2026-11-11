@@ -20,7 +20,7 @@ export function installSlice(day, world) {
     if (glow) m.emissiveColor = B.Color3.FromHexString(hex).scale(glow);
     return m;
   };
-  const st = { lawn: "straw", scattered: 0, coins: 0, creaks: 0, ripples: 0, drinks: 0 };
+  const st = { lawn: "straw", lawnK: 0, tomatoes: 0, scattered: 0, coins: 0, creaks: 0, ripples: 0, drinks: 0 };
   const emit = (action, detail) => {
     try { window.dispatchEvent(new window.CustomEvent("day:slice", { detail: Object.assign({ action }, detail) })); } catch (e) { /* node */ }
   };
@@ -33,15 +33,20 @@ export function installSlice(day, world) {
   strip.isPickable = false;
   const wallM = mat("slice-tomato-m", "#c23a2a", 0.25);
   const leafM = mat("slice-leaf-m", "#3f7a3a");
-  for (let i = 0; i < 9; i++) {
-    for (let j = 0; j < 3; j++) {
+  /* The wall stays west of the roof ramp (x -28.5..-17, z 6.475..8.2): the ramp's slab and its wedge fill that part of
+     the north face, so the vines and fruit that used to run along it were buried in the wedge and poked through the
+     ramp, and clipped into him as he walked up (playtest: "lower body passes into the green wall and red slab").
+     The panels are solid from the wall out (flush at z 6.5, so the facade's window panes behind them are covered, not
+     poking through), and the fruit sits on them. */
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
       const f = B.MeshBuilder.CreateSphere("slice-tom", { diameter: 0.34, segments: 4 }, scene);
-      f.position.set(-28 + i * 1.4 + (j % 2) * 0.3, 0.9 + j * 0.8, 6.62);
+      f.position.set(-31.5 + i * 0.8 + (j % 2) * 0.2, 0.9 + j * 0.8, 6.78);
       f.material = wallM;
       f.isPickable = false;
     }
-    const l = B.MeshBuilder.CreateBox("slice-vine", { width: 0.9, height: 2.6, depth: 0.08 }, scene);
-    l.position.set(-28 + i * 1.4, 1.6, 6.55);
+    const l = B.MeshBuilder.CreateBox("slice-vine", { width: 0.7, height: 3.5, depth: 0.2 }, scene);
+    l.position.set(-31.5 + i * 0.8, 0.08 + 1.75, 6.6);
     l.material = leafM;
     l.isPickable = false;
   }
@@ -54,11 +59,34 @@ export function installSlice(day, world) {
   lawn.material = strawM;
   lawn.isPickable = false;
   lawn.visibility = 0.55;
-  const setLawn = (s) => {
-    st.lawn = s;
-    lawn.material = s === "damp" ? dampM : strawM;
-    lawn.visibility = s === "damp" ? 0.3 : 0.55;
-    emit("lawn", { state: s });
+  /* `k` (0..1) is how fresh the water is (js/memory.js fades it over three real days); `quiet` = a restore, no event. */
+  const blendM = mat("slice-blend", "#8a7c45");
+  const strawC = B.Color3.FromHexString("#8a7c45");
+  const dampC = B.Color3.FromHexString("#2f5a38");
+  const setLawn = (s, k, quiet) => {
+    const f = s === "damp" ? (k == null ? 1 : Math.max(0, Math.min(1, k))) : 0;
+    st.lawn = s === "damp" && f > 0 ? "damp" : "straw";
+    st.lawnK = +f.toFixed(2);
+    if (f >= 1) lawn.material = dampM;
+    else if (f <= 0) lawn.material = strawM;
+    else { blendM.diffuseColor = B.Color3.Lerp(strawC, dampC, f); lawn.material = blendM; }
+    lawn.visibility = 0.55 + (0.3 - 0.55) * f;
+    if (!quiet) emit("lawn", { state: st.lawn });
+  };
+  // fuller tomato wall after Birdie's rain: a second set of fruit between the first (js/memory.js sets how many by freshness)
+  const extra = [];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) {
+    const f = B.MeshBuilder.CreateSphere("slice-tom-extra", { diameter: 0.4, segments: 4 }, scene);
+    f.position.set(-31.1 + i * 0.8 + (j % 2) * 0.2, 1.3 + j * 0.8, 6.8);
+    f.material = wallM;
+    f.isPickable = false;
+    f.setEnabled(false);
+    extra.push(f);
+  }
+  const setTomatoes = (k) => {
+    const n = Math.round(extra.length * Math.max(0, Math.min(1, k || 0)));
+    extra.forEach((f, i) => f.setEnabled(i < n));
+    st.tomatoes = n;
   };
 
   // pond ripples: rings that grow and fade
@@ -172,7 +200,7 @@ export function installSlice(day, world) {
     const d = e.detail || {};
     if (d.action === "reward" && (d.id === "birdie" || d.neighbor === "birdie" || d.who === "birdie")) {
       st.drinks++;
-      setLawn("damp");
+      if (!(day.memory && day.memory.now)) setLawn("damp"); // js/memory.js (if it's up) sets the lawn and the fruit from the store
       sfx("pad");
       sfx("rumble");
       emit("birdie-rain", {});
@@ -183,6 +211,7 @@ export function installSlice(day, world) {
     now: () => ({ ...st, pigeons: pigeons.filter((p) => p.fly < 0).length }),
     scatter,
     setLawn,
+    setTomatoes,
   };
   day.slice = api;
   return api;

@@ -71,7 +71,7 @@ function install() {
   try { total = (JSON.parse(localStorage.getItem(key)) || {}).score | 0; } catch (e) { /* private mode */ }
   let dayKey = null;
   const st = {}; // id -> { stage, askOpen, askAt, shown: [{beat, until}], missed }
-  const fresh = () => people.forEach((p) => (st[p.id] = { stage: 0, doneBeats: [], bubble: null, bubbleUntil: 0, thanksAt: 0, askOpen: false }));
+  const fresh = () => people.forEach((p) => (st[p.id] = { stage: 0, doneBeats: [], bubble: null, bubbleUntil: 0, thanksAt: 0, askOpen: false, remembered: false }));
   fresh();
   let dayScore = 0;
   const events = [];
@@ -228,14 +228,19 @@ function install() {
   }
   function say(p, beat, secs) {
     const s = st[p.id];
-    s.bubble = beat;
+    // Spoken through js/voice.js (their own voice, from where they stand, one caption tagged with their name; never over
+    // Small Weather): the bubble then keeps only the verb chip of an ask, not the words.
+    const V = day.voice;
+    const spoken = !!(V && V.speakAs);
+    if (spoken) V.speakAs(p.name.split(" ")[0], beat.text, { x: p.__pos.x, z: p.__pos.z, via: "neighbor-" + beat.kind });
+    s.bubble = Object.assign({}, beat, { spoken });
     s.bubbleUntil = beat.kind === "ask" ? Infinity : performance.now() + secs * 1000;
     // ask / thanks / surprise each play their own gesture on the figure
     if (beat.kind === "ask" || beat.kind === "thanks" || beat.kind === "surprise") {
       p.__gestureWant = beat.kind;
       emit("gesture", { id: p.id, kind: beat.kind, beat: beat.id, x: p.__pos.x, z: p.__pos.z });
     }
-    emit("beat", { id: p.id, beat: beat.id, kind: beat.kind, text: beat.text, x: p.__pos.x, z: p.__pos.z });
+    emit("beat", { id: p.id, beat: beat.id, kind: beat.kind, text: beat.text, x: p.__pos.x, z: p.__pos.z, positional: spoken });
   }
 
   function stepBeats(p, h, here, nowMs) {
@@ -244,6 +249,20 @@ function install() {
     if (p.__pos.inside) return;
     const near = distTo(p, here) < (cfg.near || 9);
     const beats = p.beats || [];
+    // what he remembers (day.memory facts, today and yesterday): a voiced greeting the first time he walks up each day,
+    // `helped` after he answered their ask, `botched` after he left it; not while an ask of theirs is open or answered today
+    const rem = p.remember;
+    if (rem && near && !s.remembered && !s.askOpen && !s.thanksAt && !s.bubble && !s.doneBeats.includes(`${p.id}-ask`)) {
+      const f = (day.memory && day.memory.facts && day.memory.facts()) || {};
+      const tone = f[`answered.${p.id}`] ? "helped" : f[`botched.${p.id}`] ? "botched" : null;
+      if (tone && rem[tone]) {
+        s.remembered = true;
+        say(p, { id: `${p.id}-remember-${tone}`, kind: "remember", text: rem[tone] }, 7);
+        p.__gestureWant = tone === "helped" ? "thanks" : null; // a wave for the ones he helped
+        emit("remember", { id: p.id, tone });
+        return;
+      }
+    }
     // the surprise has its own window and needs only the clock and him being close
     const sur = beats.find((b) => b.kind === "surprise");
     if (sur && !s.doneBeats.includes(sur.id) && near && inWindow(h, sur.from, sur.to) && !s.askOpen && !s.thanksAt) {
@@ -254,6 +273,8 @@ function install() {
     const beat = beats[s.stage];
     if (!beat || beat.kind === "surprise") return;
     if (beat.kind === "ask") {
+      // today's request (js/daily.js) is theirs: their usual ask gives way to it
+      if (day.daily && day.daily.owns && day.daily.owns(p.id)) return;
       if (!inWindow(h, beat.from, beat.to)) {
         if (s.askOpen) {
           // the window closed unanswered: the ask and its thanks are missed for today
@@ -467,9 +488,9 @@ function install() {
         tag.style.opacity = cd > 60 ? String(Math.max(0.35, 1 - (cd - 60) / 60)) : "1";
         tag.style.zIndex = String(Math.round(1000 - cd));
         const b = p.__bubble;
-        b.hidden = !(showBubble && cd < 40);
+        b.hidden = !(showBubble && cd < 40 && !(s.bubble.spoken && s.bubble.kind !== "ask"));
         if (showBubble) {
-          const txt = s.bubble.text + (s.bubble.kind === "ask" ? `<small>${(window.powers && window.powers.abilities && window.powers.abilities.get && (window.powers.abilities.get(s.bubble.ability) || {}).name) || s.bubble.ability}</small>` : "");
+          const txt = (s.bubble.spoken ? "" : s.bubble.text) + (s.bubble.kind === "ask" ? `<small>${(window.powers && window.powers.abilities && window.powers.abilities.get && (window.powers.abilities.get(s.bubble.ability) || {}).name) || s.bubble.ability}</small>` : "");
           if (b.dataset.id !== s.bubble.id) {
             b.dataset.id = s.bubble.id;
             b.innerHTML = txt;
@@ -550,6 +571,12 @@ function install() {
       animStats.samples = 0;
     },
     events: () => events.slice(),
+    /** Have them play a gesture (ask, thanks, surprise) toward him: js/daily.js's request and thanks. */
+    gesture: (id, kind) => {
+      const p = people.find((q) => q.id === id);
+      if (p) p.__gestureWant = kind;
+      return !!p;
+    },
   };
   window.neighbors = api;
   day.neighbors = api;
