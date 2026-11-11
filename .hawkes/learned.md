@@ -1,0 +1,4 @@
+- convention: Tornado lives in js/tornado.js — powers.js only starts/ticks it; plaza casts use plazaCourse, street casts use streetCourse.
+- lesson: Debris pool must wait for Havok — building on the first tick with phys=null locks the session into mesh-only shove forever; wait until physics() is ready or ~1.5 s.
+- convention: Tornado wreck marks go through day.memory.noteDebris (cap 4 solid kinds per cast); paper/leaf stay session-only so the 20-mark CAP isn't flooded.
+- lesson: Ground-contact after tipping must use mesh bounding-box minimumWorld.y vs a down ray, not pivot − kindFeet, or tipped bins fail the float check by construction.
