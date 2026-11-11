@@ -20,6 +20,7 @@
    ========================================================================== */
 const B = window.BABYLON;
 import { installProps, reserved } from "./props.js";
+import { runCityAudit } from "./city-audit.js";
 let world = null;
 
 function makeRng(seed) {
@@ -490,9 +491,10 @@ export function installCityscape(w) {
     crossings++;
     // crosswalks: west and east of the junction across the avenue, north and south across the cross street
     [-1, 1].forEach((s) => {
-      for (let k = -3; k <= 3; k++) {
-        zebraZ.thinInstanceAdd(T(cx + s * 3.7, 0.05, a.z + k * 0.55 + 0, 1, 1, 0.78));
-        zebraX.thinInstanceAdd(T(cx + k * 0.55, 0.05, a.z + s * 3.7, 0.78, 1, 1));
+      // bars run the way people walk (across the road) and stack along it, 0.55 m apart, none touching the stop line
+      for (let k = -2; k <= 2; k++) {
+        zebraZ.thinInstanceAdd(T(cx + s * 3.5 + k * 0.55, 0.05, a.z, 1, 1, 1.6));
+        zebraX.thinInstanceAdd(T(cx, 0.05, a.z + s * 3.5 + k * 0.55, 1.6, 1, 1));
       }
       stopX.thinInstanceAdd(T(cx + s * 5.1, 0.05, a.z - s * 1.05, 1, 1, 0.5));
       stopZ.thinInstanceAdd(T(cx + s * 1.05, 0.05, a.z + s * 5.1, 0.5, 1, 1));
@@ -502,7 +504,7 @@ export function installCityscape(w) {
   avs.forEach((a) => {
     if (!a.main) for (let x = a.from + 1; x < a.to; x += 6) if (!nearJunction(x, crossXs, 7)) dashX.thinInstanceAdd(T(x, 0.05, a.z));
     // edge lines between junctions
-    const cuts = crossXs.filter((c) => c > a.from + 8 && c < a.to - 8);
+    const cuts = crossXs.filter((c) => c >= a.from + 4 && c <= a.to - 4); // where the crosswalks are
     const pts = [a.from].concat(cuts, [a.to]);
     for (let p = 0; p < pts.length - 1; p++) {
       const x0 = pts[p] + (p === 0 ? 1 : 6.4);
@@ -666,6 +668,12 @@ export function installCityscape(w) {
   });
 
   const api = {
+    /* the city audit (js/city-audit.js; scripts/check-city.mjs runs the same under the NullEngine): floating or sunk props,
+       coplanar faces, bad normals, the walkable roofs' AC colliders. `day.cityscape.audit()` -> { failures, counts } */
+    audit() {
+      const r = runCityAudit(scene, B, cfg, { solids: world.solids });
+      return { failures: r.failures, counts: r.counts };
+    },
     info() {
       return {
         fillers: stats.fillers,

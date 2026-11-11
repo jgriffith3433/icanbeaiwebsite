@@ -56,6 +56,7 @@ class Part {
     this.nrm = [];
     this.col = [];
     this.idx = [];
+    this.prims = []; // world-space boxes of every box/cylinder/ball: the city audit (js/city-audit.js) clusters them into props
     this.f = { ox: 0, oz: 0, oy: 0, c: 1, s: 0 };
   }
   frame(ox, oz, yaw, oy) {
@@ -69,6 +70,18 @@ class Part {
   wn(x, y, z) {
     const f = this.f;
     return [x * f.c + z * f.s, y, -x * f.s + z * f.c];
+  }
+  /* the world-space box round a local box, for the audit */
+  prim(x0, y0, z0, x1, y1, z1) {
+    const lo = [1e9, 1e9, 1e9];
+    const hi = [-1e9, -1e9, -1e9];
+    for (const x of [x0, x1]) for (const z of [z0, z1]) {
+      const q = this.w(x, y0, z);
+      for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], q[k]); hi[k] = Math.max(hi[k], q[k]); }
+    }
+    lo[1] = y0 + (this.f.oy || 0);
+    hi[1] = y1 + (this.f.oy || 0);
+    this.prims.push([lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]]);
   }
   quad(a, b, c, d, n, col) {
     const base = this.pos.length / 3;
@@ -84,6 +97,7 @@ class Part {
   /* centre (x, z), bottom y0, size w x d x h (h up) */
   box(x, y0, z, w, h, d, col) {
     const x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, y1 = y0 + h;
+    this.prim(x0, y0, z0, x1, y1, z1);
     this.quad([x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [0, 0, 1], col);
     this.quad([x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [0, 0, -1], col);
     this.quad([x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0], [1, 0, 0], col);
@@ -93,6 +107,8 @@ class Part {
   }
   /* a (tapered) cylinder or cone: radii r0 at the bottom, r1 at the top */
   cyl(x, y0, z, r0, r1, h, seg, col, cap) {
+    const rm = Math.max(r0, r1);
+    this.prim(x - rm, y0, z - rm, x + rm, y0 + h, z + rm);
     for (let i = 0; i < seg; i++) {
       const a0 = (i / seg) * Math.PI * 2;
       const a1 = ((i + 1) / seg) * Math.PI * 2;
@@ -122,6 +138,7 @@ class Part {
   /* a squashed low-poly ball */
   ball(x, y, z, r, sy, col, seg) {
     seg = seg || 6;
+    this.prim(x - r, y - r * sy, z - r, x + r, y + r * sy, z + r);
     const rings = 4;
     for (let j = 0; j < rings; j++) {
       const t0 = (j / rings) * Math.PI;
@@ -150,6 +167,7 @@ class Part {
     vd.applyToMesh(m);
     m.material = material;
     m.isPickable = false;
+    m.metadata = { prims: this.prims };
     m.freezeWorldMatrix();
     return m;
   }
@@ -207,6 +225,9 @@ export function installProps(ctx) {
     solid.frame(x, z, yaw, G);
     solid.box(0, 0.42, 0, 1.6, 0.07, 0.46, WOOD);
     solid.box(0, 0.72, -0.2, 1.6, 0.34, 0.06, WOOD);
+    // the back's two posts, from the seat's top up into the rail, so the back isn't floating over the seat
+    solid.box(-0.7, 0.49, -0.2, 0.07, 0.25, 0.06, DARK);
+    solid.box(0.7, 0.49, -0.2, 0.07, 0.25, 0.06, DARK);
     solid.box(-0.7, 0, 0, 0.07, 0.42, 0.4, DARK);
     solid.box(0.7, 0, 0, 0.07, 0.42, 0.4, DARK);
     if (solidToo !== false) {
@@ -237,10 +258,11 @@ export function installProps(ctx) {
     solid.box(0, 0, 0, 3.2, 0.05, 1.15, hex("#555b62")); // base slab, inside the sidewalk's 1.2 m
     [-1.55, 1.55].forEach((px) => solid.box(px, 0.05, -0.5, 0.08, 2.4, 0.08, METAL));
     solid.box(0, 2.42, -0.1, 3.4, 0.1, 1.5, hex("#2c333c")); // roof
-    solid.box(0, 0.5, -0.56, 0.1, 0.1, 0.1, DARK);
     solid.box(0, 0.5, -0.4, 2.4, 0.07, 0.4, WOOD); // seat
+    [-1.0, 1.0].forEach((sx) => solid.box(sx, 0, -0.4, 0.07, 0.5, 0.3, DARK)); // its two legs, standing in the slab
+    solid.box(0, 0.5, -0.56, 0.1, 0.1, 0.1, DARK); // the stop's call button on the glass
     warm.frame(x, z, yaw, G);
-    warm.box(0, 0.8, -0.58, 3.0, 1.5, 0.05, hex("#bfe3ff")); // lit ad panel / glass back
+    warm.box(0, 0.8, -0.5, 3.04, 1.5, 0.05, hex("#bfe3ff")); // lit ad panel / glass back, between the posts (it ends inside them)
     // the stop sign on its own pole, at the kerb end
     solid.box(1.9, 0, 0.1, 0.07, 3.0, 0.07, METAL);
     warm.box(1.9, 2.55, 0.1, 0.56, 0.56, 0.06, hex("#3ecbff"));
@@ -468,8 +490,9 @@ export function installProps(ctx) {
       if (dx === 0) warm.box(tx, 14.4, tz + dz * e, 2.3, 2.3, 0.08, hex("#fff1c9"));
       else warm.box(tx + dx * e, 14.4, tz, 0.08, 2.3, 2.3, hex("#fff1c9"));
       solid.frame(0, 0, 0);
-      if (dx === 0) { solid.box(tx, 14.4, tz + dz * (e + 0.05), 0.12, 0.9, 0.06, DARK); solid.box(tx + 0.3, 14.4, tz + dz * (e + 0.05), 0.7, 0.1, 0.06, DARK); }
-      else { solid.box(tx + dx * (e + 0.05), 14.4, tz, 0.06, 0.9, 0.12, DARK); solid.box(tx + dx * (e + 0.05), 14.4, tz + 0.3, 0.06, 0.1, 0.7, DARK); }
+      // the hands: the minute hand stands 1.5 cm proud of the hour hand, so where they cross they don't share a face
+      if (dx === 0) { solid.box(tx, 14.4, tz + dz * (e + 0.05), 0.12, 0.9, 0.06, DARK); solid.box(tx + 0.3, 14.4, tz + dz * (e + 0.065), 0.7, 0.1, 0.06, DARK); }
+      else { solid.box(tx + dx * (e + 0.05), 14.4, tz, 0.06, 0.9, 0.12, DARK); solid.box(tx + dx * (e + 0.065), 14.4, tz + 0.3, 0.06, 0.1, 0.7, DARK); }
     });
     solid.box(tx, 22.9, tz, 0.12, 2.2, 0.12, METAL);
     colliders.push({ x: tx, y: 8.6, z: tz, w: 3.4, h: 17.2, d: 3.4 });
@@ -479,7 +502,6 @@ export function installProps(ctx) {
     [[pl.x0 + 5, pl.z1 - 12], [pl.x1 - 5, pl.z1 - 12], [pl.x0 + 8, pl.z1 - 8]].forEach(([x, z]) => {
       solid.frame(x, z, 0);
       solid.cyl(0, 0.07, 0, 0.5, 0.5, 0.05, 8, hex("#c9c2b0"));
-      solid.cyl(0, 0.07, 0, 0.05, 0.05, 0.75, 6, METAL);
       solid.cyl(0, 2.0, 0, 1.3, 0.05, 0.45, 8, hex("#c04a46"));
       solid.cyl(0, 0.07, 0, 0.05, 0.05, 2.0, 6, METAL);
       [[0.9, 0], [-0.9, 0]].forEach(([dx, dz]) => solid.cyl(dx, 0.07, dz, 0.22, 0.22, 0.45, 6, DARK));
@@ -491,6 +513,7 @@ export function installProps(ctx) {
       stats.plazaLamps++;
     });
     [[pl.x0 + 1.4, pcz], [pl.x1 - 1.4, pcz]].forEach(([x, z]) => {
+      solid.frame(0, 0, 0); // back to world coordinates: the box used the last lamp's frame and stood 100 m away
       solid.box(x, 0.07, z, 1.6, 0.5, 1.6, hex("#5b4636"));
       tree(x, z, 0.7);
       colliders.pop();
@@ -636,9 +659,9 @@ export function installProps(ctx) {
       // 3. West tar membrane patch (dx = -4.2, dz = -0.2)
       roof.box(-4.2, b.h, -0.2, 2.3, 0.028, 3.0, hex("#232730"));
       // 4. Roof-drain puddle basin + metal gutter scupper (dx = -2.2, dz = 1.6)
-      roof.box(-2.2, b.h, 1.6, 2.1, 0.034, 2.1, hex("#2c4e6b"));
-      roof.cyl(-2.2, b.h + 0.034, 1.6, 0.28, 0.28, 0.016, 8, METAL);
-      roof.box(-2.2, b.h + 0.02, b.d / 2 - 0.35, 0.14, 0.22, 0.35, METAL); // gutter scupper at parapet
+      roof.box(-2.25, b.h, 1.6, 1.3, 0.034, 2.1, hex("#2c4e6b")); // between the gravel (to -1.55) and the tar (from -3.05): no shared tops
+      roof.cyl(-2.25, b.h + 0.034, 1.6, 0.28, 0.28, 0.016, 8, METAL);
+      roof.box(-2.2, b.h, b.d / 2 - 0.35, 0.14, 0.22, 0.35, METAL); // gutter scupper at parapet, on the roof
     } else if (b.w >= 12) {
       acUnit(b.x - sx, b.h, b.z, 0);
       waterTank(b.x + sx, b.h, b.z + b.d * 0.1);
