@@ -853,6 +853,103 @@ async function sliceScenario(options, t) {
   t.event("slice-done", JSON.stringify(window.day.slice.now()));
 }
 
+/* ---------------- memory: the city remembers what he did today, and forgets over three real days ---------------- */
+// Setup shortcuts: the day bar beside the car, Take control, the memory store cleared, and day.memory.reload() / shiftDays()
+// standing in for a page reload and for the date moving on. Everything he does is real keys: WASD to the park, R, WASD to the avenue, E, Esc.
+async function memoryScenario(options, t) {
+  t.scene("Park");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.memory && window.day.slice && window.day.control, 8000, "the city's memory (js/memory.js)");
+  const M = window.day.memory;
+  const C = window.day.control;
+  const sc = () => world().scene;
+  M.reset();
+  M.shiftDays(0);
+  const decals = () => sc().meshes.filter((m) => /^mem-(scorch|puddle|bin|sign-board)/.test(m.name) && m.isEnabled() && m.visibility > 0.01).length;
+  const outside = carSideMoment(window.day.today());
+  scrubTo(outside.start + 1);
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  if (options && options.touch) { try { C.touch(true); } catch (e) { /* desktop */ } }
+  const P = window.powers || window.day.powers;
+  const refill = () => { if (P && P.abilities && P.abilities.reset) P.abilities.reset(100); }; // setup: a full Charge
+  refill();
+  const sideZ = (window.DAY_CONFIG.street || { z: 12.6 }).z - 2.8;
+  for (let k = 0; k < 8 && Math.abs(C.state().x + 2) > 3; k++) await goTo(C.state().x + Math.max(-20, Math.min(20, -2 - C.state().x)), sideZ, t, { sprint: true, ms: 12000, close: 1.2 });
+  await goTo(-2, 34, t, { sprint: true, ms: 16000, close: 2 });
+  t.event("memory-park", `in the park at ${C.state().x.toFixed(0)},${C.state().z.toFixed(0)}; lawn ${window.day.slice.now().lawn}`);
+  if (window.day.slice.now().lawn !== "straw") t.problem("bug", "The lawn should start dry (straw) with a clean store");
+  pressKey("r");
+  await t.until(() => M.today().zones.park && M.today().zones.park.rain, 3000, "rain on the park remembered");
+  await sleep(1200);
+  t.event("memory-rain", JSON.stringify(M.today()));
+  const rainLawn = window.day.slice.now().lawn;
+  if (rainLawn !== "damp") t.problem("bug", "Rain on the park didn't turn the lawn green");
+  t.scene("The green lawn");
+  await sleep(800);
+  t.scene("Avenue");
+  await goTo(C.state().x, sideZ, t, { sprint: true, ms: 12000, close: 1.2 });
+  await goTo(C.state().x + 12, sideZ, t, { sprint: true, ms: 12000, close: 1.5 });
+  refill();
+  await sleep(1800); // Lightning's cooldown
+  pressKey("e");
+  await t.until(() => M.today().deeds.power >= 2, 3000, "the bolt remembered");
+  await sleep(900);
+  const today = M.today();
+  t.event("memory-bolt", JSON.stringify(today));
+  if (!(today.zones.avenue && today.zones.avenue.bolt) && !(today.zones.street && today.zones.street.bolt)) t.problem("bug", `The bolt wasn't recorded where it landed: ${JSON.stringify(today.zones)}`);
+  const s0 = M.now();
+  if (!s0.scorch) t.problem("bug", "The bolt left no scorch mark");
+  t.scene("Scorch on the avenue");
+  await sleep(1200);
+  pressKey("Escape");
+  await sleep(1500);
+  // a same-day reload: the store is read back and the marks rebuilt
+  const before = { lawn: M.now().lawn, decals: decals() };
+  M.reload();
+  await sleep(700);
+  const after = M.now();
+  t.event("memory-reload", `same date: lawn ${after.lawn}, ${decals()} decals, scorch ${after.scorch}`);
+  if (window.day.slice.now().lawn !== "damp" || after.lawn < 1) t.problem("bug", "After a same-day reload the lawn isn't green");
+  if (!after.scorch || decals() < 1) t.problem("bug", "After a same-day reload the scorch mark is gone");
+  if (decals() !== before.decals) t.problem("bug", `Reload changed the marks (${before.decals} -> ${decals()})`);
+  t.scene("Same day, after a reload");
+  await sleep(1200);
+  // the date moves: +1 day shows them fainter, +3 days is the default state
+  M.shiftDays(1);
+  await sleep(600);
+  t.event("memory-plus1", `lawn ${M.now().lawn}, ${decals()} decals`);
+  if (!(M.now().lawn > 0 && M.now().lawn < 1) || !decals()) t.problem("bug", "One day on, the marks should still show, fainter");
+  t.scene("One day later, fainter");
+  await sleep(900);
+  M.shiftDays(3);
+  await sleep(600);
+  t.event("memory-plus3", `lawn ${M.now().lawn}, ${decals()} decals, slice ${window.day.slice.now().lawn}`);
+  if (decals() || M.now().lawn || window.day.slice.now().lawn !== "straw") t.problem("bug", "Three days on, the marks should be gone and the lawn dry again");
+  t.scene("Three days later, back to default");
+  await sleep(900);
+  // phone budget: low quality with marks present, the frame rate over two seconds
+  M.shiftDays(0);
+  const wasQ = window.day.look.quality();
+  window.day.look.quality("low");
+  await sleep(800);
+  const samples = [];
+  const obs = sc().onAfterRenderObservable.add(() => samples.push(world().engine.getDeltaTime()));
+  await sleep(2500);
+  sc().onAfterRenderObservable.remove(obs);
+  const fps = samples.length ? 1000 / (samples.reduce((a, b) => a + b, 0) / samples.length) : 0;
+  t.metric("memoryLowFps", Math.round(fps * 10) / 10);
+  t.metric("memoryDecalsLow", decals());
+  t.event("memory-low", `low quality, ${decals()} decals (cap ${6}): ${fps.toFixed(0)} fps`);
+  if (decals() > 6 * 3) t.problem("bug", `Low quality drew ${decals()} decal meshes`);
+  if (fps < 30) t.problem("bug", `With marks present on low quality the frame rate is ${fps.toFixed(0)} fps`);
+  window.day.look.quality(wasQ);
+  M.reset();
+  M.shiftDays(0);
+}
+
 async function neighborsScenario(options, t) {
   t.scene("Home");
   checkBasics(t);
@@ -7310,6 +7407,7 @@ installPlaytest({
     { id: "weather-abilities", title: "Take control, use Rain (R), Gale (V), Fog (C), Sun break (X) and Lightning (E) once each; each looks and sounds different and the sky is calm again seconds later", seconds: 150, tags: ["weather", "powers"], description: "Day bar beside the car (setup), Sound on, Enter. Real keys for each ability; waits for Energy between calls. Events ability-<id> / fade-<id>, then all-distinct." },
     { id: "crowd-reacts", title: "Take control at lunch and use Lightning, Rain, Gale, Fog and Sun break; the street's citizens look up, run for cover, hold their hats, slow down and cheer, then go back to routine as the weather clears", seconds: 150, tags: ["crowd", "weather", "powers"], description: "Day bar to lunch (setup), Enter, real keys for each ability. Events react-<id> and routine-<id>, metrics reacting-<id>." },
     { id: "slice", title: "Vertical slice: walk from the driveway to Birdie, answer her rain, see the lawn drink, the park path, bandstand pigeons and creak, the pond coin toss; reports quality.maxQuietSeconds and quality.textOnlyBeats", seconds: 200, tags: ["slice", "story"], description: "Real WASD, R for Birdie, Y at the pond." },
+    { id: "memory", title: "The city remembers: rain on the park turns the lawn green, a bolt on the avenue leaves a scorch; a same-day reload shows both again, a day on they're fainter, three days on the city is back to default; with marks present on low quality the frame rate stays over 30", seconds: 150, tags: ["memory", "retention", "phone"], description: "Day bar beside the car (setup), Enter, the store cleared and a full Charge (setup). Real keys: WASD with Shift to the park, R, WASD to the avenue, E, Esc. day.memory.reload() stands in for a page reload and day.memory.shiftDays(1 / 3) for the date moving on (setup). Events memory-park / -rain / -bolt / -reload / -plus1 / -plus3 / -low; metrics memoryLowFps, memoryDecalsLow. Option {\"touch\":true} for 390x844 touch." },
     { id: "neighbors", title: "Walk the avenue to Birdie, Dex and Ines Quill: each asks for a weather ability in a speech bubble, answering it pays a thank-you and a reward, and a later surprise pays more", seconds: 260, tags: ["neighbors", "story"], description: "Day bar beside the car (setup), Enter, then real WASD/Shift to each neighbor and R, X, E for their asks; the day bar jumps to each surprise hour. Events found-<id>, beat-ask-<id>, beat-thanks-<id>, reward-<id>, beat-surprise-<id>." },
     { id: "neighbor-bodies", title: "Peoplekit bodies: slowed walk clips for Birdie, Dex and Ines (stride matches speed), ask wave and thanks cheer gestures, rain hunch and sun eye-shield, foot-slide detectors clean over a full day", seconds: 320, tags: ["neighbors", "quality"], description: "Day bar + Enter (setup). Real WASD to each neighbour; R/X/E for asks. Events slow-clip / gait-step / gesture-ask-* / gesture-thanks-* / weather-pose-rain / weather-pose-sun / foot-slide-clean; metric quality.footSlideFails." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
@@ -7391,6 +7489,7 @@ installPlaytest({
       else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
+      else if (id === "memory") await memoryScenario(options, t);
       else if (id === "neighbor-bodies") await neighborBodies(options, t);
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);
