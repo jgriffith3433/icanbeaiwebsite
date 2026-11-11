@@ -54,6 +54,14 @@ export function startMoments() {
 .mo-end .outro{margin:0 0 22px;font:600 clamp(1.1rem,2.8vw,1.5rem)/1.3 Fraunces,Georgia,serif;opacity:0;transition:opacity .6s ease}
 .mo-end .outro.on{opacity:1}
 .mo-end .hint{margin:10px 0 0;font-size:.78rem;color:rgba(246,241,232,.55)}
+.mo-cine{display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.mo-cine[hidden],.mo-cine-tap[hidden]{display:none}
+.mo-cine .who{margin:0;font:600 .68rem/1 Outfit,system-ui,sans-serif;letter-spacing:.28em;text-transform:uppercase;color:#7ec8ff;text-shadow:0 2px 10px rgba(0,0,0,.7);min-height:.7rem}
+.mo-cine .cap{margin:0;max-width:100%;box-sizing:border-box;padding:9px 18px;border-radius:999px;background:rgba(10,13,22,.66);border:1px solid rgba(126,200,255,.35);backdrop-filter:blur(8px);color:#f6f1e8;font:600 clamp(.82rem,3.6vw,1.3rem)/1.25 Fraunces,Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 12px rgba(0,0,0,.6);transition:opacity .35s ease;opacity:1}
+.mo-cine .cap.off{opacity:0}
+.mo-cine button{pointer-events:auto;appearance:none;min-height:48px;min-width:96px;padding:10px 26px;border-radius:999px;border:1px solid rgba(246,241,232,.4);background:rgba(14,16,22,.62);color:#f6f1e8;font:600 .95rem Outfit,system-ui,sans-serif;cursor:pointer;touch-action:manipulation}
+.mo-cine button:active,.mo-cine button:hover{background:rgba(126,200,255,.22);border-color:rgba(126,200,255,.7)}
+.mo-cine button:focus-visible{outline:2px solid #7ec8ff;outline-offset:3px}
 @keyframes mo-in{to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.mo-end li,.mo-end .outro{animation-duration:.01s;animation-delay:0s;transition:none}}
 `;
@@ -273,13 +281,137 @@ export function startMoments() {
     if (n.length) lastNotes = n;
   });
 
+  /* ---------- 3. turning points: one staged moment per episode beat (config `moments.turning`) ---------- */
+  const TURN = Object.assign({}, user.turning || {});
+  const turnLog = [];
+  const cine = document.createElement("div");
+  cine.className = "mo-cine";
+  cine.id = "moment-cine";
+  cine.hidden = true;
+  cine.setAttribute("role", "status");
+  cine.innerHTML = `<p class="who"></p><p class="cap" id="moment-cap"></p><button type="button" id="moment-cine-skip"></button>`;
+  const tap = document.createElement("div");
+  tap.className = "mo-cine-tap";
+  tap.id = "moment-cine-tap";
+  tap.hidden = true;
+  document.body.append(tap, cine);
+  const cineWho = cine.querySelector(".who");
+  const cineCap = cine.querySelector(".cap");
+  const cineSkip = cine.querySelector("#moment-cine-skip");
+  cineSkip.textContent = T.skip;
+  // a bot's tab only plays them when the scenario is about them (the other scenarios wait on the toasts)
+  let turnOn = true;
+  try {
+    const id = new URLSearchParams(location.search).get("playtest");
+    if (id && id !== "turning-moments") turnOn = false;
+    else if (!id && navigator.webdriver) turnOn = false;
+  } catch (e) { /* no location */ }
+  let cur = null; // { id, spec, t0, timers, raf, said }
+  const MAX_SECS = 8;
+  function fitCaption() {
+    cineCap.style.fontSize = "";
+    let px = parseFloat(getComputedStyle(cineCap).fontSize) || 16;
+    let n = 0;
+    while (cineCap.scrollWidth > cineCap.clientWidth + 1 && px > 11 && n++ < 24) { px -= 0.5; cineCap.style.fontSize = px + "px"; }
+  }
+  function showCaption(who, text) {
+    cineWho.textContent = who || "";
+    cineCap.textContent = text;
+    cineCap.classList.remove("off");
+    fitCaption();
+  }
+  function endTurn(how, via) {
+    const c = cur;
+    if (!c) return false;
+    cur = null;
+    cancelAnimationFrame(c.raf);
+    c.timers.forEach(clearTimeout);
+    const w = day.world && day.world();
+    const info = w && w.cineInfo ? w.cineInfo() : null;
+    if (w && w.cineShot) w.cineShot(null);
+    if (day.control && day.control.hold) day.control.hold(false);
+    html.classList.remove("cine-up");
+    tap.hidden = true;
+    cine.hidden = true;
+    if (document.activeElement && cine.contains(document.activeElement)) document.activeElement.blur();
+    try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
+    const secs = Math.round((performance.now() - c.t0) / 100) / 10;
+    const d = { moment: c.id, action: how, via: via || "auto", seconds: secs, insideFrames: info ? info.inside : 0, frames: info ? info.frames : 0, minClear: info ? Math.round(info.minClear * 10) / 10 : null };
+    turnLog.push(Object.assign({ t: performance.now() }, d));
+    if (turnLog.length > 20) turnLog.shift();
+    emit(c.id, how === "end" ? "end" : "skip", d);
+    try { c.spec.onEnd && c.spec.onEnd(how, d); } catch (e) { console.error("[moments]", e); }
+    return true;
+  }
+  /** Play a turning-point moment: spec { id, title, secs, sting, shot, lines: [{ who, text, at, caption }], speak, tick, onStart, onEnd }. */
+  function play(spec) {
+    if (!spec || !turnOn || !day.world) return false;
+    if (cur) endTurn("skip", "replaced");
+    const w = day.world();
+    if (lineUp) endLine("skip", "moment");
+    if (endUp) return false;
+    const secs = Math.min(MAX_SECS, spec.secs || 6);
+    cur = { id: spec.id, spec, t0: performance.now(), timers: [], raf: 0 };
+    const c = cur;
+    html.classList.add("cine-up");
+    try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(secs + 1); } catch (e) { /* no sensor */ }
+    if (day.control && day.control.hold) day.control.hold(true);
+    const camera = !!(w && w.cineShot && spec.shot && w.cineShot(Object.assign({ secs }, spec.shot)));
+    let sting = false;
+    try { sting = !!(day.score && day.score.momentSting && day.score.momentSting(spec.sting)); } catch (e) { /* no audio */ }
+    cineCap.textContent = "";
+    cineWho.textContent = "";
+    cineCap.classList.add("off");
+    cine.hidden = false;
+    tap.hidden = false;
+    emit(spec.id, "start", { title: spec.title || "", secs, camera, sting: spec.sting || null, stingPlayed: sting, lines: (spec.lines || []).length, shot: spec.shot ? { tx: spec.shot.tx, tz: spec.shot.tz } : null });
+    try { spec.onStart && spec.onStart(); } catch (e) { console.error("[moments]", e); }
+    (spec.lines || []).forEach((L, i) => {
+      c.timers.push(setTimeout(() => {
+        if (cur !== c) return;
+        showCaption(L.who, L.caption || L.text);
+        emit(spec.id, "line", { index: i, who: L.who, text: L.text, caption: L.caption || L.text });
+        if (spec.speak) spec.speak(L.who, L.text);
+        const hold = Math.max(1.8, Math.min(5.2, 1.2 + L.text.length * 0.065));
+        c.timers.push(setTimeout(() => { if (cur === c) cineCap.classList.add("off"); }, hold * 1000));
+      }, Math.max(0, (L.at || 0) * 1000)));
+    });
+    const loop = () => {
+      if (cur !== c) return;
+      const k = Math.min(1, (performance.now() - c.t0) / (secs * 1000));
+      try { spec.tick && spec.tick(k, secs); } catch (e) { /* a tick must not end the moment */ }
+      c.raf = requestAnimationFrame(loop);
+    };
+    c.raf = requestAnimationFrame(loop);
+    c.timers.push(setTimeout(() => endTurn("end", "auto"), secs * 1000));
+    try { cineSkip.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
+    return true;
+  }
+  cineSkip.addEventListener("click", (e) => { e.stopPropagation(); endTurn("skip", "click"); });
+  cineSkip.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch") { e.stopPropagation(); endTurn("skip", "tap"); } });
+  tap.addEventListener("click", () => endTurn("skip", "tap"));
+  tap.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch") endTurn("skip", "tap"); });
+  window.addEventListener("keydown", (e) => {
+    if (!cur) return;
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); endTurn("skip", "esc"); }
+  }, true);
+  window.addEventListener("day:control", (e) => {
+    const a = e && e.detail && e.detail.action;
+    if (cur && (a === "let-go" || a === "letgo")) endTurn("skip", "let-go");
+  });
+
   const api = {
     takeover,
     recap: (via) => recap(via || "api"),
     pickEvents,
     pickDeeds: (key, n) => pickDeeds(key || day.now().key, n || D.speakDeeds || 2),
-    skip: () => endLine("skip", "api") || closeEnd("skip", "api"),
-    now: () => ({ line: lineUp, text: lineText, recap: endUp, events: shown, pushing: !!(day.control && day.control.pushing && day.control.pushing()), log: log.slice() }),
+    play,
+    playing: () => !!cur,
+    turning: (id) => (id ? TURN[id] || null : Object.assign({}, TURN)),
+    enabled: () => turnOn,
+    enable: (on) => { turnOn = on !== false; return turnOn; },
+    skip: () => endTurn("skip", "api") || endLine("skip", "api") || closeEnd("skip", "api"),
+    now: () => ({ line: lineUp, text: lineText, recap: endUp, events: shown, pushing: !!(day.control && day.control.pushing && day.control.pushing()), turning: cur ? cur.id : null, turnLog: turnLog.slice(), log: log.slice() }),
   };
   day.moments = api;
   window.moments = api;
