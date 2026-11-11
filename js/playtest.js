@@ -6573,6 +6573,169 @@ async function titleScenario(options, t) {
   t.progress(1);
 }
 
+/* ---------------- cold-start: a new player's first Play to the first bolt and the street's reaction ---------------- */
+// Needs ?playtest=cold-start (or the runner's start("cold-start")). Setup (named): every icanbe.* key cleared, the cold open armed,
+// the title up. Real input only from there: a click or tap on the title's Play, then the one cue on screen ("Hold E" -> E held;
+// "Hold the bolt" -> a touch held on the Bolt button). Event-driven: day:control, day:power, day:story, day:coldopen, day:crowd,
+// day:dialogue and day:voice stamp the times; the only waits are one-shot timers for the +5 / +15 / +30 s shots and a deadline.
+// Reports seconds to first input / first cast / first city reaction / Birdie's voice, words on screen before the first cast,
+// what else is visible before it (a phone: only the stick, Jump and Bolt), and the other criteria as problems.
+async function coldStart(options, t) {
+  t.scene("Cold start");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const phone = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
+  t.event("cold-start-setup", `${innerWidth}x${innerHeight}, ${phone ? "touch" : "keyboard and mouse"}`);
+  if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  // setup: a new player (no icanbe.* keys), the title up, the cold open armed
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  if (!D.coldopen) { t.problem("blocker", "There's no cold open (js/coldopen.js didn't install)"); return; }
+  D.coldopen.arm();
+  if (D.tutorial && D.tutorial.reset) { /* the cold open replaces its card: a new player must not get both */ }
+  D.title.show("playtest");
+  await sleep(700);
+  if (!D.coldopen.pending()) t.problem("blocker", "A player with no saved keys isn't pending the cold open");
+
+  const T = {}; // seconds since Play, by name
+  let tPlay = 0;
+  const since = () => (performance.now() - tPlay) / 1000;
+  const stamp = (k) => { if (T[k] == null) T[k] = Math.round(since() * 100) / 100; };
+  const waiters = [];
+  const evs = [];
+  const note = (src, d) => {
+    evs.push({ src, t: Math.round(since() * 100) / 100, ...(d || {}) });
+    for (let i = waiters.length - 1; i >= 0; i--) if (waiters[i].test()) { const w = waiters.splice(i, 1)[0]; clearTimeout(w.to); w.res(true); }
+  };
+  const waitFor = (test, ms) => new Promise((res) => {
+    if (test()) return res(true);
+    const w = { test, res, to: setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0) waiters.splice(i, 1); res(false); }, ms) };
+    waiters.push(w);
+  });
+  const on = (name, fn) => window.addEventListener(name, (e) => { fn((e && e.detail) || {}); note(name, (e && e.detail) || {}); });
+  on("day:control", (d) => { if (d.action === "take") stamp("control"); });
+  on("day:power", (d) => { if (d.action === "bolt" && d.power === "bolt") stamp("bolt"); });
+  on("day:crowd", (d) => { if (d.kind === "lookup") stamp("lookup"); });
+  on("day:story", (d) => { if (d.action === "say" && d.who === "Birdie") stamp("birdie-say"); });
+  on("day:dialogue", (d) => { if (d.action === "say" && d.who === "Birdie") stamp("birdie-voice"); });
+  on("day:voice", (d) => { if (d.action === "play") stamp("voice-" + (T["voice-first"] == null ? "first" : "next")); });
+  on("day:coldopen", (d) => {
+    if (d.action === "landed") stamp("landed");
+    if (d.action === "prompt") stamp("prompt");
+    if (d.action === "input") stamp("input");
+    if (d.action === "birdie") stamp("birdie-called");
+  });
+  // visible words: text nodes of anything a player can see (not the canvas), split on spaces
+  function wordsOnScreen() {
+    const out = [];
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const txt = (n.textContent || "").trim();
+      if (!txt) continue;
+      const el = n.parentElement;
+      if (!el || /^(SCRIPT|STYLE|NOSCRIPT|TITLE)$/.test(el.tagName)) continue;
+      if (!hudVisible(el)) continue;
+      txt.split(/\s+/).filter((x) => /\w/.test(x)).forEach((x) => out.push(x));
+    }
+    return out;
+  }
+  const allowed = [".touchpad .stick", ".touchpad .jump", "#coldopen-bolt", "#coldopen-prompt", "#voice-caption", "#coldopen-say"];
+  function extras() {
+    return hudRects().filter((p) => !allowed.some((sel) => p.el.matches(sel) || p.el.closest(sel))).map((p) => p.name);
+  }
+
+  // Play: the real click (or tap)
+  const playBtn = $("title-play");
+  tPlay = performance.now();
+  // the +5 / +15 / +30 s shots (the runner takes a frame at each event)
+  [5, 15, 30].forEach((s) => setTimeout(() => {
+    t.event(`cold-start-play-plus-${s}`, `${s}s after Play: ${D.control.mode()}, cold open ${D.coldopen.now().phase}, ${wordsOnScreen().length} words, crowd ${D.crowd && D.crowd.info ? D.crowd.info().reaction || "no reaction" : "?"}`);
+  }, s * 1000));
+
+  if (phone) await tapEl(playBtn); else await clickEl(playBtn);
+  t.event("cold-start-play", phone ? "tapped Play" : "clicked Play");
+  const gotControl = await waitFor(() => T.control != null, 4000);
+  if (!gotControl) { t.problem("blocker", `Play didn't hand him over (control mode ${D.control.mode()})`); return; }
+  t.event("cold-start-control", `he is the player's ${T.control}s after Play; title ${D.title.showing() ? "STILL UP" : "closed"}`);
+  if (D.title.showing()) t.problem("bug", "The title is still up after Play");
+  if (D.tutorial && D.tutorial.blocking && D.tutorial.blocking()) t.problem("bug", "The first-visit card shows during the cold open");
+  if ($("opening") && !$("opening").hidden) t.problem("bug", "The text opening shows during the cold open");
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) t.problem("bug", "An episode offer card shows during the cold open");
+  t.progress(0.2);
+
+  // the cue
+  const cue = await waitFor(() => T.prompt != null, 6000);
+  if (!cue) { t.problem("blocker", "The cold open never showed its prompt"); return; }
+  await sleep(500); // the prompt fades in
+  const promptEl = $("coldopen-prompt");
+  const cueText = (promptEl && promptEl.textContent || "").trim();
+  const words = wordsOnScreen();
+  const other = extras();
+  t.metric("wordsBeforeFirstCast", words.length);
+  t.event("cold-start-words", `${words.length} words on screen before the first cast: "${words.join(" ")}"`);
+  t.event("cold-start-cue", `prompt "${cueText}" at ${T.prompt}s; also visible: ${other.join(", ") || "nothing else"}`);
+  if (words.length > 25) t.problem("bug", `${words.length} words are on screen before the first cast (the limit is 25)`);
+  if (other.length) t.problem("bug", `${phone ? "On a phone only the stick, Jump and Bolt may show before the first cast" : "No HUD may show before the first cast"}; also visible: ${other.join(", ")}`);
+  if (!promptEl || !hudVisible(promptEl)) t.problem("bug", "The prompt isn't visible");
+  if (phone) {
+    const b = $("coldopen-bolt");
+    const r = b && b.getBoundingClientRect();
+    if (!b || !hudVisible(b)) t.problem("blocker", "No Bolt button on a phone");
+    else {
+      if (r.width < 64 || r.height < 64) t.problem("bug", `The Bolt button is small (${Math.round(r.width)}x${Math.round(r.height)})`);
+      if (r.left < innerWidth / 2) t.problem("bug", "The Bolt button isn't in the right thumb zone");
+      const pr = promptEl.getBoundingClientRect();
+      if (pr.bottom > r.top + 2) t.problem("bug", "The prompt isn't above the Bolt button");
+      const j = document.querySelector(".touchpad .jump");
+      const jr = j && j.getBoundingClientRect();
+      if (jr && !(r.bottom <= jr.top + 2 || r.top >= jr.bottom - 2 || r.right <= jr.left || r.left >= jr.right)) t.problem("bug", "The Bolt button overlaps Jump");
+    }
+  }
+  t.progress(0.4);
+
+  // follow the cue: a short tap does nothing, a hold throws it
+  if (/bolt/i.test(cueText) || phone) {
+    const b = $("coldopen-bolt");
+    const r = b.getBoundingClientRect();
+    touchOn(b, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+    await sleep(900);
+    touchOn(b, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+  } else {
+    keyDown("e");
+    await sleep(900);
+    keyUp("e");
+  }
+  const cast = await waitFor(() => T.bolt != null, 4000);
+  if (!cast) { t.problem("blocker", `Holding the bolt as the prompt said never threw it (${cueText})`); return; }
+  t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
+  t.metric("secondsToFirstInput", T.input);
+  t.metric("secondsToFirstCast", T.bolt);
+  if (T.input == null || T.input > 3) t.problem("bug", `The first input was accepted ${T.input}s after Play (the limit is 3 s)`);
+  if (T.bolt > 30) t.problem("bug", `The first bolt landed ${T.bolt}s after Play (the limit is 30 s)`);
+  t.progress(0.65);
+
+  // the street looks up; Birdie calls up in her voice (within 15 s of the bolt)
+  const reacted = await waitFor(() => T.lookup != null, 15000);
+  const voiced = await waitFor(() => T["birdie-voice"] != null, Math.max(500, (T.bolt + 15 - since()) * 1000));
+  const crowd = D.crowd && D.crowd.info ? D.crowd.info() : {};
+  if (T.lookup != null) t.metric("secondsToFirstReaction", T.lookup);
+  t.event("cold-start-reaction", reacted ? `the crowd looked up ${T.lookup}s after Play (${Math.round((T.lookup - T.bolt) * 100) / 100}s after the bolt); ${crowd.lookingUp || 0} looking up` : "the crowd never looked up");
+  t.event("cold-start-birdie", voiced ? `Birdie's voiced line played ${T["birdie-voice"]}s after Play` : `Birdie's line ${T["birdie-say"] != null ? "was said but has no voice clip playing" : "never came"}`);
+  if (!reacted) t.problem("bug", "The crowd's look-up reaction didn't fire after the bolt");
+  else if (T.lookup - T.bolt > 15) t.problem("bug", "The crowd looked up more than 15 s after the bolt");
+  if (!voiced) t.problem("bug", "Birdie's voiced line (a sound event) didn't play within 15 s of the bolt");
+  t.progress(0.85);
+
+  // the shots at +5 / +15 / +30 s, then he is free: the HUD is back and the bolt button is gone
+  await sleep(Math.max(0, 30500 - since() * 1000));
+  const free = !document.documentElement.classList.contains("cold-open");
+  t.event("cold-start-free", `${since().toFixed(1)}s after Play: HUD ${free ? "back" : "STILL HIDDEN"}, cold open ${D.coldopen.now().phase}`);
+  if (!free) t.problem("bug", "The HUD never came back after the first bolt");
+  checkHud(t, "cold-start");
+  t.progress(1);
+}
+
 /* ---------------- opening: Small Weather's skippable intro on a first Play ---------------- */
 // Needs ?playtest=opening. Run 1 watches two beats and clicks Skip; run 2 skips with Esc; run 3 is a returning player (no opening).
 async function openingScenario(options, t) {
@@ -7017,6 +7180,7 @@ installPlaytest({
     { id: "charge-log-pause", title: "Charge vs Body Energy, Live log has no future rows, pause/scrub say Paused and hold the clock, resume continues in order", seconds: 70, tags: ["hud", "smoke"], description: "Load with ?playtest=charge-log-pause. Real input: Esc, Space, day bar scrub, Play/10x, Enter. Events live-log-clean / paused-status / paused-clock / coming-up / resumed / log-order / charge-bar / body-energy. Run at 1280x720 and 390x844." },
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
+    { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, holds the bolt at the shop roof's rod within 30 s, and the street looks up and Birdie calls up in her voice, with under 25 words on screen before the first cast", seconds: 60, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (E held; the Bolt button held on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
     { id: "quiet-ui", title: "The quiet page: ?view=public shows the city, the status card, one Time control, Take control and Episodes (no log, Body, Things or config text, no overlaps, six HUD regions at most); the Time control opens the day bar and speeds by click or tap and closes on take-over; the title and the Episodes menu clear the caption, ability bar and hint; the menu starts the tutorial; no index.html fetch, no question in control", seconds: 75, tags: ["hud", "menus", "smoke"], description: "Load with ?playtest=quiet-ui&view=public. Real input: clicks on the Time control, a speed, Enter, Episodes and the tutorial row. Events no-dev-text / time-control / hud-regions / episodes-clear / time-drawer-open / drawer-closed-on-take / title-exclusive / menu-exclusive / episode-from-menu / no-question-in-control / no-index-fetch. Run at 1280x720 and 390x844." },
     { id: "hud-layout", title: "HUD layout: Quality lives in the Settings menu, the left column stacks Episodes, Neighbors, weather and Pressure without overlap, Take control stays bottom-centre; overlap check on title and in play", seconds: 40, tags: ["hud", "smoke"], description: "Load with ?playtest=hud-layout. Real input: Settings click, Enter, Esc. Events settings-open / hud-clear / hud-layout-play. Run at 1280x720, 390x844 and 844x390." },
@@ -7070,13 +7234,14 @@ installPlaytest({
     if (window.hawkesPlaytest && !window.hawkesPlaytest.cut) window.hawkesPlaytest.cut = (s) => t.cut(s);
     try {
       if (["smoke", "hud-layout", "phone", "cold-start", "quiet-ui"].includes(id)) forcePublicView();
-      if (id !== "title"&& window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (id !== "title" && id !== "cold-start" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
       if (t.spot) await spotProbe(options, t, t.spot);
       else if (id === "barks") await barksScenario(options, t);
       else if (id === "moments") await momentsScenario(options, t);
+      else if (id === "cold-start") await coldStart(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
       else if (id === "hud-layout") await hudLayoutScenario(options, t);

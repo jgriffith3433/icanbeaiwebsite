@@ -491,7 +491,10 @@ export function startPowers(world, dayApi) {
     return { x: Math.sin(p.yaw || 0), z: Math.cos(p.yaw || 0) };
   }
 
+  let aimOverride = null; // the opening points the first bolt at the shop's rod
+  let gateFn = null; // the opening decides when a bolt may go (a hold, not a tap)
   function groundAim() {
+    if (aimOverride) return aimOverride;
     const p = who();
     if (pointerAimed && aimClient && world.engine && world.engine.getRenderWidth) {
       const canvas = scene.getEngine().getRenderingCanvas && scene.getEngine().getRenderingCanvas();
@@ -789,6 +792,7 @@ export function startPowers(world, dayApi) {
   function command(name, via) {
     const fn = commands[name];
     if (!fn || mode() !== "control") return false;
+    if (gateFn && !gateFn(name, via || "key")) return false;
     return fn(via || "key");
   }
 
@@ -1515,6 +1519,10 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     pose,
     command,
     abilities: abil,
+    /** The opening's hooks: aim every bolt at {x,y,z} (null = back to the reticle); gate(fn(name, via) -> bool) (null = open). */
+    aimAt(pt) { aimOverride = pt ? { x: pt.x, y: pt.y, z: pt.z } : null; return aimOverride; },
+    hitstop(sec) { hitstop = Math.max(hitstop, sec || 0); return hitstop; },
+    gate(fn) { gateFn = typeof fn === "function" ? fn : null; return !!gateFn; },
     hold(on) {
       wantStorm = !!on;
       return wantStorm;

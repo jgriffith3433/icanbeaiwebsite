@@ -32,7 +32,7 @@ export function startTitle() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title") quiet = true;
+    if (id && id !== "title" && id !== "cold-start") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
@@ -156,6 +156,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     if (!up) return false;
     if (musicWanted) setSound(true);
     hide("play", via);
+    // A new player's first Play is the cold open (js/coldopen.js): he is the player's in this same click, on the roof.
+    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via)) return true;
     // A first Play opens with js/opening.js (skippable); it takes control when it ends.
     if (day.opening && day.opening.pending()) return day.opening.start(via) || true;
     // The page's own Take control button, so it counts as a button press. He can't be taken while driving:

@@ -216,3 +216,18 @@ html.title-up #weather-btn, html.title-up .ep-hud, html.title-up .mo-line, html.
 html.ep-menu-up .voice-caption, html.ep-menu-up .abilitybar, html.ep-menu-up .powerpad, html.ep-menu-up .touchpad, html.ep-menu-up .pressure,
 html.ep-menu-up #weather-btn, html.ep-menu-up .control-hint, html.ep-menu-up .tutorial, html.ep-menu-up .ep-hud, html.ep-menu-up .mo-line,
 html.ep-menu-up .ep-say, html.ep-menu-up .ep-toast, html.ep-menu-up .nb-layer, html.ep-menu-up .update-pill { visibility: hidden; }
+
+/* ---------- the cold open (js/coldopen.js): a new player's first bolt, nothing on screen but the one prompt ----------
+   html.cold-open hides the whole HUD (header, side panel, timeline, weather, Pressure, abilities, hints, Let go) until the
+   first bolt has landed. On a phone only the stick and Jump stay, plus the big Bolt button over the right thumb; the prompt
+   sits above it. */
+html.cold-open .hud, html.cold-open .side, html.cold-open .hud-left, html.cold-open .abilitybar, html.cold-open .powerpad,
+html.cold-open .control-btn, html.cold-open .control-hint, html.cold-open .public-toggle, html.cold-open .version-tag,
+html.cold-open .update-pill, html.cold-open .quality-btn, html.cold-open .voices-btn, html.cold-open .tutorial, html.cold-open .nb-btn,
+html.cold-open .ep-btn, html.cold-open .power-reticle, html.cold-open .pressure, html.cold-open #weather-btn, html.cold-open .mo-line, html.cold-open .nb-layer { visibility: hidden; }
+.co-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); z-index: 37; }
+.co-bolt { position: fixed; right: var(--safe-r); bottom: calc(var(--safe-b) + 124px); z-index: 37; }
+.co-say { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); z-index: 37; }
+html.touch-ui .co-prompt { left: auto; right: var(--safe-r); transform: none; bottom: calc(var(--safe-b) + 232px); }
+html.touch-ui .co-say { bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px)); }
+html.title-up .co-prompt, html.title-up .co-bolt, html.title-up .co-say { visibility: hidden; }

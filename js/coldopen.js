@@ -1,0 +1,338 @@
+/* ==========================================================================
+   The cold open: a new player's first Play (js/title.js calls it). No card, no modal, no step list.
+   The title closes and he is the player's in the same frame, on the apartment roof at dusk, the camera pushing in
+   over his shoulder while a storm cell he didn't call rolls in (rain, far thunder, the music tenses with the sky).
+   He says one line (his DoD voice, js/voice.js); a pulsing ring marks the shop roof's lightning rod and the only
+   words on screen are "Hold E" ("Hold the bolt" on touch, with one big Bolt button over the right thumb). The
+   bolt: hit-stop, flash, the street lamps flicker, the crowd looks up, Birdie calls up from the avenue (her
+   voice), and he answers. Then the HUD comes in and the day is his.
+   Words: day.config.js `coldopen`. Returning players (icanbe.opening or icanbe.tutorial kept) never see it.
+   A bot's tab (?playtest= other than cold-start) never gets it; the cold-start scenario arms it.
+   `day.coldopen`: pending(), active(), start(via), arm(), now(); `day:coldopen` events.
+   ========================================================================== */
+
+export function startColdOpen() {
+  const day = window.day;
+  if (!day || day.coldopen || !document.body) return day && day.coldopen;
+  const cfg = (window.DAY_CONFIG && window.DAY_CONFIG.coldopen) || null;
+  if (!cfg) return null;
+  const html = document.documentElement;
+  const B = window.BABYLON;
+
+  let quiet = false;
+  try {
+    const id = new URLSearchParams(location.search).get("playtest");
+    if (id && id !== "cold-start") quiet = true;
+    else if (!id && navigator.webdriver) quiet = true; // the runner's start() without ?playtest=: the scenario arms it
+  } catch (e) { /* no location */ }
+
+  const style = document.createElement("style");
+  style.textContent = `
+.co-prompt{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 22px 12px;border-radius:999px;background:rgba(10,13,22,.72);border:1px solid rgba(126,200,255,.5);backdrop-filter:blur(8px);color:#f6f1e8;font:600 1.15rem/1 Fraunces,Georgia,serif;text-shadow:0 2px 12px rgba(0,0,0,.55);pointer-events:none;opacity:0;transition:opacity .4s ease}
+.co-prompt.on{opacity:1}
+.co-prompt[hidden]{display:none}
+.co-prompt .bar{width:96px;height:4px;border-radius:2px;background:rgba(246,241,232,.22);overflow:hidden}
+.co-prompt .bar i{display:block;height:100%;width:0;background:#7ec8ff;box-shadow:0 0 10px #7ec8ff}
+.co-bolt{appearance:none;width:104px;height:104px;border-radius:50%;border:2px solid rgba(126,200,255,.75);background:rgba(14,22,40,.62);color:#bfe3ff;font:700 1rem Outfit,system-ui,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;backdrop-filter:blur(6px);box-shadow:0 0 22px rgba(126,200,255,.45)}
+.co-bolt[hidden]{display:none}
+.co-bolt.held{background:#7ec8ff;color:#0c1220}
+.co-say{display:flex;align-items:center;gap:10px;max-width:min(88vw,28em);padding:8px 16px;border-radius:999px;background:rgba(10,13,22,.7);border:1px solid rgba(240,194,122,.45);backdrop-filter:blur(8px);color:#f6f1e8;font:600 clamp(.95rem,2.2vw,1.15rem)/1.25 Fraunces,Georgia,serif;text-shadow:0 2px 12px rgba(0,0,0,.55);pointer-events:none}
+.co-say[hidden]{display:none}
+.co-say b{font:600 .65rem/1 Outfit,system-ui,sans-serif;letter-spacing:.28em;text-transform:uppercase;color:#f0c27a}
+`;
+  document.head.appendChild(style);
+
+  const prompt = document.createElement("div");
+  prompt.className = "co-prompt";
+  prompt.id = "coldopen-prompt";
+  prompt.hidden = true;
+  prompt.setAttribute("role", "status");
+  prompt.innerHTML = `<span class="txt"></span><span class="bar"><i></i></span>`;
+  const bolt = document.createElement("button");
+  bolt.type = "button";
+  bolt.className = "co-bolt";
+  bolt.id = "coldopen-bolt";
+  bolt.hidden = true;
+  bolt.textContent = "Bolt";
+  bolt.setAttribute("aria-label", "Bolt");
+  const say = document.createElement("div");
+  say.className = "co-say";
+  say.id = "coldopen-say";
+  say.hidden = true;
+  say.setAttribute("role", "status");
+  say.innerHTML = `<b></b><span></span>`;
+  document.body.append(prompt, bolt, say);
+  const promptTxt = prompt.querySelector(".txt");
+  const promptBar = prompt.querySelector(".bar i");
+
+  let on = false; // from Play until the first bolt's moment is over
+  let phase = "idle"; // idle | landing | waiting | cast | done
+  let t0 = 0;
+  let castAt = 0;
+  let reactAt = 0;
+  let firstInputAt = 0;
+  let held = null; // { via, t }
+  let passing = false;
+  let meshes = null;
+  let obs = null;
+  let timers = [];
+  const log = [];
+
+  const touchy = () => html.classList.contains("touch-ui") || (day.control && day.control.state && day.control.state().touch);
+  const later = (fn, ms) => { const h = setTimeout(() => { timers = timers.filter((x) => x !== h); fn(); }, ms); timers.push(h); return h; };
+  function emit(action, extra) {
+    const detail = Object.assign({ action, t: Math.round((performance.now() - t0) / 10) / 100 }, extra || {});
+    log.push(detail);
+    if (log.length > 40) log.shift();
+    window.dispatchEvent(new CustomEvent("day:coldopen", { detail }));
+  }
+  const keys = () => cfg.keys || ["icanbe.opening", "icanbe.tutorial"];
+  const returning = () => {
+    try { return keys().some((k) => !!localStorage.getItem(k)); } catch (e) { return true; }
+  };
+  const mark = () => { keys().forEach((k) => { try { localStorage.setItem(k, "cold-open"); } catch (e) { /* private mode */ } }); };
+
+  /* ---- the rod, the beam and the ring: world-space, on the shop roof ---- */
+  function build() {
+    const w = day.world && day.world();
+    if (!w || !w.scene || !B) return null;
+    const scene = w.scene;
+    const R = cfg.rod;
+    const metal = new B.StandardMaterial("co-rod", scene);
+    metal.diffuseColor = new B.Color3(0.55, 0.58, 0.62);
+    metal.emissiveColor = new B.Color3(0.1, 0.22, 0.36);
+    const glow = new B.StandardMaterial("co-glow", scene);
+    glow.disableLighting = true;
+    glow.emissiveColor = new B.Color3(0.45, 0.78, 1);
+    glow.alpha = 0.85;
+    glow.fogEnabled = false;
+    glow.backFaceCulling = false;
+    const beamM = glow.clone("co-beam");
+    beamM.alpha = 0.16;
+    const pole = B.MeshBuilder.CreateCylinder("co-rod-pole", { diameter: 0.16, height: R.height, tessellation: 8 }, scene);
+    pole.position.set(R.x, R.roofY + R.height / 2, R.z);
+    pole.material = metal;
+    const tip = B.MeshBuilder.CreateSphere("co-rod-tip", { diameter: 0.36, segments: 8 }, scene);
+    tip.position.set(R.x, R.roofY + R.height + 0.1, R.z);
+    tip.material = metal;
+    const top = R.roofY + R.height;
+    const ring = B.MeshBuilder.CreateTorus("co-ring", { diameter: 3.4, thickness: 0.16, tessellation: 40 }, scene);
+    ring.position.set(R.x, top - 0.6, R.z);
+    ring.material = glow;
+    const beam = B.MeshBuilder.CreateCylinder("co-beam", { diameter: 1.5, height: 22, tessellation: 20, updatable: false }, scene);
+    beam.position.set(R.x, top + 11, R.z);
+    beam.material = beamM;
+    [pole, tip, ring, beam].forEach((m) => { m.isPickable = false; m.alwaysSelectAsActiveMesh = true; });
+    ring.renderingGroupId = beam.renderingGroupId = 1; // over the skyline, so it reads from the roof 70 m away
+    return { scene, metal, glow, beamM, pole, tip, ring, beam, top };
+  }
+  function dropMeshes() {
+    if (!meshes) return;
+    [meshes.pole, meshes.tip, meshes.ring, meshes.beam].forEach((m) => m.dispose());
+    [meshes.metal, meshes.glow, meshes.beamM].forEach((m) => m.dispose());
+    if (obs) meshes.scene.onBeforeRenderObservable.remove(obs);
+    obs = null;
+    meshes = null;
+  }
+  function frame() {
+    const dt = Math.min(0.1, (meshes.scene.getEngine().getDeltaTime() || 16) / 1000);
+    const nowS = performance.now() / 1000;
+    const pulse = 1 + 0.1 * Math.sin(nowS * 5);
+    let prog = 0;
+    if (held) {
+      held.t += dt;
+      prog = Math.min(1, held.t / cfg.holdSec);
+      if (prog >= 1) fire(held.via);
+    }
+    const s = pulse * (1 - 0.18 * prog);
+    meshes.ring.scaling.set(s, s, s);
+    meshes.ring.rotation.y += dt * (1 + prog * 6);
+    meshes.glow.emissiveColor.set(0.45 + 0.55 * prog, 0.78 + 0.22 * prog, 1);
+    meshes.beamM.alpha = 0.13 + 0.06 * Math.sin(nowS * 5) + 0.3 * prog;
+    promptBar.style.width = Math.round(prog * 100) + "%";
+  }
+
+  /* ---- the hold ---- */
+  function press(via) {
+    if (phase !== "waiting" && phase !== "landing") return;
+    if (!firstInputAt) {
+      firstInputAt = performance.now();
+      emit("input", { via, kind: "hold" });
+    }
+    if (held) return;
+    held = { via, t: 0 };
+    bolt.classList.add("held");
+    emit("hold", { via });
+  }
+  function release() {
+    if (!held) return;
+    const was = held;
+    held = null;
+    bolt.classList.remove("held");
+    promptBar.style.width = "0%";
+    if (phase === "waiting" || phase === "landing") emit("release", { via: was.via, held: Math.round(was.t * 100) / 100 });
+  }
+  function fire(via) {
+    held = null;
+    bolt.classList.remove("held");
+    const P = window.powers || day.powers;
+    if (!P) return;
+    passing = true;
+    let ok = false;
+    try { ok = P.command("bolt", via === "touch" ? "touch" : via); } finally { passing = false; }
+    if (!ok) { held = null; return; }
+    phase = "cast";
+    castAt = performance.now();
+    P.hitstop(0.14);
+    if (day.cityscape && day.cityscape.flicker) day.cityscape.flicker(1.8);
+    prompt.classList.remove("on");
+    bolt.hidden = true;
+    emit("bolt", { via });
+    // The crowd looks up on its own (the bolt's storm is the ability weather its reaction reads); Birdie answers a beat
+    // after that. If the crowd is thin or late, she calls anyway.
+    later(() => birdie("timer"), 3500);
+    later(finish, 12500);
+    later(() => html.classList.remove("cold-open"), 1600); // the day's HUD comes in after the strike
+  }
+  function pipeLine(who, text) {
+    window.dispatchEvent(new CustomEvent("day:story", { detail: { action: "say", who, text, via: "coldopen" } }));
+  }
+  function caption(who, text, secs) {
+    say.querySelector("b").textContent = who;
+    say.querySelector("span").textContent = text;
+    say.hidden = false;
+    later(() => { say.hidden = true; }, (secs || 3.6) * 1000);
+  }
+  let birdieDone = false;
+  function birdie(why) {
+    if (birdieDone || phase !== "cast") return;
+    birdieDone = true;
+    const L = cfg.lines.birdie;
+    pipeLine(L[0], L[1]);
+    caption(L[0], L[1], 5);
+    emit("birdie", { why, text: L[1] });
+    later(() => {
+      const V = day.voice;
+      const A = cfg.lines.after;
+      if (V && V.say) V.say("opening", { text: A[1], force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "opening" });
+      emit("after", { text: A[1] });
+    }, 5600);
+  }
+  function finish() {
+    if (phase === "done") return;
+    phase = "done";
+    on = false;
+    html.classList.remove("cold-open");
+    const P = window.powers || day.powers;
+    if (P) { P.gate(null); P.aimAt(null); }
+    bolt.hidden = true;
+    prompt.hidden = true;
+    dropMeshes();
+    timers.forEach(clearTimeout);
+    timers = [];
+    say.hidden = true;
+    emit("end");
+  }
+
+  /* ---- inputs: the hold's release (the press arrives through powers' gate) ---- */
+  window.addEventListener("keyup", (e) => { if (held && (e.key || "").toLowerCase() === "e") release(); }, true);
+  window.addEventListener("pointerup", () => { if (held) release(); }, true);
+  window.addEventListener("pointercancel", () => { if (held) release(); }, true);
+  window.addEventListener("blur", () => release());
+  bolt.addEventListener("pointerdown", (e) => {
+    press("touch");
+    try { bolt.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+    e.preventDefault();
+  });
+  bolt.addEventListener("contextmenu", (e) => e.preventDefault());
+  window.addEventListener("day:crowd", (e) => {
+    const d = (e && e.detail) || {};
+    if (!on || d.action !== "reaction" || d.kind !== "lookup") return;
+    reactAt = performance.now();
+    emit("react", { kind: d.kind });
+    later(() => birdie("look-up"), (cfg.reactDelay || 1) * 1000);
+  });
+
+  /* ---- the sequence ---- */
+  function begin() {
+    const C = day.control;
+    const sp = cfg.spot;
+    C.place(sp.x, sp.z, sp.yaw, { from: sp.from, alpha: cfg.camera.alpha, beta: cfg.camera.beta, radius: cfg.camera.radius });
+    if (day.jump && cfg.clock) day.jump(cfg.clock);
+    if (C.push) C.push({ from: cfg.camera.from, fov: cfg.camera.fov, secs: cfg.camera.secs });
+    const P = window.powers || day.powers;
+    if (P) {
+      P.abilities.reset(100);
+      P.aimAt({ x: cfg.rod.x, y: cfg.rod.roofY + cfg.rod.height, z: cfg.rod.z });
+      P.gate((name, via) => {
+        if (passing) return true;
+        if (name === "bolt") press(via);
+        return false; // nothing but the bolt, and the bolt only as a hold
+      });
+    }
+    meshes = build();
+    if (meshes) obs = meshes.scene.onBeforeRenderObservable.add(frame);
+    phase = "landing";
+    promptTxt.textContent = touchy() ? cfg.prompt.touch : cfg.prompt.keys;
+    bolt.hidden = !touchy();
+    emit("landed", { x: sp.x, z: sp.z });
+    // the cell: far thunder as it arrives, then his line, then the prompt
+    const W = window.weather;
+    later(() => { if (W && W.triggerFlash) W.triggerFlash(90, -0.3); }, 700);
+    later(() => {
+      const L = cfg.lines.he;
+      const V = day.voice;
+      if (V && V.say) V.say("opening", { text: L[1], force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "opening" });
+      emit("line", { text: L[1] });
+      phase = "waiting";
+      prompt.hidden = false;
+      requestAnimationFrame(() => prompt.classList.add("on"));
+      emit("prompt", { text: promptTxt.textContent });
+    }, (cfg.firstLine || 1.4) * 1000);
+  }
+  function tryTake(frames) {
+    const C = day.control;
+    const btn = document.getElementById("control");
+    if (C.mode() === "schedule") {
+      if (btn && !btn.disabled) btn.click();
+      else if (!btn) C.take();
+    }
+    if (C.mode() === "control") return begin();
+    // He is driving (or between frames): jump the clock to dusk, where he is on foot, and take him on the next frame.
+    if (frames === 0 && day.jump && cfg.clock) day.jump(cfg.clock);
+    if (frames > 40) { emit("failed", { mode: C.mode() }); finish(); return; }
+    requestAnimationFrame(() => tryTake(frames + 1));
+  }
+
+  const api = {
+    pending: () => !quiet && !on && !returning(),
+    active: () => on,
+    arm() { quiet = false; return true; },
+    /** Called by the title's Play, in the click: the same frame the title closes. */
+    start(via) {
+      if (on || quiet || returning()) return false;
+      if (!day.control || !day.control.place) return false;
+      on = true;
+      t0 = performance.now();
+      firstInputAt = 0;
+      castAt = 0;
+      reactAt = 0;
+      birdieDone = false;
+      held = null;
+      mark();
+      if (day.tutorial && day.tutorial.skip) day.tutorial.skip(); // its card is up under the title for a new player
+      html.classList.add("cold-open");
+      const W = window.weather;
+      if (W && W.set) W.set(cfg.cell.state, cfg.cell.intensity, "cell"); // the storm nobody called
+      emit("start", { via });
+      tryTake(0);
+      return true;
+    },
+    now: () => ({ on, phase, held: !!held, firstInput: firstInputAt ? (firstInputAt - t0) / 1000 : null, cast: castAt ? (castAt - t0) / 1000 : null, react: reactAt ? (reactAt - t0) / 1000 : null, log: log.slice() }),
+  };
+  day.coldopen = api;
+  window.coldopen = api;
+  return api;
+}
+
+if (typeof window !== "undefined" && window.day && typeof document !== "undefined") startColdOpen();

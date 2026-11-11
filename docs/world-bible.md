@@ -264,3 +264,7 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 - Storm Tank as reservoir, District Board identity, how much the district "knows," and Ines's larger "pulling" hook stay tied to `docs/story-arc-beat-sheet.md` open questions / story-spec recommendations. Playable arc uses the recommendations; bible treats them as **working canon for builds** until J overrides.
 - He/him only for Small Weather; neighbors use his first name in tone, never "they" for him.
 - Main character model is always Small Weather, never a placeholder while loading.
+
+## Cold open (first Play)
+- **Story beat:** dusk on the apt roof (19:00). A storm cell he didn't call rolls in over the avenue; the shop roof's lightning rod is the only thing he says is his. His first bolt lights the avenue: the lamps stutter, the street looks up, Birdie (on the avenue below the apt block) calls up that her tomatoes want rain, and he says "Rain. I can do that." That is the seed of her morning rain ask.
+- **Voice lines:** He "That storm isn't mine. The rod on the shop roof is." / Birdie "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain." / He "Rain. I can do that."

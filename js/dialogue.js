@@ -71,6 +71,9 @@ export function dialogueLines(config) {
     if (!Array.isArray(pool)) return;
     pool.forEach((text) => add("He", text, `voice:${group}`));
   });
+  // The cold open's lines ([who, text] pairs in coldopen.lines): his in Eric's voice, Birdie's in hers.
+  const cold = (C.coldopen && C.coldopen.lines) || {};
+  Object.keys(cold).forEach((k) => add(cold[k][0], cold[k][1], `coldopen:${k}`));
   return out;
 }
 

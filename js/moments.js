@@ -112,7 +112,7 @@ export function startMoments() {
   line.addEventListener("click", () => endLine("skip", "tap"));
   window.addEventListener("day:control", (e) => {
     const a = e && e.detail && e.detail.action;
-    if (a === "take" && !botElsewhere) takeover(e.detail.via);
+    if (a === "take" && !botElsewhere && !(window.day.coldopen && window.day.coldopen.active && window.day.coldopen.active())) takeover(e.detail.via);
     else if ((a === "let-go" || a === "letgo") && lineUp) endLine("skip", "let-go");
   });
   // moving ends the push in control.js; the line goes with it

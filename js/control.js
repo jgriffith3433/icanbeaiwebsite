@@ -118,11 +118,12 @@ export function createMover(world, cfg) {
   }
 
   /* He's the player's from (x, z): if the day had him in a chair or in bed, he stands up beside it. */
-  function start(x, z, yaw) {
-    const p = freeSpotNear(x, z);
+  function start(x, z, yaw, from) {
+    // `from` (a roof's height + a little): stand on whatever is under that height, not the street (the opening's roof)
+    const p = from != null ? { x, z } : freeSpotNear(x, z);
     s.x = p.x;
     s.z = p.z;
-    s.y = floorAt(p.x, p.z, 2.3);
+    s.y = floorAt(p.x, p.z, from != null ? from : 2.3);
     s.yaw = yaw;
     s.vx = s.vy = s.vz = 0;
     s.grounded = true;
@@ -812,7 +813,9 @@ function install() {
       if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
       if (mode === "schedule") {
         if (e.key === "Enter" && !(e.target && (e.target.tagName === "BUTTON" || e.target.tagName === "A")) && !btn.disabled) {
-          take("key");
+          // Enter on the title is Play (a new player's first Play is the cold open), not a bare take
+          if (day.title && day.title.showing && day.title.showing()) day.title.play("key");
+          else take("key");
           e.preventDefault();
           e.stopImmediatePropagation();
         }
@@ -1115,13 +1118,19 @@ function install() {
     /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */
     avatar: () => avatar,
     // Playtest hook: stand him at x,z (street level) while he's the player's, so a scenario needn't walk a slow bot there.
-    place: (x, z, yaw) => {
+    // opts (the cold open's roof): { from: ray start height, alpha, beta, radius: the camera behind him }
+    place: (x, z, yaw, opts) => {
       if (mode !== "control") return null;
-      const r = mover.start(x, z, yaw == null ? s.yaw : yaw);
+      const o = opts || {};
+      const r = mover.start(x, z, yaw == null ? s.yaw : yaw, o.from);
       // A placement is a cut, not a walk: the camera's target would glide metres to him (a visible camera jump) and could be left
       // facing the wall he now stands at. Snap it to him, frame the side with the most room, and tell the playtest it was intended.
       camera.target.set(s.x, s.y + 1.35, s.z);
-      frameOutdoors({}, { x: s.x, z: s.z });
+      if (o.alpha != null) {
+        camera.alpha = o.alpha;
+        if (o.beta != null) camera.beta = o.beta;
+        if (o.radius != null) wantRadius = o.radius;
+      } else frameOutdoors({}, { x: s.x, z: s.z });
       lastRadius = null;
       try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
       return r;
