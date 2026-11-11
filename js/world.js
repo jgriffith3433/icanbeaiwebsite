@@ -1701,7 +1701,9 @@
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
       hemi.intensity = 0.46 + day * 0.4; // dusk/night floor: the street and people must stay readable; the shaded faces of the city's buildings must still read in the morning
       B.Color3.LerpToRef(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
-      B.Color3.LerpToRef(C("#3a4258"), C("#3a362c"), day, hemi.groundColor);
+      // Vertical faces get half this ground colour: keep the dusk/night floor bright enough that brick facades and
+      // the street beside the apt ramp don't go near-black before weather.js can lift it with cover.
+      B.Color3.LerpToRef(C("#586878"), C("#3a362c"), day, hemi.groundColor);
       if (!scene.metadata || !scene.metadata.dayLook) {
         const ipc = pipeline.imageProcessing && pipeline.imageProcessing.imageProcessingConfiguration;
         if (ipc) ipc._exposure = 0.84 + day * 0.1;
