@@ -1919,6 +1919,35 @@ window.DAY_CONFIG = {
       here: "here",
       inside: "at home",
     },
+    /* THE STREET TEACHES (js/street.js): after the cold open's bolt, Rain, Sun break, Fog and Wind are locked and each
+       arrives because a neighbor asks for it out loud, in their own voice, one after another. A step: `who` (neighbor id),
+       `unlock` (the verb's ability id), `answer` (the powers that answer it, called within `range` m of the target),
+       `ask` (spoken when he is within `near` m of them and they're outside), `call` (spoken from a window or down the
+       street: the neighbor is inside, or far away), `thanks` (1.1 s after the answer, in person or called), `then`
+       (a follow-up ask that the next verb answers; Ines: Fog, then a Wind gust to clear it). `spot` is where the cue
+       stands when they are inside. Birdie's call is the cold open's own line (coldopen.lines.birdie) and unlocks Rain.
+       Voice clips: Hawkes Gen audio.voice in their voices (scripts/sync-dialogue.mjs lists them). */
+    teach: {
+      storageKey: "icanbe.street",
+      gap: 4.5, // s from a thanks to the next neighbor's call
+      near: 14, // m: closer than this and they ask in person
+      range: 18, // m: how close he must be to answer
+      nag: 40, // s: an unanswered call is said once more
+      steps: [
+        { id: "rain", who: "birdie", unlock: "rain", answer: ["rain"], color: [0.45, 0.7, 1], spot: { x: -21, z: 9.5 },
+          call: null, // the cold open's line is her call
+          thanks: "Look at them drink. Bless you." },
+        { id: "sun", who: "dex", unlock: "sunbreak", answer: ["sunbreak"], color: [1, 0.8, 0.35], spot: { x: 46, z: 9.8 },
+          ask: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.",
+          call: "Small Weather! Down by the shop. My parcels are soaked. A sun break?",
+          thanks: "Dry as a bone. I owe you a delivery." },
+        { id: "fog", who: "quill", unlock: "fog", answer: ["fog"], color: [0.78, 0.7, 1], spot: { x: 154, z: 9.8 },
+          ask: "The streetlights are drowning my stars. Could you soften them with some fog?",
+          call: "Small Weather! The annex, up the avenue. The streetlights are drowning my stars. Fog, please?",
+          thanks: "Lovely. Too lovely. I can't see through it. A gust, to clear a window?",
+          then: { unlock: "wind", answer: ["gust", "gale", "tornado"], color: [0.55, 1, 0.8], thanks: "There. Orion, sharp as a pin. Thank you." } },
+      ],
+    },
     list: [
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",

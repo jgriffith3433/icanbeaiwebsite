@@ -129,14 +129,16 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
   document.body.appendChild(caption);
   const captionText = caption.querySelector("#voice-caption-text");
 
-  function showCaption(text) {
+  const captionWho = caption.querySelector("b");
+  function showCaption(text, who, secs) {
     if (captionTimer) clearTimeout(captionTimer);
+    captionWho.textContent = who || "Small Weather";
     captionText.textContent = text || "";
     caption.hidden = false;
     caption.classList.remove("leaving");
     live.caption = text || null;
-    const secs = cfg().captionSecs;
-    captionTimer = setTimeout(() => hideCaption(), Math.max(1.2, secs) * 1000);
+    const hold = secs != null ? secs : cfg().captionSecs;
+    captionTimer = setTimeout(() => hideCaption(), Math.max(1.2, hold) * 1000);
   }
   function hideCaption() {
     if (captionTimer) clearTimeout(captionTimer);
@@ -410,6 +412,96 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     return line;
   }
 
+  /**
+   * A neighbor speaks (their own Gen voice, a clip from audio/dialogue): one speaker-tagged caption, no overlap with
+   * Small Weather or another neighbor (a neighbor's line takes the voice, whatever was playing), and positional:
+   * quieter with distance from the camera and panned to the side they are on. opts: { x, z } (their place in the
+   * world), onend (called when the clip ends, or after the caption's time when it can't play), via.
+   * Returns { id, file, secs } (file null when no clip is in the build or Sound is off: the caption still shows).
+   */
+  let audioCtx = null;
+  function placeVoice(el, opts) {
+    const w = day.world && day.world();
+    const cam = w && w.scene && w.scene.activeCamera;
+    let gain = 1;
+    let pan = 0;
+    if (cam && cam.position && opts.x != null) {
+      const dx = opts.x - cam.position.x;
+      const dz = opts.z - cam.position.z;
+      const d = Math.hypot(dx, dz);
+      gain = Math.max(0.35, Math.min(1, 1.15 - d / 140));
+      const fwd = cam.getForwardRay ? cam.getForwardRay(1).direction : null;
+      if (fwd && d > 1) pan = Math.max(-0.85, Math.min(0.85, (dx * fwd.z - dz * fwd.x) / d)); // right of the view = +
+    }
+    el.volume = Math.min(1, cfg().volume * gain);
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && !el.__pan) {
+        audioCtx = audioCtx || new AC();
+        const src = audioCtx.createMediaElementSource(el);
+        const sp = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+        if (sp) { src.connect(sp); sp.connect(audioCtx.destination); } else src.connect(audioCtx.destination);
+        el.__pan = sp || true;
+      }
+      if (el.__pan && el.__pan.pan) el.__pan.pan.value = pan;
+    } catch (err) {
+      /* no web audio: the volume alone carries the distance */
+    }
+    return { gain, pan };
+  }
+  function speakAs(who, text, opts) {
+    opts = opts || {};
+    const id = lineId(who, text);
+    const file = `audio/dialogue/${id}.mp3`;
+    const have = dialogueFiles.has(file) && !missing[file];
+    const canPlay = have && soundOn() && voicesOn();
+    if (playing) stopCurrent();
+    live.last = { id, group: "neighbor-" + String(who).toLowerCase(), text, file: have ? file : null, via: opts.via || "neighbor", at: performance.now() / 1000 };
+    lastAt = performance.now() / 1000;
+    heard++;
+    live.heard = heard;
+    let secs = Math.max(2.6, Math.min(7, 1.2 + text.length * 0.055));
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (playing && playing.id === id) { playing = null; playPri = 0; live.playing = false; }
+      if (opts.onend) opts.onend();
+    };
+    let a = null;
+    if (canPlay) {
+      a = audioEls[file];
+      if (!a) {
+        a = new Audio(file);
+        a.preload = "auto";
+        a.addEventListener("error", () => { missing[file] = true; });
+        audioEls[file] = a;
+      }
+      a.onended = finish;
+      a.playbackRate = 1;
+    }
+    const where = placeVoice(a || { volume: 1 }, opts);
+    if (a) {
+      try {
+        a.currentTime = 0;
+        const p = a.play();
+        if (p && p.catch) p.catch(() => finish());
+        playing = { id, group: live.last.group, text, file, who, el: a };
+        playPri = 9;
+        live.playing = true;
+        if (isFinite(a.duration) && a.duration > 0) secs = a.duration + 0.4;
+        else a.addEventListener("loadedmetadata", () => { if (!done && isFinite(a.duration)) showCaption(text, who, a.duration + 0.4); }, { once: true });
+      } catch (err) {
+        a = null;
+      }
+    }
+    showCaption(text, who, secs);
+    quietNote(`${who}: ${text}`);
+    if (!a) setTimeout(finish, secs * 1000);
+    emit({ action: "play", id, group: live.last.group, text, file: a ? file : null, who, via: opts.via || "neighbor", positional: true, gain: +where.gain.toFixed(2), pan: +where.pan.toFixed(2), caption: true });
+    return { id, file: a ? file : null, secs };
+  }
+
   function onPower(e) {
     const d = (e && e.detail) || {};
     const power = d.power || d.action;
@@ -549,6 +641,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
       spoken: Object.keys(cfg().spoken).length,
     }),
     say,
+    speakAs,
     play: (id, opts) => say(id, Object.assign({ force: true, ignoreCooldown: true, ignoreLineCooldown: true }, opts || {})),
     groups: () => Object.keys(Object.assign({}, groups, cfg().spoken)),
     lines: () => cfg().lines.slice(),

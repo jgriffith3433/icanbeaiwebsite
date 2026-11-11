@@ -191,11 +191,11 @@ export function startColdOpen() {
     // The crowd looks up on its own (the bolt's storm is the ability weather its reaction reads); Birdie answers a beat
     // after that. If the crowd is thin or late, she calls anyway.
     later(() => birdie("timer"), 3500);
-    later(finish, 12500);
+    later(finish, 22000); // a safety: the sequence ends itself after his answer to Birdie
     later(() => html.classList.remove("cold-open"), 1600); // the day's HUD comes in after the strike
   }
   function pipeLine(who, text) {
-    window.dispatchEvent(new CustomEvent("day:story", { detail: { action: "say", who, text, via: "coldopen" } }));
+    window.dispatchEvent(new CustomEvent("day:story", { detail: { action: "say", who, text, via: "coldopen", positional: !!(day.voice && day.voice.speakAs) } }));
   }
   function caption(who, text, secs) {
     say.querySelector("b").textContent = who;
@@ -208,15 +208,21 @@ export function startColdOpen() {
     if (birdieDone || phase !== "cast") return;
     birdieDone = true;
     const L = cfg.lines.birdie;
-    pipeLine(L[0], L[1]);
-    caption(L[0], L[1], 5);
-    emit("birdie", { why, text: L[1] });
-    later(() => {
-      const V = day.voice;
+    const V = day.voice;
+    const N = day.neighbors && day.neighbors.now && day.neighbors.now();
+    const me = N && N.people && N.people.find((p) => p.id === "birdie");
+    const afterLine = () => {
       const A = cfg.lines.after;
       if (V && V.say) V.say("opening", { text: A[1], force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "opening" });
       emit("after", { text: A[1] });
-    }, 5600);
+      later(finish, 3400); // her call opened Rain: the bolt's gate comes off once he has answered her
+    };
+    // Birdie calls from her pots (js/voice.js: her voice, from where she stands, one caption with her name on it, never
+    // over his line); the street's lesson (js/street.js) starts on this event: her call is Rain's ask.
+    pipeLine(L[0], L[1]);
+    if (V && V.speakAs) V.speakAs(L[0], L[1], { x: me ? me.x : -21, z: me ? me.z : 9.5, via: "coldopen", onend: () => later(afterLine, 500) });
+    else { caption(L[0], L[1], 5); later(afterLine, 5600); }
+    emit("birdie", { why, text: L[1] });
   }
   function finish() {
     if (phase === "done") return;

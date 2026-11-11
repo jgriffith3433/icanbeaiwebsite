@@ -190,7 +190,8 @@ html.cine-up #weather-btn, html.cine-up .mo-line, html.cine-up .voice-caption, h
 html:not(.in-control) .voice-caption { bottom: calc(var(--tl) + 88px); }
 .preview-public .voice-caption { bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); }
 html.touch-ui.in-control .voice-caption {
-  bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px));
+  /* above the verb arc (it stands 168px up and is 210px tall, on the right): a speaker's line never sits over a verb */
+  bottom: max(392px, calc(env(safe-area-inset-bottom) + 380px));
 }
 /* phone, just let go (and watching): the one-line caption floats in the open middle of the screen: below the status card
    (top), above Episodes / weather (bottom-left, up to ~300px), Take control and the timeline, clear of the verb arc */

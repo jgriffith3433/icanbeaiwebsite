@@ -65,6 +65,7 @@ const beats = [
   ['day:episode', { action: 'piece' }, 'blip'],
   ['day:episode', { action: 'kick' }, 'rumble'],
   ['day:episode', { action: 'unlock' }, 'unlock'],
+  ['day:street', { action: 'unlock' }, 'unlock'],
   ['day:episode', { action: 'score', cleared: true }, 'fanfare'],
   ['day:episode', { action: 'score', cleared: false }, 'fanfare-minor'],
   ['day:episode', { action: 'show-cue', grade: 'perfect' }, 'cue-perfect'],

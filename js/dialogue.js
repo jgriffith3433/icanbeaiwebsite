@@ -71,6 +71,15 @@ export function dialogueLines(config) {
   });
   // What they remember of him (neighbors.list[].remember: helped / botched): their voice, same as their beats.
   people.forEach((p) => Object.keys(p.remember || {}).forEach((tone) => add(neighborWho(p), p.remember[tone], `neighbor:${p.id}-remember-${tone}`)));
+  // The street's lessons (neighbors.teach): the neighbor asks, calls, thanks and follows up in their own voice.
+  const teach = (C.neighbors && C.neighbors.teach) || {};
+  (teach.steps || []).forEach((st) => {
+    const p = people.find((x) => x.id === st.who);
+    if (!p) return;
+    const who = neighborWho(p);
+    [st.ask, st.call, st.thanks].forEach((t) => add(who, t, `street:${st.id}`));
+    if (st.then) add(who, st.then.thanks, `street:${st.id}-then`);
+  });
   // The autopilot's memory steps (`say` on a spine step or a pool entry with `remembers`): his voice.
   const walk = (steps, where) => (steps || []).forEach((st) => {
     if (!st) return;
@@ -182,11 +191,11 @@ export function startDialogue(dayApi, opts) {
   if (typeof window !== "undefined" && window.addEventListener) {
     window.addEventListener("day:story", (e) => {
       const d = (e && e.detail) || {};
-      if (d.action === "say") speak(d.who, d.text);
+      if (d.action === "say" && !d.positional) speak(d.who, d.text); // a positional line is voiced by js/voice.js speakAs
     });
     window.addEventListener("day:neighbor", (e) => {
       const d = (e && e.detail) || {};
-      if (d.action !== "beat") return;
+      if (d.action !== "beat" || d.positional) return;
       const b = beats.get(d.beat);
       if (b) speak(b.who, b.text);
     });

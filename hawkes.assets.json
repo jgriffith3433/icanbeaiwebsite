@@ -4247,6 +4247,101 @@
    }
   },
   {
+   "id": "dlg-dex-10m2r30",
+   "note": "Spoken line (street:sun), Dex: \"Small Weather! Down by the shop. My parcels are soaked. A sun break?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather! Down by the shop. My parcels are soaked. A sun break?",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-10m2r30.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-se81cu",
+   "note": "Spoken line (street:fog), Ines: \"The streetlights are drowning my stars. Could you soften them with some fog?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The streetlights are drowning my stars. Could you soften them with some fog?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-se81cu.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-bktbmo",
+   "note": "Spoken line (street:fog), Ines: \"Small Weather! The annex, up the avenue. The streetlights are drowning my stars. Fog, please?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Small Weather! The annex, up the avenue. The streetlights are drowning my stars. Fog, please?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-bktbmo.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-121n50b",
+   "note": "Spoken line (street:fog), Ines: \"Lovely. Too lovely. I can't see through it. A gust, to clear a window?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Lovely. Too lovely. I can't see through it. A gust, to clear a window?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-121n50b.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-ito856",
+   "note": "Spoken line (street:fog-then), Ines: \"There. Orion, sharp as a pin. Thank you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "There. Orion, sharp as a pin. Thank you.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-ito856.mp3"
+   }
+  },
+  {
    "id": "dlg-he-1thw15y",
    "note": "Spoken line (memory:8:05), He: \"Birdie's pots. Quick hello.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [

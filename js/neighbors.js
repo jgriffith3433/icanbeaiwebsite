@@ -228,14 +228,19 @@ function install() {
   }
   function say(p, beat, secs) {
     const s = st[p.id];
-    s.bubble = beat;
+    // Spoken through js/voice.js (their own voice, from where they stand, one caption tagged with their name; never over
+    // Small Weather): the bubble then keeps only the verb chip of an ask, not the words.
+    const V = day.voice;
+    const spoken = !!(V && V.speakAs);
+    if (spoken) V.speakAs(p.name.split(" ")[0], beat.text, { x: p.__pos.x, z: p.__pos.z, via: "neighbor-" + beat.kind });
+    s.bubble = Object.assign({}, beat, { spoken });
     s.bubbleUntil = beat.kind === "ask" ? Infinity : performance.now() + secs * 1000;
     // ask / thanks / surprise each play their own gesture on the figure
     if (beat.kind === "ask" || beat.kind === "thanks" || beat.kind === "surprise") {
       p.__gestureWant = beat.kind;
       emit("gesture", { id: p.id, kind: beat.kind, beat: beat.id, x: p.__pos.x, z: p.__pos.z });
     }
-    emit("beat", { id: p.id, beat: beat.id, kind: beat.kind, text: beat.text, x: p.__pos.x, z: p.__pos.z });
+    emit("beat", { id: p.id, beat: beat.id, kind: beat.kind, text: beat.text, x: p.__pos.x, z: p.__pos.z, positional: spoken });
   }
 
   function stepBeats(p, h, here, nowMs) {
@@ -483,9 +488,9 @@ function install() {
         tag.style.opacity = cd > 60 ? String(Math.max(0.35, 1 - (cd - 60) / 60)) : "1";
         tag.style.zIndex = String(Math.round(1000 - cd));
         const b = p.__bubble;
-        b.hidden = !(showBubble && cd < 40);
+        b.hidden = !(showBubble && cd < 40 && !(s.bubble.spoken && s.bubble.kind !== "ask"));
         if (showBubble) {
-          const txt = s.bubble.text + (s.bubble.kind === "ask" ? `<small>${(window.powers && window.powers.abilities && window.powers.abilities.get && (window.powers.abilities.get(s.bubble.ability) || {}).name) || s.bubble.ability}</small>` : "");
+          const txt = (s.bubble.spoken ? "" : s.bubble.text) + (s.bubble.kind === "ask" ? `<small>${(window.powers && window.powers.abilities && window.powers.abilities.get && (window.powers.abilities.get(s.bubble.ability) || {}).name) || s.bubble.ability}</small>` : "");
           if (b.dataset.id !== s.bubble.id) {
             b.dataset.id = s.bubble.id;
             b.innerHTML = txt;
