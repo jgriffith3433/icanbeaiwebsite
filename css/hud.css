@@ -121,6 +121,11 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-hint { bottom: calc
   .in-control .hud-left .ep-btn { order: 5; }
 }
 html.touch-ui .hud-left { bottom: auto; top: var(--safe-t); flex-direction: column; left: max(12px, env(safe-area-inset-left)); }
+/* phone, not in control: the top-left is the status card, so Episodes sits bottom-left above the timeline (beside Take control) */
+@media (max-width: 700px) {
+  html:not(.in-control):not(.preview-public) .hud-left { top: auto; bottom: 156px; flex-direction: column-reverse; }
+}
+html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; bottom: 156px; flex-direction: column-reverse; }
 
 /* ---------- bottom row: the ability bar, the power pad ---------- */
 .abilitybar { position: fixed; left: 50%; bottom: var(--safe-b); transform: translateX(-50%); }
