@@ -470,6 +470,9 @@ function install() {
   let wantRadius = 5.5;
   let lastRadius = null;
   let glidePull = 0;
+  let screenLift = 0; // metres (view space) the orbit target is shifted up on screen, clear of the HUD along the bottom
+  let hudTop = null; // CSS px: top of the lowest-centre HUD piece he would hide behind (hint, Let go, ability bar)
+  let hudAt = 0;
   const camRay = new B.PhysicsRaycastResult();
   const CAM_LIFT = 1.4; // least height of the camera over the surface under it
   const RIDE = Object.assign({
@@ -490,6 +493,8 @@ function install() {
     camera.beta = Math.min(camera.beta, 1.3);
     lastRadius = null;
     glidePull = 0;
+    screenLift = 0;
+    hudAt = 0;
   }
   /* Taken outside (the day's camera is a cutaway shot looking into the house): put the camera along the street,
      on the side with the most room, so he, the street and the sky are what show, not the bedroom behind him. */
@@ -544,6 +549,40 @@ function install() {
     ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (camera[k] = saved[k]));
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
     glidePull = 0;
+    screenLift = 0;
+    camera.targetScreenOffset.y = 0;
+  }
+  /* The orbit camera centres his chest, so at 1280 x 720 his legs and body sit at the bottom centre of the screen,
+     right behind the hint line, Let go and the ability bar (the playtest saw him "lost behind the HUD"). Shift the
+     target up on screen, smoothly, until his feet sit just above the top of that bottom stack. The reference is the
+     damped target, not his feet, so a jump doesn't swing the shot. Phones keep the centre (their pads are at the sides). */
+  function hudLiftGoal() {
+    if (touchMode()) return 0;
+    const cv = world.scene.getEngine().getRenderingCanvas();
+    const ch = cv ? cv.clientHeight : 0;
+    const cw = cv ? cv.clientWidth : 0;
+    if (ch < 300) return 0;
+    const now = performance.now();
+    if (hudTop == null || now - hudAt > 250) {
+      hudAt = now;
+      hudTop = ch;
+      [".control-hint", "#control", "#abilitybar"].forEach((q) => {
+        const el = document.querySelector(q);
+        if (!el || el.hidden || !el.offsetParent) return;
+        const r = el.getBoundingClientRect();
+        if (r.height > 0 && r.left < cw / 2 + 60 && r.right > cw / 2 - 60) hudTop = Math.min(hudTop, r.top);
+      });
+    }
+    if (hudTop >= ch - 40) return 0;
+    const t = camera.target;
+    const feet = new B.Vector3(t.x, t.y - 1.35, t.z);
+    const clip = B.Vector3.TransformCoordinates(feet, world.scene.getTransformMatrix());
+    const d = Math.max(1, B.Vector3.Distance(camera.globalPosition, feet));
+    const pxPerM = ch / 2 / (d * Math.tan((camera.fov || 0.78) / 2));
+    const feetY = (1 - clip.y) / 2 * ch + screenLift * pxPerM; // where they'd be with no shift
+    const headY = feetY - 1.8 * pxPerM;
+    const px = Math.max(0, Math.min(feetY - (hudTop - 12), headY - 56)); // head stays on screen
+    return px / pxPerM;
   }
   /* The take-over push: the camera starts wide and fast-pushes in to his shoulder (js/moments.js asks for it).
      Any move, jump or stick input, or push(null), ends it. */
@@ -659,6 +698,8 @@ function install() {
     else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(1.5, Math.max(0.35, 45 * dt)));
     else camera.radius = damp(camera.radius, r, dt, 3);
     lastRadius = camera.radius;
+    screenLift = damp(screenLift, hudLiftGoal(), dt, 3);
+    camera.targetScreenOffset.y = screenLift;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
     const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5)); // 0.15 at 0.5 m and closer
     if (world.person && Math.abs(vis - himVis) > 0.02) setHimVis(vis);
