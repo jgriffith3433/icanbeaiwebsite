@@ -31,8 +31,21 @@ const HUD_PARTS = [
   ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .charge", "Charge"],
   [".powerpad button", "power pad"], [".touchpad .stick", "stick"], [".touchpad .jump", "jump"],
   [".tutorial", "tutorial card"], [".ep-hud", "episode HUD"], [".control-hint", "controls hint"],
-  ["#voice-caption", "voice caption"], ["#voices", "Voices"],
+  ["#voice-caption", "voice caption"], ["#voices", "Voices"], ["#time-btn", "Time control"], ["#time-drawer", "Time drawer"], ["#update-pill", "New version"],
 ];
+/* HUD regions: the parts above grouped as a player sees them (the status card and the tools are the top bar, an ability
+   bar of six buttons is one region). The public view holds these to six at any time. */
+const HUD_REGIONS = {
+  status: [".panel.now"], tools: ["#sound", "#details", "#settings", ".settings-pop", "#quality"], side: [".side"],
+  time: ["#time-btn", "#time-drawer", ".hud.bottom"], control: ["#control"], episodes: ["#episodes", ".ep-hud"],
+  stack: ["#weather-btn", "#pressure", "#neighbors-btn", "#neighbors-panel"], abilities: [".abilitybar .ab", ".abilitybar .charge"],
+  touch: [".powerpad button", ".touchpad .stick", ".touchpad .jump"], notes: [".tutorial", ".control-hint", "#voice-caption", "#voices", "#update-pill"],
+};
+function hudRegionNames() {
+  const seen = new Set();
+  Object.entries(HUD_REGIONS).forEach(([name, sels]) => sels.forEach((sel) => document.querySelectorAll(sel).forEach((el) => { if (hudVisible(el)) seen.add(name); })));
+  return [...seen];
+}
 const hudSeen = new Set();
 function hudVisible(el) {
   if (!el || el.hidden) return null;
@@ -163,6 +176,35 @@ function carScreenPos() {
   const v = B.Vector3.Project(c, B.Matrix.Identity(), w.scene.getTransformMatrix(), w.scene.activeCamera.viewport.toGlobal(rw, rh));
   if (v.z < 0 || v.z > 1) return null;
   return { x: v.x / rw, y: v.y / rh };
+}
+
+/* The public view (a real host, or ?view=public): the quiet page. A scenario that judges the public layout asks for it, so
+   a run on a local host plays the same page the beta does. The head script in index.html sets the classes from the URL;
+   this does the same for a run that wasn't given the parameter, and keeps the URL honest. */
+function forcePublicView() {
+  const root = document.documentElement;
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get("view") !== "public") {
+      q.set("view", "public");
+      history.replaceState(history.state, "", location.pathname + "?" + q.toString() + location.hash);
+    }
+  } catch (e) { /* none */ }
+  if (!root.classList.contains("preview-public")) root.classList.add("preview-public", "view-forced");
+  const tog = $("public-toggle");
+  if (tog && root.classList.contains("view-forced")) tog.hidden = true;
+  return root.classList.contains("preview-public");
+}
+const isPublicView = () => document.documentElement.classList.contains("preview-public");
+/* Open (or close) the Time drawer the way a player does: a real click on the Time control. */
+async function timeDrawer(on) {
+  const btn = $("time-btn"), drawer = $("time-drawer");
+  if (!btn || !drawer || !isPublicView()) return false;
+  if (drawer.classList.contains("open") !== !!on) {
+    await clickEl(btn);
+    await sleep(300);
+  }
+  return drawer.classList.contains("open") === !!on;
 }
 
 function clickSpeed(s) {
@@ -337,6 +379,7 @@ async function smoke(options, t) {
   else t.event("status-card-label", `status card label "${markText}"`);
   if (personOnScreen()) t.event("person-visible");
   else t.problem("warning", "The person isn't on screen at load");
+  await timeDrawer(true); // the public view keeps the day bar in the Time drawer: open it like a player
   const daybarBox = boxOf(document.querySelector(".daybar"));
   const whatBox = boxOf($("what"));
   const tutBox = boxOf($("tutorial"));
@@ -349,7 +392,8 @@ async function smoke(options, t) {
     }
     t.event("hud-and-tutorial", `daybar ${Math.round(daybarBox.width)}×${Math.round(daybarBox.height)}, narration "${$("what").textContent}", tutorial "${($("tutorial-text") || {}).textContent || ""}"`);
   }
-  const topIds = ["sound", "details", "quality", "episodes"];
+  await timeDrawer(false);
+  const topIds = isPublicView() ? ["sound", "episodes"] : ["sound", "details", "quality", "episodes"]; // no Details or Quality out in the public view (Quality lives under Settings)
   const topBoxes = [];
   const nowBox = boxOf(document.querySelector(".now"));
   if (nowBox) topBoxes.push({ id: "now", r: nowBox });
@@ -405,6 +449,7 @@ async function smoke(options, t) {
     if (seenWx.size === 1 && seenWx.has("clear") && dayStates.size === 1 && dayStates.has("clear")) t.event("calm-idle", `sky clear while the day ran at 10×; the day's forecast is clear all 24 h`);
     else t.problem("bug", `Weather started on its own: seen ${[...seenWx].join(",")}, forecast ${[...dayStates].join(",")}`);
   }
+  await timeDrawer(true);
   if (!boxOf(document.querySelector(".daybar")) || !boxOf($("what")) || !boxOf($("tutorial"))) {
     t.problem("bug", "The day bar, narration HUD, or tutorial prompt disappeared during 10× playback");
   }
@@ -1552,20 +1597,20 @@ async function analytics(options, t) {
     t.metric("progressSent", sent().filter((e) => e.name === "progress").length);
     if (!sent().some((e) => e.name === "feature" && e.ctx && e.ctx.time && e.ctx.activity)) t.problem("warning", "Events don't carry the time of day and the activity in their context");
 
-    // The question: after 3 minutes on screen, when the viewer isn't touching anything.
-    t.scene("Watching (the question comes after 3 minutes)");
-    const after = window.day.analytics.askAfter;
+    // The question: after the first episode score card, when the viewer isn't touching anything and isn't in control.
+    t.scene("Watching (the question comes after the first episode score card)");
     const card = () => document.querySelector(`[data-hawkes-ask="${window.day.analytics.askId}"]`);
-    while (!card() && window.day.analytics.watched() < after + 20) {
-      await sleep(2000);
-      t.progress(0.2 + 0.6 * Math.min(1, window.day.analytics.watched() / after));
-    }
+    await sleep(6000);
+    if (card()) t.problem("bug", "The feedback question showed before any episode score card");
+    // setup shortcut: the score event a finished episode sends (the real card needs a full episode)
+    window.dispatchEvent(new CustomEvent("day:episode", { detail: { action: "score", id: "morning", why: "playtest" } }));
+    for (let i = 0; i < 12 && !card(); i++) await sleep(1500);
     if (!card()) {
-      t.problem("bug", `The feedback question didn't show after ${window.day.analytics.watched()} s on screen`);
+      t.problem("bug", `The feedback question didn't show after an episode score card (${window.day.analytics.watched()} s on screen)`);
       return;
     }
     t.scene("The question");
-    t.event("feedback-prompt", `shown after ${window.day.analytics.watched()} s: "Are you enjoying this so far?"`);
+    t.event("feedback-prompt", `shown after the first episode score card, ${window.day.analytics.watched()} s on screen: "Are you enjoying this so far?"`);
     await sleep(5000); // long enough to read in the footage
     const close = card().shadowRoot && card().shadowRoot.querySelector(".ha-x");
     if (!close) t.problem("bug", "The feedback question has no close button");
@@ -5944,6 +5989,17 @@ async function phone(options, t) {
 
   // 6. The day timeline, dragged by touch.
   t.scene("Timeline");
+  // The Time control steps aside while he's the player's (the drawer closes on take-over), so let go first, then tap it.
+  if (isPublicView() && taken()) {
+    await tap($("control"), "Let go");
+    await t.until(() => !taken(), 3000, "Let go by tap").catch(() => {});
+    await sleep(500);
+  }
+  if (isPublicView()) {
+    const open = await timeDrawer(true);
+    if (open) t.event("time-drawer-open", `the Time control opened the day bar by tap at ${innerWidth}x${innerHeight}`);
+    else t.problem("bug", "Phone: tapping the Time control didn't open the day bar");
+  }
   const scrub = $("scrub");
   const m0 = window.day.now().minutes;
   const sb = scrub && scrub.getBoundingClientRect();
@@ -6246,6 +6302,124 @@ async function hudLayoutScenario(options, t) {
   }
   t.event("hud-layout-play", `weather and Pressure clear, Let go centred at ${size}`);
   pressKey("Escape");
+}
+
+/* ---------------- the quiet page: the public view, one Time control, one thing at a time ---------------- */
+async function quietUi(options, t) {
+  t.scene("Public view");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  if (window.day.title && window.day.title.quiet) window.day.title.quiet();
+  const size = `${innerWidth}x${innerHeight}`;
+  const phone = innerWidth <= 700;
+  // Requests: the page must make no index.html fetch (the old 10-minute reload loop is gone).
+  const fetched = [];
+  const realFetch = window.fetch;
+  window.fetch = function (u) { fetched.push(String(u && u.url ? u.url : u)); return realFetch.apply(this, arguments); };
+  const reloads = performance.getEntriesByType("navigation").length;
+  await sleep(800);
+
+  // 1. Nothing that reads as a developer tool, and the bottom bar is one Time control.
+  const gone = ["Every action", "Body", "Things", "day.config.js"];
+  const shown = [];
+  document.querySelectorAll("body *").forEach((el) => {
+    if (el.children.length || !hudVisible(el)) return;
+    const txt = (el.textContent || "").trim();
+    gone.forEach((g) => { if (txt.includes(g)) shown.push(g); });
+  });
+  if (shown.length) t.problem("bug", `The public view shows developer text: ${[...new Set(shown)].join(", ")} (${size})`);
+  else t.event("no-dev-text", `no 'Every action', 'Body', 'Things' or 'day.config.js' text at ${size}`);
+  if (hudVisible($("side")) || hudVisible($("details"))) t.problem("bug", `The side panel or Details shows in the public view (${size})`);
+  const tb = $("time-btn");
+  if (!hudVisible(tb)) { t.problem("bug", `No Time control in the public view (${size})`); return; }
+  ["live", "play", "speeds", "scrub"].forEach((id) => { if (hudVisible($(id))) t.problem("bug", `#${id} shows before the Time control is opened (${size})`); });
+  t.event("time-control", `one Time control "${(tb.textContent || "").trim()}" (dot ${tb.dataset.mode}) at ${size}`);
+  const regions = hudRegionNames();
+  t.metric("hudRegionsWatching", regions.length);
+  if (regions.length > 6) t.problem("bug", `${regions.length} HUD regions while watching (${regions.join(", ")}); the public view holds six (${size})`);
+  checkHud(t, "quiet-ui: watching");
+  t.event("hud-regions", `${regions.length} regions while watching: ${regions.join(", ")} (${size})`);
+  // Episodes sits clear of the status card, on a phone too
+  const eb = boxOf($("episodes")), nb = boxOf(document.querySelector(".panel.now"));
+  if (!eb) t.problem("bug", `Episodes isn't on screen (${size})`);
+  else if (nb && boxesOverlap(eb, nb)) t.problem("bug", `Episodes overlaps the status card (${size})`);
+  else t.event("episodes-clear", `Episodes at y ${Math.round(eb.top)} clear of the status card (to y ${nb ? Math.round(nb.bottom) : 0}) at ${size}`);
+
+  // 2. The Time control opens the day bar and the speeds on a click or tap, and closes again.
+  t.scene("Time control");
+  await clickEl(tb);
+  await sleep(400);
+  const opened = ["live", "play", "scrub"].every((id) => hudVisible($(id))) && !!document.querySelector("#speeds button") && hudVisible(document.querySelector("#speeds button"));
+  if (!opened) t.problem("bug", `The Time control didn't open the day bar and speeds (${size})`);
+  else t.event("time-drawer-open", `Live, Pause, speeds and the day bar opened at ${size}`);
+  checkHud(t, "quiet-ui: Time drawer open");
+  const m0 = window.day.now().minutes;
+  clickSpeed(10);
+  await sleep(1500);
+  if (!(window.day.now().minutes > m0)) t.problem("bug", "10× from the drawer didn't move the clock");
+  await clickEl(tb);
+  await sleep(300);
+  if (hudVisible($("scrub"))) t.problem("bug", "A second tap on the Time control didn't close the drawer");
+  $("live").click();
+  t.progress(0.35);
+
+  // 3. The drawer closes on take-over; in play nothing stacks; the title and Episodes menu clear the play HUD.
+  t.scene("Taking over");
+  await clickEl(tb);
+  await sleep(300);
+  pressKey("Enter");
+  await t.until(() => window.day.control && window.day.control.mode() === "player", 8000, "taking control");
+  await sleep(1200);
+  if ($("time-drawer").classList.contains("open") || hudVisible($("scrub"))) t.problem("bug", "The Time drawer stayed open after take-over");
+  else t.event("drawer-closed-on-take", "the Time drawer closed when he was taken over");
+  const inPlay = hudRegionNames();
+  t.metric("hudRegionsInPlay", inPlay.length);
+  if (inPlay.length > 6) t.problem("bug", `${inPlay.length} HUD regions in play (${inPlay.join(", ")}) (${size})`);
+  checkHud(t, "quiet-ui: in play");
+  t.event("hud-regions", `${inPlay.length} regions in play: ${inPlay.join(", ")} (${size})`);
+  const play = ["#voice-caption", ".abilitybar", ".control-hint"];
+  // a voice line's caption, so there is one to hide (Sound stays off)
+  try { window.day.voice && window.day.voice.say && window.day.voice.say("power"); } catch (e) { /* none */ }
+  await sleep(500);
+  const upBefore = play.filter((q) => hudVisible(document.querySelector(q)));
+  window.day.title.show("api");
+  await sleep(600);
+  const overTitle = play.filter((q) => hudVisible(document.querySelector(q)));
+  if (overTitle.length) t.problem("bug", `With the title up, ${overTitle.join(", ")} still show (${size})`);
+  else t.event("title-exclusive", `the title is up and ${upBefore.length ? upBefore.join(", ") + " went" : "no caption, ability bar or hint shows"} (${size})`);
+  window.day.title.quiet();
+  await sleep(500);
+
+  // 4. Episodes from play: the menu clears the caption, ability bar and hint, and starts the tutorial.
+  t.scene("Episodes menu");
+  const epb = $("episodes");
+  if (!hudVisible(epb)) t.problem("bug", `Episodes isn't reachable while he's the player's (${size}); on a phone it is part of the top-left column`);
+  await clickEl(epb);
+  await sleep(500);
+  const menu = $("episode-menu");
+  if (!menu || menu.hidden) { t.problem("bug", `Tapping Episodes didn't open the menu (${size})`); return; }
+  const overMenu = play.filter((q) => hudVisible(document.querySelector(q)));
+  if (overMenu.length) t.problem("bug", `With the Episodes menu open, ${overMenu.join(", ")} still show (${size})`);
+  else t.event("menu-exclusive", `the Episodes menu is open and no caption, ability bar or hint shows (${size})`);
+  const row = $("ep-row-tutorial") || document.querySelector("#episode-menu .ep-row");
+  if (!row) { t.problem("bug", "The Episodes menu lists no episode"); return; }
+  await clickEl(row);
+  await t.until(() => { const e = window.day.episodes && window.day.episodes.now(); return e && e.id; }, 6000, "the episode to start").catch(() => {});
+  const ep = window.day.episodes.now();
+  if (ep && ep.id) t.event("episode-from-menu", `the menu started "${ep.id}" at ${size}`);
+  else t.problem("bug", `The Episodes menu didn't start an episode (${size})`);
+  // 5. No question in control, no index.html fetch, no reload
+  await sleep(2000);
+  if (document.querySelector('[data-hawkes-ask]')) t.problem("bug", "The feedback question showed while in control");
+  else t.event("no-question-in-control", "no 'Are you enjoying this so far?' while he is the player's");
+  const idx = fetched.filter((u) => /index\.html/.test(u));
+  if (idx.length) t.problem("bug", `The page fetched index.html ${idx.length}x (${idx[0]})`);
+  else t.event("no-index-fetch", "no index.html fetch during the run");
+  if (performance.getEntriesByType("navigation").length !== reloads) t.problem("bug", "The page reloaded");
+  window.fetch = realFetch;
+  if (window.day.episodes.skip) window.day.episodes.skip();
+  pressKey("Escape");
+  t.progress(1);
 }
 
 async function titleScenario(options, t) {
@@ -6841,6 +7015,7 @@ installPlaytest({
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
+    { id: "quiet-ui", title: "The quiet page: ?view=public shows the city, the status card, one Time control, Take control and Episodes (no log, Body, Things or config text, no overlaps, six HUD regions at most); the Time control opens the day bar and speeds by click or tap and closes on take-over; the title and the Episodes menu clear the caption, ability bar and hint; the menu starts the tutorial; no index.html fetch, no question in control", seconds: 75, tags: ["hud", "menus", "smoke"], description: "Load with ?playtest=quiet-ui&view=public. Real input: clicks on the Time control, a speed, Enter, Episodes and the tutorial row. Events no-dev-text / time-control / hud-regions / episodes-clear / time-drawer-open / drawer-closed-on-take / title-exclusive / menu-exclusive / episode-from-menu / no-question-in-control / no-index-fetch. Run at 1280x720 and 390x844." },
     { id: "hud-layout", title: "HUD layout: Quality lives in the Settings menu, the left column stacks Episodes, Neighbors, weather and Pressure without overlap, Take control stays bottom-centre; overlap check on title and in play", seconds: 40, tags: ["hud", "smoke"], description: "Load with ?playtest=hud-layout. Real input: Settings click, Enter, Esc. Events settings-open / hud-clear / hud-layout-play. Run at 1280x720, 390x844 and 844x390." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"] },
@@ -6891,6 +7066,7 @@ installPlaytest({
     // window.hawkesPlaytest.cut; the contract's api has none (cut lives on `t`), so every placement counted as a camera snap.
     if (window.hawkesPlaytest && !window.hawkesPlaytest.cut) window.hawkesPlaytest.cut = (s) => t.cut(s);
     try {
+      if (["smoke", "hud-layout", "phone", "cold-start", "quiet-ui"].includes(id)) forcePublicView();
       if (id !== "title"&& window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
@@ -6901,6 +7077,7 @@ installPlaytest({
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
       else if (id === "hud-layout") await hudLayoutScenario(options, t);
+      else if (id === "quiet-ui") await quietUi(options, t);
       else if (id === "charge-log-pause") await chargeLogPause(options, t);
       else if (id === "smoke") await smoke(options, t);
       else if (id === "day") await wholeDay(options, t);

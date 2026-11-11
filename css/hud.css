@@ -77,7 +77,7 @@ html.touch-ui .tools { position: fixed; top: var(--safe-t); right: max(12px, env
 /* ---------- Let go / Take control (centre, above the bottom row) ---------- */
 .control-btn { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tl) + 32px); }
 html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(--above-a); }
-.preview-public .control-btn { bottom: var(--safe-b); }
+.preview-public .control-btn { bottom: 40px; }
 @media (max-width: 700px) {
   .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
 }
@@ -114,7 +114,7 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-hint { bottom: calc
 .hud-left .weather-btn, .hud-left #weather-chip { order: 3; }
 .hud-left .pressure { order: 4; }
 .nb-panel { position: fixed; left: var(--safe-l); bottom: calc(var(--l1) + 100px); }
-.preview-public .hud-left { bottom: 78px; }
+.preview-public .hud-left { bottom: 40px; }
 /* phone: the column hangs top-left (weather, Pressure, Neighbors, Episodes), clear of the tools column */
 @media (max-width: 700px) {
   .hud-left { bottom: auto; top: var(--safe-t); flex-direction: column; left: max(12px, env(safe-area-inset-left)); }
@@ -185,3 +185,31 @@ html.touch-ui.in-control .voice-caption {
 
 /* ---------- bubbles ---------- */
 .nb-layer { position: fixed; inset: 0; }
+
+/* ---------- the public view (a real host, or ?view=public) ----------
+   Watching: one row along the bottom: Episodes left, Take control centre, the Time control right; the status card and the
+   tools (Sound, Settings) are the top bar. On a phone Take control rises a row so the three never touch.
+   In control (desktop): Let go, the hint, the caption and the tutorial stack above the ability bar, never over it. */
+:root { --pub-a: calc(var(--safe-b) + var(--row-a-h)); }
+.preview-public .hud.bottom { left: auto; right: var(--safe-r); bottom: 40px; width: auto; }
+.preview-public .time-drawer { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; width: min(560px, calc(100vw - var(--safe-l) - var(--safe-r))); }
+html.preview-public:not(.in-control) .hud-left { top: auto; bottom: 40px; left: var(--safe-l); flex-direction: column-reverse; }
+html.touch-ui.preview-public:not(.in-control) .control-btn { bottom: 92px; }
+@media (max-width: 700px) { html.preview-public:not(.in-control) .control-btn { bottom: 92px; } }
+html.preview-public.in-control:not(.touch-ui) .control-btn { bottom: calc(var(--pub-a) + 8px); }
+html.preview-public.in-control:not(.touch-ui) .control-hint { bottom: calc(var(--pub-a) + 56px); }
+html.preview-public.in-control:not(.touch-ui) .voice-caption { bottom: calc(var(--pub-a) + 104px); }
+html.preview-public.in-control:not(.touch-ui) .tutorial { top: 96px; bottom: auto; }
+
+/* ---------- "New version" pill: top centre; on a phone just above Take control ---------- */
+.update-pill { position: fixed; left: 50%; transform: translateX(-50%); top: var(--safe-t); }
+@media (max-width: 700px) { .update-pill { top: auto; bottom: 148px; } }
+html.touch-ui .update-pill { top: auto; bottom: 148px; }
+
+/* ---------- one thing at a time: the title, the Episodes menu and the in-play HUD never show together ----------
+   Re-showing the title or opening Episodes from play hides what belongs to play (caption, ability bar, hint, ...). */
+html.title-up .voice-caption, html.title-up .abilitybar, html.title-up .powerpad, html.title-up .touchpad, html.title-up .pressure,
+html.title-up #weather-btn, html.title-up .ep-hud, html.title-up .mo-line, html.title-up .ep-say, html.title-up .ep-toast, html.title-up .nb-layer,
+html.ep-menu-up .voice-caption, html.ep-menu-up .abilitybar, html.ep-menu-up .powerpad, html.ep-menu-up .touchpad, html.ep-menu-up .pressure,
+html.ep-menu-up #weather-btn, html.ep-menu-up .control-hint, html.ep-menu-up .tutorial, html.ep-menu-up .ep-hud, html.ep-menu-up .mo-line,
+html.ep-menu-up .ep-say, html.ep-menu-up .ep-toast, html.ep-menu-up .nb-layer, html.ep-menu-up .update-pill { visibility: hidden; }
