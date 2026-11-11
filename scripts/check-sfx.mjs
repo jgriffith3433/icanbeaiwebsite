@@ -77,6 +77,7 @@ const beats = [
   ['day:neighbor', { action: 'gesture', id: 'birdie', kind: 'thanks' }, 'gesture-thanks'],
   ['day:neighbor', { action: 'gesture', id: 'quill', kind: 'surprise' }, 'gesture-surprise'],
   ['day:neighbor', { action: 'umbrella', id: 'birdie' }, 'umbrella'],
+  ['day:wind', { action: 'umbrella-flip', count: 1 }, 'umbrella'],
   ['day:neighbor', { action: 'reward', id: 'birdie' }, 'goal'],
   ['day:power', { action: 'bolt' }, 'bolt-crack'],
   ['day:power', { action: 'denied' }, 'denied'],

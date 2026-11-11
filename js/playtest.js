@@ -4118,6 +4118,123 @@ async function fiveVerbs(options, t) {
   t.progress(1);
 }
 
+/* ---------------- wind-fog: a Gust you can see, an umbrella that flips, fog that rolls in ---------------- */
+// Real input: Take control (Enter / touch), Wind tapped (V, or the #ability-wind button) for a Gust, Fog (C, or
+// #ability-fog). Setup shortcuts (named): the clock to lunch (full pavements), him placed on the plaza by the flags.
+// Events: wind-gust / wind-ribbons / wind-leaves / wind-bend / wind-cloth / wind-umbrella / fog-roll / fog-skyline /
+// fog-fps. Metrics: windRibbons, windLeaves, windFlips, windPlugins, fogSeconds, fogSlices, windFogFpsAvg.
+// { "touch": true } forces low quality at 390x844 by touch: 2 fog slices, vertex shaders only, fps >= 30.
+async function windFog(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const P = window.powers || (window.day && window.day.powers);
+  const C = window.day.control;
+  const W = window.weather || (window.day && window.day.weather);
+  await t.until(() => window.day.windfog && window.day.crowd, 8000, "wind and fog (js/windfog.js) and the crowd");
+  const wf = window.day.windfog;
+  if (!P || !C || !W) return t.problem("bug", "powers, weather or Take control isn't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  scrubTo(12.4 * 60); // setup: lunch, when the pavements are full
+  clickSpeed(1);
+  await sleep(1500);
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    C.touch(true);
+  }
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: touch ? "touch" : "mouse" }));
+    sound.click();
+    await sleep(200);
+  }
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  t.event("control-taken", touch ? "by touch, low quality" : "Enter");
+  if (C.place) C.place(112, 24, -Math.PI / 2); // setup: on the plaza, a flag pole and the avenue's trees in view
+  await sleep(800);
+  const quality = window.day.look.quality();
+  t.metric("quality", quality === "low" ? 0 : 1);
+  if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await t.until(() => P.now().pressure >= 40, 8000, "Charge").catch(() => {});
+  const calm = () => { const n = W.now(); return n.rain < 0.05 && n.fog < 0.015 && n.wind < 0.2; };
+  await t.until(calm, 8000, "a calm sky").catch(() => {});
+  const base = wf.info();
+  t.event("wind-baseline", `wind ${base.wind}, ${base.flags} flags, ${base.laundry} laundry, ${base.cloth} cloth, ${base.plugins} shader bends, ${base.slices} fog slices (${quality})`);
+  if (base.plugins < 3) t.problem("bug", `Only ${base.plugins} materials bend in the wind shader (want trees, planters and awnings)`);
+  if (quality === "low" && base.cloth > 0) t.problem("bug", "Cloth simulation is on at low quality (a phone gets vertex shaders only)");
+  if (quality !== "low" && base.cloth < 3) t.problem("bug", `Only ${base.cloth} hero cloth pieces (want 3)`);
+  t.progress(0.1);
+
+  /* the Gust */
+  t.scene("Gust");
+  const fpsGust = fpsWindow(7000);
+  const crowd0 = window.day.crowd.info();
+  const flips0 = crowd0.flips || 0;
+  if (touch) await tapEl($("ability-wind")); else await holdVerb("v", 120);
+  t.event("wind-gust", "Wind tapped: a Gust");
+  let maxRib = 0, maxLeaf = 0, maxSwirl = 0, maxWind = 0, maxFlip = 0, flippedNow = 0;
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    const inf = wf.info();
+    const ci = window.day.crowd.info();
+    maxRib = Math.max(maxRib, inf.ribbons); maxLeaf = Math.max(maxLeaf, inf.leaves); maxSwirl = Math.max(maxSwirl, inf.swirling); maxWind = Math.max(maxWind, inf.wind);
+    maxFlip = Math.max(maxFlip, (ci.flips || 0) - flips0); flippedNow = Math.max(flippedNow, ci.flipped || 0);
+    if (i === 6) t.event("wind-peak", `wind ${inf.wind}, ribbons ${inf.ribbons}, leaves ${inf.leaves}, swirling ${inf.swirling}`);
+  }
+  const gf = await fpsGust;
+  t.metric("windRibbons", maxRib);
+  t.metric("windLeaves", maxLeaf);
+  t.metric("windPeak", maxWind);
+  t.metric("windFlips", maxFlip);
+  t.metric("windPlugins", wf.info().plugins);
+  if (maxWind < 0.9) t.problem("bug", `The Gust only reached wind ${maxWind} (want a strong gust, 0.9+)`);
+  if (maxRib < 1) t.problem("bug", "No wind ribbons streaked along the gust");
+  else t.event("wind-ribbons", `${maxRib} ribbons streaking along the gust`);
+  if (maxLeaf < 10) t.problem("bug", `Only ${maxLeaf} leaves and papers swirled (want 10+)`);
+  else t.event("wind-leaves", `${maxLeaf} leaves and papers, ${maxSwirl} inside eddies`);
+  t.event("wind-bend", `${wf.info().bent.join(", ")} bend in the vertex shader`);
+  const spread = wf.info().clothSpread;
+  if (quality !== "low") {
+    if (!spread.length || spread.some((x) => !(x > 0.2))) t.problem("bug", `Hero cloth isn't streaming in the gust (${spread})`);
+    else t.event("wind-cloth", `${spread.length} hero cloths reach ${spread.join(", ")} m downwind`);
+  }
+  if (maxFlip < 1) t.problem("bug", "No walker's umbrella flipped inside out on a strong gust (is anyone on the street?)");
+  else t.event("wind-umbrella", `${maxFlip} walkers' umbrellas flipped (${flippedNow} at once)`);
+  t.metric("windFogFpsAvg", Math.round(gf.avg * 10) / 10);
+  if (touch && gf.avg < 30) t.problem("bug", `Phone fps averaged ${gf.avg.toFixed(1)} through the Gust (want 30+)`);
+  t.progress(0.5);
+  await t.until(() => wf.info().gust < 0.1, 9000, "the gust to ease out").catch(() => {});
+
+  /* the Fog */
+  t.scene("Fog");
+  await t.until(() => P.now().pressure >= 16, 12000, "Charge for Fog").catch(() => {});
+  const fpsFog = fpsWindow(8000);
+  const t0 = performance.now();
+  if (touch) await tapEl($("ability-fog")); else await holdVerb("c", 120);
+  t.event("fog-cast", "Fog called");
+  let rolled = null;
+  await t.until(() => { if (wf.info().fog >= 0.4) { rolled = (performance.now() - t0) / 1000; return true; } return false; }, 6000, "ground fog to roll in").catch(() => {});
+  const fi = wf.info();
+  t.metric("fogSeconds", rolled == null ? 99 : Math.round(rolled * 10) / 10);
+  t.metric("fogSlices", fi.visibleSlices);
+  if (rolled == null || rolled > 5) t.problem("bug", `Ground fog took ${rolled == null ? "over 6" : rolled.toFixed(1)} s to roll in (want within 5 s)`);
+  else t.event("fog-roll", `${fi.visibleSlices} slices rolled in within ${rolled.toFixed(1)} s`);
+  if (fi.visibleSlices < (quality === "low" ? 2 : 6)) t.problem("bug", `${fi.visibleSlices} fog slices showing (want ${quality === "low" ? 2 : 6})`);
+  await sleep(2500);
+  const fi2 = wf.info();
+  if (!fi2.veils) t.problem("bug", "No skyline veil rings in the fog");
+  else t.event("fog-skyline", `${fi2.veils} veil rings fade the skyline, fog ${fi2.fog}, scene fog density ${W.now().fog}`);
+  if (fi2.cones > 0 || fi2.shafts > 0) t.event("fog-lights", `${fi2.cones} headlight cones, ${fi2.shafts} lamp shafts`);
+  const ff = await fpsFog;
+  t.metric("windFogFogFpsAvg", Math.round(ff.avg * 10) / 10);
+  if (touch && ff.avg < 30) t.problem("bug", `Phone fps averaged ${ff.avg.toFixed(1)} through the Fog (want 30+)`);
+  else t.event("fog-fps", `${ff.avg.toFixed(1)} fps avg through the Fog (${quality})`);
+  t.progress(1);
+}
+
 /* ---------------- tornado-plaza: funnel layers, plaza wreck, settle, phone cap + fps ---------------- */
 // Real input: Take control (Enter / touch), hold Wind full charge for Tornado. Setup shortcut (named): day bar
 // beside the car, then control.place on the plaza so the funnel runs through the café (the stick can't be driven
@@ -8683,6 +8800,7 @@ installPlaytest({
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
     { id: "camera-run", title: "Third-person camera: a two-minute walk, climb and cast run (the avenue, the stair, the apartment roof and its parapets, all five verbs and a Tornado) with the camera never inside a building or the ground, never turning over 180 deg/s, framing him and the cast's target together for 1 s or more; taking control blends in; by touch a right-half drag looks and it recentres behind him within 3 s", seconds: 170, tags: ["control", "feel", "phone", "camera"], description: "Load with ?playtest=camera-run ({\"touch\":true} for the phone run). Setup: the day bar beside the car, a full Charge. Real input: Enter, WASD with Shift up the stair and round the roof, mouse drags (one a full-width flick), E R V C X and a held V for the Tornado; by touch a tap on Take control, the stick, one-finger drags on the left and right halves, a tap on Bolt. Events control-taken / take-blend / on-the-roof / cast-framed-<power> / left-half-drag / right-half-drag / recentred / camera-stats; metrics cameraInsideFrames, cameraMaxYawDegPerSec, castFramed.<power>, recentreSeconds. Run at 1280x720 and 390x844 touch." },
+    { id: "wind-fog", title: "Wind and fog you can see: a Gust shows ribbons, 10+ swirling leaves and papers, bending trees, flapping awnings and flags, a walker's umbrella flips; Fog rolls ground-fog slices into the street within 5 s and fades the skyline; on a phone, vertex shaders only, 2 slices, fps ≥ 30", seconds: 75, tags: ["powers", "phone", "feel"], description: "Takes control at lunch, stands on the plaza, taps Wind (V / #ability-wind) for a Gust, then Fog (C / #ability-fog). Events wind-gust / wind-ribbons / wind-leaves / wind-bend / wind-cloth / wind-umbrella / fog-cast / fog-roll / fog-skyline / fog-lights / fog-fps. Option {\"touch\":true} for 390x844 low quality by touch." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
@@ -8760,6 +8878,7 @@ installPlaytest({
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "five-verbs") await fiveVerbs(options, t);
+      else if (id === "wind-fog") await windFog(options, t);
       else if (id === "tornado-plaza") await tornadoPlaza(options, t);
       else if (id === "lightning-bolt") await lightningBolt(options, t);
       else if (id === "camera-run") await cameraRun(options, t);
