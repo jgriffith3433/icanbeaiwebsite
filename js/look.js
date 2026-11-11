@@ -5,6 +5,7 @@
    that blends day / dusk / night and weather state (weather.js calls setSky),
    controlled bloom on emissives, and a quality toggle for phones.
    ========================================================================== */
+import { installSurfaces } from "./surfaces.js";
 const B = window.BABYLON;
 
 const TILE = 64;
@@ -684,7 +685,7 @@ export function installLook(world) {
           else m.albedoColor.set(r, g, b);
           if (meta.wet) {
             const wEff = Math.max(wet, surfaceWet * 0.78);
-            const wetRough = Math.max(0.2, dryRough - wEff * 0.54);
+            const wetRough = Math.max(0.15, dryRough - wEff * 0.72); // wet: about 0.15 on a full downpour
             m.roughness = wetRough + (0.9 - wetRough) * snowK;
             if (m.clearCoat) {
               const wantCoat = !low; // always on at high quality (intensity carries the wetness): no mid-play recompile
@@ -784,6 +785,7 @@ export function installLook(world) {
   };
   scene.metadata = scene.metadata || {};
   scene.metadata.dayLook = api;
+  if (typeof document !== "undefined") api.surfaces = installSurfaces(api, scene); // Gen PBR sets, once the page is up
   world.look = api;
   if (window.day) window.day.look = api;
   return api;

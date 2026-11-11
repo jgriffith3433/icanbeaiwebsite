@@ -5556,6 +5556,286 @@
    "files": {
     "audio": "audio/dialogue/dlg-he-15gfxux.mp3"
    }
+  },
+  {
+   "id": "mat-brick",
+   "note": "Red brick for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/brick-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and brick-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Wall of red-brown brick in running bond, rain-darkened navy-brown tones, cooler grey mortar, subtle variation brick to brick, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even red brick tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "take": "textures/city/brick-take.webp",
+    "maps.albedo": "textures/city/brick-albedo.webp",
+    "maps.normal": "textures/city/brick-normal.webp",
+    "maps.roughness": "textures/city/brick-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-stucco",
+   "note": "Painted stucco for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/stucco-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and stucco-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Painted stucco wall, muted slate-blue paint over fine trowelled plaster, hairline cracks and light stains, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even painted stucco tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "take": "textures/city/stucco-take.webp",
+    "maps.albedo": "textures/city/stucco-albedo.webp",
+    "maps.normal": "textures/city/stucco-normal.webp",
+    "maps.roughness": "textures/city/stucco-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-concrete",
+   "note": "Board-formed concrete for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/concrete-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and concrete-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Board-formed concrete: horizontal timber board grain pressed into cool grey concrete, tie-hole dimples, faint stains, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even board-formed concrete tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "take": "textures/city/concrete-take.webp",
+    "maps.albedo": "textures/city/concrete-albedo.webp",
+    "maps.normal": "textures/city/concrete-normal.webp",
+    "maps.roughness": "textures/city/concrete-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-glass",
+   "note": "Glass curtain wall for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/glass-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and glass-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Glass curtain wall: navy-black reflective panes divided by thin dark aluminium mullions, a faint electric-blue reflection, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even glass curtain wall tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "take": "textures/city/glass-take.webp",
+    "maps.albedo": "textures/city/glass-albedo.webp",
+    "maps.normal": "textures/city/glass-normal.webp",
+    "maps.roughness": "textures/city/glass-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-asphalt",
+   "note": "Wet asphalt for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/asphalt-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and asphalt-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Dark wet asphalt, nearly black navy, fine aggregate grain, a few soft cracks and patched seams, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even wet asphalt tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "take": "textures/city/asphalt-take.webp",
+    "maps.albedo": "textures/city/asphalt-albedo.webp",
+    "maps.normal": "textures/city/asphalt-normal.webp",
+    "maps.roughness": "textures/city/asphalt-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-pavers",
+   "note": "Sidewalk pavers for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/pavers-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and pavers-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Sidewalk of rectangular concrete pavers laid in a herringbone with thin dark joints, cool grey with a navy cast, worn edges, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even sidewalk pavers tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "take": "textures/city/pavers-take.webp",
+    "maps.albedo": "textures/city/pavers-albedo.webp",
+    "maps.normal": "textures/city/pavers-normal.webp",
+    "maps.roughness": "textures/city/pavers-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-tar",
+   "note": "Roof tar membrane for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/tar-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and tar-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Flat rooftop tar membrane, navy-black torch-down sheets with welded seams and patched repairs, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even roof tar membrane tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "take": "textures/city/tar-take.webp",
+    "maps.albedo": "textures/city/tar-albedo.webp",
+    "maps.normal": "textures/city/tar-normal.webp",
+    "maps.roughness": "textures/city/tar-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-gravel",
+   "note": "Gravel ballast for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/gravel-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and gravel-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Rooftop gravel ballast: small rounded grey and navy stones packed together, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even gravel ballast tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "take": "textures/city/gravel-take.webp",
+    "maps.albedo": "textures/city/gravel-albedo.webp",
+    "maps.normal": "textures/city/gravel-normal.webp",
+    "maps.roughness": "textures/city/gravel-roughness.webp"
+   }
   }
  ]
 }

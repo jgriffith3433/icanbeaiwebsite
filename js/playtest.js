@@ -4270,6 +4270,50 @@ async function tornadoPlaza(options, t) {
   t.progress(1);
 }
 
+/* ---------------- wet-materials: the street's PBR surfaces go dark and glossy under a Rain cast and dry back ---------------- */
+// Real input: Take control (Enter / touch), cast Rain (R or #ability-rain). Setup shortcuts (named): the day bar beside the
+// car, control.place on the apartment roof. Events: surfaces-set (which Gen sets loaded), wet-on (roughness / albedo within
+// 3 s), wet-dry (back within 60 s). { "touch": true } = 390x844, low quality.
+async function wetMaterials(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const P = window.powers || (window.day && window.day.powers);
+  const C = window.day.control;
+  const W = window.weather;
+  if (!P || !C || !W) return t.problem("bug", "powers, Take control or weather isn't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  const day = window.day.today();
+  const outside = carSideMoment(day) || day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  if (touch) { try { window.day.look.quality("low"); } catch (e) { /* */ } C.touch(true); }
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  if (C.place) C.place(-21, 0.5, Math.PI / 2);
+  await sleep(2500);
+  const mats = window.day.look.mats;
+  const sample = () => ({ asphaltRough: mats.asphalt.roughness, brickDark: mats.brick.albedoColor ? mats.brick.albedoColor.r : 1, coat: mats.asphalt.clearCoat ? mats.asphalt.clearCoat.intensity : 0 });
+  const surf = window.day.look.surfaces && window.day.look.surfaces.info();
+  t.event("surfaces-set", `${surf ? surf.loaded.join(",") || "none (procedural)" : "no loader"} at ${window.day.look.quality()} quality`);
+  const dry = sample();
+  const cost = (window.DAY_CONFIG.powers && window.DAY_CONFIG.powers.costs && window.DAY_CONFIG.powers.costs.rain) || 20;
+  if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await t.until(() => P.now().pressure + 0.05 >= cost, 8000, "Charge for Rain");
+  const t0 = performance.now();
+  if (touch) await tapEl($("ability-rain")); else await tapKey("r");
+  await t.until(() => W.now().rain > 0.3, 5000, "the rain");
+  await sleep(2400);
+  const wet = sample();
+  const secs = (performance.now() - t0) / 1000;
+  t.metric("wetRoughness", +wet.asphaltRough.toFixed(2));
+  t.event("wet-on", `after ${secs.toFixed(1)} s: asphalt roughness ${dry.asphaltRough.toFixed(2)} -> ${wet.asphaltRough.toFixed(2)}, coat ${wet.coat.toFixed(2)}, brick ${dry.brickDark.toFixed(2)} -> ${wet.brickDark.toFixed(2)}`);
+  if (wet.asphaltRough > 0.4 || wet.brickDark >= dry.brickDark) t.problem("bug", "Rain didn't darken and gloss the street surfaces within 3 s");
+  await t.until(() => mats.asphalt.roughness > dry.asphaltRough - 0.05, 60000, "the street to dry back").catch(() => t.problem("bug", "The street was still wet 60 s after the rain"));
+  t.event("wet-dry", `dry again, roughness ${mats.asphalt.roughness.toFixed(2)}`);
+}
+
 /* ---------------- rain-cast: heavy, wet rain (js/rain.js): streaks, splashes, ripples, curtains, lens drops, fog ---------------- */
 // Real input: Take control (Enter / touch), drag the camera level with the sky, cast Rain (R, or a tap on #ability-rain).
 // Setup shortcuts (named): the day bar beside the car, control.place on the apartment roof and then on the plaza, and for
@@ -8836,6 +8880,7 @@ installPlaytest({
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
     { id: "camera-run", title: "Third-person camera: a two-minute walk, climb and cast run (the avenue, the stair, the apartment roof and its parapets, all five verbs and a Tornado) with the camera never inside a building or the ground, never turning over 180 deg/s, framing him and the cast's target together for 1 s or more; taking control blends in; by touch a right-half drag looks and it recentres behind him within 3 s", seconds: 170, tags: ["control", "feel", "phone", "camera"], description: "Load with ?playtest=camera-run ({\"touch\":true} for the phone run). Setup: the day bar beside the car, a full Charge. Real input: Enter, WASD with Shift up the stair and round the roof, mouse drags (one a full-width flick), E R V C X and a held V for the Tornado; by touch a tap on Take control, the stick, one-finger drags on the left and right halves, a tap on Bolt. Events control-taken / take-blend / on-the-roof / cast-framed-<power> / left-half-drag / right-half-drag / recentred / camera-stats; metrics cameraInsideFrames, cameraMaxYawDegPerSec, castFramed.<power>, recentreSeconds. Run at 1280x720 and 390x844 touch." },
+    { id: "wet-materials", title: "Wet materials: Rain makes brick, asphalt and roofs darker and glossy within 3 s and they dry back within 60 s; on phone 512 maps", seconds: 90, tags: ["weather", "phone", "look"], description: "Day bar beside the car (setup), Enter / Take control tap, control.place on the apartment roof (setup), tap R / #ability-rain. Events surfaces-set / wet-on / wet-dry. Option {\"touch\":true} for 390x844 low quality." },
     { id: "rain-cast", title: "Heavy rain: a Rain cast shows velocity-stretched streaks, splashes on the roof and his shoulders, ripples in puddles, 5+ lens drops sliding when the camera looks up, and distant curtains in a plaza storm; on phone at most 4000 streaks, no lens drops, fps ≥ 30", seconds: 60, tags: ["powers", "weather", "phone", "feel"], description: "Day bar beside the car (setup), Sound on, Enter / Take control tap, control.place on the apartment roof (setup), drag the camera level, tap R / #ability-rain. Then weather.set storm and control.place on the plaza (setup) for the curtains. Events rain-cast / rain-streaks / rain-splashes / rain-ripples / rain-lens / rain-curtains / rain-fog / rain-phone / rain-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
@@ -8916,6 +8961,7 @@ installPlaytest({
       else if (id === "five-verbs") await fiveVerbs(options, t);
       else if (id === "tornado-plaza") await tornadoPlaza(options, t);
       else if (id === "rain-cast") await rainCast(options, t);
+      else if (id === "wet-materials") await wetMaterials(options, t);
       else if (id === "lightning-bolt") await lightningBolt(options, t);
       else if (id === "camera-run") await cameraRun(options, t);
       else if (id === "voice") await voice(options, t);
