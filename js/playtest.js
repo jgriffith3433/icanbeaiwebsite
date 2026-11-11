@@ -8264,6 +8264,236 @@ function sensorScene() {
   return scene;
 }
 
+/* ---------------- camera-run: the third-person camera in a two-minute walk, climb and cast run ---------------- */
+// Setup shortcuts (named): the day bar beside the car, a full Charge (powers.abilities.reset), and on the phone control.place +
+// day.control.touch(true). Everything else is real input: Enter, WASD with Shift (goTo), mouse drags on the view, the verb keys,
+// and by touch a tap on Take control, the stick, one-finger drags on the right and left halves, and the ability buttons.
+// Measured here and not by the camera's own report: the camera's turn rate from every drawn frame's real timestamps, its point inside
+// a building or the ground (world.cameraInside), and, for each cast, how long he and the aim are on screen together.
+async function cameraRun(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const P = window.powers || (window.day && window.day.powers);
+  const C = window.day.control;
+  const w = world();
+  const cam = w.camera;
+  if (!P || !C || !C.camera) return t.problem("bug", "powers or the camera report (day.control.camera) isn't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const day = window.day.today();
+  const outside = carSideMoment(day) || day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  if (touch) C.touch(true);
+  const refill = () => { if (P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  const sound = $("sound");
+  if (sound) { sound.click(); await sleep(150); }
+
+  // the sampler: one reading per drawn frame, with the real time between them
+  const S = { frames: 0, inside: 0, maxYaw: 0, maxPitch: 0, worstYawAt: "", cuts: 0, casts: [], castWindow: null, last: null, minAbove: 99 };
+  let stop = false;
+  const onScreen = (x, y, z) => {
+    const eng = w.scene.getEngine();
+    const rw = eng.getRenderWidth(), rh = eng.getRenderHeight();
+    const p = BABYLON.Vector3.Project(new BABYLON.Vector3(x, y, z), BABYLON.Matrix.Identity(), w.scene.getTransformMatrix(), cam.viewport.toGlobal(rw, rh));
+    return p.z > 0 && p.z < 1 && p.x > rw * 0.02 && p.x < rw * 0.98 && p.y > rh * 0.04 && p.y < rh * 0.96;
+  };
+  const sample = (now) => {
+    if (stop) return;
+    if (C.mode() === "control") {
+      const pos = cam.globalPosition;
+      const st = C.state();
+      const cur = { ms: now, a: cam.alpha, b: cam.beta, x: st.x, z: st.z };
+      if (S.last && now - S.last.ms > 4 && now - S.last.ms < 500 && !S.skip) {
+        const dts = (now - S.last.ms) / 1000;
+        const da = Math.abs(((cur.a - S.last.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * 180 / Math.PI / dts;
+        const db = Math.abs(cur.b - S.last.b) * 180 / Math.PI / dts;
+        if (da > S.maxYaw) { S.maxYaw = da; S.worstYawAt = `${st.x.toFixed(1)},${st.z.toFixed(1)}`; }
+        if (db > S.maxPitch) S.maxPitch = db;
+      }
+      S.skip = false;
+      S.last = cur;
+      S.frames++;
+      if (w.cameraInside && w.cameraInside(pos)) S.inside++;
+      const cw = S.castWindow;
+      if (cw && now - cw.start < 1800) {
+        cw.frames++;
+        if (onScreen(st.x, st.y + 1.0, st.z) && onScreen(cw.x, cw.y + 0.3, cw.z)) { cw.run += (now - cw.lastMs) / 1000; cw.best = Math.max(cw.best, cw.run); } else cw.run = 0;
+        cw.lastMs = now;
+      } else if (cw) { S.casts.push({ power: cw.power, best: cw.best, frames: cw.frames }); S.castWindow = null; }
+    } else S.last = null;
+    requestAnimationFrame(sample);
+  };
+  requestAnimationFrame(sample);
+  window.addEventListener("day:power", (e) => {
+    const d = e.detail || {};
+    if (d.action === "denied" || C.mode() !== "control") return;
+    const aim = P.now().aim || { x: C.state().x, y: C.state().y, z: C.state().z + 6 };
+    S.castWindow = { power: d.power || d.action, x: aim.x, y: aim.y || 0, z: aim.z, start: performance.now(), lastMs: performance.now(), run: 0, best: 0, frames: 0 };
+  });
+  const wrap = (a) => ((a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  const behindNow = () => { const y = C.state().yaw; return Math.atan2(-Math.cos(y), -Math.sin(y)); };
+
+  // ---- take control: a blend from the watch camera, not a snap ----
+  const watchA = cam.alpha, watchR = cam.radius;
+  const tk0 = performance.now();
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  t.event("control-taken", touch ? "by a tap on Take control" : "Enter");
+  const early = [];
+  for (let i = 0; i < 8; i++) { await sleep(90); early.push({ a: cam.alpha, r: cam.radius }); }
+  const blending = C.camera().blending || performance.now() - tk0 < 650;
+  let worstStep = 0;
+  early.forEach((e, i) => { const prev = i ? early[i - 1] : { a: watchA, r: watchR }; worstStep = Math.max(worstStep, Math.abs(e.r - prev.r)); });
+  t.metric("takeBlendWorstRadiusStep", Math.round(worstStep * 100) / 100);
+  if (worstStep > 6) t.problem("bug", `Taking control cut the camera's distance by ${worstStep.toFixed(1)} m in one step (it should blend over 0.6 s)`);
+  else t.event("take-blend", `radius ${watchR.toFixed(1)} -> ${cam.radius.toFixed(1)} m, biggest step ${worstStep.toFixed(2)} m, blending ${blending}`);
+  C.resetCameraStats();
+  refill();
+
+  if (touch) {
+    // ---- [phone] one-finger drag on the right half looks, the left half doesn't, and it recentres behind him ----
+    t.scene("Phone: look and recentre");
+    const view = $("view");
+    const vr = view.getBoundingClientRect();
+    const y0 = vr.top + vr.height * 0.45;
+    await goTo(-2.2, street.z - 1.8, t, { close: 1.6, ms: 20000, progress: 0.2 }).catch(() => {});
+    // the stick, held up the avenue for a few seconds
+    const stickEl = $("stick") || document.querySelector(".stick");
+    if (stickEl) {
+      const sr = stickEl.getBoundingClientRect();
+      const cx = sr.left + sr.width / 2, cy = sr.top + sr.height / 2;
+      touchOn(stickEl, "pointerdown", cx, cy, 11);
+      touchOn(window, "pointermove", cx, cy - 40, 11);
+      await sleep(2600);
+      touchOn(window, "pointerup", cx, cy - 40, 11);
+    }
+    await sleep(400);
+    const dragTouch = async (x0, dx, id) => {
+      touchOn(view, "pointerdown", x0, y0, id);
+      for (let i = 1; i <= 10; i++) { touchOn(view, "pointermove", x0 + (dx * i) / 10, y0, id); await sleep(30); }
+      return () => touchOn(view, "pointerup", x0 + dx, y0, id);
+    };
+    // left half first: nothing turns
+    const a0 = cam.alpha;
+    const upL = await dragTouch(vr.left + vr.width * 0.15, vr.width * 0.3, 21);
+    await sleep(60);
+    const leftTurn = Math.abs(wrap(cam.alpha - a0));
+    upL();
+    t.metric("leftHalfDragRad", Math.round(leftTurn * 1000) / 1000);
+    if (leftTurn > 0.05) t.problem("bug", `A drag on the left half turned the camera ${(leftTurn * 57.3).toFixed(0)} deg (it is the stick's side)`);
+    else t.event("left-half-drag", `the left half did not turn the camera (${(leftTurn * 57.3).toFixed(1)} deg)`);
+    await sleep(500);
+    // right half: it turns
+    const a1 = cam.alpha;
+    const upR = await dragTouch(vr.left + vr.width * 0.85, -vr.width * 0.55, 22);
+    await sleep(60);
+    const turned = Math.abs(wrap(cam.alpha - a1));
+    upR();
+    const releaseAt = performance.now();
+    t.metric("rightHalfDragRad", Math.round(turned * 1000) / 1000);
+    if (turned < 0.4) t.problem("bug", `A one-finger drag on the right half turned the camera only ${(turned * 57.3).toFixed(0)} deg`);
+    else t.event("right-half-drag", `the camera turned ${(turned * 57.3).toFixed(0)} deg for a ${Math.round(vr.width * 0.55)} px drag`);
+    const offBehind = Math.abs(wrap(cam.alpha - behindNow()));
+    // recentre: within 3 s of release it is behind him again
+    let back = null;
+    while (performance.now() - releaseAt < 4500) {
+      await sleep(100);
+      if (Math.abs(wrap(cam.alpha - behindNow())) < 0.25) { back = (performance.now() - releaseAt) / 1000; break; }
+    }
+    t.metric("recentreSeconds", back == null ? -1 : Math.round(back * 10) / 10);
+    if (back == null) t.problem("bug", `The camera didn't recentre behind him (still ${(Math.abs(wrap(cam.alpha - behindNow())) * 57.3).toFixed(0)} deg off, was ${(offBehind * 57.3).toFixed(0)}) 4.5 s after release`);
+    else if (back > 3) t.problem("bug", `The camera took ${back.toFixed(1)} s to recentre after release (limit 3 s)`);
+    else t.event("recentred", `behind him ${back.toFixed(1)} s after release (was ${(offBehind * 57.3).toFixed(0)} deg off)`);
+    // a cast by tap, framed
+    t.scene("Phone: a cast");
+    refill();
+    const bolt = $("ability-bolt");
+    if (bolt) await tapEl(bolt);
+    await sleep(2300);
+  } else {
+    // ---- the walk: the avenue, mouse drags (a fast big one too), the stair, the apartment roof, the casts ----
+    t.scene("Walk");
+    const reached = await goTo(-2.2, street.z - 1.8, t, { close: 1.6, ms: 20000, sprint: true, progress: 0.1 });
+    if (!reached) t.problem("bug", "He didn't reach the avenue");
+    await goTo(14, street.z - 1.8, t, { close: 1.6, ms: 12000, sprint: true, progress: 0.14 }).catch(() => {});
+    await dragCamera(0.45);
+    await goTo(34, street.z - 1.8, t, { close: 1.6, ms: 14000, sprint: true, progress: 0.18 }).catch(() => {});
+    // a sudden full-width drag: the camera may only turn at its cap
+    pointer("pointerdown", 0.9, 0.55);
+    pointer("pointermove", 0.05, 0.55);
+    pointer("pointerup", 0.05, 0.55);
+    await sleep(900);
+    await goTo(6, street.z - 1.8, t, { close: 1.6, ms: 16000, sprint: true, progress: 0.24 }).catch(() => {});
+
+    t.scene("Climb");
+    const blocks = (cfg.city && cfg.city.blocks) || [];
+    const apt = blocks.find((b) => b.id === "apt") || blocks.find((b) => b.stair);
+    if (apt && apt.stair) {
+      const st = apt.stair;
+      const lip = apt.z + apt.d / 2 - 1.1;
+      const topX = st.x1 - 0.25;
+      await goTo(st.x0 - 0.9, st.z, t, { sprint: true, progress: 0.3, ms: 22000 });
+      await goTo(topX, st.z, t, { close: 0.35, progress: 0.34, ms: 18000 });
+      await goTo(topX, lip, t, { close: 0.5, progress: 0.38, ms: 8000 });
+      await goTo(apt.x, apt.z, t, { close: 0.9, progress: 0.42, ms: 9000 });
+      const roof = C.state();
+      if (roof.y < apt.h - 0.5) t.problem("bug", `He didn't reach the apt rooftop (y ${roof.y.toFixed(2)}, roof ${apt.h})`);
+      else t.event("on-the-roof", `apt roof at ${roof.x.toFixed(1)}, ${roof.z.toFixed(1)}, y ${roof.y.toFixed(2)}`);
+      // along the parapets and the AC units: walls and edges all round the camera
+      t.scene("Roof");
+      const hx = apt.w / 2 - 1.6, hz = apt.d / 2 - 1.6;
+      const corners = [[apt.x - hx, apt.z - hz], [apt.x + hx, apt.z - hz], [apt.x + hx, apt.z + hz], [apt.x - hx, apt.z + hz], [apt.x, apt.z]];
+      for (let i = 0; i < corners.length; i++) {
+        await goTo(corners[i][0], corners[i][1], t, { close: 1.0, ms: 9000, sprint: i % 2 === 0, progress: 0.46 + i * 0.03 }).catch(() => {});
+        if (i === 1) await dragCamera(-0.4);
+      }
+    }
+
+    // ---- the casts, each watched for him and the target on screen together ----
+    t.scene("Casts");
+    const casts = [
+      ["bolt", async () => tapKey("e", 90)],
+      ["rain", async () => tapKey("r", 90)],
+      ["gale", async () => holdVerb("v", 1100)],
+      ["fog", async () => tapKey("c", 90)],
+      ["sunbreak", async () => tapKey("x", 90)],
+      ["tornado", async () => holdVerb("v", 2300)],
+    ];
+    for (const [name, act] of casts) {
+      refill();
+      await sleep(250);
+      const before = S.casts.length;
+      await act();
+      await sleep(2300);
+      const got = S.casts.slice(before).find((c) => c.frames > 3) || S.casts[S.casts.length - 1];
+      if (!got || S.casts.length === before) { t.problem("bug", `The ${name} cast made no camera framing window`); continue; }
+      t.metric(`castFramed.${name}`, Math.round(got.best * 100) / 100);
+      if (got.best < 1) t.problem("bug", `On the ${name} cast he and the target were on screen together only ${got.best.toFixed(2)} s (need 1 s)`);
+      else t.event(`cast-framed-${name}`, `he and the target on screen together for ${got.best.toFixed(2)} s over ${got.frames} frames (${got.power})`);
+    }
+    await goTo(apt ? apt.x : 0, apt ? apt.z : 0, t, { close: 1.4, ms: 8000, progress: 0.9 }).catch(() => {});
+  }
+
+  stop = true;
+  const rep = C.camera();
+  t.metric("cameraInsideFrames", S.inside);
+  t.metric("cameraInsideFramesReported", rep.inside);
+  t.metric("cameraBlockedFrames", rep.blocked);
+  t.metric("cameraMaxYawDegPerSec", Math.round(S.maxYaw));
+  t.metric("cameraMaxYawDegPerSecReported", Math.round(rep.maxYawDegPerSec));
+  t.metric("cameraMaxPitchDegPerSec", Math.round(S.maxPitch));
+  t.metric("cameraFrames", S.frames);
+  t.event("camera-stats", `${S.frames} frames, camera inside ${S.inside} (its own count ${rep.inside}, behind a wall ${rep.blocked}), turn rate at most ${S.maxYaw.toFixed(0)} deg/s at ${S.worstYawAt} (its own ${rep.maxYawDegPerSec}), pitch ${S.maxPitch.toFixed(0)} deg/s`);
+  if (S.inside || rep.inside) t.problem("bug", `The camera was inside a building or the ground for ${Math.max(S.inside, rep.inside)} frame(s) of ${S.frames}`);
+  if (S.maxYaw > 180 || rep.maxYawDegPerSec > 180) t.problem("bug", `The camera turned ${Math.max(S.maxYaw, rep.maxYawDegPerSec).toFixed(0)} deg/s (limit 180) near ${S.worstYawAt}`);
+  t.progress(1);
+}
+
 /* ---------------- charge / live log / pause: Body Energy vs Charge, no future rows live, Paused holds the clock ---------------- */
 // Acceptance: Body alone says Energy; ability bar says Charge (amber); Live log has no soon rows; pause/scrub shows
 // Paused and freezes the clock; resume continues from the same minute with the log in order. Shots at the current size
@@ -8452,6 +8682,7 @@ installPlaytest({
     { id: "weather-audio", title: "Rooftop weather soundscape and footsteps: Sound on (real click), Take control (sting), climb apt roof, walk across gravel, metal, tar and puddle surfaces, then cycle clear/sun, clouds, rain (light roof patter vs heavy downpour, gutters, umbrella), storm (distance-delayed thunder crack and rolling thunder), fog, wind (3D-panned gusts and flapping awnings) and snow (muffled city) with equal-power crossfades", seconds: 150, tags: ["weather", "audio"], description: "Day bar outside, confirms silence, turns Sound on with a pointer, Enter, climbs apt rooftop, walks gravel/metal/tar/puddle zones, cycles keys 1–7 on the roof. Logs footstep-*, rain-layers, thunder-delay, loop-seams, music-* and soundscape levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
+    { id: "camera-run", title: "Third-person camera: a two-minute walk, climb and cast run (the avenue, the stair, the apartment roof and its parapets, all five verbs and a Tornado) with the camera never inside a building or the ground, never turning over 180 deg/s, framing him and the cast's target together for 1 s or more; taking control blends in; by touch a right-half drag looks and it recentres behind him within 3 s", seconds: 170, tags: ["control", "feel", "phone", "camera"], description: "Load with ?playtest=camera-run ({\"touch\":true} for the phone run). Setup: the day bar beside the car, a full Charge. Real input: Enter, WASD with Shift up the stair and round the roof, mouse drags (one a full-width flick), E R V C X and a held V for the Tornado; by touch a tap on Take control, the stick, one-finger drags on the left and right halves, a tap on Bolt. Events control-taken / take-blend / on-the-roof / cast-framed-<power> / left-half-drag / right-half-drag / recentred / camera-stats; metrics cameraInsideFrames, cameraMaxYawDegPerSec, castFramed.<power>, recentreSeconds. Run at 1280x720 and 390x844 touch." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
@@ -8531,6 +8762,7 @@ installPlaytest({
       else if (id === "five-verbs") await fiveVerbs(options, t);
       else if (id === "tornado-plaza") await tornadoPlaza(options, t);
       else if (id === "lightning-bolt") await lightningBolt(options, t);
+      else if (id === "camera-run") await cameraRun(options, t);
       else if (id === "voice") await voice(options, t);
       else if (id === "voice-director") await voiceDirector(options, t);
       else if (id === "spoken-dialogue") await spokenDialogue(options, t);

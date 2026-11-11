@@ -1688,6 +1688,16 @@
       }
       return false;
     }
+    /* The camera-inside detector: the camera's point inside a building's box (an axis-aligned solid), or under the ground. */
+    function cameraInside(p) {
+      if (p.y < (surfaceAt ? surfaceAt(p.x, p.z) : 0) + 0.06 && p.y < 4) return true;
+      for (let i = 0; i < solids.length; i++) {
+        const q = solids[i];
+        if (q.roll || q.yaw || q.pitch) continue;
+        if (Math.abs(p.x - q.x) < q.w / 2 + 0.1 && Math.abs(p.y - q.y) < q.h / 2 + 0.1 && Math.abs(p.z - q.z) < q.d / 2 + 0.1) return true;
+      }
+      return false;
+    }
     function cineStep(dt) {
       const c = cine;
       c.t += dt;
@@ -2180,7 +2190,12 @@
         cam.beta = camera.beta;
         cam.radius = camera.radius;
       } else {
-        cam.alpha = cam.snapAlpha ? alphaGoal : dampAngle(cam.alpha, alphaGoal, dt, 1.2);
+        if (cam.snapAlpha) cam.alpha = alphaGoal;
+        else {
+          // the hand-back from the player's camera swings round at most 150 deg/s (the playtest's turn-rate limit is 180)
+          const da = dampAngle(cam.alpha, alphaGoal, dt, 1.2) - cam.alpha;
+          cam.alpha += Math.max(-2.6 * dt, Math.min(2.6 * dt, da));
+        }
         cam.snapAlpha = false;
         cam.beta = damp(cam.beta, shot.beta, dt, 1.2);
         cam.radius = damp(cam.radius, shot.radius, dt, 1.2);
@@ -2556,6 +2571,7 @@
       officePowerNow: () => officePowerK,
       cineShot: setCineShot,
       cineOn: () => !!cine,
+      cameraInside,
       cineInfo: () => (cine ? { frames: cine.frames, inside: cine.inside, minClear: cine.minClear, t: cine.t } : cineLast),
       titleShotOn: () => !!titleShot,
       person: me.root, // read by the playtest

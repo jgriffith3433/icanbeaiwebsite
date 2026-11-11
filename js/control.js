@@ -429,7 +429,7 @@ function install() {
   hint.className = "control-hint";
   hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold in the air to glide) · drag to look · E Lightning (hold for Storm), R Rain, V Wind (tap Gust, hold Gale, full Tornado), C Fog, X Sun · Esc to let go";
   const HINT_KEYS = hint.textContent;
-  const HINT_TOUCH = "Left stick: move · Jump · five verbs on the right (Lightning, Rain, Wind, Fog, Sun) · tap the street to aim · drag to look";
+  const HINT_TOUCH = "Left stick: move · Jump · five verbs on the right (Lightning, Rain, Wind, Fog, Sun) · tap the street to aim · drag the right side to look";
   const HINT_SEEN_KEY = "icanbe.controlHint";
   const pad = document.createElement("div");
   pad.className = "touchpad";
@@ -494,19 +494,81 @@ function install() {
     updraft: { radius: 4.2, lift: 8, life: 7, ambient: true, weather: { clear: 0.08, clouds: 0.15, rain: 0.35, storm: 1, fog: 0.1, wind: 0.92, snow: 0.2 } },
   }, C.ride || {});
   const UD = Object.assign({ radius: 4.2, lift: 8, life: 7, ambient: true, weather: {} }, RIDE.updraft || {});
+  /* The third-person camera (rewritten): a critically damped spring follows him (with a look-ahead when he runs), the yaw is
+     capped (CAM.yawCapDeg), a sphere cast against the buildings, roofs and stair huts pulls it in before it can enter
+     geometry and eases it out after, every cast frames him and where it lands for about 1.6 s, and taking control blends
+     over CAM.blendSecs from the watch camera. Touch: a one-finger drag on the right half looks, and it recentres behind him
+     after CAM.recenterAfter s of no look input. The numbers are in day.config.js control.camera (CAM below). */
+  const CAM = Object.assign({
+    yawCapDeg: 150, // the most the camera turns about its axis per second (the playtest's limit is 180)
+    pitchCapDeg: 70,
+    follow: 14, followY: 10, followAir: 4, // spring rates (1/s), critically damped
+    ahead: 1.1, aheadFrom: 3, aheadTo: 7, // look-ahead metres at a run (speed in m/s)
+    sphere: 0.3, // the camera's collision radius (its near plane is 0.2)
+    blendSecs: 0.6,
+    recenterAfter: 2, recenterRate: 5, touchSens: 420,
+    castSecs: 1.8, castRise: 0.3, castFall: 0.5,
+    cast: {},
+  }, C.camera || {});
+  const CAST = Object.assign({
+    default: { rad: 0.6, beta: 0, align: 0.9 },
+    bolt: { rad: -0.7, beta: -0.03, align: 0.9 }, // a slight push in
+    storm: { rad: 0.4, beta: -0.02, align: 0.9 },
+    tornado: { rad: 1.3, beta: 0.24, align: 0.85 }, // a low angle, up at the funnel
+    gale: { rad: 0.9, beta: 0.1, align: 0.85 },
+    gust: { rad: 0.6, beta: 0.06, align: 0.85 },
+    rain: { rad: 0.5, beta: 0.04, align: 0.9 },
+    fog: { rad: 0.5, beta: 0, align: 0.9 },
+    sunbreak: { rad: 0.7, beta: 0.1, align: 0.9 },
+  }, CAM.cast || {});
+  const TAU2 = Math.PI * 2;
+  const wrapPi = (a) => ((((a + Math.PI) % TAU2) + TAU2) % TAU2) - Math.PI;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const smooth01 = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
+  /** One axis of a critically damped spring: [position, velocity]. */
+  const spring1 = (p, v, goal, w, dt) => {
+    const x = p - goal;
+    const e = Math.exp(-w * dt);
+    const tt = (v + w * x) * dt;
+    return [goal + (x + tt) * e, (v - w * tt) * e];
+  };
+  const cs = {
+    aimA: null, shownA: null, shownB: null, // the yaw asked for (his heading, the player's drag) and the yaw drawn
+    tp: null, tv: { x: 0, y: 0, z: 0 }, ahead: { x: 0, z: 0 },
+    appliedB: 0, lastFinalA: null, lastFinalB: null, lastMs: 0, lookAt: 0, lookDown: false,
+    blend: null, cast: null,
+    fresh: true, // the next frame follows a cut (take, place): no yaw rate sample
+  };
+  const camStats = { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], recentres: 0, lookDrags: 0 };
+  function camReset() {
+    cs.aimA = cs.shownA = cs.shownB = null;
+    cs.tp = null;
+    cs.tv = { x: 0, y: 0, z: 0 };
+    cs.ahead = { x: 0, z: 0 };
+    cs.appliedB = 0;
+    cs.blend = null;
+    cs.cast = null;
+    cs.fresh = true;
+    cs.lastFinalA = null;
+    cs.lookAt = performance.now();
+  }
   function cameraTake() {
-    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (saved[k] = camera[k]));
+    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit", "angularSensibilityX", "angularSensibilityY"].forEach((k) => (saved[k] = camera[k]));
+    const watch = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, x: camera.target.x, y: camera.target.y, z: camera.target.z };
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => ((saved[k] = kb[k]), (kb[k] = [])));
     camera.lowerRadiusLimit = 0.2; // a wall behind him may pull the camera in this close, inside his own head (the wheel stops at 1.5)
     camera.upperRadiusLimit = 16;
     camera.lowerBetaLimit = 0.25;
     camera.upperBetaLimit = 1.62;
+    if (touchMode()) camera.angularSensibilityX = camera.angularSensibilityY = CAM.touchSens;
     wantRadius = Math.max(3.5, Math.min(6.5, camera.radius));
     camera.beta = Math.min(camera.beta, 1.3);
     lastRadius = null;
     glidePull = 0;
     screenLift = 0;
     hudAt = 0;
+    camReset();
+    cs.watch = watch;
   }
   /* Taken outside (the day's camera is a cutaway shot looking into the house): put the camera along the street,
      on the side with the most room, so he, the street and the sky are what show, not the bedroom behind him. */
@@ -558,7 +620,8 @@ function install() {
   }
   function cameraGive() {
     if (himVis !== 1) setHimVis(1);
-    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => (camera[k] = saved[k]));
+    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit", "angularSensibilityX", "angularSensibilityY"].forEach((k) => (camera[k] = saved[k]));
+    camReset();
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
     glidePull = 0;
     screenLift = 0;
@@ -616,16 +679,154 @@ function install() {
     camera.fov = push.baseFov || camera.fov;
     return true;
   }
+  /* The take-over blend: the watch camera's own pose is where the orbit starts, and it eases to his shoulder over CAM.blendSecs. */
+  function startBlend() {
+    const w = cs.watch;
+    cs.watch = null;
+    if (!w) return;
+    cs.aimA = camera.alpha; // the heading the framing chose
+    cs.shownA = w.alpha;
+    cs.shownB = w.beta;
+    cs.blend = { t: 0, a: wrapPi(w.alpha - camera.alpha), b: w.beta - camera.beta, r: Math.min(16, w.radius) };
+    cs.appliedB = w.beta - camera.beta;
+    cs.tp = { x: w.x, y: w.y, z: w.z };
+    camera.alpha = w.alpha;
+    camera.beta = w.beta;
+    camera.radius = cs.blend.r;
+    camera.target.set(w.x, w.y, w.z);
+    lastRadius = null;
+  }
+  /* A cast frames him and where it lands: the camera eases (rise, hold, fall: about 1.8 s) round behind him so the target is
+     ahead of it, and changes its angle by the power (a slight push for Lightning, low for a Tornado). */
+  window.addEventListener("day:power", (e) => {
+    const d = e.detail || {};
+    if (mode !== "control" || d.action === "denied" || cine()) return;
+    const pw = window.powers || day.powers;
+    let aim = null;
+    try { aim = pw && pw.now ? pw.now().aim : null; } catch (err) { aim = null; }
+    const id = d.power || d.action || "default";
+    if (!aim) aim = { x: s.x + Math.sin(s.yaw) * 6, z: s.z + Math.cos(s.yaw) * 6, y: s.y };
+    cs.cast = { t: 0, power: id, x: aim.x, y: aim.y == null ? s.y : aim.y, z: aim.z, run: 0, best: 0, frames: 0, framedFrames: 0 };
+  });
+  const cine = () => !!(world.cineOn && world.cineOn());
+  /* One-finger drag on the right half of the screen looks round; the left half is the stick's, so it does nothing there. */
+  const ptr = camera.inputs && camera.inputs.attached && camera.inputs.attached.pointers;
+  if (ptr && typeof ptr.onTouch === "function") {
+    const orig = ptr.onTouch.bind(ptr);
+    ptr.onTouch = (pt, dx, dy) => {
+      const touchy = pt && (pt.type === "touch" || pt.type === "pen" || (pt.type == null && touchMode()));
+      if (mode === "control" && touchy) {
+        const cv = world.scene.getEngine().getRenderingCanvas();
+        const r = cv ? cv.getBoundingClientRect() : { left: 0, width: window.innerWidth };
+        if (pt.x < r.left + r.width / 2) return; // the left half belongs to the stick
+        camStats.lookDrags++;
+      }
+      orig(pt, dx, dy);
+    };
+  }
+  window.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "touch" && e.target && e.target.tagName === "CANVAS") cs.lookDown = (cs.lookDown || 0) + 1;
+  }, true);
+  const lookUp = (e) => { if (e.pointerType === "touch" && cs.lookDown) cs.lookDown = Math.max(0, cs.lookDown - 1); };
+  window.addEventListener("pointerup", lookUp, true);
+  window.addEventListener("pointercancel", lookUp, true);
+
+  /* Distance the camera may go along `dir` from `o` (to `r` at most) without its sphere touching anything: the centre ray and
+     four more that end on a ring of CAM.sphere round the camera, each scaled back by its margin. */
+  const sphereRight = new B.Vector3();
+  function sphereClear(ox, oy, oz, dx, dy, dz, r) {
+    const pl = world.physics && world.physics();
+    const rad = CAM.sphere;
+    const h = Math.hypot(dx, dz) || 1;
+    sphereRight.set(dz / h, 0, -dx / h);
+    const ux = -dy * sphereRight.z, uy = dz * sphereRight.x - dx * sphereRight.z, uz = dy * sphereRight.x;
+    const offs = [[0, 0, 0], [sphereRight.x, 0, sphereRight.z], [-sphereRight.x, 0, -sphereRight.z], [ux, uy, uz], [-ux, -uy, -uz]];
+    let best = r;
+    for (let i = 0; i < offs.length; i++) {
+      const k = i ? rad : 0;
+      const ex = dx * r + offs[i][0] * k, ey = dy * r + offs[i][1] * k, ez = dz * r + offs[i][2] * k;
+      const L = Math.hypot(ex, ey, ez) || 1;
+      const qx = ex / L, qy = ey / L, qz = ez / L;
+      let ri = r;
+      if (world.clearRadius) ri = Math.min(ri, (world.clearRadius(ox, oy, oz, qx, qy, qz, L, 0.6) / L) * r);
+      if (pl) {
+        const from = new B.Vector3(ox + qx * 0.05, oy + qy * 0.05, oz + qz * 0.05);
+        pl.plugin.raycast(from, new B.Vector3(ox + qx * (L + 0.3), oy + qy * (L + 0.3), oz + qz * (L + 0.3)), camRay, mover.rayQuery());
+        if (camRay.hasHit) ri = Math.min(ri, (Math.max(0.2, B.Vector3.Distance(new B.Vector3(ox, oy, oz), camRay.hitPoint) - 0.35) / L) * r);
+      }
+      best = Math.min(best, ri);
+    }
+    return Math.max(0.2, best);
+  }
+  /* The camera behind geometry from his head (the feel sensor's camera-blocked): a ray from his head to the camera hits something. */
+  function cameraBlockedNow(head, pos) {
+    const pl = world.physics && world.physics();
+    if (!pl) return false;
+    const d = B.Vector3.Distance(head, pos);
+    if (d < 0.5) return false;
+    const dirv = pos.subtract(head).normalize();
+    pl.plugin.raycast(head.add(dirv.scale(0.1)), pos, camRay, mover.rayQuery());
+    return !!(camRay.hasHit && B.Vector3.Distance(head, camRay.hitPoint) < d - 0.12);
+  }
   function cameraFollow(dt, look) {
-    if (world.cineOn && world.cineOn()) return; // a moment's cut-away camera (js/moments.js) has the view
-    // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
-    if (!push.on && lastRadius != null && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
-    camera.alpha -= look.x * 2.4 * dt;
+    if (cine()) return; // a moment's cut-away camera (js/moments.js) has the view
+    const nowMs = performance.now();
+    const realDt = cs.lastMs ? Math.min(0.25, (nowMs - cs.lastMs) / 1000) : dt;
+    cs.lastMs = nowMs;
+    if (cs.watch) startBlend();
+    if (cs.aimA == null) { cs.aimA = cs.shownA = camera.alpha; cs.shownB = camera.beta; }
+    // what the player did to the camera since the last frame (a drag, its inertia): the orbit's own drift, not mine
+    const drag = wrapPi(camera.alpha - cs.shownA - (camera.shakeAlpha || 0));
+    if (Math.abs(drag) > 1e-5) { cs.aimA += drag; cs.lookAt = nowMs; }
+    camera.beta -= cs.appliedB;
+    if (look.x || look.y) cs.lookAt = nowMs;
+    cs.aimA -= look.x * 2.4 * dt;
     camera.beta = Math.max(camera.lowerBetaLimit, Math.min(camera.upperBetaLimit, camera.beta - look.y * 1.5 * dt));
+    // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
+    if (!push.on && lastRadius != null && !cs.blend && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
+    if (cs.lookDown || Math.abs(stick.x) > 0.35 || keys.has("l") || keys.has("r")) cs.lookAt = nowMs; // steering sideways is turning, not idling (the camera would chase him round)
+    const touch = touchMode();
+    if (touch && !push.on && !cs.cast && !cs.blend && nowMs - cs.lookAt > CAM.recenterAfter * 1000) {
+      // idle after a look: swing round behind him, and level the pitch
+      const behind = Math.atan2(-Math.cos(s.yaw), -Math.sin(s.yaw));
+      const k = Math.min(1, CAM.recenterRate * dt);
+      const dA = wrapPi(behind - cs.aimA);
+      if (Math.abs(dA) > 0.02 || Math.abs(camera.beta - 1.12) > 0.02) camStats.recentres += Math.abs(dA) > 0.2 ? 1 : 0;
+      cs.aimA += dA * k;
+      camera.beta += (1.12 - camera.beta) * k;
+    }
+    // ---- the spring follow, with a look-ahead at a run ----
+    const bl = cs.blend;
+    let ek = 1;
+    if (bl) {
+      bl.t += dt;
+      ek = smooth01(bl.t / CAM.blendSecs);
+      if (bl.t >= CAM.blendSecs) cs.blend = null;
+    }
+    if (!cs.tp) cs.tp = { x: camera.target.x, y: camera.target.y, z: camera.target.z };
+    const run = clamp((s.speed - CAM.aheadFrom) / Math.max(0.1, CAM.aheadTo - CAM.aheadFrom), 0, 1) * (s.grounded ? 1 : 0.5);
+    let gx = 0, gz = 0;
+    if (run > 0 && s.speed > 0.1) {
+      let reach = CAM.ahead * run;
+      const plA = world.physics && world.physics();
+      if (plA) { // a wall right ahead: no look-ahead into it
+        const o = new B.Vector3(s.x, s.y + 1.35, s.z);
+        const dx = s.vx / s.speed, dz = s.vz / s.speed;
+        plA.plugin.raycast(o, o.add(new B.Vector3(dx, 0, dz).scale(reach + 0.5)), camRay, mover.rayQuery());
+        if (camRay.hasHit) reach = Math.max(0, Math.min(reach, B.Vector3.Distance(o, camRay.hitPoint) - 0.6));
+      }
+      gx = (s.vx / s.speed) * reach;
+      gz = (s.vz / s.speed) * reach;
+    }
+    cs.ahead.x = damp(cs.ahead.x, gx, dt, 3);
+    cs.ahead.z = damp(cs.ahead.z, gz, dt, 3);
+    const wxz = bl ? 5 + (CAM.follow - 5) * ek : CAM.follow;
+    const wy = s.grounded ? CAM.followY : CAM.followAir;
+    [cs.tp.x, cs.tv.x] = spring1(cs.tp.x, cs.tv.x, s.x + cs.ahead.x, wxz, dt);
+    [cs.tp.z, cs.tv.z] = spring1(cs.tp.z, cs.tv.z, s.z + cs.ahead.z, wxz, dt);
+    [cs.tp.y, cs.tv.y] = spring1(cs.tp.y, cs.tv.y, s.y + 1.35, bl ? Math.min(wy, wxz) : wy, dt);
     const t = camera.target;
-    t.x = damp(t.x, s.x, dt, 14);
-    t.z = damp(t.z, s.z, dt, 14);
-    t.y = damp(t.y, s.y + 1.35, dt, s.grounded ? 10 : 4);
+    t.set(cs.tp.x, cs.tp.y, cs.tp.z);
     const pullWant = s.gliding ? (RIDE.cameraPull || 3.4) : 0;
     glidePull = damp(glidePull, pullWant, dt, 2.4);
     let r = wantRadius + glidePull;
@@ -637,27 +838,48 @@ function install() {
       camera.fov = push.baseFov + push.fov * (1 - e);
       if (k >= 1) pushEnd();
     }
+    // ---- a cast frames him and the target ----
+    let castA = 0, castB = 0, castR = 0;
+    const cst = cs.cast;
+    if (cst) {
+      cst.t += dt;
+      if (cst.t >= CAM.castSecs) {
+        camStats.casts.push({ power: cst.power, framedSeconds: Math.round(cst.best * 100) / 100, frames: cst.frames });
+        if (camStats.casts.length > 40) camStats.casts.shift();
+        window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "cast-framed", power: cst.power, seconds: cst.best } }));
+        cs.cast = null;
+      } else {
+        const env = smooth01(cst.t / CAM.castRise) * (1 - smooth01((cst.t - (CAM.castSecs - CAM.castFall)) / CAM.castFall));
+        const P = CAST[cst.power] || CAST.default;
+        const wr = wrapPi(Math.atan2(cst.z - s.z, cst.x - s.x) + Math.PI - cs.aimA); // the heading that puts the target dead ahead
+        castA = clamp(wr, -2.4, 2.4) * smooth01((Math.abs(wr) - 0.12) / 0.4) * P.align * env;
+        castB = P.beta * env;
+        const D = Math.hypot(cst.x - s.x, cst.z - s.z);
+        castR = (P.rad + 0.16 * Math.max(0, D - 10)) * env;
+      }
+    }
+    r += Math.max(-1.2, Math.min(2.4, castR));
     /* Low over a slope or roof (the ramp up a block, the parapets): a camera skimming the slab shows only dark planes.
        Look down from where the surface under it is at least CAM_LIFT below: lift the pitch (smoothly) until it is. */
+    camera.alpha = cs.aimA;
     const pl = world.physics && world.physics();
+    const groundUnder = (alpha, beta) => {
+      const sb = Math.sin(beta);
+      const cx = t.x + Math.cos(alpha) * sb * r;
+      const cy = t.y + Math.cos(beta) * r;
+      const cz = t.z + Math.sin(alpha) * sb * r;
+      pl.plugin.raycast(new B.Vector3(cx, cy + 0.5, cz), new B.Vector3(cx, cy - CAM_LIFT - 0.5, cz), camRay, mover.rayQuery());
+      return camRay.hasHit ? camRay.hitPoint.y : null;
+    };
     if (pl && !push.on) {
-      const pitchFor = (beta) => {
-        const sb = Math.sin(beta);
-        const cx = t.x + Math.cos(camera.alpha) * sb * r;
-        const cy = t.y + Math.cos(beta) * r;
-        const cz = t.z + Math.sin(camera.alpha) * sb * r;
-        pl.plugin.raycast(new B.Vector3(cx, cy + 0.5, cz), new B.Vector3(cx, cy - CAM_LIFT - 0.5, cz), camRay, mover.rayQuery());
-        return camRay.hasHit ? camRay.hitPoint.y : null;
-      };
       let lift = camera.beta;
       for (let i = 0; i < 6; i++) {
-        const gy = pitchFor(lift);
+        const gy = groundUnder(cs.aimA, lift);
         const cy = t.y + Math.cos(lift) * r;
         if (gy == null || cy - gy >= CAM_LIFT || lift <= camera.lowerBetaLimit + 0.01) break;
         lift = Math.max(camera.lowerBetaLimit, lift - 0.14);
       }
       if (lift < camera.beta) {
-        // damped, and never more than 0.1 rad a frame: on a slow frame (dt up to 0.1 s) the damping alone swung the camera metres
         const nb = damp(camera.beta, lift, dt, 6);
         camera.beta = Math.max(nb, camera.beta - 0.1, lift);
       }
@@ -665,7 +887,7 @@ function install() {
     /* Walking at a wall with the camera on its far side squeezes the camera in to his head (a wall in front of him, the
        camera behind the wall). Swing the orbit round, at a capped rate, to the nearest heading with room, as a
        third-person camera does, rather than only pulling in. Not while the player is turning the camera themselves. */
-    if (world.clearRadius && !push.on && Math.abs(look.x) < 0.05) {
+    if (world.clearRadius && !push.on && !cs.cast && Math.abs(look.x) < 0.05 && Math.abs(drag) < 1e-3) {
       const want = Math.min(r, 3.5);
       const sb0 = Math.sin(camera.beta);
       const plr = world.physics && world.physics();
@@ -681,42 +903,87 @@ function install() {
         }
         return rm;
       };
-      if (room(camera.alpha) < want - 0.3) {
+      if (room(cs.aimA) < want - 0.3) {
         let pick = null;
         for (let k = 1; k <= 12 && pick == null; k++) {
           for (const sg of [1, -1]) {
-            const a = camera.alpha + sg * k * 0.2618;
+            const a = cs.aimA + sg * k * 0.2618;
             if (room(a) >= want - 0.05) { pick = a; break; }
           }
         }
-        if (pick != null) camera.alpha += Math.max(-2.2 * dt, Math.min(2.2 * dt, pick - camera.alpha));
+        if (pick != null) cs.aimA += Math.max(-2.2 * dt, Math.min(2.2 * dt, pick - cs.aimA));
       }
     }
-    const dx = Math.cos(camera.alpha) * Math.sin(camera.beta);
-    const dy = Math.cos(camera.beta);
-    const dz = Math.sin(camera.alpha) * Math.sin(camera.beta);
-    // buildings: the box test needs no Havok, and keeps a margin so the near plane never cuts into a facade
-    if (world.clearRadius) r = Math.min(r, world.clearRadius(t.x, t.y, t.z, dx, dy, dz, r, 0.6));
-    const p = world.physics && world.physics();
-    if (p) {
-      const dir = new B.Vector3(dx, dy, dz);
-      const from = t.add(dir.scale(0.05)); // from him: starting further out missed a wall closer than that (flush against the ramp's end) and put the camera behind it
-      // not his own capsule: with the target trailing him at a sprint the ray started behind it, hit it, and pulled the camera into his head
-      p.plugin.raycast(from, t.add(dir.scale(r + 0.3)), camRay, mover.rayQuery());
-      // Stay in front of the wall, however close that is: a floor of 1.2 m used to put the camera inside or behind it.
-      if (camRay.hasHit) r = Math.max(0.2, B.Vector3.Distance(t, camRay.hitPoint) - 0.35);
+    // ---- the drawn yaw and pitch: the asked-for ones plus the cast's and the blend's, turning at most the capped rate ----
+    const blA = cs.blend ? cs.blend.a * (1 - smooth01(cs.blend.t / CAM.blendSecs)) : 0;
+    const wantA = cs.aimA + castA + blA;
+    const capA = (CAM.yawCapDeg * Math.PI / 180) * dt;
+    cs.shownA += clamp(wrapPi(wantA - cs.shownA), -capA, capA);
+    let wantB = camera.beta + castB + (cs.blend ? cs.blend.b * (1 - smooth01(cs.blend.t / CAM.blendSecs)) : 0);
+    wantB = clamp(wantB, camera.lowerBetaLimit, camera.upperBetaLimit);
+    const base = camera.beta;
+    const capB = (CAM.pitchCapDeg * Math.PI / 180) * dt;
+    cs.shownB += clamp(wantB - cs.shownB, -capB, capB);
+    // a low angle never puts the camera on the slab or the road
+    if (pl && !push.on && cs.shownB > base) {
+      for (let i = 0; i < 4; i++) {
+        const gy = groundUnder(cs.shownA, cs.shownB);
+        if (gy == null || t.y + Math.cos(cs.shownB) * r - gy >= CAM_LIFT * 0.7) break;
+        cs.shownB = Math.max(base, cs.shownB - 0.1);
+      }
     }
-    /* Pull in fast but never in one jump: a thin edge (the ramp's end, a parapet) entering the ray used to cut the
-       radius by metres in a single frame, a visible camera snap. 45 m/s still beats a walking pace by far; a slow frame (dt up to 0.1 s) is capped at 1.5 m so it stays under the feel sensor's 3 m. */
-    if (push.on) camera.radius = r;
-    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(1.5, Math.max(0.35, 45 * dt)));
-    else camera.radius = damp(camera.radius, r, dt, 3);
+    camera.alpha = cs.shownA;
+    camera.beta = cs.shownB;
+    cs.appliedB = cs.shownB - base;
+    // ---- the sphere cast, with the final heading ----
+    const sbF = Math.sin(camera.beta);
+    const dx = Math.cos(camera.alpha) * sbF;
+    const dy = Math.cos(camera.beta);
+    const dz = Math.sin(camera.alpha) * sbF;
+    r = Math.min(r, sphereClear(t.x, t.y, t.z, dx, dy, dz, r));
+    /* Pull in fast but never in one jump: a thin edge entering the cast used to cut the radius by metres in a single frame, a
+       visible camera snap. A slow frame (dt up to 0.1 s) is capped at 2.4 m so it stays under the feel sensor's 3 m, and it eases
+       out slowly after. */
+    if (cs.blend) camera.radius = Math.min(r, cs.blend.r + (r - cs.blend.r) * smooth01(cs.blend.t / CAM.blendSecs));
+    else if (push.on) camera.radius = r;
+    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(2.4, Math.max(0.5, 60 * dt)));
+    else camera.radius = damp(camera.radius, r, dt, 2.2);
     lastRadius = camera.radius;
     screenLift = damp(screenLift, hudLiftGoal(), dt, 3);
     camera.targetScreenOffset.y = screenLift;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
     const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5)); // 0.15 at 0.5 m and closer
     if (world.person && Math.abs(vis - himVis) > 0.02) setHimVis(vis);
+    // ---- what the playtest reads: the turn rate, the camera-inside frames, the cast framing ----
+    const head = new B.Vector3(s.x, s.y + 1.35, s.z);
+    const cpos = new B.Vector3(t.x + dx * camera.radius, t.y + dy * camera.radius, t.z + dz * camera.radius);
+    if (!cs.fresh && cs.lastFinalA != null && realDt > 0.004) {
+      const yawRate = (Math.abs(wrapPi(camera.alpha - cs.lastFinalA)) / realDt) * 180 / Math.PI;
+      const pitchRate = (Math.abs(camera.beta - cs.lastFinalB) / realDt) * 180 / Math.PI;
+      camStats.maxYawDegPerSec = Math.max(camStats.maxYawDegPerSec, Math.round(yawRate * 10) / 10);
+      camStats.maxPitchDegPerSec = Math.max(camStats.maxPitchDegPerSec, Math.round(pitchRate * 10) / 10);
+    }
+    cs.lastFinalA = camera.alpha;
+    cs.lastFinalB = camera.beta;
+    cs.fresh = false;
+    camStats.frames++;
+    const here = world.cameraInside ? world.cameraInside(cpos) : false;
+    if (here) camStats.inside++;
+    camStats.minClear = Math.min(camStats.minClear, Math.round(camera.radius * 100) / 100);
+    if (camStats.frames % 2 === 0 && cameraBlockedNow(head, cpos)) camStats.blocked++;
+    if (cst) {
+      cst.frames++;
+      const eng = world.scene.getEngine();
+      const rw = eng.getRenderWidth(), rh = eng.getRenderHeight();
+      const m = world.scene.getTransformMatrix();
+      const vp = camera.viewport.toGlobal(rw, rh);
+      const on = (x, y, z) => {
+        const p = B.Vector3.Project(new B.Vector3(x, y, z), B.Matrix.Identity(), m, vp);
+        return p.z > 0 && p.z < 1 && p.x > rw * 0.02 && p.x < rw * 0.98 && p.y > rh * 0.04 && p.y < rh * 0.96;
+      };
+      const both = on(s.x, s.y + 1.0, s.z) && on(cst.x, cst.y + 0.3, cst.z);
+      if (both) { cst.run += dt; cst.best = Math.max(cst.best, cst.run); cst.framedFrames++; } else cst.run = 0;
+    }
   }
 
   /* ---------- wind trails + whoosh while he glides ---------- */
@@ -1156,10 +1423,18 @@ function install() {
         if (o.radius != null) wantRadius = o.radius;
       } else frameOutdoors({}, { x: s.x, z: s.z });
       lastRadius = null;
+      camReset();
       try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
       return r;
     },
     ride: RIDE,
+    /** The camera's own report (the playtest): turn rate, camera-inside frames, cast framing, the numbers it runs on. */
+    camera: () => ({
+      ...camStats, casts: camStats.casts.slice(), yawCapDeg: CAM.yawCapDeg, blendSecs: CAM.blendSecs, recenterAfter: CAM.recenterAfter,
+      blending: !!cs.blend, casting: cs.cast ? cs.cast.power : null, alpha: camera.alpha, beta: camera.beta, radius: camera.radius,
+      behind: Math.atan2(-Math.cos(s.yaw), -Math.sin(s.yaw)), lookDown: cs.lookDown || 0,
+    }),
+    resetCameraStats: () => { Object.assign(camStats, { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], recentres: 0, lookDrags: 0 }); },
     log: () => log.slice(),
     take: () => take("console"),
     push: (spec) => pushStart(spec),

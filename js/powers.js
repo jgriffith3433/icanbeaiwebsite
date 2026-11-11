@@ -1476,10 +1476,12 @@ html.touch-ui.in-control .side{display:none}
     if (cam) {
       cam.alpha -= shaken.a;
       cam.beta -= shaken.b;
-      shaken.a = (Math.random() - 0.5) * shake;
-      shaken.b = (Math.random() - 0.5) * shake * 0.6;
+      // eased towards each new random offset (not a fresh one every frame): the camera's turn rate stays under the 180 deg/s limit
+      shaken.a += ((Math.random() - 0.5) * shake * 0.5 - shaken.a) * 0.4;
+      shaken.b += ((Math.random() - 0.5) * shake * 0.4 - shaken.b) * 0.4;
       cam.alpha += shaken.a;
       cam.beta += shaken.b;
+      cam.shakeAlpha = shaken.a; // js/control.js reads the camera's drag net of this
       shake = Math.max(0, shake - dt * 1.6);
       cam.fov += pushApplied;
       pushApplied = push;
