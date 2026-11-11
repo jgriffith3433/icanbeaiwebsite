@@ -100,6 +100,12 @@
     feature("neighbor", { action: d.action, id: d.id, beat: d.beat, kind: d.kind, score: d.score });
   }));
 
+  // Today's request (js/daily.js): asked aloud, answered, thanked, the reward standing.
+  window.addEventListener("day:daily", safe((e) => {
+    const d = (e && e.detail) || {};
+    feature("daily", { action: d.action, id: d.id, who: d.who, via: d.via });
+  }));
+
   // Chapter episodes (js/episodes.js): offer, start, goals, score card.
   window.addEventListener("day:episode", safe((e) => {
     const d = e.detail || {};

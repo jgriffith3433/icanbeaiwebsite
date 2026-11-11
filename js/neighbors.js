@@ -273,6 +273,8 @@ function install() {
     const beat = beats[s.stage];
     if (!beat || beat.kind === "surprise") return;
     if (beat.kind === "ask") {
+      // today's request (js/daily.js) is theirs: their usual ask gives way to it
+      if (day.daily && day.daily.owns && day.daily.owns(p.id)) return;
       if (!inWindow(h, beat.from, beat.to)) {
         if (s.askOpen) {
           // the window closed unanswered: the ask and its thanks are missed for today
@@ -569,6 +571,12 @@ function install() {
       animStats.samples = 0;
     },
     events: () => events.slice(),
+    /** Have them play a gesture (ask, thanks, surprise) toward him: js/daily.js's request and thanks. */
+    gesture: (id, kind) => {
+      const p = people.find((q) => q.id === id);
+      if (p) p.__gestureWant = kind;
+      return !!p;
+    },
   };
   window.neighbors = api;
   day.neighbors = api;
