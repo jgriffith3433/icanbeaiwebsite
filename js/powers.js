@@ -1,35 +1,41 @@
 /* ==========================================================================
    Small Weather's powers, while the player has him.
 
-   Pressure fills over time and faster in a storm. Hold to call a storm down
-   on him (the cloud gathers over his head, then the sky he already commands
-   in js/weather.js spreads and it rains). Aim and throw lightning. A gust
-   shoves bins and people's umbrellas in a cone. A tornado runs the street.
+   Five verbs, one Charge pool: Lightning (E; hold into Storm), Rain (R),
+   Wind (V; tap Gust, hold Gale, full charge Tornado; G aliases a Gust),
+   Fog (C), Sun (X). Charge fills over time and faster in a storm. Keys 1–7
+   and the Q wheel live behind Settings as Sky studio (off by default).
 
    The numbers and the lines are day.config.js `powers`. createGauge() is the
    meter with no scene, so npm test can spend it dry. startPowers() is the page.
    ========================================================================== */
 
-import { createAbilities, startAbilityBar } from "./abilities.js";
+import { createAbilities, startAbilityBar, VERB_IDS } from "./abilities.js";
 
-export const POWER_NAMES = ["storm", "bolt", "gust", "tornado", "rain", "gale", "fog", "sunbreak"];
+/** All spendable effects (verbs + hold depths). The bar shows VERB_IDS only. */
+export const POWER_NAMES = ["bolt", "rain", "wind", "fog", "sunbreak", "storm", "gust", "gale", "tornado"];
+export { VERB_IDS };
 
 const DEFAULTS = {
   max: 100,
   regen: 12,
   stormRegen: 14,
-  hold: 0.7,
+  hold: 0.7, // Lightning hold → Storm
+  windHold: 0.55, // Wind hold → Gale
+  windFull: 1.35, // Wind full charge → Tornado
+  tapMax: 0.28, // release before this = tap (bolt / gust)
   aim: 3.6,
   cone: 52,
   reach: 11,
-  costs: { storm: 40, bolt: 24, gust: 16, tornado: 48, rain: 18, gale: 20, fog: 16, sunbreak: 22 },
-  keys: { storm: "f", bolt: "e", gust: "g", tornado: "t", rain: "r", gale: "v", fog: "c", sunbreak: "x" },
+  costs: { storm: 40, bolt: 24, gust: 16, tornado: 48, rain: 18, gale: 20, fog: 16, sunbreak: 22, wind: 16 },
+  keys: { bolt: "e", rain: "r", wind: "v", fog: "c", sunbreak: "x", gust: "g" },
   // seconds before it can be called again, and how long it lasts (the bar's sweep and glow)
-  cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8, rain: 4, gale: 5, fog: 4, sunbreak: 6 },
-  durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4, rain: 3, gale: 3, fog: 3, sunbreak: 3 },
-  names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado", rain: "Rain", gale: "Gale", fog: "Fog", sunbreak: "Sun break" },
+  cooldowns: { storm: 6, bolt: 1.5, gust: 2, tornado: 8, rain: 4, gale: 5, fog: 4, sunbreak: 6, wind: 2 },
+  durations: { storm: 0, bolt: 0.55, gust: 0.42, tornado: 5.4, rain: 3, gale: 3, fog: 3, sunbreak: 3, wind: 0 },
+  names: { storm: "Storm", bolt: "Lightning", gust: "Gust", tornado: "Tornado", rain: "Rain", gale: "Gale", fog: "Fog", sunbreak: "Sun", wind: "Wind" },
   lines: {
     gather: "The sky draws in over him.",
+    windGather: "The air tightens in his hands.",
     storm: "He calls the storm down.",
     bolt: "Lightning. Where he aimed.",
     gust: "A hard gust.",
@@ -143,19 +149,44 @@ export function startPowers(world, dayApi) {
   cfg.durations = Object.assign({}, DEFAULTS.durations, cfg.durations);
   cfg.names = Object.assign({}, DEFAULTS.names, cfg.names);
   cfg.lines = Object.assign({}, DEFAULTS.lines, cfg.lines);
-  // The registry every call goes through (js/abilities.js); Charge is the Pressure meter (Body Energy is separate).
+  // The registry every call goes through (js/abilities.js); Charge is the Pressure pool (Body Energy is separate).
   const abil = createAbilities({ max: cfg.max });
-  POWER_NAMES.forEach((id) => abil.register({ id, name: cfg.names[id], key: cfg.keys[id], cost: cfg.costs[id], cooldown: cfg.cooldowns[id], duration: cfg.durations[id] }));
+  POWER_NAMES.forEach((id) => {
+    const key = cfg.keys[id] || (id === "storm" ? cfg.keys.bolt : id === "gale" || id === "tornado" ? cfg.keys.wind : "");
+    abil.register({
+      id,
+      name: cfg.names[id] || id,
+      key,
+      cost: cfg.costs[id] != null ? cfg.costs[id] : 0,
+      cooldown: cfg.cooldowns[id] || 0,
+      duration: cfg.durations[id] || 0,
+      verb: VERB_IDS.includes(id),
+    });
+  });
   const gauge = {
     step: (dt, storm) => abil.step(dt, (cfg.regen || 0) + (storm ? cfg.stormRegen || 0 : 0)),
     now: () => ({ value: abil.now().energy, max: abil.now().max, costs: Object.assign({}, cfg.costs) }),
   };
   let lastWhy = null;
   gauge.spend = (id) => {
+    // Wind depths share the Wind lock; Storm shares Lightning's lock.
+    if ((id === "gust" || id === "gale" || id === "tornado") && abil.isLocked("wind")) {
+      lastWhy = "locked";
+      return false;
+    }
+    if (id === "storm" && abil.isLocked("bolt")) {
+      lastWhy = "locked";
+      return false;
+    }
     const r = abil.use(id);
     lastWhy = r.ok ? null : r.reason;
     return r.ok;
   };
+  function buzz() {
+    try {
+      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(18);
+    } catch (e) { /* unsupported */ }
+  }
   const cosMin = Math.cos(((cfg.cone || 52) * Math.PI) / 180);
   const reach = cfg.reach || 11;
   const aimDist = cfg.aim || 3.6;
@@ -163,13 +194,24 @@ export function startPowers(world, dayApi) {
   const props = [];
   let propsReady = false;
   let age = 0;
-  let keyStorm = false;
-  let touchStorm = false;
-  let wantStorm = false;
-  let charge = 0;
-  let holdResolved = false;
+  // Lightning hold → Storm; Wind hold → Gale / full → Tornado (tap = bolt / gust).
+  let keyBolt = false;
+  let touchBolt = false;
+  let padBolt = false;
+  let keyWind = false;
+  let touchWind = false;
+  let padWind = false;
+  let boltCharge = 0;
+  let windCharge = 0;
+  let boltResolved = false;
+  let windResolved = ""; // "", "gale", "tornado"
   let gatherNoted = false;
+  let windGatherNoted = false;
   let localStorm = false;
+  let wantStorm = false; // for pose() / now().charging while Lightning is gathering
+  let charge = 0; // mirrors boltCharge for now().radius / pose
+  let prevTouchBolt = false;
+  let prevTouchWind = false;
   let castFor = 0;
   let throwFor = 0;
   let flash = 0;
@@ -329,7 +371,10 @@ export function startPowers(world, dayApi) {
     lastCast = { id, at: performance.now(), kind: c.kind, hitstop: !!c.hold };
   }
   function say(action, via, power) {
-    if (action !== "denied") castFx(power || action);
+    if (action !== "denied") {
+      castFx(power || action);
+      buzz();
+    }
     const g = gauge.now();
     const a = abil.get(power || action);
     emit({ action, via: via || "key", power: power || action, pressure: Math.round(g.value), energy: Math.round(g.value), cooldown: a ? a.cooldown : 0, reason: action === "denied" ? lastWhy : undefined });
@@ -1041,38 +1086,22 @@ export function startPowers(world, dayApi) {
     o.stop(t + 0.18);
   }
 
-  /* ---- the meter, the reticle, the phone buttons ---- */
+  /* ---- Charge (ability bar) and the reticle; the old Pressure chip and power pad are gone ---- */
   if (canDom) {
     const style = document.createElement("style");
     style.textContent = `
-.pressure{z-index:6;width:228px;pointer-events:none;font:600 0.78rem/1.2 system-ui,sans-serif;color:#e7eef8}
-.pressure[hidden]{display:none}
-.pressure .bar{margin-top:4px;height:8px;border-radius:99px;background:rgba(8,12,20,.55);border:1px solid rgba(126,200,255,.45);overflow:hidden}
-.pressure .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1a4c7a,#7ec8ff);border-radius:99px}
-.pressure.dry .bar i{background:#c4554a}
+.pressure{display:none !important}
+.powerpad{display:none !important}
 .power-reticle{position:fixed;z-index:5;width:16px;height:16px;margin:-8px 0 0 -8px;border:2px solid #9fd4ff;border-radius:50%;box-shadow:0 0 8px rgba(80,160,255,.8);pointer-events:none}
 .power-reticle[hidden]{display:none}
-.powerpad{z-index:6;display:grid;grid-template-columns:1fr 1fr;gap:8px;width:168px}
-.powerpad[hidden]{display:none}
-.powerpad button{appearance:none;border:1px solid rgba(126,200,255,.55);background:rgba(10,14,22,.55);color:#d5e8ff;border-radius:12px;padding:10px 6px;font:600 0.78rem system-ui,sans-serif;touch-action:none}
-.powerpad button.held{background:#7ec8ff;color:#102033}
-html.touch-ui .pressure,html.touch-ui.public .pressure,html.touch-ui.preview-public .pressure{width:min(148px,40vw);min-height:44px;box-sizing:border-box;padding:6px 10px;border-radius:12px;background:rgba(10,14,22,.55);display:flex;flex-direction:column;justify-content:center}
-html.touch-ui .pressure[hidden]{display:none}
 html.touch-ui.in-control .side{display:none}
-html.touch-ui .powerpad{width:148px;gap:6px}
-html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
 `;
     document.head.appendChild(style);
     meter = document.createElement("div");
     meter.className = "pressure";
     meter.id = "pressure";
     meter.hidden = true;
-    meter.setAttribute("role", "meter");
-    meter.setAttribute("aria-valuemin", "0");
-    meter.setAttribute("aria-valuemax", String(cfg.max));
-    meter.setAttribute("aria-label", "Pressure");
-    meter.innerHTML = `Pressure<div class="bar"><i></i></div>`;
-    meterFill = meter.querySelector("i");
+    meterFill = { style: {} };
     reticle = document.createElement("div");
     reticle.className = "power-reticle";
     reticle.id = "power-reticle";
@@ -1081,59 +1110,33 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     pad.className = "powerpad";
     pad.id = "powerpad";
     pad.hidden = true;
-    [["storm", "Storm"], ["bolt", "Bolt"], ["gust", "Gust"], ["tornado", "Tornado"]].forEach(([name, label]) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.id = "power-" + name;
-      b.textContent = label;
-      b.setAttribute("aria-label", label);
-      pad.appendChild(b);
-      buttons[name] = b;
-    });
-    (document.getElementById("hud-left") || document.body).append(meter);
     document.body.append(reticle, pad);
-    const holdBtn = buttons.storm;
-    holdBtn.addEventListener("pointerdown", (e) => {
-      touchStorm = true;
-      holdBtn.classList.add("held");
-      e.preventDefault();
-    });
-    const holdUp = () => {
-      touchStorm = false;
-      holdBtn.classList.remove("held");
-    };
-    holdBtn.addEventListener("pointerup", holdUp);
-    holdBtn.addEventListener("pointercancel", holdUp);
-    holdBtn.addEventListener("pointerleave", (e) => {
-      if (e.buttons) holdUp();
-    });
-    ["bolt", "gust", "tornado"].forEach((name) => {
-      buttons[name].addEventListener("pointerdown", (e) => {
-        command(name, "touch");
-        e.preventDefault();
-      });
-    });
+  }
+
+  function refuseBar(id) {
+    const why = abil.why(id === "gust" || id === "gale" || id === "tornado" ? "wind" : id === "storm" ? "bolt" : id);
+    if (why === "locked") bar.refuse(line("locked"));
+    else if (why === "energy") bar.refuse(line("dry"));
   }
 
   const bar = startAbilityBar(abil, (id) => {
+    if (id === "bolt" || id === "wind") return; // holds go through onHold
     if (command(id, "touch")) return;
-    const why = abil.why(id); // a refused tap says why on the bar itself (the key path says it in the log)
-    if (why === "locked") bar.refuse(line("locked"));
-    else if (why === "energy") bar.refuse(line("dry"));
+    refuseBar(id);
+  }, {
+    verbs: VERB_IDS,
+    onHold(id, down) {
+      if (id === "bolt") touchBolt = !!down;
+      if (id === "wind") touchWind = !!down;
+    },
   });
 
   function paintMeter() {
     if (!canDom) return;
     const on = mode() === "control";
     bar.paint(on);
-    const g = gauge.now();
-    meter.hidden = !on;
-    meter.setAttribute("aria-valuenow", String(Math.round(g.value)));
-    meterFill.style.width = Math.max(0, Math.min(100, (g.value / g.max) * 100)) + "%";
-    const dry = blocked && age - blocked.at < 0.7;
-    meter.classList.toggle("dry", !!dry || g.value < (cfg.costs.gust || 16));
-    const touch = on && (who().touch || (window.matchMedia && (window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 700)));
-    pad.hidden = !touch;
+    meter.hidden = true;
+    pad.hidden = true;
     if (!on) reticle.hidden = true;
   }
 
@@ -1176,18 +1179,53 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
   /* ---- keys, mouse, gamepad ---- */
   const keyName = {};
   Object.entries(cfg.keys).forEach(([name, k]) => (keyName[String(k).toLowerCase()] = name));
+  // G stays as a Gust alias (brief); map it onto Wind's tap path via keyName "gust".
+  function releaseBolt(via) {
+    if (boltResolved) return;
+    if (boltCharge < (cfg.tapMax || 0.28)) {
+      if (!command("bolt", via)) refuseBar("bolt");
+    }
+    // held past Storm threshold already fired; mid-hold with no Storm = no bolt
+  }
+  function releaseWind(via) {
+    // Exclusive depths (same idea as Lightning): tap Gust, mid hold Gale on release, full charge Tornado while held.
+    if (windResolved === "tornado") return;
+    if (windCharge >= (cfg.windHold || 0.55)) {
+      if (!command("gale", via)) refuseBar("gale");
+      return;
+    }
+    if (!command("gust", via)) refuseBar("gust");
+  }
   window.addEventListener("keydown", (e) => {
     if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
     const name = keyName[(e.key || "").toLowerCase()];
     if (!name || mode() !== "control") return;
-    if (name === "storm") {
-      if (!e.repeat) keyStorm = true;
+    if (name === "bolt") {
+      if (!e.repeat) keyBolt = true;
+    } else if (name === "wind") {
+      if (!e.repeat) keyWind = true;
+    } else if (name === "gust") {
+      if (!e.repeat) command("gust", "key"); // G alias: tap Gust
     } else if (!e.repeat) command(name, "key");
     e.preventDefault();
     e.stopImmediatePropagation();
   }, true);
   window.addEventListener("keyup", (e) => {
-    if (keyName[(e.key || "").toLowerCase()] === "storm") keyStorm = false;
+    const name = keyName[(e.key || "").toLowerCase()];
+    if (name === "bolt" && keyBolt) {
+      keyBolt = false;
+      if (mode() === "control") releaseBolt("key");
+      boltCharge = 0;
+      boltResolved = false;
+      gatherNoted = false;
+    }
+    if (name === "wind" && keyWind) {
+      keyWind = false;
+      if (mode() === "control") releaseWind("key");
+      windCharge = 0;
+      windResolved = "";
+      windGatherNoted = false;
+    }
   }, true);
   window.addEventListener("pointermove", (e) => {
     const canvas = world.engine && world.engine.getRenderingCanvas && world.engine.getRenderingCanvas();
@@ -1198,14 +1236,18 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
   window.addEventListener("pointerdown", (e) => {
     const a = ensureAudio();
     if (a && a.ctx.state === "suspended") a.ctx.resume();
-    if (e.button !== 2 || mode() !== "control") return;
+    if (mode() !== "control") return;
     const canvas = world.engine && world.engine.getRenderingCanvas && world.engine.getRenderingCanvas();
-    if (canvas && e.target !== canvas) return;
+    if (!canvas || e.target !== canvas) return;
+    // A street tap aims the next cast; right-click still throws Lightning.
     pointerAimed = true;
     aimClient = { x: e.clientX, y: e.clientY };
-    command("bolt", "mouse");
-    e.preventDefault();
-    e.stopImmediatePropagation();
+    if (e.button === 2) {
+      command("bolt", "mouse");
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+    // left tap on the street sets aim for the next cast (camera drag still works)
   }, true);
   window.addEventListener("contextmenu", (e) => {
     if (mode() === "control") e.preventDefault();
@@ -1213,7 +1255,8 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
 
   function pollPad() {
     const pads = (navigator.getGamepads && navigator.getGamepads()) || [];
-    let hold = false;
+    let boltHold = false;
+    let windHold = false;
     for (const g of pads) {
       if (!g || !g.connected) continue;
       const pressed = (i) => {
@@ -1226,12 +1269,13 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
         padPrev[g.index + ":" + i] = now;
         return now && !was;
       };
-      if (pressed(3)) hold = true; // Y: hold for the storm
-      if (edge(2)) command("bolt", "gamepad"); // X
-      if (edge(6)) command("gust", "gamepad"); // LT
-      if (edge(7)) command("tornado", "gamepad"); // RT
+      if (pressed(3) || pressed(2)) boltHold = true; // Y or X: hold Lightning → Storm
+      if (pressed(6) || pressed(7)) windHold = true; // LT/RT: hold Wind
+      if (edge(1)) command("rain", "gamepad");
+      if (edge(0)) command("fog", "gamepad");
+      if (edge(9)) command("sunbreak", "gamepad");
     }
-    return hold;
+    return { boltHold, windHold };
   }
 
   /* ---- each frame, after the day and the weather have had the scene ---- */
@@ -1242,41 +1286,91 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     const on = mode() === "control";
     if (on && !wasControl) pointerAimed = false;
     if (!on) {
-      keyStorm = false;
-      touchStorm = false;
+      keyBolt = false;
+      touchBolt = false;
+      padBolt = false;
+      keyWind = false;
+      touchWind = false;
+      padWind = false;
       wantStorm = false;
       localStorm = false;
       cloudTarget = 0;
-      holdResolved = false;
+      boltResolved = false;
+      windResolved = "";
       gatherNoted = false;
+      windGatherNoted = false;
+      boltCharge = 0;
+      windCharge = 0;
+      charge = 0;
     }
     wasControl = on;
     if (on) gauge.step(dt, storming());
 
-    const padHolding = on && pollPad();
-    // F, the Storm button, or a gamepad's Y — any of them holds the call
-    wantStorm = on && (keyStorm || touchStorm || padHolding);
+    const padState = on ? pollPad() : { boltHold: false, windHold: false };
+    const boltDown = on && (keyBolt || touchBolt || padState.boltHold);
+    const windDown = on && (keyWind || touchWind || padState.windHold);
 
-    if (wantStorm) {
-      if (!gatherNoted) {
-        gatherNoted = true;
-        charge = 0;
-        holdResolved = false;
-        note(line("gather"));
+    // Falling edges (touch / gamepad). Keyboard uses keyup.
+    if (on && prevTouchBolt && !touchBolt && !keyBolt && !padState.boltHold) {
+      releaseBolt("touch");
+      boltCharge = 0; boltResolved = false; gatherNoted = false; charge = 0;
+    }
+    if (on && padBolt && !padState.boltHold && !keyBolt && !touchBolt) {
+      releaseBolt("gamepad");
+      boltCharge = 0; boltResolved = false; gatherNoted = false; charge = 0;
+    }
+    if (on && prevTouchWind && !touchWind && !keyWind && !padState.windHold) {
+      releaseWind("touch");
+      windCharge = 0; windResolved = ""; windGatherNoted = false;
+    }
+    if (on && padWind && !padState.windHold && !keyWind && !touchWind) {
+      releaseWind("gamepad");
+      windCharge = 0; windResolved = ""; windGatherNoted = false;
+    }
+    prevTouchBolt = touchBolt;
+    prevTouchWind = touchWind;
+    padBolt = padState.boltHold;
+    padWind = padState.windHold;
+
+    wantStorm = boltDown && !boltResolved && boltCharge >= (cfg.tapMax || 0.28);
+    if (boltDown) {
+      boltCharge += dt;
+      charge = boltCharge;
+      if (boltCharge >= (cfg.tapMax || 0.28)) {
+        if (!gatherNoted) {
+          gatherNoted = true;
+          note(line("gather"));
+        }
+        if (!boltResolved) cloudTarget = Math.max(cloudTarget, 2.2 + 7 * Math.min(1, boltCharge / (cfg.hold || 0.7)));
+        if (!boltResolved && boltCharge >= (cfg.hold || 0.7)) {
+          boltResolved = true;
+          const via = padState.boltHold ? "gamepad" : touchBolt ? "touch" : "key";
+          if (!summon(via)) refuseBar("storm");
+          if (!localStorm) cloudTarget = 0;
+        }
       }
-      charge += dt;
-      if (!holdResolved) cloudTarget = Math.max(cloudTarget, 2.2 + 7 * Math.min(1, charge / (cfg.hold || 0.7)));
-      if (!holdResolved && charge >= (cfg.hold || 0.7)) {
-        holdResolved = true;
-        const via = padHolding ? "gamepad" : touchStorm ? "touch" : "key";
-        summon(via);
-        if (!localStorm) cloudTarget = 0;
+    }
+
+    if (windDown) {
+      windCharge += dt;
+      if (windCharge >= (cfg.tapMax || 0.28)) {
+        if (!windGatherNoted) {
+          windGatherNoted = true;
+          note(line("windGather"));
+        }
+        if (!boltDown && !localStorm) {
+          const full = cfg.windFull || 1.35;
+          cloudTarget = Math.max(cloudTarget, 1.4 + 10 * Math.min(1, windCharge / full));
+        }
+        // Full charge → Tornado only (no Gale tax on the way). Mid-hold Gale fires on release.
+        if (windResolved !== "tornado" && windCharge >= (cfg.windFull || 1.35)) {
+          windResolved = "tornado";
+          const via = padState.windHold ? "gamepad" : touchWind ? "touch" : "key";
+          if (!command("tornado", via)) refuseBar("tornado");
+        }
       }
-    } else {
-      charge = 0;
-      holdResolved = false;
-      gatherNoted = false;
-      if (!localStorm) cloudTarget = 0;
+    } else if (!boltDown && !localStorm) {
+      cloudTarget = 0;
     }
     if (localStorm) cloudTarget = Math.max(cloudTarget, 34);
 
@@ -1481,7 +1575,7 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
   function pose() {
     if (mode() !== "control") return null;
     if (throwFor > 0) return "throw";
-    if (keyStorm || touchStorm || wantStorm || charge > 0 || castFor > 0) return "cast";
+    if (keyBolt || touchBolt || padBolt || keyWind || touchWind || padWind || wantStorm || charge > 0 || windCharge > 0 || castFor > 0) return "cast";
     return null;
   }
 
@@ -1497,7 +1591,7 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
       storming: storming(),
       called: localStorm,
       radius: cloudR,
-      charging: wantStorm && !holdResolved,
+      charging: wantStorm && !boltResolved,
       flash,
       aim: aim ? { x: aim.x, z: aim.z, y: aim.y } : null,
       strike: strike ? Object.assign({}, strike) : null,
@@ -1524,6 +1618,14 @@ html.touch-ui .powerpad button{min-height:44px;padding:11px 4px}
     hitstop(sec) { hitstop = Math.max(hitstop, sec || 0); return hitstop; },
     gate(fn) { gateFn = typeof fn === "function" ? fn : null; return !!gateFn; },
     hold(on) {
+      // Cold-open / tests: hold Lightning (Storm) or release.
+      touchBolt = !!on;
+      if (!on) {
+        boltCharge = 0;
+        boltResolved = false;
+        gatherNoted = false;
+        charge = 0;
+      }
       wantStorm = !!on;
       return wantStorm;
     },

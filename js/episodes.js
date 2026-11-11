@@ -360,6 +360,7 @@ function install() {
 @media (max-width:700px){.ep-btn{display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-size:0.78rem;white-space:nowrap}}
 html.touch-ui .ep-btn{display:inline-flex;align-items:center;justify-content:center;height:44px;min-height:44px;min-width:44px;padding:0 14px;border-radius:999px;font-size:0.78rem;white-space:nowrap}
 .ep-hud{z-index:7;width:min(280px,calc(100vw - 36px));pointer-events:none;font:600 0.78rem/1.35 Outfit,system-ui,sans-serif;color:#e7eef8}
+html.touch-ui .ep-hud{width:min(420px,calc(100vw - 24px))}
 .ep-hud[hidden]{display:none}
 .ep-hud .ep-card{pointer-events:auto;background:rgba(10,14,22,.72);border:1px solid rgba(126,200,255,.35);border-radius:16px;padding:12px 14px;backdrop-filter:blur(14px)}
 .ep-hud h3{margin:0 0 4px;font-size:0.95rem;letter-spacing:.02em}
@@ -866,6 +867,9 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     const A = abil();
     if (!A || !id) return;
     A.unlock(id);
+    // Wind's hold depths and Lightning's Storm share the verb's lock.
+    if (id === "wind") ["gust", "gale", "tornado"].forEach((x) => A.unlock(x));
+    if (id === "bolt") A.unlock("storm");
     const info = A.get(id) || { name: id, key: "" };
     const text = String((run.ep.lines && run.ep.lines.unlock) || "New ability: {name}. Key {key}.")
       .replace("{name}", info.name)
@@ -2000,7 +2004,9 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       // A used ability ("denied" and the world's thunder echo don't count).
       if (d.action !== power || d.action === "denied") return;
       const cur = currentTutorialGoal(active);
-      if (cur && cur.power === power) completeGoal(cur, d.via || "key");
+      const windFamily = { wind: 1, gust: 1, gale: 1, tornado: 1 };
+      const match = cur && (cur.power === power || (cur.power === "wind" && windFamily[power]) || (cur.power === "bolt" && power === "storm"));
+      if (match) completeGoal(cur, d.via || "key");
       return;
     }
     if (d.action === d.power && d.action !== "denied" && active.used) active.used.add(d.power);

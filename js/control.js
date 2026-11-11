@@ -427,9 +427,10 @@ function install() {
   btn.className = "control-btn";
   const hint = document.createElement("p");
   hint.className = "control-hint";
-  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold in the air to glide) · drag to look · hold F for a storm, E lightning, G a gust (and an updraft), T a tornado · 1–7 or hold Q for the weather · Esc to let go";
+  hint.textContent = "WASD or arrows to move · Shift to run · Space to jump (three times, hold in the air to glide) · drag to look · E Lightning (hold for Storm), R Rain, V Wind (tap Gust, hold Gale, full Tornado), C Fog, X Sun · Esc to let go";
   const HINT_KEYS = hint.textContent;
-  const HINT_TOUCH = "Left stick: move · Jump (tap again in the air) · tap Bolt, Rain, Gale, Fog, Sun break, or Storm, Gust, Tornado · drag to look";
+  const HINT_TOUCH = "Left stick: move · Jump · five verbs on the right (Lightning, Rain, Wind, Fog, Sun) · tap the street to aim · drag to look";
+  const HINT_SEEN_KEY = "icanbe.controlHint";
   const pad = document.createElement("div");
   pad.className = "touchpad";
   pad.hidden = true;
@@ -453,7 +454,17 @@ function install() {
     document.documentElement.classList.toggle("touch-ui", touchMode());
     pad.hidden = !(mode === "control" && touchMode());
     hint.textContent = touchMode() ? HINT_TOUCH : HINT_KEYS;
-    hint.hidden = mode !== "control";
+    let hintSeen = false;
+    try { hintSeen = localStorage.getItem(HINT_SEEN_KEY) === "1"; } catch (e) { /* private */ }
+    hint.hidden = mode !== "control" || hintSeen;
+    if (mode === "control" && !hintSeen) {
+      hint.classList.add("hint-once");
+      clearTimeout(hint._fade);
+      hint._fade = setTimeout(() => {
+        hint.classList.add("hint-faded");
+        try { localStorage.setItem(HINT_SEEN_KEY, "1"); } catch (e) { /* private */ }
+      }, 5500);
+    }
   }
   let lastDriving = null;
 

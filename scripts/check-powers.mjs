@@ -4,6 +4,7 @@
 //
 import {
   POWER_NAMES,
+  VERB_IDS,
   createGauge,
   cameraForward,
   inCone,
@@ -11,7 +12,7 @@ import {
   nearestStructure,
   streetCourse,
 } from "../js/powers.js";
-import { createAbilities } from "../js/abilities.js";
+import { createAbilities, VERB_IDS as AB_VERBS } from "../js/abilities.js";
 
 const problems = [];
 const ok = (cond, msg) => {
@@ -19,7 +20,10 @@ const ok = (cond, msg) => {
   return cond;
 };
 
-ok(POWER_NAMES.join(",") === "storm,bolt,gust,tornado,rain,gale,fog,sunbreak", `power names are ${POWER_NAMES.join(",")}`);
+ok(VERB_IDS.join(",") === "bolt,rain,wind,fog,sunbreak", `verb ids are ${VERB_IDS.join(",")}`);
+ok(AB_VERBS.join(",") === VERB_IDS.join(","), "abilities VERB_IDS match powers");
+ok(POWER_NAMES.includes("wind") && POWER_NAMES.includes("storm") && POWER_NAMES.includes("tornado"), `power names include verbs and hold depths: ${POWER_NAMES.join(",")}`);
+ok(VERB_IDS.every((id) => POWER_NAMES.includes(id)), "every verb is in POWER_NAMES");
 
 const g = createGauge({ max: 100, regen: 10, stormRegen: 20, costs: { storm: 40, bolt: 24, gust: 16, tornado: 48 }, start: 0 });
 ok(g.now().value === 0, "gauge starts empty");
