@@ -655,7 +655,11 @@ export function installCityscape(w) {
     props.update(w, lit);
     facadeMats.forEach((m) => m.emissiveColor.set(windows * 1.15, windows * 1.15, windows * 1.15));
     shopMat.emissiveColor.set(shops * 1.1, shops * 1.1, shops * 1.1);
-    skyMat.emissiveColor.set(windows * 1.3, windows * 1.3, windows * 1.3);
+    // by day the far towers get their own fill (the sun and hemisphere light barely reach them, so they were black slabs at noon):
+    // a tint of the horizon colour that fades out as the windows come on, plus the windows' own emissive map at night
+    const fillK = Math.max(0, 1 - windows) * (0.25 + 0.3 * w.day);
+    skyMat.emissiveColor.set(windows * 1.3 + scene.fogColor.r * fillK, windows * 1.3 + scene.fogColor.g * fillK, windows * 1.3 + scene.fogColor.b * fillK);
+    skyMat.ambientColor.set(1.2, 1.25, 1.35);
     headM.emissiveColor.set(lamps * 1.5, lamps * 1.35, lamps * 1.05);
     poolM.emissiveColor.set(lamps * 0.85, lamps * 0.85, lamps * 0.85);
     poolM.alpha = 1;
