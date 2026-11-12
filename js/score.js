@@ -273,6 +273,7 @@ export function startScore(dayApi) {
   let pk = 0;
   let duckUntil = 0;
   let duckK = 1;
+  let usingMix = false; // js/mix.js owns the destination when true
   const live = {
     bed: null,
     target: null,
@@ -324,8 +325,20 @@ export function startScore(dayApi) {
     if (ctx) return ctx;
     if (!window.AudioContext && !window.webkitAudioContext) return null;
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      ctx = new Ctx();
+      // Prefer the shared mix graph (js/mix.js): music/ambience buses → master compressor/limiter.
+      const Mix = (day && day.mix) || window.mix;
+      if (Mix && typeof Mix.ctx === "function") {
+        try { if (typeof Mix.unlock === "function") Mix.unlock(); } catch (e) { /* */ }
+        ctx = Mix.ctx();
+      }
+      if (!ctx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        ctx = new Ctx();
+      }
+      const mixMusic = Mix && typeof Mix.bus === "function" ? Mix.bus("music") : null;
+      const mixAmb = Mix && typeof Mix.bus === "function" ? Mix.bus("ambience") : null;
+      usingMix = !!(mixMusic && mixMusic.bus && mixAmb && mixAmb.bus && Mix.ctx && Mix.ctx() === ctx);
+
       master = ctx.createGain();
       master.gain.value = 0;
       musicBus = ctx.createGain();
@@ -357,25 +370,45 @@ export function startScore(dayApi) {
         fogDelay = null;
         fogWet = null;
       }
-      lim = ctx.createDynamicsCompressor();
-      if (lim.threshold) lim.threshold.value = -6;
-      if (lim.knee) lim.knee.value = 12;
-      if (lim.ratio) lim.ratio.value = 12;
-      if (lim.attack) lim.attack.value = 0.003;
-      if (lim.release) lim.release.value = 0.2;
-      if (tone) {
-        musicBus.connect(tone);
-        tone.connect(fogLp || master);
-      } else musicBus.connect(fogLp || master);
-      ambBus.connect(fogLp || master);
-      if (fogLp) fogLp.connect(master);
-      if (fogDelay && fogWet) {
-        master.connect(fogDelay);
-        fogDelay.connect(fogWet);
-        fogWet.connect(lim);
+      if (usingMix) {
+        // Tone/fog into the shared music & ambience buses; mix owns the master chain + ducking.
+        if (tone) {
+          musicBus.connect(tone);
+          tone.connect(mixMusic.bus);
+        } else musicBus.connect(mixMusic.bus);
+        if (fogLp) {
+          ambBus.connect(fogLp);
+          fogLp.connect(mixAmb.bus);
+        } else ambBus.connect(mixAmb.bus);
+        if (fogDelay && fogWet) {
+          ambBus.connect(fogDelay);
+          fogDelay.connect(fogWet);
+          fogWet.connect(mixAmb.bus);
+        }
+        // Local master stays disconnected: mix owns the destination. Callers that
+        // write master.gain (unlock fade) are no-ops on this dead node when mix is up.
+        lim = null;
+      } else {
+        lim = ctx.createDynamicsCompressor();
+        if (lim.threshold) lim.threshold.value = -6;
+        if (lim.knee) lim.knee.value = 12;
+        if (lim.ratio) lim.ratio.value = 12;
+        if (lim.attack) lim.attack.value = 0.003;
+        if (lim.release) lim.release.value = 0.2;
+        if (tone) {
+          musicBus.connect(tone);
+          tone.connect(fogLp || master);
+        } else musicBus.connect(fogLp || master);
+        ambBus.connect(fogLp || master);
+        if (fogLp) fogLp.connect(master);
+        if (fogDelay && fogWet) {
+          master.connect(fogDelay);
+          fogDelay.connect(fogWet);
+          fogWet.connect(lim);
+        }
+        master.connect(lim);
+        lim.connect(ctx.destination);
       }
-      master.connect(lim);
-      lim.connect(ctx.destination);
     } catch (err) {
       ctx = null;
       return null;
@@ -1063,11 +1096,14 @@ export function startScore(dayApi) {
     }
 
     if (on && ctx.state === "suspended") ctx.resume();
-    setGainSmooth(master, on ? c.mix.master : 0, 0.04);
-    const musicGoal = c.musicVol * duckK * (titleUp ? c.mix.title / Math.max(0.01, c.musicVol) : 1);
+    const masterGoal = on ? c.mix.master : 0;
+    setGainSmooth(master, masterGoal, 0.04);
+    // When mix owns the destination, fold the master level into the bus goals (local master is disconnected).
+    const masterK = usingMix ? masterGoal : 1;
+    const musicGoal = c.musicVol * duckK * masterK * (titleUp ? c.mix.title / Math.max(0.01, c.musicVol) : 1);
     setGainSmooth(musicBus, musicGoal, 0.05);
     setGainSmooth(bedBus, bedGoal, 0.25);
-    setGainSmooth(ambBus, c.ambVol * (titleUp ? 0.5 : 1), 0.05);
+    setGainSmooth(ambBus, c.ambVol * masterK * (titleUp ? 0.5 : 1), 0.05);
 
     const T = ensureTension();
     if (T) {
@@ -1183,11 +1219,15 @@ export function startScore(dayApi) {
   );
 
   // His spoken lines (js/voice.js): the music dips under them for a couple of seconds.
+  // When js/mix.js is up it owns the −8 dB / −4 dB duck on the shared buses — skip the
+  // local duck so we don't stack another −7 dB on top.
   window.addEventListener("day:voice", () => {
+    if (usingMix || (day.mix || window.mix)) return;
     duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + 2600;
   });
   // and under the story's and neighbors' spoken lines (js/dialogue.js)
   window.addEventListener("day:dialogue", () => {
+    if (usingMix || (day.mix || window.mix)) return;
     duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + 3200;
   });
 

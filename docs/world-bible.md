@@ -101,9 +101,13 @@ Definition of done (all required):
 - **Short:** most filler roofs are props-only (no second stair set pieces); no roof garden or water tower climb verb beyond parkour.
 - **Build:** AC fans spin with wind (code); one extra traverse prop between shop and annex roofs after queue 1.
 
+### Acoustics (the ear knows where he is)
+- **In (`js/mix.js`, `js/mix-core.js`):** six convolution reverb zones — open rooftop, street canyon, plaza, apartment interior, car cabin, office — synthesised IRs (no GPU), crossfaded over 0.5 s as he moves. Buses: music, ambience, sfx, voice, UI → makeup → compressor → limiter (~−16 LUFS). World sources: HRTF + inverse distance on high; stereo pan on low/phone. A building between source and camera low-passes (~1.1 kHz, −6 dB), one raycast per active source, throttled. Voice ducks music −8 dB and ambience −4 dB (150 ms attack). Settings: Music / Effects / Voice sliders (`icanbe.mix`). `day.audio.info()` / playtest `audio-mix`.
+- **Heard as:** the avenue rings; the apt and car stay dry and close; every voiced line cuts through the beds.
+
 ### Main Avenue Commute
 - **Mood:** the day's artery. Morning clear drive; evening can be his own storm's debris.
-- **Look / sound:** asphalt 0.04, lane dashes, crosswalks, signals on a 36 s cycle; cars in two lanes; people on SIDE 3.5 m graphs. Score beds crossfade with weather; rain ambience; far siren at night.
+- **Look / sound:** asphalt 0.04, lane dashes, crosswalks, signals on a 36 s cycle; cars in two lanes; people on SIDE 3.5 m graphs. Score beds crossfade with weather; rain ambience; far siren at night; street-canyon reverb while on foot, car-cabin dry when driving.
 - **Size:** avenues z 12.6 / −34 / 76 from x −48..210; crosses at x −42, 36, 100, 168.
 - **In / out:** his car on the day spine; on foot under control anywhere; Hurricane drive west from lot to parkHome.
 - **In:** crowd + cars, signals, weather reactions, four hurricane closures, lunch street clear (Nell, Ravi).

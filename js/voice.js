@@ -269,9 +269,24 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
           playing = null;
           playPri = 0;
           live.playing = false;
+          emit({ action: "end", id: line.id, group: line.group });
           drainPilot();
         }
       });
+      // Route Small Weather's clips into the shared voice bus when the mix is up.
+      try {
+        const Mix = mixApi();
+        if (Mix && typeof Mix.ctx === "function" && !a.__voiceBus) {
+          if (typeof Mix.unlock === "function") Mix.unlock();
+          audioCtx = Mix.ctx() || audioCtx;
+          if (audioCtx) {
+            const src = audioCtx.createMediaElementSource(a);
+            const voiceBus = Mix.bus && Mix.bus("voice");
+            src.connect((voiceBus && voiceBus.bus) || audioCtx.destination);
+            a.__voiceBus = true;
+          }
+        }
+      } catch (err) { /* plain element playback */ }
       audioEls[line.file] = a;
     }
     a.volume = cfg().volume;
@@ -281,6 +296,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
   }
 
   function stopCurrent() {
+    const was = playing;
     if (playing && playing.el) {
       try {
         playing.el.pause();
@@ -291,6 +307,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     playing = null;
     playPri = 0;
     live.playing = false;
+    if (was) emit({ action: "end", id: was.id, group: was.group });
     if (day.pilot && day.pilot.pulse) day.pilot.pulse(false);
   }
 
@@ -422,6 +439,9 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
    * Returns { id, file, secs } (file null when no clip is in the build or Sound is off: the caption still shows).
    */
   let audioCtx = null;
+  function mixApi() {
+    return day.mix || window.mix || day.audio || null;
+  }
   function placeVoice(el, opts) {
     const w = day.world && day.world();
     const cam = w && w.scene && w.scene.activeCamera;
@@ -437,13 +457,38 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     }
     el.volume = Math.min(1, cfg().volume * gain);
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC && !el.__pan) {
-        audioCtx = audioCtx || new AC();
-        const src = audioCtx.createMediaElementSource(el);
-        const sp = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
-        if (sp) { src.connect(sp); sp.connect(audioCtx.destination); } else src.connect(audioCtx.destination);
-        el.__pan = sp || true;
+      const Mix = mixApi();
+      if (Mix && typeof Mix.ctx === "function" && !el.__pan) {
+        try { if (typeof Mix.unlock === "function") Mix.unlock(); } catch (e) { /* */ }
+        audioCtx = Mix.ctx() || audioCtx;
+        if (audioCtx) {
+          const src = audioCtx.createMediaElementSource(el);
+          const sp = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+          const voiceBus = Mix.bus && Mix.bus("voice");
+          const dest = (voiceBus && voiceBus.bus) || audioCtx.destination;
+          if (sp) { src.connect(sp); sp.connect(dest); } else src.connect(dest);
+          el.__pan = sp || true;
+          // Positional neighbor lines also get HRTF/occlusion when mix.place is there.
+          if (opts.x != null && Mix.place) {
+            try {
+              const world = Mix.place(opts.x, 1.5, opts.z, { bus: "voice" });
+              if (world && world.input) {
+                if (sp) { try { sp.disconnect(); sp.connect(world.input); } catch (e) { /* */ } }
+                else { try { src.disconnect(); src.connect(world.input); } catch (e) { /* */ } }
+                el.__world = world;
+              }
+            } catch (e) { /* */ }
+          }
+        }
+      } else if (!el.__pan) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          audioCtx = audioCtx || new AC();
+          const src = audioCtx.createMediaElementSource(el);
+          const sp = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+          if (sp) { src.connect(sp); sp.connect(audioCtx.destination); } else src.connect(audioCtx.destination);
+          el.__pan = sp || true;
+        }
       }
       if (el.__pan && el.__pan.pan) el.__pan.pan.value = pan;
     } catch (err) {
@@ -640,10 +685,15 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
   }
   function wireRadio(el, radio) {
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      audioCtxPilot = audioCtxPilot || new AC();
       if (el.__radio) return;
+      const Mix = mixApi();
+      if (Mix && typeof Mix.ctx === "function") {
+        try { if (typeof Mix.unlock === "function") Mix.unlock(); } catch (e) { /* */ }
+        audioCtxPilot = Mix.ctx() || audioCtxPilot;
+      }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!audioCtxPilot && AC) audioCtxPilot = new AC();
+      if (!audioCtxPilot) return;
       const src = audioCtxPilot.createMediaElementSource(el);
       const hp = audioCtxPilot.createBiquadFilter();
       hp.type = "highpass";
@@ -656,7 +706,8 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
       src.connect(hp);
       hp.connect(lp);
       lp.connect(g);
-      g.connect(audioCtxPilot.destination);
+      const voiceBus = Mix && Mix.bus && Mix.bus("voice");
+      g.connect((voiceBus && voiceBus.bus) || audioCtxPilot.destination);
       el.__radio = { hp, lp, g };
     } catch (err) {
       /* no web audio: plain playback */
