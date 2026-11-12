@@ -227,6 +227,7 @@ export function startRain(world, dayApi) {
     made: { ripples: 0, splashes: 0 }, kinds: { ground: 0, roof: 0, puddle: 0, car: 0, umbrella: 0, shoulder: 0 },
     lens: { drops: [], spawned: 0, cleared: 0, w: 0, h: 0, ctx: null, el: null, facing: 0 },
     fogMul: 1, windowOn: false, curtainsShown: 0, awnings: [], awnT: -1, edgeT: 0, edges: [], puddleT: -9, puddleRects: [], windT: 0,
+    afterLeft: 0, // Sun-break aftermath: gutters keep dripping after the rain stops (js/aftermath.js)
   };
 
   /* ---- materials: a soft ring, a dot, and the rain's streaky curtain ---- */
@@ -520,6 +521,8 @@ if (wrAmt > 0.02) {
     const f = focus();
     const indoors = !!(f && world.indoorsAt && world.indoorsAt(f.x, f.z));
     const active = rain > 0.06 && !indoors && !!f;
+    if (st.afterLeft > 0) st.afterLeft = Math.max(0, st.afterLeft - dt);
+    const dripping = (active || st.afterLeft > 0) && !indoors && !!f;
 
     /* height fog: heavy rain closes the avenue in */
     const boost = active ? fogBoost(rain, st.wind) : 1;
@@ -551,7 +554,7 @@ if (wrAmt > 0.02) {
       if (c.mesh.material.alpha > 0.04) st.curtainsShown++;
     });
 
-    /* hits: ripples, crowns, drips */
+    /* hits: ripples, crowns, drips (after-drip keeps gutters going through a Sun-break clearing) */
     if (st.edgeT <= 0) { st.edgeT = 20; refreshSources(); }
     st.edgeT -= dt;
     if (active) {
@@ -563,13 +566,20 @@ if (wrAmt > 0.02) {
       const dn = Math.floor(st.dripAcc);
       st.dripAcc -= dn;
       if (dn > 0) spawnDrips(dn, f);
+    } else if (dripping) {
+      st.spawnAcc = 0;
+      const afterK = Math.min(1, st.afterLeft / 12);
+      st.dripAcc += (q.drips * 0.45 * afterK) * dt;
+      const dn = Math.floor(st.dripAcc);
+      st.dripAcc -= dn;
+      if (dn > 0) spawnDrips(dn, f);
     } else { st.spawnAcc = 0; st.dripAcc = 0; }
 
     for (let i = st.drips.length - 1; i >= 0; i--) {
       const d = st.drips[i];
       d.v += 9.8 * dt;
       d.y -= d.v * dt;
-      if (d.y <= d.ground || !active) { if (active) addHit(d.x, d.ground, d.z, "ground", false); st.drips.splice(i, 1); }
+      if (d.y <= d.ground || !dripping) { if (dripping) addHit(d.x, d.ground, d.z, "ground", false); st.drips.splice(i, 1); }
     }
     for (let i = st.hits.length - 1; i >= 0; i--) {
       const h = st.hits[i];
@@ -631,12 +641,18 @@ if (wrAmt > 0.02) {
         curtains: st.curtainsShown,
         curtainCount: curtains.length,
         drips: st.drips.length,
+        afterLeft: Math.round(st.afterLeft * 100) / 100,
         lens: { enabled: !lowQ(), drops: L.drops.length, sliding: L.drops.filter((d) => d.sliding).length, spawned: L.spawned, cleared: L.cleared, facing: L.facing },
         window: { shader: wr.ok, materials: wr.hooked, amt: Math.round(wr.amt * 100) / 100 },
         fog: { mul: Math.round(st.fogMul * 100) / 100, density: scene.fogDensity, visibilityM: Math.round(visibilityM(scene.fogDensity)) },
         streaks: { cap: streakBudget(lowQ() ? "low" : "high"), alive: ps ? Math.round(ps.emitRate * ((ps.minLifeTime + ps.maxLifeTime) / 2)) : 0, gpu: !!(ps && ps.__gpu) },
         error: st.err || null,
       };
+    },
+    /** Keep gutters and awnings dripping for `sec` real seconds after the rain stops (Sun-break aftermath). */
+    afterDrip(sec) {
+      st.afterLeft = Math.max(st.afterLeft, Math.max(0, sec == null ? 30 : sec));
+      if (st.edgeT > 2) st.edgeT = 0; // refresh awning / gutter sources soon
     },
     heightAt: (x, z) => hmap.at(x, z),
     budget,

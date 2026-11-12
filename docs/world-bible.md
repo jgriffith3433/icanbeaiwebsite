@@ -374,3 +374,12 @@ The episodes are one arc of five chapters. Each chapter has a line (what he want
 ## The painted sky (js/sky.js, config `sky`)
 
 The sky is a painted, moving thing: dawn peach at 6:30, a bright cumulus noon, a golden-hour sun low in the west, an amber-and-navy dusk, and a starry night with the moon to the right of the default view. Weather is the drama: a Storm or Lightning thickens and darkens the cloud deck and brings in the storm shelf cloud; every strike lights the deck from inside; Sun break tears a ragged gap with a sun in it and god rays through it (high quality), and the glass and wet streets reflect whichever sky is up. No new characters or areas; Small Weather's line "Sky's mine for a minute." is the beat this serves.
+
+## Sun-break aftermath (js/aftermath.js, config `aftermath`)
+
+- **Areas:** the whole district under an open sky — roofs, asphalt, car bonnets, gutters, awnings, the apt/shop/annex roofs where pigeons land.
+- **Landmarks:** the rainbow arc opposite the sun at 42° (shader ribbon; always on, including phone), steam wisps off wet surfaces, dripping gutters after the rain stops.
+- **Who lives here:** the crowd (umbrellas fold, a few shop doors open), bandstand pigeons that relocate to a roof, Dex Moreno when he is near (his existing dry-parcels thanks).
+- **Characters:** Dex — Want: dry parcels; Moment: Sun break after rain, he says "Dry as a bone. I owe you a delivery." if he is within ~28 m (no new line).
+- **What happens:** Rain or a storm marks the game clock; a Sun break within 2 game minutes fires the aftermath — steam ~20 s, rainbow ~28 s (fades with cloud cover), drips ~30 s (js/rain.js `afterDrip`), puddle sparkles, birds home, umbrellas close, shop owners step out; the render grade already warms from `weather.now().sun`. Phone: half steam and drip counts; rainbow stays. Playtest: `sun-aftermath`.
+- **Story beats:** clearing a storm feels like a reward — told by steam, the rainbow, dripping gutters, umbrellas folding and Dex's voice, not a text card.

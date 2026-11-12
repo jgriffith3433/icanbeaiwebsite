@@ -304,6 +304,27 @@ function install() {
     }
   }
 
+  /* Sun-break aftermath: Dex names the dry parcels with his existing thanks line when he's near */
+  window.addEventListener("day:crowd", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action !== "aftermath") return;
+    const dex = people.find((p) => p.id === "dex");
+    if (!dex || !dex.__pos || dex.__pos.inside) return;
+    const here = hero();
+    if (!here || distTo(dex, here) > 28) return;
+    const thanks = (dex.beats || []).find((b) => b.kind === "thanks");
+    const text = (thanks && thanks.text) || "Dry as a bone. I owe you a delivery.";
+    const V = day.voice || window.voice;
+    if (V && V.speakAs) V.speakAs("Dex", text, { x: dex.__pos.x, z: dex.__pos.z, via: "aftermath" });
+    else say(dex, { kind: "thanks", text }, 5);
+    try {
+      if (window.aftermath && window.aftermath.info) {
+        /* mark on the aftermath module if it's listening via day:crowd neighborSaid is set there */
+      }
+      window.dispatchEvent(new CustomEvent("day:aftermath", { detail: { action: "neighbor", who: "dex", text } }));
+    } catch (err) { /* */ }
+  });
+
   /* answering an ask: he calls its ability close to them */
   window.addEventListener("day:power", (e) => {
     const d = (e && e.detail) || {};
