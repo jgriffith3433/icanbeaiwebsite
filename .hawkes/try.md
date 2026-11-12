@@ -1,0 +1,1 @@
+Open the page with Sound on, press Take control (hear Pilot's take-over line), cast something (e.g. Lightning), then Let go: Pilot names what you did. Cause chaos for a worried line. Watch the wrist ring pulse and the one Pilot caption line. Scenario: pilot.
