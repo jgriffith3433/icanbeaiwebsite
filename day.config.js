@@ -1428,17 +1428,17 @@ window.DAY_CONFIG = {
         title: "Learn the weather",
         tagline: "Lightning, Rain, Wind, Fog and Sun, one at a time.",
         goals: [
-          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Tap E for Lightning. Hold E to call a Storm." },
-          { id: "rain", kind: "ability", power: "rain", label: "Call Rain", prompt: "Press R. Rain, just here, just for a moment.", after: "bolt" },
-          { id: "wind", kind: "ability", power: "wind", label: "Call Wind", prompt: "Tap V for a Gust. Hold V for a Gale; hold longer for a Tornado.", after: "rain" },
-          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Press C. Fog rolls in off the street.", after: "wind" },
-          { id: "sunbreak", kind: "ability", power: "sunbreak", label: "Break the Sun through", prompt: "Press X. The clouds split.", after: "fog" },
+          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Tap Lightning. Hold to call a Storm." },
+          { id: "rain", kind: "ability", power: "rain", label: "Call Rain", prompt: "Tap Rain. Just here, just for a moment.", after: "bolt" },
+          { id: "wind", kind: "ability", power: "wind", label: "Call Wind", prompt: "Tap Wind for a Gust. Hold for a Gale; hold longer for a Tornado.", after: "rain" },
+          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Tap Fog. It rolls in off the street.", after: "wind" },
+          { id: "sunbreak", kind: "ability", power: "sunbreak", label: "Break the Sun through", prompt: "Tap Sun. The clouds split.", after: "fog" },
         ],
         lines: {
           start: "Five verbs. He learns them one at a time.",
           done: "That's all five. The sky is his.",
           skip: "Skipped. Every ability is open.",
-          unlock: "New ability: {name}. Key {key}.",
+          unlock: "New ability: {name}.",
         },
       },
       {
@@ -1597,9 +1597,9 @@ window.DAY_CONFIG = {
           },
         ],
         goals: [
-          { id: "shelter", kind: "help", piece: "shelter", count: 3, label: "Shelter the plaza: Sun near each" },
-          { id: "rescue", kind: "help", piece: "rescue", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop" },
-          { id: "street", kind: "help", piece: "street", count: 2, after: "rescue", label: "Clear the street: Wind near each" },
+          { id: "shelter", kind: "help", piece: "shelter", power: "sunbreak", count: 3, label: "Shelter the plaza: Sun near each" },
+          { id: "rescue", kind: "help", piece: "rescue", power: "bolt", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop" },
+          { id: "street", kind: "help", piece: "street", power: "wind", count: 2, after: "rescue", label: "Clear the street: Wind near each" },
         ],
         lines: {
           start: "Lunch break. A storm nobody called.",
@@ -1802,10 +1802,10 @@ window.DAY_CONFIG = {
           },
         ],
         goals: [
-          { id: "debris", kind: "help", piece: "debris", count: 2, label: "Clear the road: Wind near each" },
-          { id: "underpass", kind: "help", piece: "underpass", count: 2, after: "debris", label: "Drain the underpass: Sun near each" },
-          { id: "bus", kind: "help", piece: "bus", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it" },
-          { id: "bridge", kind: "help", piece: "bridge", count: 2, after: "bus", label: "Hold the bridge open: Fog near each" },
+          { id: "debris", kind: "help", piece: "debris", power: "wind", count: 2, label: "Clear the road: Wind near each" },
+          { id: "underpass", kind: "help", piece: "underpass", power: "sunbreak", count: 2, after: "debris", label: "Drain the underpass: Sun near each" },
+          { id: "bus", kind: "help", piece: "bus", power: "bolt", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it" },
+          { id: "bridge", kind: "help", piece: "bridge", power: "fog", count: 2, after: "bus", label: "Hold the bridge open: Fog near each" },
           { id: "home", kind: "reach", spot: "parkHome", r: 8, after: "bridge", label: "Get home" },
         ],
         lines: {

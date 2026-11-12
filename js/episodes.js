@@ -368,7 +368,9 @@ html.touch-ui .ep-btn{display:inline-flex;align-items:center;justify-content:cen
 html.touch-ui .ep-hud{width:min(420px,calc(100vw - 24px))}
 .ep-hud[hidden]{display:none}
 .ep-hud .ep-card{pointer-events:auto;background:rgba(10,14,22,.72);border:1px solid rgba(126,200,255,.35);border-radius:16px;padding:12px 14px;backdrop-filter:blur(14px)}
-.ep-hud h3{margin:0 0 4px;font-size:0.95rem;letter-spacing:.02em}
+.ep-hud li .g-ico{flex:0 0 22px;width:22px;height:22px;margin-top:1px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(126,200,255,.45))}
+.ep-hud .prompt .g-ico{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
+.ep-hud h3{margin:0 0 4px;font-size:0.95rem;letter-spacing:.02em;font-family:Fraunces,Georgia,serif}
 .ep-hud .tag{margin:0 0 8px;color:rgba(231,238,248,.7);font-weight:500}
 .ep-hud ul{margin:0;padding:0;list-style:none}
 .ep-hud li{display:flex;gap:8px;align-items:flex-start;margin:4px 0;color:rgba(231,238,248,.88)}
@@ -395,7 +397,8 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
 .ep-hud .rankline b{font-size:1.15rem;color:#f6f1e8}
 .ep-hud .pieceline{margin-top:6px;color:#9fd4ff}
 .ep-hud .pieceline.late{color:#e58a7a}
-.ep-panel .rank{margin:6px 0 0;font:800 4rem/1 Outfit,system-ui,sans-serif;letter-spacing:.02em;color:#f0c27a}
+.ep-panel .rank{margin:6px 0 0;font:800 4rem/1 Outfit,system-ui,sans-serif;letter-spacing:.02em;color:#f0c27a;text-align:center}
+.ep-panel .rank .ui-rank-img{display:block;width:72px;height:72px;margin:0 auto 2px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(126,200,255,.35))}
 .ep-panel .rank.r-S{color:#ffe08a;text-shadow:0 0 22px rgba(255,224,138,.6)}.ep-panel .rank.r-A{color:#8dceb0}.ep-panel .rank.r-B{color:#9fd4ff}.ep-panel .rank.r-C{color:#e58a7a}
 .ep-panel .rankdetail{font-size:.9rem;color:rgba(246,241,232,.75);margin:2px 0 8px}
 .ep-say{z-index:22;transform:translate(-50%,8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:min(520px,calc(100vw - 28px));padding:10px 16px;border-radius:14px;background:#f6f1e8;color:#1a1c22;font:600 0.9rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.45)}
@@ -426,7 +429,8 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
 .ep-panel .nextline{margin:8px 0 0;font-size:.82rem;color:rgba(246,241,232,.55)}
 .ep-panel button[disabled]{opacity:.45;cursor:default}
 .ep-menu .ep-row.locked{opacity:.5;cursor:default}
-.ep-menu .ep-row .rk{display:inline-block;min-width:1.2em;margin-right:6px;font-weight:800;color:#f0c27a}
+.ep-menu .ep-row .rk{display:inline-block;min-width:1.2em;margin-right:6px;font-weight:800;color:#f0c27a;vertical-align:-2px}
+.ep-menu .ep-row .rk.ui-rank-inline{width:1.35em;height:1.35em;min-width:1.35em;background:center/contain no-repeat var(--ui-rank);color:transparent;text-shadow:none;overflow:hidden}
 .ep-menu .ep-list{max-height:min(60vh,520px);overflow:auto}
 .ep-panel .unlockline{margin:6px 0 0;font-size:.9rem;color:#9fd4ff;font-weight:700}
 .ep-menu .ep-row.chal{padding-left:24px;border-style:dashed}
@@ -925,14 +929,24 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     hudTitle.textContent = active.ep.title;
     hudTag.textContent = active.ep.tagline || "";
     hudList.innerHTML = "";
+    const art = window.uiArt || (window.day && window.day.uiArt);
     active.goals.forEach((g) => {
       const li = document.createElement("li");
       if (g.done) li.className = "done";
       else if (g.failed) li.className = "failed";
       const markEl = document.createElement("i");
       markEl.textContent = g.done ? "✓" : g.failed ? "✗" : "·";
+      const verb = art && art.goalVerb ? art.goalVerb(g, active.ep.pieces) : (g.power || null);
+      if (verb && art && art.verbIcon) {
+        const ico = document.createElement("img");
+        ico.className = "g-ico";
+        ico.alt = "";
+        ico.src = art.verbIcon(verb, !g.done && !g.failed);
+        li.appendChild(ico);
+      }
       const label = document.createElement("span");
       let text = g.label || g.id;
+      if (art && art.stripKeyLetters) text = art.stripKeyLetters(text);
       if ((g.kind === "ability-in" && g.count > 1) || g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris" || g.kind === "help" || g.kind === "show-hits" || g.kind === "show-variety") {
         const need = g.count | 0;
         const have = Math.min(need, g.progress | 0);
@@ -975,7 +989,20 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (active.ep.tutorial) hudRank.hidden = true;
     const cur = active.ep.tutorial ? currentTutorialGoal(active) : null;
     hudPrompt.hidden = !cur;
-    hudPrompt.textContent = cur ? cur.prompt || "" : "";
+    if (cur) {
+      const artP = window.uiArt || (window.day && window.day.uiArt);
+      const prompt = artP && artP.stripKeyLetters ? artP.stripKeyLetters(cur.prompt || "") : (cur.prompt || "");
+      const verbP = artP && artP.goalVerb ? artP.goalVerb(cur, active.ep.pieces) : (cur.power || null);
+      hudPrompt.textContent = "";
+      if (verbP && artP && artP.verbIcon) {
+        const ico = document.createElement("img");
+        ico.className = "g-ico";
+        ico.alt = "";
+        ico.src = artP.verbIcon(verbP, true);
+        hudPrompt.appendChild(ico);
+      }
+      hudPrompt.appendChild(document.createTextNode(prompt));
+    } else hudPrompt.textContent = "";
     hudSkip.hidden = !active.ep.tutorial;
     if (active.show) paintCue();
     else if (active.ep.cue) {
@@ -1849,6 +1876,10 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     scoreRank.hidden = false;
     scoreRank.textContent = card.rank;
     scoreRank.className = "rank r-" + card.rank;
+    try {
+      const artR = window.uiArt || (window.day && window.day.uiArt);
+      if (artR && artR.applyRank && card.rank) artR.applyRank(scoreRank, card.rank);
+    } catch (e) { /* */ }
     scoreRankDetail.hidden = false;
     {
       const R = run.rescue;
@@ -2042,9 +2073,15 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       const lock = ep.tutorial ? null : episodeLock(list, best, ep.id);
       btn.dataset.locked = lock ? "1" : "0";
       btn.dataset.rank = b && b.rank ? b.rank : "";
+      const artM = window.uiArt || (window.day && window.day.uiArt);
+      const rk = b && b.rank
+        ? (artM && artM.rankStamp
+          ? `<span class="rk ui-rank-inline" style="--ui-rank:url('${artM.rankStamp(b.rank)}')" title="${b.rank}">${b.rank}</span>`
+          : `<span class="rk">${b.rank}</span>`)
+        : "";
       btn.innerHTML = lock
         ? `<strong>${ep.title}</strong><small>Locked · finish ${lock} first</small>`
-        : `<strong>${b && b.rank ? `<span class="rk">${b.rank}</span>` : ""}${ep.title}</strong><small>${ep.tagline || ""}${b ? ` · ${L.best} ${b.rank ? "rank " + b.rank + " · " : ""}${b.pct}%${episodeDone(best, ep.id) ? " · finished" : ""}` : ""}</small>`;
+        : `<strong>${rk}${ep.title}</strong><small>${ep.tagline || ""}${b ? ` · ${L.best} ${b.rank ? "rank " + b.rank + " · " : ""}${b.pct}%${episodeDone(best, ep.id) ? " · finished" : ""}` : ""}</small>`;
       if (lock) {
         btn.disabled = true;
         btn.classList.add("locked");

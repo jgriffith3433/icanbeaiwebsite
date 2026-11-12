@@ -117,6 +117,7 @@ function install() {
 .nb-panel h3{margin:0 0 8px;font-size:0.95rem}
 .nb-panel .row{display:flex;gap:8px;align-items:center;margin:6px 0}
 .nb-panel .dot{flex:0 0 12px;height:12px;border-radius:50%}
+.nb-panel .bust{flex:0 0 36px;width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid rgba(240,194,122,.45)}
 .nb-panel .row small{display:block;color:rgba(231,238,248,.62);font-weight:500}
 .nb-panel .stars{margin-left:auto;color:#f0c27a;letter-spacing:1px}
 .nb-panel .tally{margin-top:8px;color:#f0c27a}
@@ -352,11 +353,16 @@ function install() {
   };
   function renderPanel() {
     const here = hero();
+    const art = window.uiArt || (window.day && window.day.uiArt);
     panel.innerHTML = `<h3>${L.title || "Your neighbors"}</h3>` + people.map((p) => {
       const d = distTo(p, here);
       const where = p.__pos.inside ? `${L.inside || "at home"}: ${p.home}` : here ? `${Math.round(d)} m ${compass(p.__pos.x - here.x, p.__pos.z - here.z)}` : p.home;
-      return `<div class="row"><span class="dot" style="background:${p.color}"></span><div>${p.name}<small>${p.role} · ${where}</small></div><span class="stars">${stars(p)}</span></div>`;
+      const face = art && art.bust
+        ? `<img class="bust" alt="" src="${art.bust(p.id || p.name)}"/>`
+        : `<span class="dot" style="background:${p.color}"></span>`;
+      return `<div class="row">${face}<div>${p.name}<small>${p.role} · ${where}</small></div><span class="stars">${stars(p)}</span></div>`;
     }).join("") + `<div class="tally">${L.score || "Good neighbor"}: ${total}</div>`;
+    if (art && art.applyFrame) art.applyFrame(panel);
   }
 
   /* ---- per frame ---- */
