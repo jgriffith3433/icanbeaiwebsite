@@ -93,7 +93,7 @@ Definition of done (all required):
 
 ### The Roofs
 - **Mood:** his playground. Stairs on apt, shop, annex; AC units, tanks, vents, antennas; lightning coils on his arms while the player steers.
-- **Look / sound:** rooftop props and distinct surface zones (gravel ballast bed, metal grating and AC decks, dark tar membrane seams, and a wet roof-drain puddle basin with gutter pipe); layered weather soundscape (light rain patter on roofs vs heavy downpour, gurgling roof gutters, rain drumming on umbrellas below, 3D-panned wind gusts and flapping canvas awnings, rolling thunder delayed by strike distance vs close cracks, sunlit rooftop birds and brightened city hum, and snow-muffled street tone); Small Weather's footsteps change across gravel, metal, tar, and splash in puddles; storm gather over him on hold F; bolt crack and scorch; updraft float; camera orbit with wall pull-in.
+- **Look / sound:** rooftop props and distinct surface zones (gravel ballast bed, metal grating and AC decks, dark tar membrane seams, and a wet roof-drain puddle basin with gutter pipe); layered weather soundscape (light rain patter on roofs vs heavy downpour, gurgling roof gutters, rain drumming on umbrellas below, 3D-panned wind gusts and flapping canvas awnings, layered lightning crack/body/rumble with thunder delayed at 343 m/s — within 30 m with the flash — sunlit rooftop birds and brightened city hum, and snow-muffled street tone); Small Weather's footsteps change across gravel, metal, tar, and splash in puddles; storm gather over him on hold F; bolt crack and scorch; updraft float; camera orbit with wall pull-in.
 - **Rain (js/rain.js):** a Rain cast is heavy and wet: velocity-stretched streaks leaning with the wind, a ring and a crown of droplets where each drop lands (roofs, car roofs, umbrellas, puddles, his shoulders), runnels down the facade windows, drips off gutters and awnings, three curtains of rain sweeping the skyline under the cloud deck, drops that bead and slide on the camera when it looks level or up (not on a phone), and a thicker fog so the far avenue goes soft. The existing rain sound (hiss, roof patter) is untouched.
 - **Size:** three stair roofs plus filler rooftops with units; ramps and parapets.
 - **In / out:** north-face stairs; jump/float between; can't Take control while driving.
@@ -264,7 +264,7 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 ### The Roofs
 - **Interactions:** full power set; parkour; walk across gravel, metal grates, tar seams and puddle drain basins (surface footsteps and splashes); lunch Hollis; Part 2 gale; smoke bolt.
 - **On their own:** AC fans spin with wind (Build); antennas; roof gutters trickle when wet; crowd below.
-- **Ambient:** layered weather soundscape (roof rain patter vs heavy downpour, gutters, umbrella patter below, 3D-panned wind gusts, flapping awnings, distance-delayed thunder, sunlit birds, muffled snow city), ability whoosh/crack.
+- **Ambient:** layered weather soundscape (roof rain patter vs heavy downpour, gutters, umbrella patter below, 3D-panned wind gusts, flapping awnings, distance-delayed thunder at 343 m/s with layered crack/body/rumble variants, sunlit birds, muffled snow city), ability whoosh/gale loop, tornado roar+debris+pressure by proximity, fog world-bus hush, sun-break shimmer.
 - **Over time:** dusk→night bloom; wet sheen only on ability weather.
 - **Short:** more traverse routes between the three stairs.
 

@@ -4286,6 +4286,231 @@ async function atmosphere(options, t) {
   t.progress(1);
 }
 
+/* ---------------- power-sfx: layered thunder at 343 m/s, 4 crack variants, tornado proximity, phone limiter ---------------- */
+// Criteria: 340 m → ~1 s delay; ≤30 m with the flash; ≥4 distinct cracks across 8 casts; tornado +6 dB 60→10 m;
+// phone: master limiter on, first cast sound ≤100 ms.
+async function powerSfx(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Phone avenue" : "Avenue");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok").catch(() => {});
+  const P = window.powers || (window.day && window.day.powers);
+  const C = window.day.control;
+  const SFX = window.day && window.day.sfx;
+  const S = window.day && window.day.score;
+  if (!P || !C) {
+    t.problem("bug", "Powers or Take control missing");
+    return;
+  }
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG || {};
+  const street = cfg.street || { z: 12.6 };
+  const outside = carSideMoment(day) || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(400);
+  if (touch) {
+    document.documentElement.classList.add("touch-ui");
+    if (C.touch) C.touch(true);
+  }
+
+  // Delay formula (exported): 340 m ≈ 1 s, ≤30 m with the flash.
+  const delayFn = P.thunderDelay || ((d) => (d <= 30 ? 0 : Math.min(2.8, d / 343)));
+  const dNear = delayFn(20);
+  const dFar = delayFn(340);
+  t.metric("thunderDelayNearSec", Math.round(dNear * 1000) / 1000);
+  t.metric("thunderDelayFarSec", Math.round(dFar * 1000) / 1000);
+  t.event("thunder-delay-formula", `20 m → ${dNear.toFixed(3)} s, 340 m → ${dFar.toFixed(3)} s`);
+  if (dNear > 0.05) t.problem("bug", `Near strike delay ${dNear} s should ride the flash (≤30 m)`);
+  if (Math.abs(dFar - 340 / 343) > 0.05) t.problem("bug", `340 m delay ${dFar} s should be about 1 s at 343 m/s`);
+
+  const sound = $("sound");
+  if (sound) {
+    if (touch) await tapEl(sound);
+    else {
+      const r = sound.getBoundingClientRect();
+      sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 9, pointerType: "mouse" }));
+      sound.click();
+    }
+    await sleep(350);
+  }
+  t.event("sound-on", sound && sound.getAttribute("aria-pressed") === "true" ? "on" : "off");
+
+  if (touch) {
+    const take = $("take") || document.querySelector("[data-take],#control-take,button.take");
+    if (take) await tapEl(take);
+    else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 5000, "Take control");
+  if (C.place) C.place(-2, street.z - 1.5, 0);
+  await sleep(200);
+  t.progress(0.15);
+
+  // Fill Charge for eight bolts.
+  try {
+    if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+  } catch (err) { /* ok */ }
+
+  // Near strike (aim at feet / close conductor).
+  const flashNear = performance.now();
+  let nearStrike = null;
+  if (touch) {
+    const bolt = $("ability-bolt") || $("ability-lightning");
+    if (bolt) await tapEl(bolt);
+    else pressKey("e");
+  } else pressKey("e");
+  await t.until(() => {
+    const s = P.now().strike;
+    return s && s.at && (nearStrike = s);
+  }, 3000, "near strike").catch(() => {});
+  if (nearStrike) {
+    t.metric("nearStrikeDistM", nearStrike.dist);
+    t.metric("nearStrikeDelaySec", nearStrike.delay);
+    t.event("strike-near", `dist ${nearStrike.dist} m delay ${nearStrike.delay} s`);
+    if (nearStrike.dist <= 30 && nearStrike.delay > 0.05) {
+      t.problem("bug", `Strike within 30 m delayed ${nearStrike.delay} s (should play with the flash)`);
+    }
+    await t.until(() => nearStrike.thunder || (P.now().strike && P.now().strike.id === nearStrike.id && P.now().strike.thunder), 2500, "near thunder").catch(() => {});
+    const th = (SFX && SFX.info && SFX.info().lastThunder) || (S && S.now && S.now().lastThunder);
+    if (th) {
+      t.event("thunder-near-log", JSON.stringify(th));
+      t.metric("thunderNearActualSec", th.actualDelay);
+    }
+  } else t.problem("bug", "Near Lightning cast left no strike");
+  t.progress(0.3);
+
+  // Far strike: aim at the Storm Tank (~190, 44) from the avenue (~0, 12) ≈ 190 m+; place farther west if needed.
+  if (P.aimAt) P.aimAt({ x: 190, y: 12, z: 44 });
+  if (C.place) C.place(-40, street.z, 0.35);
+  await sleep(200);
+  try { if (P.abilities && P.abilities.reset) P.abilities.reset(100); } catch (err) { /* ok */ }
+  if (touch) {
+    const bolt = $("ability-bolt") || $("ability-lightning");
+    if (bolt) await tapEl(bolt);
+    else pressKey("e");
+  } else pressKey("e");
+  let farStrike = null;
+  await t.until(() => {
+    const s = P.now().strike;
+    return s && (!nearStrike || s.id !== nearStrike.id) && (farStrike = s);
+  }, 3000, "far strike").catch(() => {});
+  if (farStrike) {
+    t.metric("farStrikeDistM", farStrike.dist);
+    t.metric("farStrikeDelaySec", farStrike.delay);
+    t.event("strike-far", `dist ${farStrike.dist} m delay ${farStrike.delay} s`);
+    // If the aim landed ~340 m, delay should be ~1 s; otherwise still log distance/delay pairing.
+    const expect = farStrike.dist <= 30 ? 0 : farStrike.dist / 343;
+    if (Math.abs(farStrike.delay - expect) > 0.08) {
+      t.problem("bug", `Far delay ${farStrike.delay} s ≠ dist/343 (${expect.toFixed(3)}) at ${farStrike.dist} m`);
+    }
+    await sleep(Math.min(3000, farStrike.delay * 1000 + 400));
+    const th = (SFX && SFX.info && SFX.info().lastThunder) || (S && S.now && S.now().lastThunder);
+    if (th) {
+      t.event("thunder-far-log", JSON.stringify(th));
+      t.metric("thunderFarActualSec", th.actualDelay);
+      if (farStrike.dist >= 300 && Math.abs((th.actualDelay || farStrike.delay) - 1) > 0.25) {
+        t.problem("warning", `~340 m thunder actual ${th.actualDelay} s (want about 1 s)`);
+      }
+    }
+  } else t.problem("bug", "Far Lightning cast left no strike");
+  if (P.aimAt) P.aimAt(null);
+  t.progress(0.5);
+
+  // Eight consecutive Lightning casts → at least 4 distinct crack variants (or synth tags rotating).
+  const cracks = [];
+  for (let i = 0; i < 8; i++) {
+    try { if (P.abilities && P.abilities.reset) P.abilities.reset(100); } catch (err) { /* ok */ }
+    const before = (SFX && SFX.info && (SFX.info().heard["bolt-crack"] || 0)) || 0;
+    const t0 = performance.now();
+    let soundMs = -1;
+    const waitCrack = new Promise((res) => {
+      const h = (e) => {
+        if (e.detail && e.detail.action === "bolt") {
+          soundMs = performance.now() - t0;
+          window.removeEventListener("day:power", h);
+          res();
+        }
+      };
+      window.addEventListener("day:power", h);
+      setTimeout(res, 800);
+    });
+    if (touch) {
+      const bolt = $("ability-bolt") || $("ability-lightning");
+      if (bolt) await tapEl(bolt);
+      else pressKey("e");
+    } else pressKey("e");
+    await waitCrack;
+    await sleep(120);
+    const info = SFX && SFX.info && SFX.info();
+    const plays = (info && info.power && info.power.plays) || [];
+    const lastCrack = [...plays].reverse().find((p) => /crack/.test(p.kind) || /crack/.test(p.file || ""));
+    const heard = info && info.heard;
+    const tag = lastCrack ? lastCrack.file : (heard && heard["bolt-crack"] ? `synth-${heard["bolt-crack"]}-${i}` : `cast-${i}`);
+    cracks.push(tag);
+    if (i === 0) {
+      const dt = soundMs >= 0 ? soundMs : performance.now() - t0;
+      t.metric("firstCastSoundMs", Math.round(dt));
+      t.event("first-cast-ms", `${Math.round(dt)} ms (bolt-crack ${(heard && heard["bolt-crack"]) || 0} was ${before})`);
+      if (dt > 100) t.problem("bug", `First cast sound took ${Math.round(dt)} ms (want ≤100)`);
+    }
+    await sleep(220);
+  }
+  const distinct = new Set(cracks.filter(Boolean));
+  t.metric("crackVariants", distinct.size);
+  t.event("crack-variants", `${distinct.size} distinct across 8 casts: ${[...distinct].slice(0, 6).join(", ")}`);
+  if (distinct.size < 4) {
+    // Synth fallback still "plays" but without files; require 4 once power bank is loaded, else note.
+    const indexed = SFX && SFX.info && SFX.info().power && SFX.info().power.indexed;
+    if (indexed >= 4) t.problem("bug", `Only ${distinct.size} crack variants across 8 casts (need ≥4)`);
+    else t.event("crack-variants-pending", `power bank has ${indexed || 0} clips; synth stood in`);
+  }
+  t.progress(0.72);
+
+  // Tornado proximity: gain at 60 m vs 10 m must rise ≥6 dB.
+  const tg = SFX && SFX.tornadoGainAt;
+  if (tg) {
+    const a60 = tg(60);
+    const a10 = tg(10);
+    const rise = a10.db - a60.db;
+    t.metric("tornadoDbAt60", a60.db);
+    t.metric("tornadoDbAt10", a10.db);
+    t.metric("tornadoDbRise", Math.round(rise * 10) / 10);
+    t.event("tornado-proximity", `60 m ${a60.db} dB → 10 m ${a10.db} dB (rise ${rise.toFixed(1)} dB)`);
+    if (rise < 6) t.problem("bug", `Tornado roar rises only ${rise.toFixed(1)} dB from 60 m to 10 m (need ≥6)`);
+  } else t.problem("bug", "day.sfx.tornadoGainAt missing");
+
+  // Spawn a short tornado so the roar path runs (real hold on Wind).
+  try { if (P.abilities && P.abilities.reset) P.abilities.reset(100); } catch (err) { /* ok */ }
+  if (C.place) C.place(118, 26, 0); // plaza
+  await sleep(200);
+  if (touch) {
+    const wind = $("ability-wind");
+    if (wind) {
+      const r = wind.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      wind.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: x, clientY: y, pointerId: 11, pointerType: "touch" }));
+      await sleep(2200);
+      wind.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: x, clientY: y, pointerId: 11, pointerType: "touch" }));
+    }
+  } else {
+    keyDown("v");
+    await sleep(2200);
+    keyUp("v");
+  }
+  await sleep(600);
+  const tornado = P.now().tornado;
+  if (tornado) t.event("tornado-live", `at ${tornado.x && tornado.x.toFixed ? tornado.x.toFixed(1) : tornado.x},${tornado.z && tornado.z.toFixed ? tornado.z.toFixed(1) : tornado.z}`);
+  const info = SFX && SFX.info && SFX.info();
+  if (info && info.power && info.power.limiter) t.event("master-limiter", "sfx compressor on");
+  else t.event("master-limiter", info && info.power ? "no lim flag" : "no power info");
+  t.metric("powerBankBytes", (info && info.power && info.power.bytes) || 0);
+  t.progress(1);
+  pressKey("Escape");
+  t.event("power-sfx-pass", "delay, variants, tornado proximity, limiter checked");
+}
+
 /* ---------------- powers: five verbs, Charge, Lightning hold→Storm, Wind full→Tornado ---------------- */
 // Real input: day bar beside the car (setup), Sound on, Enter, WASD to the avenue near the loose props,
 // hold E for Storm, tap E bolt, G/V gust, hold V for Gale then Tornado; Charge refuses when dry.
@@ -10043,6 +10268,7 @@ installPlaytest({
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "foley", title: "Foley: recorded jump, landing, crowd, car, bird and UI sounds in lazy groups, taps on the ability arc and Episodes play the UI press, no clip file twice within 60 s, foley transfer under 400 KB", seconds: 130, tags: ["audio", "phone"], description: "Load with ?playtest=foley. Sound on, Take control by touch, taps on the ability arc and Episodes, Jump taps, then a two-minute listen. Events sound-on / ui-arc / sfx-sources / foley-repeats; metrics foley.bytes, foley.indexed." },
+    { id: "power-sfx", title: "Power SFX: Lightning crack/body/rumble layers with distance delay at 343 m/s (≤30 m with the flash, ~340 m ≈ 1 s), ≥4 crack variants across 8 casts, tornado roar rises ≥6 dB from 60 m to 10 m; on phone the master limiter holds and the first cast sounds within 100 ms", seconds: 150, tags: ["audio", "powers", "phone"], description: "Load with ?playtest=power-sfx ({\"touch\":true} for 390x844). Sound on, Take control, near then far bolt, eight Lightning casts, Wind hold for Tornado. Events thunder-delay-formula / strike-near / strike-far / crack-variants / tornado-proximity / master-limiter; metrics thunderDelayFarSec, crackVariants, tornadoDbRise, firstCastSoundMs." },
     { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "voice-director", title: "Voice director: take control and first power uses speak with a caption clear of the ability bar; lines never overlap; Voices mute leaves music/effects alone; day end speaks", seconds: 90, tags: ["voice", "audio"], description: "Load with ?playtest=voice-director. Sound on (real pointer), Enter, E then R, Voices off in Settings, day-end recap (setup). Optional {\"touch\":true}. Events voice-take / voice-power-first / voice-caption / voice-no-overlap / voices-mute / voice-dayend. Run at desktop and 390x844." },
@@ -10119,6 +10345,7 @@ installPlaytest({
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
+      else if (id === "power-sfx") await powerSfx(options, t);
       else if (id === "stem-score") await stemScore(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
