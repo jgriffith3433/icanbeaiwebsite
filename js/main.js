@@ -218,7 +218,10 @@
   function ensureAudio() {
     if (soundOn && !audio) {
       try {
-        audio = new (window.AudioContext || window.webkitAudioContext)();
+        // Share the mix's context (alarm beeps then go through its limiter and the Effects level).
+        const Mx = window.mix;
+        if (Mx && Mx.ctx) { try { if (Mx.unlock) Mx.unlock(); audio = Mx.ctx(); } catch (e) { audio = null; } }
+        if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
       } catch (e) {
         audio = null;
       }
@@ -253,13 +256,20 @@
     if (!audio) return;
     const o = audio.createOscillator();
     const g = audio.createGain();
-    o.type = "square";
-    o.frequency.value = freq;
+    // A square wave is harsh at 880 Hz; a triangle through a lowpass keeps the beep but not the buzz.
+    o.type = "triangle";
+    o.frequency.value = freq * (1 + (Math.random() - 0.5) * 0.02);
+    const lp = audio.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 2400;
     g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(vol || 0.035, at + 0.015);
+    g.gain.exponentialRampToValueAtTime((vol || 0.035) * 1.4, at + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, at + len);
-    o.connect(g);
-    g.connect(audio.destination);
+    o.connect(lp);
+    lp.connect(g);
+    const Mx = window.mix;
+    const sb = Mx && Mx.bus && Mx.ctx && Mx.ctx() === audio ? Mx.bus("sfx") : null;
+    g.connect(sb && sb.bus ? sb.bus : audio.destination);
     o.start(at);
     o.stop(at + len + 0.02);
   }

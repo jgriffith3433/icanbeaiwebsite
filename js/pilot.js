@@ -103,7 +103,13 @@ export function startPilot(dayApi) {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
+      const sb = document.getElementById("sound");
+      if (!sb || sb.getAttribute("aria-pressed") !== "true") return; // respects the Sound setting
+      const Mx = window.mix;
+      let mixBus = null;
+      if (!audioChirpCtx && Mx && Mx.ctx && Mx.bus) { try { audioChirpCtx = Mx.ctx(); mixBus = Mx.bus("voice"); } catch (e) { audioChirpCtx = null; } }
       const ctx = audioChirpCtx || (audioChirpCtx = new AC());
+      if (!mixBus && Mx && Mx.ctx && Mx.ctx() === ctx) mixBus = Mx.bus("voice");
       if (ctx.state === "suspended" && ctx.resume) ctx.resume();
       const t0 = ctx.currentTime;
       const o = ctx.createOscillator();
@@ -112,15 +118,15 @@ export function startPilot(dayApi) {
       f.type = "bandpass";
       f.frequency.value = 1400;
       f.Q.value = 2.2;
-      o.type = "square";
-      o.frequency.setValueAtTime(1800, t0);
+      o.type = "triangle";
+      o.frequency.setValueAtTime(1800 * (1 + (Math.random() - 0.5) * 0.06), t0);
       o.frequency.exponentialRampToValueAtTime(700, t0 + 0.05);
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(0.045, t0 + 0.008);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
       o.connect(f);
       f.connect(g);
-      g.connect(ctx.destination);
+      g.connect(mixBus && mixBus.bus ? mixBus.bus : ctx.destination);
       o.start(t0);
       o.stop(t0 + 0.08);
     } catch (err) {

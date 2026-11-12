@@ -851,14 +851,30 @@ export function startWeather(world, dayApi) {
   function ensureAudio() {
     if (audio || !window.AudioContext && !window.webkitAudioContext) return audio;
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new Ctx();
+      // Share js/mix.js's context: weather beds go to its ambience bus (limiter, Effects slider, voice ducking).
+      const Mx = window.mix;
+      let ctx = null;
+      let dest = null;
+      if (Mx && Mx.ctx) {
+        try { if (Mx.unlock) Mx.unlock(); ctx = Mx.ctx(); const b = Mx.bus && Mx.bus("ambience"); dest = b && b.bus; } catch (e) { ctx = null; }
+      }
+      const shared = !!(ctx && dest);
+      if (!shared) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        ctx = new Ctx();
+      }
       const master = ctx.createGain();
       master.gain.value = 0;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       master.connect(analyser);
-      analyser.connect(ctx.destination);
+      if (shared) master.connect(dest);
+      else {
+        const lim = ctx.createDynamicsCompressor();
+        lim.threshold.value = -8; lim.ratio.value = 12; lim.knee.value = 10; lim.attack.value = 0.003; lim.release.value = 0.2;
+        analyser.connect(lim);
+        lim.connect(ctx.destination);
+      }
       const buffer = noiseBuffer(ctx);
       function layer(type, freq, withPan) {
         const src = ctx.createBufferSource();

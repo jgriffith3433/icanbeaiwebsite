@@ -350,7 +350,7 @@ if (modelPath) {
     ok(bytes.length < 3 * 1024 * 1024, `${modelPath} is ${(bytes.length / 1048576).toFixed(2)} MB (must be < 3 MB)`);
     const { loadSmallWeather, SKIN_CLIPS } = await import(new URL('js/small-weather.js', root).href);
     const extras = {};
-    for (const name of ['lookup', 'windbolt', 'windrain', 'triumph', 'shelter', 'window']) {
+    for (const name of ['lookup', 'windbolt', 'windrain', 'triumph', 'shelter', 'window', 'cast', 'throw', 'fall', 'float']) {
       const ep = new URL('models/clips/' + name + '.glb', root);
       if (fs.existsSync(ep)) {
         const b = fs.readFileSync(ep);
