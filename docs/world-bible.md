@@ -210,14 +210,14 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 2. **Shop → plaza → Tank (second slice):** shop neon buzz → Dex stoop / parcel carry / door knock → signal-box spark or crosswalk wait → vendor cart → fountain coin toss + Clock faces → cafe wipe or stall crates / tip busker → annex turbines (spin or still) → Tank neon + speaker idle hiss → yard clipboard worker by day.
 3. **Park north → Needle:** path lamp → park edge crowd → cart roll / worker → Needle beacon pulse → (optional) deck lookout sting.
 4. **South avenue z −34 (full length):** same kerb pool as the main avenue; no stretch without a bead every ≤30 m.
-5. **Night (23:00–06:00) and 2–5 lull:** lit-window silhouettes, late diner glow, street sweeper pass, dog-walker, stoop cat; thin crowd still counts as life if something moves or sounds every ≤8 s.
+5. **Night (23:00–06:00) and 2–5 lull:** *In:* lit-window rooms on schedules (dusk on ~18:00–20:00, bedtime off after 23:30; apt/office follow Small Weather's day), neon flicker/buzz, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares, wet-street reflections (SSR high, reflection probe low), bolt flicker on windows. *Build (queue 2):* late diner, street sweeper, dog-walker, stoop cat — lights alone do not meet the ≤8 s night density rule. Playtest: `night-glow`.
 6. **Apt ↔ shop ↔ annex roofs:** spinning AC / vent puff / antenna sway with wind, plus one parkour prop bead between stairs — roofs are on the density table, not only parkour and powers.
 
 ### West Avenue Home Block
 - **Interactions:** Take control / Let go; walk, run, jump, float; call Rain for Birdie; climb apt stair; knock props with Gust; look through cutaway rooms; **Build:** carry watering can to pots; knock/enter apt (fridge hum, radio); sit on stoop.
 - **On their own:** his autopilot morning; Birdie's pot watering path; crowd thin→commute; lamps by sky; day-end moment when the clock rolls.
 - **Ambient:** birds, city hum, footsteps, alarm/coffee diegetic day sounds, title/score beds under the page.
-- **Over time:** model-constant look; windows and lamps follow dusk/night; opening once per new player.
+- **Over time:** model-constant look; windows follow occupant schedules (dusk on, bedtime off) and Small Weather's apt lights; lamps and neon by dusk/night; opening once per new player.
 - **Short:** no fridge/radio loop; few porch interactions after Birdie goes in.
 
 ### The Park
@@ -230,8 +230,8 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 ### Shop Strip
 - **Interactions:** Dex sun break; shop roof bolt/rod precision; shove bins; observe crowd doors; Storm hold; **Build:** carry Dex's dropped parcel to the stoop; knock/enter one shop bay; dawn stoop cat pet/leave.
 - **On their own:** Dex routine; shop neon; people enter shops; umbrellas.
-- **Ambient:** neon buzz (Build), car pass-bys, courier shoes.
-- **Over time:** dusk neon weight; lunch cell drifts east toward Tank.
+- **Ambient:** neon tube buzz (sfx under the signs at night), car pass-bys, courier shoes.
+- **Over time:** dusk neon weight with Gen textures when present (`textures/neon/*.webp`); lunch cell drifts east toward Tank.
 - **Short:** enterable shop or window shoppers would kill empty-facade feel (queue 5 / art).
 
 ### Plaza Market

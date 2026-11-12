@@ -10,8 +10,10 @@
    - SSAO2 for contact darkness at roof edges, AC units and kerbs (high only),
    - a cascaded shadow generator (2 cascades at 2048 with soft PCF; one 1024 cascade on low) for the sun and,
      at night, the moon: Small Weather, the neighbours, the crowd and the rooftop props cast,
-   - FXAA, a light vignette and a very subtle chromatic aberration (high only).
-   Low quality (phones): tonemap, LUT and half-res bloom, one 1024 cascade, no SSAO.
+   - FXAA, a light vignette and a very subtle chromatic aberration (high only),
+   - screen-space reflections on the wet street (desktop high); phones use a reflection-probe
+     fallback on the road (weather.js / look clear coat) instead of SSR.
+   Low quality (phones): tonemap, LUT and half-res bloom, one 1024 cascade, no SSAO, no SSR.
    Small Weather keeps his own fill light (js/small-weather.js, includedOnlyMeshes): nothing here brightens the
    city for him. `day.render.info()` reports what is on, the current LUT and the shadow casters (the playtests).
    ========================================================================== */
@@ -422,6 +424,42 @@ export function installRenderPipeline(world) {
     }
   }
 
+  /* ---------- SSR on wet streets (desktop high only; phones use a reflection probe) ---------- */
+  let ssr = null;
+  let ssrOn = false;
+  function wantSsr(on) {
+    if (nullEngine) return;
+    if (!on) {
+      if (ssr) {
+        try { ssr.dispose(); } catch (e) { /* */ }
+        ssr = null;
+      }
+      ssrOn = false;
+      return;
+    }
+    if (ssr) { ssrOn = true; return; }
+    try {
+      if (!B.SSRRenderingPipeline) { ssrOn = false; return; }
+      ssr = new B.SSRRenderingPipeline("wet-ssr", scene, [camera], false); // geometry-buffer off: uses the scene's depth
+      ssr.strength = 0.9;
+      ssr.reflectionSpecularFalloffExponent = 2.2;
+      ssr.roughnessFactor = 0.14;
+      ssr.step = 0.1;
+      ssr.maxSteps = 28;
+      ssr.maxDistance = 80;
+      ssr.selfCollisionNumSkip = 2;
+      ssr.enableAutomaticThicknessComputation = false;
+      ssr.thickness = 0.35;
+      ssr.blurDispersionStrength = 0.04;
+      ssr.enableSmoothReflections = true;
+      ssrOn = true;
+    } catch (e) {
+      ssr = null;
+      ssrOn = false;
+      fail("SSR", e);
+    }
+  }
+
   /* ---------- the finish: bloom, FXAA, aberration, vignette ---------- */
   function applyFinish(low) {
     if (!pipeline) return;
@@ -454,6 +492,7 @@ export function installRenderPipeline(world) {
     buildShadows(low);
     scanCasters(low);
     wantSsao(!low);
+    wantSsr(!low);
   }
 
   /* ---------- the moon: a cool key light with shadows when the sun is gone ---------- */
@@ -531,12 +570,14 @@ export function installRenderPipeline(world) {
       if (pipeline && pipeline.bloomEnabled) effects.push("bloom");
       if (csm) effects.push("cascaded-shadows");
       if (ssao) effects.push("ssao2");
+      if (ssrOn) effects.push("ssr");
       if (pipeline && pipeline.fxaaEnabled) effects.push("fxaa");
       if (pipeline && pipeline.imageProcessing && pipeline.imageProcessing.vignetteEnabled) effects.push("vignette");
       if (pipeline && pipeline.chromaticAberrationEnabled) effects.push("chromatic-aberration");
       return {
         quality: state.quality,
         effects,
+        ssr: ssrOn,
         tonemapping: ipc && ipc.toneMappingEnabled ? (ipc.toneMappingType === B.ImageProcessingConfiguration.TONEMAPPING_ACES ? "ACES" : "other") : "off",
         exposure: ipc ? Number(ipc.exposure.toFixed(3)) : null,
         bloom: pipeline ? { enabled: !!pipeline.bloomEnabled, threshold: pipeline.bloomThreshold, scale: pipeline.bloomScale, kernel: pipeline.bloomKernel, source: "emissives" } : null,

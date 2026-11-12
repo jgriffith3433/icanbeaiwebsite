@@ -383,7 +383,11 @@ export function installProps(ctx) {
 
   G = 0;
 
-  /* ---------------- shop signs and neon ---------------- */
+  /* ---------------- shop signs and neon ----------------
+     Canvas stand-ins always work; Gen textures at textures/neon/<word>.webp replace them when present
+     (recipes neon-sign-* in hawkes.assets.json). Each sign flickers a little at night. */
+  const neonGen = {};
+  const signFlicker = SIGNS.map(() => ({ phase: Math.random() * 6.28, rate: 0.7 + Math.random() * 1.4, dead: 0 }));
   const signMats = SIGNS.map((sg, i) => {
     const W = 512;
     const H = 128;
@@ -411,8 +415,32 @@ export function installProps(ctx) {
     // One-sided: a double-sided plane's back copy carries the same UVs (mirrored text) and, drawn second at the same
     // depth, won from the front. The back faces the wall 8 cm behind it, so nobody sees it.
     m.backFaceCulling = true;
+    m.metadata = { neonWord: sg.word, neonGen: false };
+    // Hawkes Gen cutout (textures/neon/<word>.webp): only fetch words listed in textures/neon/index.json (no 404s)
     return m;
   });
+  // Lazy: one index fetch, then only the signs that are actually on disk
+  try {
+    if (typeof fetch === "function") {
+      fetch("textures/neon/index.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).then((list) => {
+        const have = new Set((Array.isArray(list) ? list : []).map((s) => String(s).toLowerCase()));
+        signMats.forEach((m, i) => {
+          const word = SIGNS[i].word.toLowerCase();
+          if (!have.has(word)) return;
+          const url = "textures/neon/" + word + ".webp";
+          const tex = new B.Texture(url, scene, true, false, B.Texture.BILINEAR_SAMPLINGMODE, () => {
+            m.diffuseTexture = tex;
+            m.emissiveTexture = tex;
+            m.useAlphaFromDiffuseTexture = true;
+            m.opacityTexture = tex;
+            m.metadata.neonGen = true;
+            neonGen[SIGNS[i].word] = true;
+          }, () => { /* canvas stand-in stays */ });
+          tex.hasAlpha = true;
+        });
+      }).catch(() => { /* stand-ins */ });
+    }
+  } catch (e) { /* NullEngine */ }
   const signPlane = SIGNS.map((sg, i) => {
     const p = B.MeshBuilder.CreatePlane("sign-" + sg.word, { width: 1, height: 0.25 }, scene);
     p.material = signMats[i];
@@ -815,23 +843,54 @@ export function installProps(ctx) {
   const baseBloom = pipeline && pipeline.bloomWeight != null ? pipeline.bloomWeight : 0.16;
   let state = { neon: 0, glow: 0, bloom: baseBloom };
 
+  let neonBuzzAcc = 0;
   /* called from the city's night loop (every 0.3 s) with the same weights it lights the windows by */
   function update(w, lit) {
     const neon = Math.min(1, lit.shops);
     const lamps = Math.min(1, lit.lamps);
-    signMats.forEach((m) => m.emissiveColor.set(0.3 + neon * 1.0, 0.3 + neon * 1.0, 0.3 + neon * 1.0));
+    const t = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+    signMats.forEach((m, i) => {
+      const f = signFlicker[i];
+      // occasional dead tube flicker, otherwise a soft 50–60 Hz shimmer
+      if (f.dead > 0) f.dead -= 0.3;
+      else if (Math.random() < 0.015 * neon) f.dead = 0.15 + Math.random() * 0.35;
+      const shimmer = 0.85 + 0.15 * Math.sin(t * (8 + f.rate) + f.phase);
+      const k = f.dead > 0 ? (Math.random() < 0.55 ? 0.08 : 0.55) : shimmer;
+      const e = (0.3 + neon * 1.0) * k;
+      m.emissiveColor.set(e, e, e);
+    });
     Object.values(spillMats).forEach((m) => m.emissiveColor.set(neon * 0.8, neon * 0.8, neon * 0.8));
     warmMat.emissiveColor.set(0.15 + lamps * 1.35, 0.15 + lamps * 1.35, 0.15 + lamps * 1.2);
     // soft bloom swells as the light goes
     const bloom = baseBloom + 0.16 * Math.min(1, w.dusk * 0.6 + w.night);
     if (pipeline && Math.abs(bloom - pipeline.bloomWeight) > 0.003) pipeline.bloomWeight = bloom;
-    state = { neon, glow: lamps, bloom };
+    // neon buzz: a quiet 120 Hz hum under the signs while Sound is on and neon is up
+    neonBuzzAcc += 0.3;
+    if (neonBuzzAcc > 2.4 && neon > 0.4) {
+      neonBuzzAcc = 0;
+      try {
+        if (window.day && window.day.sfx && window.day.sfx.neonBuzz) window.day.sfx.neonBuzz(neon);
+      } catch (e) { /* sfx optional */ }
+    }
+    state = { neon, glow: lamps, bloom, flicker: true, gen: Object.keys(neonGen).length };
   }
 
   return {
     update,
     info() {
-      return { ...stats, meshes: meshes.length, colliders: colliders.length, signKinds: SIGNS.length, lit: { ...state }, plaza: { ...R.plaza }, needle: { ...R.needle }, conductors: conductors.slice(), tank: { ...R.tank } };
+      return {
+        ...stats,
+        meshes: meshes.length,
+        colliders: colliders.length,
+        signKinds: SIGNS.length,
+        neonGen: Object.keys(neonGen).length,
+        neonWords: SIGNS.map((s) => s.word),
+        lit: { ...state },
+        plaza: { ...R.plaza },
+        needle: { ...R.needle },
+        conductors: conductors.slice(),
+        tank: { ...R.tank },
+      };
     },
   };
 }
