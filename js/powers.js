@@ -1524,6 +1524,8 @@ html.touch-ui.in-control .side{display:none}
       called: localStorm,
       radius: cloudR,
       charging: wantStorm && !boltResolved,
+      /* a cast being wound up: Lightning's hold, or Wind's hold before Gale/Tornado (js/stems.js reads it) */
+      windup: (wantStorm && !boltResolved) || (mode() === "control" && (boltCharge > 0.05 || windCharge > 0.05)),
       flash,
       aim: aim ? { x: aim.x, z: aim.z, y: aim.y } : null,
       strike: strike ? Object.assign({}, strike) : null,

@@ -531,6 +531,15 @@ window.DAY_CONFIG = {
        (top level `gain`), the beds speed up by up to `rate`, and the night low-pass opens. Procedural, no files. */
     pressure: { from: 0.4, gain: 0.5, rate: 0.06 },
     fallback: { day: "clear", night: "snow" },
+    /* THE STEM SCORE (js/stems.js): Small Weather's 4-note motif (notes, in A minor) in three intensity stems at 120 BPM
+       (a bar is 2 s), played in sync while he is the player's; the nine beds above carry the watch view and his own day.
+       `files` are Hawkes Gen's (hawkes.assets.json music-stem-*, music-sting-*): leave a path null until the file is in
+       the repo (a 404 is a console error); null plays the same stems synthesized from the motif. */
+    stems: {
+      bpm: 120, motif: ["A3", "C4", "E4", "D4"],
+      files: { calm: null, tension: null, storm: null, resolution: null, failure: null },
+      hold: { storm: 8, rescue: 11 },
+    },
     music: {
       clear: "audio/music/clear.mp3",
       clouds: "audio/music/clouds.mp3",

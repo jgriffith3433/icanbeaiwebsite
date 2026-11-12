@@ -7815,6 +7815,99 @@ async function titleScenario(options, t) {
 }
 
 /* ---------------- cold-start: a new player's first Play to the first bolt and the street's reaction ---------------- */
+
+/* ---------------- stem-score: one motif, three synced stems, intent-driven gains (js/stems.js) ----------------
+   Needs ?playtest=stem-score. Setup (named): every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap
+   on a phone) on Play, a hold of the bolt (E held, or a touch held on the Bolt button), and after the cold open a Tornado (named
+   shortcut `powers.command`) and an episode's score event (named shortcut). Events stem-motif-title / -coldopen, stem-ready,
+   stem-windup, stem-storm, stem-sting, stem-transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. */
+async function stemScore(options, t) {
+  t.scene("Stem score");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const phone = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
+  if (!D.stems) { t.problem("blocker", "js/stems.js didn't install (no day.stems)"); return; }
+  if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  D.coldopen.arm();
+  D.title.show("playtest");
+  await sleep(700);
+  const mb = () => performance.getEntriesByType("resource").reduce((n, r) => n + (r.transferSize || r.encodedBodySize || 0), 0) / 1048576;
+  const mbBefore = mb();
+  const heard = [];
+  window.addEventListener("day:stems", (e) => heard.push(Object.assign({ t: performance.now() }, e.detail)));
+  const before = D.stems.now();
+  if (before.stems !== 0) t.problem("bug", `${before.stems} stems are up before any input (they must stream lazily after the first input)`);
+  if (before.layers.calm.gain > 0) t.problem("bug", "A stem is audible on the title");
+  t.event("stem-before-input", `stems ${before.stems}, streaming ${before.streaming}, ${mbBefore.toFixed(2)} MB transferred`);
+
+  const playBtn = $("title-play");
+  if (phone) await tapEl(playBtn); else await clickEl(playBtn);
+  await t.until(() => D.control.mode() === "control", 6000, "him the player's").catch(() => {});
+  await t.until(() => heard.some((h) => h.action === "motif" && h.where === "coldopen"), 6000, "the cold open's motif").catch(() => {});
+  const m = D.stems.now().motifs;
+  const mt = m.find((x) => x.where === "title");
+  const mc = m.find((x) => x.where === "coldopen");
+  t.event("stem-motif-title", mt ? `the title's motif (${mt.notes}), heard ${mt.heard}` : "NO motif on the title");
+  t.event("stem-motif-coldopen", mc ? `the cold open's motif (${mc.notes}), heard ${mc.heard}` : "NO motif in the cold open");
+  if (!mt || !mc) t.problem("bug", "The 4-note motif didn't play on both the title and the cold open");
+  else if (mt.notes !== mc.notes || mt.notes.split(" ").length !== 4) t.problem("bug", "The title's and the cold open's motifs aren't the same four notes");
+  t.progress(0.25);
+
+  // the first input has happened (the Play click): the stems stream and start together
+  const ready = await t.until(() => D.stems.now().stems === 3, 20000, "three stems").then(() => true).catch(() => false);
+  const S = D.stems.now();
+  const spent = mb() - mbBefore;
+  t.metric("stemLayers", S.stems);
+  t.metric("stemMbAfterInput", Math.round(spent * 100) / 100);
+  t.event("stem-ready", `${S.stems} stems, synced ${S.synced}, ${S.source}, ${S.bpm} BPM, bar ${S.bar}s, loop ${S.loopSec}s`);
+  t.event("stem-transfer", `${spent.toFixed(2)} MB transferred since the title (stems ${(S.bytes / 1048576).toFixed(2)} MB)`);
+  if (!ready || S.stems !== 3 || !S.synced) t.problem("bug", "The music bus doesn't report 3 synced stem layers");
+  if (phone && S.bytes / 1048576 > 1.5) t.problem("bug", `The stems streamed ${(S.bytes / 1048576).toFixed(2)} MB (the phone's limit is 1.5 MB)`);
+
+  // wait out the cold open's HUD, then he is free: a wind-up is a hold of Lightning
+  await t.until(() => !document.documentElement.classList.contains("cold-open"), 40000, "the cold open to finish").catch(() => {});
+  await sleep(1500);
+  const start = performance.now();
+  let tensionAt = null;
+  let peak = 0;
+  const poll = setInterval(() => {
+    const L = D.stems.now().layers;
+    peak = Math.max(peak, L.tension.gain);
+    if (tensionAt == null && L.tension.gain > 0.1) tensionAt = (performance.now() - start) / 1000;
+  }, 40);
+  if (phone && $("coldopen-bolt") && hudVisible($("coldopen-bolt"))) {
+    const b = $("coldopen-bolt"); const r = b.getBoundingClientRect();
+    touchOn(b, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9); await sleep(1100); touchOn(b, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+  } else { keyDown("e"); await sleep(1100); keyUp("e"); }
+  await sleep(1500);
+  clearInterval(poll);
+  t.metric("stemTensionSeconds", tensionAt == null ? -1 : Math.round(tensionAt * 100) / 100);
+  t.event("stem-windup", tensionAt != null ? `the tension layer rose ${tensionAt.toFixed(2)}s after the hold began (peak ${peak.toFixed(2)})` : "the tension layer never rose");
+  if (tensionAt == null || tensionAt > 2) t.problem("bug", `A cast wind-up must raise the tension layer within one bar (2 s): ${tensionAt == null ? "it never did" : tensionAt.toFixed(2) + " s"}`);
+  t.progress(0.6);
+
+  // a tornado brings the full storm layer in
+  const s0 = performance.now();
+  let stormAt = null;
+  const poll2 = setInterval(() => { if (stormAt == null && D.stems.now().layers.storm.gain > 0.1) stormAt = (performance.now() - s0) / 1000; }, 40);
+  const cast = window.powers && window.powers.command ? window.powers.command("tornado", "playtest") : false;
+  await sleep(3500);
+  clearInterval(poll2);
+  t.metric("stemStormSeconds", stormAt == null ? -1 : Math.round(stormAt * 100) / 100);
+  t.event("stem-storm", `Tornado ${cast ? "cast" : "refused"}; the storm layer ${stormAt != null ? "rose after " + stormAt.toFixed(2) + "s" : "never rose"}`);
+  if (stormAt == null) t.problem("bug", "A tornado cast didn't bring the full storm layer in");
+
+  // an episode success: the resolution sting
+  window.dispatchEvent(new CustomEvent("day:episode", { detail: { action: "score", id: "playtest", why: "clear", cleared: true } }));
+  await sleep(600);
+  const st = D.stems.now().stings;
+  t.event("stem-sting", st.length ? `${st.map((x) => x.kind + (x.heard ? " (heard)" : "")).join(", ")}` : "no sting");
+  if (!st.some((x) => x.kind === "resolution")) t.problem("bug", "An episode success didn't play the resolution sting");
+  t.progress(1);
+}
+
 // Needs ?playtest=cold-start (or the runner's start("cold-start")). Setup (named): every icanbe.* key cleared, the cold open armed,
 // the title up. Real input only from there: a click or tap on the title's Play, then the one cue on screen ("Hold E" -> E held;
 // "Hold the bolt" -> a touch held on the Bolt button). Event-driven: day:control, day:power, day:story, day:coldopen, day:crowd,
@@ -8993,6 +9086,7 @@ installPlaytest({
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
+    { id: "stem-score", title: "Stem score: Play opens on the 4-note motif (title, then the cold open), three stems stream after the first input and play in sync, a held bolt raises the tension layer within one bar, a tornado brings the storm layer, an episode success plays the resolution sting; on a phone the stems stay under 1.5 MB", seconds: 90, tags: ["audio", "music", "phone", "opening"], description: "Load with ?playtest=stem-score. Setup: every icanbe.* key cleared, cold open armed, title up. Real input: click or tap Play, hold the bolt (E or the Bolt button). Shortcuts: powers.command('tornado'), a day:episode score event. Events stem-motif-title / -coldopen / -ready / -windup / -storm / -sting / -transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. Run at 1280x720 and 390x844 touch." },
     { id: "weather-audio", title: "Rooftop weather soundscape and footsteps: Sound on (real click), Take control (sting), climb apt roof, walk across gravel, metal, tar and puddle surfaces, then cycle clear/sun, clouds, rain (light roof patter vs heavy downpour, gutters, umbrella), storm (distance-delayed thunder crack and rolling thunder), fog, wind (3D-panned gusts and flapping awnings) and snow (muffled city) with equal-power crossfades", seconds: 150, tags: ["weather", "audio"], description: "Day bar outside, confirms silence, turns Sound on with a pointer, Enter, climbs apt rooftop, walks gravel/metal/tar/puddle zones, cycles keys 1–7 on the roof. Logs footstep-*, rain-layers, thunder-delay, loop-seams, music-* and soundscape levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
@@ -9074,6 +9168,7 @@ installPlaytest({
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
+      else if (id === "stem-score") await stemScore(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "five-verbs") await fiveVerbs(options, t);
