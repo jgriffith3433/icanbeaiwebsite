@@ -197,6 +197,18 @@ window.DAY_CONFIG = {
     musicOn: "Music on",
     musicOff: "Music off",
     hint: "Enter to play",
+    settings: "Settings",
+    continue: "Continue", // Play's word when a save exists
+    logoText: ["I Can Be", "AI"], // the lockup in type until the Gen-made logo (logo) is in the repo
+    logo: "images/logo-icanbe-ai.png", // Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
+    // the key-art crane: ends on Small Weather on the apartment roof (the pose the cold open's camera starts from)
+    crane: {
+      secs: 7,
+      from: { x: 70, y: 34, z: 18, alpha: -1.0, beta: 1.0, radius: 150 },
+      to: { x: -21, y: 7.51, z: 0.5, alpha: 3.1416, beta: 1.22, radius: 9 },
+    },
+    hero: { x: -21, y: 6.16, z: 0.5, yaw: 1.5708 },
+    glintEvery: [2.6, 5.2], // seconds between the storm's glints in the clouds
     day: "Day",
     night: "Night",
   },
@@ -216,7 +228,8 @@ window.DAY_CONFIG = {
     rod: { x: 50, z: 0.5, roofY: 3.3, height: 2.2 }, // the shop roof's lightning rod
     cell: { state: "rain", intensity: 0.75 }, // the cell nobody called (weather via "cell")
     holdSec: 0.55, // how long the bolt is held before it goes
-    firstLine: 1.4, // seconds after he lands before he speaks
+    dive: { from: 9, secs: 1.0 }, // Play from the title: the title's last shot is this pose at radius 9; the camera dives in over this long
+    firstLine: 0.8, // seconds after he lands before he speaks
     reactDelay: 1.0, // seconds from the look-up to Birdie's call
     prompt: { keys: "Hold E", touch: "Hold the bolt" },
     lines: {
@@ -537,7 +550,7 @@ window.DAY_CONFIG = {
        the repo (a 404 is a console error); null plays the same stems synthesized from the motif. */
     stems: {
       bpm: 120, motif: ["A3", "C4", "E4", "D4"],
-      files: { calm: null, tension: null, storm: null, resolution: null, failure: null },
+      files: { calm: "audio/music/stem-calm.mp3", tension: "audio/music/stem-tension.mp3", storm: "audio/music/stem-storm.mp3", resolution: "audio/music/sting-resolution.mp3", failure: "audio/music/sting-failure.mp3" },
       hold: { storm: 8, rescue: 11 },
     },
     music: {

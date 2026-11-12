@@ -103,7 +103,7 @@
   },
   {
    "id": "voice-bolt-1",
-   "note": "Small Weather spoken line (bolt): \"Point and flash.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (bolt): \"Point and flash.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -121,7 +121,7 @@
   },
   {
    "id": "voice-bolt-2",
-   "note": "Small Weather spoken line (bolt): \"That one felt personal.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (bolt): \"That one felt personal.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -139,7 +139,7 @@
   },
   {
    "id": "voice-bolt-3",
-   "note": "Small Weather spoken line (bolt): \"Keep the count. I'll keep the bolts.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (bolt): \"Keep the count. I'll keep the bolts.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -157,7 +157,7 @@
   },
   {
    "id": "voice-gust-1",
-   "note": "Small Weather spoken line (gust): \"Move.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (gust): \"Move.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -175,7 +175,7 @@
   },
   {
    "id": "voice-gust-2",
-   "note": "Small Weather spoken line (gust): \"Wind's on my side.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (gust): \"Wind's on my side.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -193,7 +193,7 @@
   },
   {
    "id": "voice-gust-3",
-   "note": "Small Weather spoken line (gust): \"Bins don't get a vote.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (gust): \"Bins don't get a vote.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -211,7 +211,7 @@
   },
   {
    "id": "voice-storm-1",
-   "note": "Small Weather spoken line (storm): \"I brought the weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (storm): \"I brought the weather.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -229,7 +229,7 @@
   },
   {
    "id": "voice-storm-2",
-   "note": "Small Weather spoken line (storm): \"Pressure's rising. Good.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (storm): \"Pressure's rising. Good.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -247,7 +247,7 @@
   },
   {
    "id": "voice-storm-3",
-   "note": "Small Weather spoken line (storm): \"Sky's mine for a minute.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (storm): \"Sky's mine for a minute.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -265,7 +265,7 @@
   },
   {
    "id": "voice-tornado-1",
-   "note": "Small Weather spoken line (tornado): \"Watch the street.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (tornado): \"Watch the street.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -283,7 +283,7 @@
   },
   {
    "id": "voice-tornado-2",
-   "note": "Small Weather spoken line (tornado): \"Funnel's going.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (tornado): \"Funnel's going.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -301,7 +301,7 @@
   },
   {
    "id": "voice-tornado-3",
-   "note": "Small Weather spoken line (tornado): \"Drama, delivered.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (tornado): \"Drama, delivered.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -319,7 +319,7 @@
   },
   {
    "id": "voice-glide-1",
-   "note": "Small Weather spoken line (glide): \"Easy.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (glide): \"Easy.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -337,7 +337,7 @@
   },
   {
    "id": "voice-glide-2",
-   "note": "Small Weather spoken line (glide): \"I don't fall. I float.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (glide): \"I don't fall. I float.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -355,7 +355,7 @@
   },
   {
    "id": "voice-wx-clear",
-   "note": "Small Weather spoken line (weather-clear): \"Clear skies. Boring, but fine.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-clear): \"Clear skies. Boring, but fine.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -373,7 +373,7 @@
   },
   {
    "id": "voice-wx-clear-2",
-   "note": "Small Weather spoken line (weather-clear): \"Sun's out. I'm not.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-clear): \"Sun's out. I'm not.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -391,7 +391,7 @@
   },
   {
    "id": "voice-wx-clouds",
-   "note": "Small Weather spoken line (weather-clouds): \"Clouds. Warming up.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-clouds): \"Clouds. Warming up.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -409,7 +409,7 @@
   },
   {
    "id": "voice-wx-rain",
-   "note": "Small Weather spoken line (weather-rain): \"Rain. Finally something useful.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-rain): \"Rain. Finally something useful.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -427,7 +427,7 @@
   },
   {
    "id": "voice-wx-rain-2",
-   "note": "Small Weather spoken line (weather-rain): \"Wet road. Good.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-rain): \"Wet road. Good.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -445,7 +445,7 @@
   },
   {
    "id": "voice-wx-storm",
-   "note": "Small Weather spoken line (weather-storm): \"There it is.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-storm): \"There it is.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -463,7 +463,7 @@
   },
   {
    "id": "voice-wx-storm-2",
-   "note": "Small Weather spoken line (weather-storm): \"This is more like it.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-storm): \"This is more like it.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -481,7 +481,7 @@
   },
   {
    "id": "voice-wx-fog",
-   "note": "Small Weather spoken line (weather-fog): \"Fog. Soft edges.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-fog): \"Fog. Soft edges.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -499,7 +499,7 @@
   },
   {
    "id": "voice-wx-wind",
-   "note": "Small Weather spoken line (weather-wind): \"Wind's restless.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-wind): \"Wind's restless.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -517,7 +517,7 @@
   },
   {
    "id": "voice-wx-snow",
-   "note": "Small Weather spoken line (weather-snow): \"Snow. Quiet drama.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (weather-snow): \"Snow. Quiet drama.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -535,7 +535,7 @@
   },
   {
    "id": "voice-ep-open-1",
-   "note": "Small Weather spoken line (episode-open): \"Alright. My turn.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (episode-open): \"Alright. My turn.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -553,7 +553,7 @@
   },
   {
    "id": "voice-ep-open-2",
-   "note": "Small Weather spoken line (episode-open): \"The day's on autopilot. I'm not.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (episode-open): \"The day's on autopilot. I'm not.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -571,7 +571,7 @@
   },
   {
    "id": "voice-ep-open-3",
-   "note": "Small Weather spoken line (episode-open): \"The Orchestrator asked for drama, so I brought the weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (episode-open): \"The Orchestrator asked for drama, so I brought the weather.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -589,7 +589,7 @@
   },
   {
    "id": "voice-ep-close-1",
-   "note": "Small Weather spoken line (episode-close): \"Back to the day. It kept going without me.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (episode-close): \"Back to the day. It kept going without me.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -607,7 +607,7 @@
   },
   {
    "id": "voice-ep-close-2",
-   "note": "Small Weather spoken line (episode-close): \"Not bad for a lunch break.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (episode-close): \"Not bad for a lunch break.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -625,7 +625,7 @@
   },
   {
    "id": "voice-ep-close-3",
-   "note": "Small Weather spoken line (episode-close): \"Pressure spent. Worth it.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (episode-close): \"Pressure spent. Worth it.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -643,7 +643,7 @@
   },
   {
    "id": "voice-ep-close-4",
-   "note": "Small Weather spoken line (episode-close): \"Clock's still running. So am I.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (episode-close): \"Clock's still running. So am I.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -661,7 +661,7 @@
   },
   {
    "id": "voice-day-1",
-   "note": "Small Weather spoken line (day): \"Another commit. Another cloud somewhere.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"Another commit. Another cloud somewhere.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -679,7 +679,7 @@
   },
   {
    "id": "voice-day-2",
-   "note": "Small Weather spoken line (day): \"Code compiles. Sky doesn't.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"Code compiles. Sky doesn't.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -697,7 +697,7 @@
   },
   {
    "id": "voice-day-3",
-   "note": "Small Weather spoken line (day): \"Standing desk. Sitting storm.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"Standing desk. Sitting storm.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -715,7 +715,7 @@
   },
   {
    "id": "voice-day-4",
-   "note": "Small Weather spoken line (day): \"Coffee's cold. Forecast isn't.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"Coffee's cold. Forecast isn't.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -733,7 +733,7 @@
   },
   {
    "id": "voice-day-5",
-   "note": "Small Weather spoken line (day): \"Traffic's nothing. Weather's everything.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"Traffic's nothing. Weather's everything.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -751,7 +751,7 @@
   },
   {
    "id": "voice-day-6",
-   "note": "Small Weather spoken line (day): \"Alarm set. Atmosphere optional.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"Alarm set. Atmosphere optional.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -769,7 +769,7 @@
   },
   {
    "id": "voice-day-7",
-   "note": "Small Weather spoken line (day): \"Pull request. Push weather.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"Pull request. Push weather.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -787,7 +787,7 @@
   },
   {
    "id": "voice-day-8",
-   "note": "Small Weather spoken line (day): \"Meeting at ten. Storm whenever.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"Meeting at ten. Storm whenever.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -805,7 +805,7 @@
   },
   {
    "id": "voice-day-9",
-   "note": "Small Weather spoken line (day): \"I type. The sky waits.\" — DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
+   "note": "Small Weather spoken line (day): \"I type. The sky waits.\" \u2014 DoD Eric voice cjVigY5qzO86Huf0OWal, Hawkes Gen audio.voice.",
    "steps": [
     {
      "tool": "audio.voice",
@@ -1384,13 +1384,13 @@
   },
   {
    "id": "dlg-birdie-cepz26",
-   "note": "Spoken line (dry-park:kick:flood), Birdie: \"That's plenty. That's — plenty.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "note": "Spoken line (dry-park:kick:flood), Birdie: \"That's plenty. That's \u2014 plenty.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "That's plenty. That's — plenty.",
+      "text": "That's plenty. That's \u2014 plenty.",
       "voice": "EXAVITQu4vr4xnSDxMaL",
       "model": "eleven_v4"
      },
@@ -6850,6 +6850,32 @@
    ],
    "files": {
     "audio": "audio/foley/ui-close-1.mp3"
+   }
+  },
+  {
+   "id": "title-logo",
+   "note": "The title's logo lockup \"I Can Be AI\" (js/title.js, day.config.js title.logo): 4 takes of image.generate, the pick goes through image.remove-background, then baked to images/logo-icanbe-ai.png and title.logo set. Until then the title draws the lockup in type with the same lightning glint. Gen job j_b67c8eedbcff (project org_eb0d5c82e8da8c2d.icanbe).",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game title logo lockup, the words \"I CAN BE AI\" in bold stylized 3D lettering, electric blue and white metal letters with glowing cyan lightning cracks running through them, small sparks, centered, perfectly flat front view, on a plain solid black background, clean bold readable silhouette, cinematic storm game logo, no extra text, no watermark",
+      "width": 1536,
+      "height": 640,
+      "count": 4
+     },
+     "save": "take"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$pick"
+     },
+     "save": "logo"
+    }
+   ],
+   "files": {
+    "logo": "images/logo-icanbe-ai.png"
    }
   }
  ]

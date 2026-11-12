@@ -8116,6 +8116,85 @@ async function stemScore(options, t) {
   t.progress(1);
 }
 
+/* ---------------- title-key-art: the crane, the logo, the storm, Play dives into the cold open ----------------
+   Needs ?playtest=title-key-art. Setup (named): every icanbe.* key cleared, the cold open armed, the title up. Real input: a tap (touch) or click
+   on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleSecondsToControl, titleBlackFrames,
+   titleButtons. Run at 1280x720 and 390x844 touch. */
+async function titleKeyArt(options, t) {
+  t.scene("Title key art");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const phone = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
+  if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  D.coldopen.arm();
+  D.title.show("playtest");
+  const glints = [];
+  window.addEventListener("day:title", (e) => { if (e.detail && e.detail.action === "glint") glints.push(performance.now()); });
+  // the crane: the camera lands on the roof, and he is standing on it (the title's hero)
+  await t.until(() => D.title.now().crane === 1, 15000, "the crane to land").catch(() => {});
+  await sleep(1500);
+  const el = $("title"), play = $("title-play"), logo = $("title-logo");
+  const tn = D.title.now();
+  t.event("title-shot", `crane ${tn.crane}, logo ${tn.logo}, play "${tn.continueLabel}", sound ${tn.sound}, ${innerWidth}x${innerHeight}`);
+  if (tn.crane !== 1) t.problem("bug", "The title's crane never landed on Small Weather");
+  const buttons = [...el.querySelectorAll("button")].filter((b) => boxOf(b));
+  t.metric("titleButtons", buttons.length);
+  t.event("title-buttons", buttons.map((b) => b.textContent.trim()).join(" | ") + (tn.daily ? ` + ${tn.daily}` : ""));
+  if (buttons.length > 4) t.problem("bug", `The title shows ${buttons.length} buttons (4 at most)`);
+  const pb = boxOf(play), lb = boxOf(logo);
+  if (!pb || !lb) t.problem("blocker", "No Play button or logo on the title");
+  else {
+    t.event("title-phone", `logo ${Math.round(lb.top)}..${Math.round(lb.bottom)} px, Play ${Math.round(pb.width)}x${Math.round(pb.height)} at ${Math.round(pb.top)}..${Math.round(pb.bottom)} of ${innerHeight}`);
+    if (pb.height < 56) t.problem("bug", `Play is ${Math.round(pb.height)} px tall (56 at least)`);
+    if (lb.bottom > innerHeight * 0.45 || lb.top < 0) t.problem("bug", "The logo isn't above the fold with room for Small Weather under it");
+    if (phone && pb.top < innerHeight * 0.55) t.problem("bug", "Play isn't in the thumb zone (the lower half)");
+    if (phone && (pb.right > innerWidth || pb.left < 0)) t.problem("bug", "Play runs off the screen");
+  }
+  await sleep(4500);
+  t.event("title-glints", `${glints.length} lightning glints in the clouds`);
+  if (glints.length < 2) t.problem("bug", `Only ${glints.length} glint(s) in 6 s on the title (every few seconds)`);
+  t.progress(0.5);
+  // black frames while Play dives: the canvas read after each rendered frame
+  const w = D.world();
+  const probe = document.createElement("canvas");
+  probe.width = probe.height = 16;
+  const pc = probe.getContext("2d", { willReadFrequently: true });
+  let frames = 0, black = 0, afterTake = 0;
+  let tPlay = 0;
+  const obs = w.scene.onAfterRenderObservable.add(() => {
+    if (!tPlay) return;
+    try {
+      pc.drawImage(w.scene.getEngine().getRenderingCanvas(), 0, 0, 16, 16);
+      const d = pc.getImageData(0, 0, 16, 16).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2];
+      frames++;
+      if (sum / 256 / 3 < 2.5) black++;
+    } catch (e) { /* tainted or lost: not counted */ }
+  });
+  const heard = {};
+  window.addEventListener("day:control", (e) => { if (e.detail && e.detail.action === "take" && !heard.control) heard.control = performance.now(); });
+  window.addEventListener("day:coldopen", (e) => { const a = e.detail && e.detail.action; if (a && !heard[a]) heard[a] = performance.now(); });
+  t.scene("Play");
+  tPlay = performance.now();
+  if (phone) await tapEl(play); else await clickEl(play);
+  await t.until(() => heard.control, 3000, "control after Play").catch(() => {});
+  await sleep(1600);
+  w.scene.onAfterRenderObservable.remove(obs);
+  const toControl = heard.control ? (heard.control - tPlay) / 1000 : null;
+  const toFirst = Math.min(...["landed", "start"].map((k) => (heard[k] ? (heard[k] - tPlay) / 1000 : 99)));
+  t.metric("titleSecondsToControl", toControl == null ? -1 : Math.round(toControl * 100) / 100);
+  t.metric("titleBlackFrames", black);
+  t.event("title-play-dive", `control after ${toControl == null ? "never" : toControl.toFixed(2)} s, cold open's first beat ${toFirst.toFixed(2)} s, ${black} black of ${frames} frames`);
+  if (toControl == null || toControl > 1) t.problem("bug", "Play didn't put him under control within 1 s");
+  if (toFirst > 1) t.problem("bug", "The cold open's first beat didn't start within 1 s of Play");
+  if (black > 0) t.problem("bug", `${black} black frame(s) while Play dove into the cold open`);
+  if (D.title.now().showing) t.problem("bug", "The title is still up after Play");
+  t.progress(1);
+}
+
 // Needs ?playtest=cold-start (or the runner's start("cold-start")). Setup (named): every icanbe.* key cleared, the cold open armed,
 // the title up. Real input only from there: a click or tap on the title's Play, then the one cue on screen ("Hold E" -> E held;
 // "Hold the bolt" -> a touch held on the Bolt button). Event-driven: day:control, day:power, day:story, day:coldopen, day:crowd,
@@ -9266,6 +9345,7 @@ installPlaytest({
     { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "street-teaches", title: "The street teaches: after the cold open's bolt, Rain, Sun break, Fog and Wind each unlock on a neighbor's voiced ask (Birdie, Dex, Ines) with a cue on the target, a glow, a vibrate and a voiced thanks, and no text card", seconds: 330, tags: ["first-minute", "phone", "voice", "neighbors", "abilities"], description: "Load with ?playtest=street-teaches. Setup: every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate recorded. Real input: Play, the bolt's hold, then keys (taps on the thumb arc and the stick on a phone) to answer each neighbor in turn. Events street-ask / -unlock / -arc / -cast / -thanks / -done / -practice; metrics secondsToRain, secondsToSun, secondsToFog, secondsToWind, secondsToAllFive. Run at 1280x720 and 390x844 touch." },
+    { id: "title-key-art", title: "Title key art: a slow crane over the district at the real time of day lands on Small Weather on the apartment roof under a forming storm with glints every few seconds, the logo lockup on top (Play 56 px+, logo and him above the fold at 390x844), at most 4 buttons; Play dives into the cold open with no cut, no black frame and control within 1 s", seconds: 45, tags: ["title", "first-minute", "phone", "audio"], description: "Load with ?playtest=title-key-art. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleButtons, titleSecondsToControl, titleBlackFrames. Run at 1280x720 and 390x844 touch." },
     { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, holds the bolt at the shop roof's rod within 30 s, and the street looks up and Birdie calls up in her voice, with under 25 words on screen before the first cast", seconds: 60, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (E held; the Bolt button held on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
     { id: "quiet-ui", title: "The quiet page: ?view=public shows the city, the status card, one Time control, Take control and Episodes (no log, Body, Things or config text, no overlaps, six HUD regions at most); the Time control opens the day bar and speeds by click or tap and closes on take-over; the title and the Episodes menu clear the caption, ability bar and hint; the menu starts the tutorial; no index.html fetch, no question in control", seconds: 75, tags: ["hud", "menus", "smoke"], description: "Load with ?playtest=quiet-ui&view=public. Real input: clicks on the Time control, a speed, Enter, Episodes and the tutorial row. Events no-dev-text / time-control / hud-regions / episodes-clear / time-drawer-open / drawer-closed-on-take / title-exclusive / menu-exclusive / episode-from-menu / no-question-in-control / no-index-fetch. Run at 1280x720 and 390x844." },
@@ -9338,7 +9418,7 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
+      if (["smoke", "hud-layout", "phone", "cold-start", "title-key-art", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
       if (id !== "title" && id !== "cold-start" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
@@ -9347,6 +9427,7 @@ installPlaytest({
       else if (id === "barks") await barksScenario(options, t);
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "cold-start") await coldStart(options, t);
+      else if (id === "title-key-art") await titleKeyArt(options, t);
       else if (id === "street-teaches") await streetTeaches(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
