@@ -28,7 +28,9 @@ export const SKIN_CLIPS = [
   "lookup", "windbolt", "windrain", "triumph", "shelter", "window",
 ];
 const LOOPS = ["idle", "walk", "run", "fall", "float", "sit", "type", "phone", "lie", "side", "recline", "shelter", "window"];
-const EXTRA_CLIPS = ["lookup", "windbolt", "windrain", "triumph", "shelter", "window"];
+/* cast, throw, fall and float also live inside small-weather.glb, but those baked copies had their arms rolled 70-160
+   degrees; the re-posed files in models/clips/ replace them (the baked group is dropped when its extra loads). */
+const EXTRA_CLIPS = ["lookup", "windbolt", "windrain", "triumph", "shelter", "window", "cast", "throw", "fall", "float"];
 /* Metres covered per loop of the clip with the stance foot planted, measured on models/small-weather.glb (stance foot
    speed at 1x times the loop length: walk 0.81 m/s over 1.067 s, run 1.63 m/s over 0.767 s). The playback speed is
    ground speed over this, so his boots keep pace with the ground. scripts/check-motion.mjs measures it again. */
@@ -166,6 +168,11 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
 
   extraGroups.forEach(({ group }) => {
     retargetGroup(group, nodeByShort);
+    const baked = groups.findIndex((g) => g.name.toLowerCase() === group.name.toLowerCase());
+    if (baked >= 0) {
+      groups[baked].stop();
+      groups.splice(baked, 1);
+    }
     groups.push(group);
   });
 

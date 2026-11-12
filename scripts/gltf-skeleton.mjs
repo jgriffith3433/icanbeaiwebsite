@@ -192,6 +192,21 @@ export function aim(sk, pose, name, child, dir) {
   const turn = q.fromTo(d, dir);
   const pr = sk.bones[i].parent < 0 ? sk.root.r : w.R[sk.bones[i].parent];
   pose.r[i] = q.norm(q.mul(q.inv(pr), q.mul(turn, w.R[i])));
+  /* A shortest-arc swing of a limb through 100+ degrees leaves the bone rolled about its own axis (77-162 deg on
+     cast / throw), which twists the forearm and the wrist. Keep only `keep` (0..1) of the roll against rest. */
+  stripTwist(sk, pose, i, c, aim.keep == null ? 0 : aim.keep);
+}
+/* Remove (1 - keep) of the bone's roll about its own child axis, measured against the rest pose. */
+export function stripTwist(sk, pose, i, c, keep = 0) {
+  const axis = v3.norm(sk.bones[c].t);
+  const rest = sk.bones[i].r;
+  const r = q.norm(q.mul(q.inv(rest), pose.r[i]));
+  const p = v3.dot([r[0], r[1], r[2]], axis);
+  let tw = q.norm([axis[0] * p, axis[1] * p, axis[2] * p, r[3]]);
+  if (p === 0 && r[3] === 0) return;
+  const swing = q.mul(r, q.inv(tw));
+  const kept = q.slerp([0, 0, 0, 1], tw, keep);
+  pose.r[i] = q.norm(q.mul(rest, q.mul(swing, kept)));
 }
 /* Turn bone `name` by `ang` radians about a world axis. */
 export function turn(sk, pose, name, axis, ang) {
