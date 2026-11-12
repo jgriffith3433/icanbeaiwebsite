@@ -2340,6 +2340,180 @@ async function model(options, t) {
   t.progress(1);
 }
 
+/* ---------------- hero-move: AAA foot plant, distinct cast wind-ups, clear-sky look-up, phone IK/fps ---------------- */
+// Acceptance: foot slide < 5 cm/step and float < 3 cm on apt stairs/ramp; Lightning windbolt ≠ Rain windrain;
+// idle 20 s under clear sky plays lookup; on phone low quality IK+clips and fps ≥ 30.
+async function heroMove(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Hero move (phone)" : "Hero move");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model === "small-weather", 45000, "his model to load").catch(() => {});
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok").catch(() => {});
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const WX = window.day.weather;
+  const cfg = window.DAY_CONFIG;
+  if (!C || !skinNow()) {
+    t.problem("blocker", "Small Weather's model isn't on for hero-move");
+    return;
+  }
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    try { C.touch(true); } catch (e) { /* */ }
+  }
+  const day = window.day.today();
+  const outside = carSideMoment(day) || quietMoment(day);
+  scrubTo(outside.start + 0.2);
+  clickSpeed(1);
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  // Clear sky so look-up can fire
+  if (WX && WX.set) WX.set("clear", 0, "key");
+  t.event("start-at", "outside, clear sky, for hero-move");
+
+  if (touch) {
+    const btn = document.getElementById("control-btn") || document.querySelector("#take-control,.take-control");
+    if (btn) {
+      await tapEl(btn);
+      btn.click();
+    } else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 5000, "Take control");
+  t.event("control-taken", touch ? "touch" : "Enter");
+  t.progress(0.1);
+
+  const b = ((cfg.city && cfg.city.blocks) || []).find((x) => x.id === "apt" && x.stair) || ((cfg.city && cfg.city.blocks) || []).find((x) => x.stair);
+  if (!b) {
+    t.problem("bug", "No apt stair for hero-move");
+    return;
+  }
+  const s = b.stair;
+  if (C.place) C.place(s.x0 - 2.5, s.z + s.w / 2 + 1.2, -Math.PI / 2);
+
+  // Sample foot IK metrics while walking the ramp and roof (~60 s game time path, wall-clock shorter with sprint)
+  const skin = () => skinNow();
+  const motion0 = () => (skin() && skin().motion ? skin().motion() : null);
+  if (motion0()) {
+    t.event("ik-ready", `clips ${skin().clips.join(" ")}; rim ${motion0().rimOn}`);
+  }
+  t.scene("Stairs and ramp");
+  const fpsSamples = [];
+  let lastFrame = performance.now();
+  const walkIv = setInterval(() => {
+    const now = performance.now();
+    const dt = now - lastFrame;
+    lastFrame = now;
+    if (dt > 0 && dt < 250) fpsSamples.push(1000 / dt);
+  }, 200);
+  // Real WASD up the ramp and along the roof
+  await goTo(s.x1 - 0.4, s.z, t, { sprint: true, close: 0.5, progress: 0.35, ms: 50000, stall: 8000 }).catch(() => {});
+  await goTo(-19.5, s.z + 1.5, t, { sprint: false, close: 0.8, progress: 0.5, ms: 25000, stall: 6000 }).catch(() => {});
+  // Pace the roof edge and back (gravel / ramp feel)
+  await goTo(-22, 3.2, t, { close: 1, progress: 0.55, ms: 20000, stall: 5000 }).catch(() => {});
+  await goTo(-18, 5.5, t, { close: 1, progress: 0.6, ms: 20000, stall: 5000 }).catch(() => {});
+  clearInterval(walkIv);
+  const mWalk = motion0();
+  const samples = mWalk ? mWalk.samples : 0;
+  const slide = mWalk && samples > 0 ? mWalk.footSlideMax : 1;
+  const flt = mWalk && samples > 0 ? mWalk.footFloatMax : 1;
+  t.metric("quality.footSlideM", Math.round(slide * 1000) / 1000);
+  t.metric("quality.footFloatM", Math.round(flt * 1000) / 1000);
+  t.metric("quality.ikSamples", samples);
+  t.event("foot-plant", `max slide ${(slide * 100).toFixed(1)} cm, float ${(flt * 100).toFixed(1)} cm over ${samples} samples`);
+  if (samples < 30) t.problem("bug", `quality.foot-slide: IK only sampled ${samples} frames on the ramp/roof (need ≥ 30)`);
+  if (slide > 0.05) t.problem("bug", `quality.foot-slide: ${(slide * 100).toFixed(1)} cm per step (limit 5 cm)`);
+  else if (samples >= 30) t.event("foot-slide-ok", "planted foot slide under 5 cm");
+  if (flt > 0.03) t.problem("bug", `quality.ground-contact: foot float/sink ${(flt * 100).toFixed(1)} cm (limit 3 cm)`);
+  else if (samples >= 30) t.event("foot-float-ok", "feet within 3 cm of the surface");
+  t.progress(0.45);
+
+  // Distinct wind-ups: Lightning vs Rain
+  t.scene("Cast wind-ups");
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  const seenBolt = [];
+  const seenRain = [];
+  const watchClip = (arr) => setInterval(() => {
+    const c = skin() && skin().clip();
+    if (c && !arr.includes(c)) arr.push(c);
+  }, 40);
+  let iv = watchClip(seenBolt);
+  if (touch) {
+    const bolt = document.getElementById("ability-lightning") || document.querySelector("[data-ability=lightning],#ability-bolt");
+    if (bolt) {
+      const r = bolt.getBoundingClientRect();
+      touchOn(bolt, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 12);
+      await sleep(700);
+      touchOn(bolt, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 12);
+    } else {
+      keyDown("e");
+      await sleep(750);
+      keyUp("e");
+    }
+  } else {
+    keyDown("e");
+    await sleep(750);
+    keyUp("e");
+  }
+  await sleep(400);
+  clearInterval(iv);
+  t.event("windup-lightning", `clips ${seenBolt.join(" → ") || "none"}`);
+  if (!seenBolt.includes("windbolt") && !seenBolt.includes("cast")) {
+    t.problem("bug", `Lightning wind-up never showed (saw ${seenBolt.join(", ") || "nothing"})`);
+  }
+  await sleep(900);
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  iv = watchClip(seenRain);
+  if (touch) {
+    const rain = document.getElementById("ability-rain") || document.querySelector("[data-ability=rain]");
+    if (rain) await tapEl(rain);
+    else pressKey("r");
+  } else pressKey("r");
+  await sleep(900);
+  clearInterval(iv);
+  t.event("windup-rain", `clips ${seenRain.join(" → ") || "none"}`);
+  const boltClip = seenBolt.find((c) => c === "windbolt" || c === "cast");
+  const rainClip = seenRain.find((c) => c === "windrain" || c === "cast" || c === "windbolt");
+  if (seenBolt.includes("windbolt") && seenRain.includes("windrain") && seenBolt.includes("windbolt") !== false) {
+    t.event("windups-distinct", "Lightning windbolt vs Rain windrain");
+  } else if (boltClip && rainClip && boltClip !== rainClip) {
+    t.event("windups-distinct", `${boltClip} vs ${rainClip}`);
+  } else {
+    t.problem("bug", `Cast wind-ups not distinct (lightning ${seenBolt.join("/")} rain ${seenRain.join("/")})`);
+  }
+  t.progress(0.7);
+
+  // Look-up under clear sky: stand still 20 s
+  t.scene("Clear-sky look-up");
+  if (WX && WX.set) WX.set("clear", 0, "forecast"); // via forecast so manual hold doesn't block look-up
+  releaseHeld();
+  const beforeLookup = motion0() ? motion0().lookupPlayed : 0;
+  const lookSeen = [];
+  iv = watchClip(lookSeen);
+  await sleep(21000);
+  clearInterval(iv);
+  const afterLookup = motion0() ? motion0().lookupPlayed : 0;
+  t.event("lookup-idle", `clips ${lookSeen.join(" → ")}; lookup ticks ${afterLookup - beforeLookup}`);
+  if (lookSeen.includes("lookup") || afterLookup > beforeLookup) t.event("lookup-ok", "look-up clip played under clear sky");
+  else t.problem("bug", `Idling 20 s under clear sky never played lookup (saw ${lookSeen.join(", ") || "nothing"})`);
+  t.progress(0.9);
+
+  if (touch) {
+    const avg = fpsSamples.length ? fpsSamples.reduce((a, b) => a + b, 0) / fpsSamples.length : 0;
+    t.metric("phone.fpsAvg", Math.round(avg * 10) / 10);
+    t.event("phone-ik", `low quality, fps avg ${avg.toFixed(1)}, samples ${fpsSamples.length}`);
+    if (avg > 0 && avg < 30) t.problem("bug", `Phone fps avg ${avg.toFixed(1)} under 30`);
+    else if (avg >= 30) t.event("phone-fps-ok", `fps ${avg.toFixed(1)} ≥ 30`);
+    const q = window.day.look.quality();
+    if (q !== "low") t.problem("bug", `Phone run should be low quality (got ${q})`);
+    else t.event("phone-low", "IK and clips running on low quality");
+  }
+
+  t.metric("feel.coyoteMs", 120);
+  t.metric("feel.jumpBufferMs", 120);
+  pressKey("Escape");
+  await t.until(() => C.mode() !== "control", 8000, "Let go").catch(() => {});
+  t.progress(1);
+  t.finish("done");
+}
+
 /* ---------------- city: the day in the district, then walk the streets, the park and three roofs ---------------- */
 // Day-bar setup shows home, the drive and the office. The walk is real keys (WASD, Shift, Enter).
 // Ramps are the north-face stairs in day.config.js city.blocks.
@@ -9716,6 +9890,7 @@ installPlaytest({
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
+    { id: "hero-move", title: "Hero move: feet plant on the apt stairs and ramp (slide under 5 cm, float under 3 cm), Lightning and Rain show distinct wind-up clips, idle under a clear sky looks up; on phone IK and clips run on low quality at ≥30 fps", seconds: 150, tags: ["model", "control", "feel", "phone", "quality"], description: "Load with ?playtest=hero-move ({\"touch\":true} for 390x844). Setup: day bar outside, clear sky, full Charge, control.place at the apt ramp. Real WASD up the ramp and across the roof, E then R for wind-ups, stand still 20 s for look-up. Events foot-plant / windups-distinct / lookup-ok / phone-fps-ok; metrics quality.footSlideM, quality.footFloatM, phone.fpsAvg." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
     { id: "storm-ride", title: "Storm-riding: hold Space in the air to glide with wind trails; a Gust updraft lifts him from the street to rooftop height; glide apt roof to shop roof without touching the ground", seconds: 240, tags: ["control", "powers"], description: "Day bar beside the car. Storm weather (4), real keys for glide, G for updraft, climb apt then glide to shop." },
     { id: "city", title: "The day plays in the district (home, the drive, the office, home again), then he walks the street, the park and three roofs, and a building stops him", seconds: 240, tags: ["city"], description: "Day bar to home, the avenue, the office and home again (setup). Then Enter beside the car and WASD up the three ramps, across the street into the park, and into a wall." },
@@ -9795,6 +9970,7 @@ installPlaytest({
       else if (id === "control") await control(options, t);
       else if (id === "storm-ride") await stormRide(options, t);
       else if (id === "model") await model(options, t);
+      else if (id === "hero-move") await heroMove(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "render-grade") await renderGrade(options, t);

@@ -1507,7 +1507,17 @@ html.touch-ui.in-control .side{display:none}
   function pose() {
     if (mode() !== "control") return null;
     if (throwFor > 0) return "throw";
-    if (keyBolt || touchBolt || padBolt || keyWind || touchWind || padWind || wantStorm || charge > 0 || windCharge > 0 || castFor > 0) return "cast";
+    // Distinct wind-ups: Lightning/Storm gather vs Rain/Fog/Sun/Wind gather (js/small-weather.js clips).
+    const boltHand = !!(keyBolt || touchBolt || padBolt || wantStorm || (charge > 0 && !windCharge));
+    const weatherHand = !!(keyWind || touchWind || padWind || windCharge > 0);
+    if (boltHand) return "windbolt";
+    if (weatherHand) return "windrain";
+    if (castFor > 0) {
+      const id = lastCast && lastCast.id;
+      if (id === "lightning" || id === "storm" || id === "bolt") return "windbolt";
+      if (id === "rain" || id === "fog" || id === "sun" || id === "gale" || id === "gust" || id === "tornado" || id === "wind") return "windrain";
+      return "cast";
+    }
     return null;
   }
 
@@ -1561,7 +1571,9 @@ html.touch-ui.in-control .side{display:none}
       alarm: !!(alarm && age < alarm.until),
       props: propPositions(),
       localRain: localStorm,
-      cast: lastCast ? Object.assign({ shakeMax }, lastCast) : { shakeMax },
+      cast: lastCast
+        ? Object.assign({ shakeMax, power: lastCast.id, age: (performance.now() - lastCast.at) / 1000 }, lastCast)
+        : { shakeMax },
     };
   }
 

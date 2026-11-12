@@ -23,8 +23,15 @@ const OUT = path.join(here, "..", "art", "small-weather", "clips");
 // the PH Origins repo next to this one (or next to the worktree's parent folder), or a path as the first argument
 const SOURCE =
   process.argv[2] ||
-  [path.join(here, "..", ".."), path.join(here, "..", "..", "..")].map((d) => path.join(d, "phoriginswebsite", "assets", "models", "ch33-hero.glb")).find((f) => fs.existsSync(f));
+  [path.join(here, "..", "models", "small-weather.glb")]
+    .concat(
+      [path.join(here, "..", ".."), path.join(here, "..", "..", "..")].map((d) =>
+        path.join(d, "phoriginswebsite", "assets", "models", "ch33-hero.glb")
+      )
+    )
+    .find((f) => fs.existsSync(f));
 const FPS = 30;
+const OUT_MODELS = path.join(here, "..", "models", "clips");
 const TAU = Math.PI * 2;
 const X = [1, 0, 0];
 const Y = [0, 1, 0];
@@ -64,20 +71,26 @@ function frames(seconds, fn) {
   const n = Math.max(2, Math.round(seconds * FPS) + 1);
   return Array.from({ length: n }, (_, k) => fn(k / (n - 1), (k / (n - 1)) * seconds));
 }
-const idleAt = (t) => sampleClip(sk, "Idle", t % sk.clips.Idle.duration);
+const clipOf = (...names) => names.find((n) => sk.clips[n]);
+const IDLE = clipOf("Idle", "idle");
+const WALK = clipOf("Walk", "walk");
+const RUN = clipOf("Run", "run");
+const SIT = clipOf("SitIdle", "sit");
+const JUMP = clipOf("Jump", "jump");
+const idleAt = (t) => sampleClip(sk, IDLE, t % sk.clips[IDLE].duration);
 
 const CLIPS = {
   /* Mixamo, in place */
-  idle: () => frames(sk.clips.Idle.duration, (u, t) => inPlace(sampleClip(sk, "Idle", t))),
-  walk: () => frames(sk.clips.Walk.duration, (u, t) => inPlace(sampleClip(sk, "Walk", t))),
-  run: () => frames(sk.clips.Run.duration, (u, t) => inPlace(sampleClip(sk, "Run", t))),
-  sit: () => frames(sk.clips.SitIdle.duration, (u, t) => inPlace(sampleClip(sk, "SitIdle", t))),
+  idle: () => frames(sk.clips[IDLE].duration, (u, t) => inPlace(sampleClip(sk, IDLE, t))),
+  walk: () => frames(sk.clips[WALK].duration, (u, t) => inPlace(sampleClip(sk, WALK, t))),
+  run: () => frames(sk.clips[RUN].duration, (u, t) => inPlace(sampleClip(sk, RUN, t))),
+  sit: () => frames(sk.clips[SIT].duration, (u, t) => inPlace(sampleClip(sk, SIT, t))),
 
   /* Mixamo's Jump from the push-off to the top, knees tucking (the game lifts him) */
   jump: () =>
     frames(0.5, (u) => {
       const t = 0.72 + 0.33 * clamp01(u / 0.75);
-      return inPlace(sampleClip(sk, "Jump", t), STAND);
+      return inPlace(sampleClip(sk, JUMP, t), STAND);
     }),
 
   /* falling: arms up and waving for balance, legs pedalling; loops */
@@ -179,14 +192,105 @@ const CLIPS = {
       legs(p, [0.08, -Math.cos(0.6), Math.sin(0.6)], [0.06, -Math.cos(0.52), Math.sin(0.52)]);
       return inPlace(p, STAND);
     }),
+
+  /* AAA hero beats: look up at a clear sky (idle under fair weather) */
+  lookup: () =>
+    frames(3.2, (u, t) => {
+      const k = ease(clamp01(t / 0.7));
+      const hold = t > 2.2 ? ease(clamp01((t - 2.2) / 1.0)) : 0;
+      const up = clonePose(idleAt(t));
+      turn(sk, up, "Spine2", X, -0.28);
+      turn(sk, up, "Spine1", X, -0.12);
+      turn(sk, up, "Head", X, -0.55);
+      arms(up, [0.2, -0.55, 0.15], [0.12, -0.9, 0.05], [-0.22, -0.5, 0.12], [-0.1, -0.85, 0.08]);
+      const p = blendPose(idleAt(t), up, k * (1 - hold));
+      return inPlace(p, STAND);
+    }),
+
+  /* Lightning wind-up: right hand gathers over the shoulder, left steadies, eyes on the aim */
+  windbolt: () =>
+    frames(1.0, (u, t) => {
+      const k = ease(clamp01(t / 0.35));
+      const base = idleAt(0);
+      const wind = clonePose(base);
+      turn(sk, wind, "Spine1", Y, -0.55);
+      turn(sk, wind, "Spine2", X, -0.18);
+      turn(sk, wind, "Head", X, -0.2);
+      turn(sk, wind, "Head", Y, 0.25);
+      arms(wind, [0.45, 0.05, 0.85], [0.25, 0.35, 0.95], [-0.15, 0.95, 0.05], [-0.05, 1.0, -0.15]);
+      legs(wind, [0.12, -1, 0.15], [0.04, -1, -0.2], [-0.18, -1, -0.05], [-0.06, -1, -0.28]);
+      const p = blendPose(base, wind, k);
+      const dip = 0.03 * Math.sin(clamp01(t / 0.35) * Math.PI);
+      return inPlace(p, STAND - dip);
+    }),
+
+  /* Rain / Fog wind-up: both palms open upward, a soft gather, chest lifts */
+  windrain: () =>
+    frames(1.1, (u, t) => {
+      const k = ease(clamp01(t / 0.4));
+      const base = idleAt(t * 0.3);
+      const rain = clonePose(base);
+      turn(sk, rain, "Spine2", X, -0.22);
+      turn(sk, rain, "Head", X, -0.3);
+      arms(rain, [0.55, 0.75, 0.35], [0.35, 0.95, 0.15], [-0.55, 0.75, 0.35], [-0.35, 0.95, 0.15]);
+      const p = blendPose(base, rain, k);
+      return inPlace(p, STAND - 0.02 * k);
+    }),
+
+  /* Triumphant fist after a big cast (Storm / Tornado) */
+  triumph: () =>
+    frames(1.4, (u, t) => {
+      const base = idleAt(0);
+      const up = clonePose(base);
+      turn(sk, up, "Spine1", Y, 0.2);
+      turn(sk, up, "Spine2", X, -0.25);
+      turn(sk, up, "Head", X, -0.15);
+      arms(up, [0.25, -0.4, 0.2], [0.15, -0.7, 0.1], [-0.2, 1.05, 0.1], [-0.08, 1.0, -0.05]);
+      let p;
+      if (t < 0.25) p = blendPose(base, up, ease(t / 0.25));
+      else if (t < 0.85) p = up;
+      else p = blendPose(up, base, ease((t - 0.85) / 0.55));
+      return inPlace(clonePose(p), STAND - (t > 0.2 && t < 0.9 ? 0.03 : 0));
+    }),
+
+  /* Rain-shelter shrug: shoulders up, head tucked, a wet-weather idle */
+  shelter: () =>
+    frames(2.4, (u, t) => {
+      const a = u * TAU;
+      const p = idleAt(t);
+      turn(sk, p, "Spine2", X, 0.18);
+      turn(sk, p, "Head", X, 0.35);
+      arms(p, [0.35, -0.35 + 0.04 * Math.sin(a), 0.55], [0.2, 0.15, 0.85], [-0.35, -0.35 + 0.04 * Math.sin(a + 1), 0.55], [-0.2, 0.15, 0.85]);
+      return inPlace(p, STAND + 0.01 * Math.sin(a));
+    }),
+
+  /* Sit-at-the-window idle for autopilot evenings: perched, looking out */
+  window: () => {
+    const sitName = sk.clips.SitIdle ? "SitIdle" : sk.clips.sit ? "sit" : "idle";
+    const dur = sk.clips[sitName].duration || 2;
+    return frames(4, (u, t) => {
+      const a = u * TAU;
+      const p = sampleClip(sk, sitName, t % dur);
+      turn(sk, p, "Spine1", Y, 0.35 + 0.04 * Math.sin(a * 0.5));
+      turn(sk, p, "Head", X, -0.1);
+      turn(sk, p, "Head", Y, 0.45);
+      arms(p, [0.3, -0.55, 0.55], [0.15, -0.2, 0.9], [-0.4, -0.75, 0.2], [-0.15, 0.35, 0.75]);
+      return inPlace(p);
+    });
+  },
 };
 
+const HERO = new Set(["lookup", "windbolt", "windrain", "triumph", "shelter", "window"]);
 fs.mkdirSync(OUT, { recursive: true });
+fs.mkdirSync(OUT_MODELS, { recursive: true });
 const only = process.argv.slice(3);
 for (const [name, make] of Object.entries(CLIPS)) {
   if (only.length && !only.includes(name)) continue;
   const f = make();
   const file = path.join(OUT, `${name}.glb`);
   writeClipGlb(file, sk, name, f, FPS);
+  if (HERO.has(name)) {
+    fs.copyFileSync(file, path.join(OUT_MODELS, `${name}.glb`));
+  }
   console.log(`${name}: ${f.length} frames, ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
 }
