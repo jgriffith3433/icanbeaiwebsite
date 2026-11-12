@@ -5901,6 +5901,956 @@
    "files": {
     "music": "audio/music/sting-failure.mp3"
    }
+  },
+  {
+   "id": "foley-jump-1",
+   "note": "Foley (move) for js/sfx.js: jump, variant 1 of 3. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Cartoon-realistic foley: a short sneaker push-off and cloth rustle of a person jumping on a rooftop, dry, close, no music",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/jump-1.mp3"
+   }
+  },
+  {
+   "id": "foley-jump-2",
+   "note": "Foley (move) for js/sfx.js: jump, variant 2 of 3. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Cartoon-realistic foley: a short sneaker push-off and cloth rustle of a person jumping on a rooftop, dry, close, no music (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/jump-2.mp3"
+   }
+  },
+  {
+   "id": "foley-jump-3",
+   "note": "Foley (move) for js/sfx.js: jump, variant 3 of 3. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Cartoon-realistic foley: a short sneaker push-off and cloth rustle of a person jumping on a rooftop, dry, close, no music (variation 3, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1014
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/jump-3.mp3"
+   }
+  },
+  {
+   "id": "foley-land-gravel-soft-1",
+   "note": "Foley (move) for js/sfx.js: land-gravel-soft, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft landing of sneakers on rooftop gravel ballast, a few crunching pebbles, dry close recording",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-gravel-soft-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-gravel-soft-2",
+   "note": "Foley (move) for js/sfx.js: land-gravel-soft, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft landing of sneakers on rooftop gravel ballast, a few crunching pebbles, dry close recording (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-gravel-soft-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-gravel-hard-1",
+   "note": "Foley (move) for js/sfx.js: land-gravel-hard, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard heavy landing on rooftop gravel, deep thud and scattering pebbles, dry close recording",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-gravel-hard-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-gravel-hard-2",
+   "note": "Foley (move) for js/sfx.js: land-gravel-hard, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard heavy landing on rooftop gravel, deep thud and scattering pebbles, dry close recording (variation 2, a different take)",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-gravel-hard-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-grating-soft-1",
+   "note": "Foley (move) for js/sfx.js: land-grating-soft, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft sneaker landing on a metal grating catwalk, light hollow clank, dry close recording",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-grating-soft-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-grating-soft-2",
+   "note": "Foley (move) for js/sfx.js: land-grating-soft, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft sneaker landing on a metal grating catwalk, light hollow clank, dry close recording (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-grating-soft-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-grating-hard-1",
+   "note": "Foley (move) for js/sfx.js: land-grating-hard, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on metal grating, loud hollow clang with a short ring, dry close recording",
+      "duration": 0.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-grating-hard-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-grating-hard-2",
+   "note": "Foley (move) for js/sfx.js: land-grating-hard, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on metal grating, loud hollow clang with a short ring, dry close recording (variation 2, a different take)",
+      "duration": 0.8,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-grating-hard-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-tar-soft-1",
+   "note": "Foley (move) for js/sfx.js: land-tar-soft, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft landing on a tar roof membrane, muted sticky thump, dry close recording",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-tar-soft-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-tar-soft-2",
+   "note": "Foley (move) for js/sfx.js: land-tar-soft, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft landing on a tar roof membrane, muted sticky thump, dry close recording (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-tar-soft-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-tar-hard-1",
+   "note": "Foley (move) for js/sfx.js: land-tar-hard, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on a tar roof, deep dull thud with a boot scuff, dry close recording",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-tar-hard-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-tar-hard-2",
+   "note": "Foley (move) for js/sfx.js: land-tar-hard, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on a tar roof, deep dull thud with a boot scuff, dry close recording (variation 2, a different take)",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-tar-hard-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-pavement-soft-1",
+   "note": "Foley (move) for js/sfx.js: land-pavement-soft, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft sneaker landing on city pavement, short slap and scuff, dry close recording",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-pavement-soft-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-pavement-soft-2",
+   "note": "Foley (move) for js/sfx.js: land-pavement-soft, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft sneaker landing on city pavement, short slap and scuff, dry close recording (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-pavement-soft-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-pavement-hard-1",
+   "note": "Foley (move) for js/sfx.js: land-pavement-hard, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on concrete pavement, heavy thud and grit scrape, dry close recording",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-pavement-hard-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-pavement-hard-2",
+   "note": "Foley (move) for js/sfx.js: land-pavement-hard, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on concrete pavement, heavy thud and grit scrape, dry close recording (variation 2, a different take)",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-pavement-hard-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-gasp-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-gasp, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small street crowd gasping together in surprise, outdoors, no words, no music",
+      "duration": 1.2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-gasp-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-gasp-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-gasp, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small street crowd gasping together in surprise, outdoors, no words, no music (variation 2, a different take)",
+      "duration": 1.2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-gasp-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-cheer-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-cheer, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small street crowd cheering and whooping, outdoors, short, no music",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-cheer-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-cheer-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-cheer, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small street crowd cheering and whooping, outdoors, short, no music (variation 2, a different take)",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-cheer-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-laugh-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-laugh, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A few people laughing together on a street, warm and short, no words",
+      "duration": 1.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-laugh-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-laugh-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-laugh, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A few people laughing together on a street, warm and short, no words (variation 2, a different take)",
+      "duration": 1.8,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-laugh-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-scream-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-scream, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small crowd screaming in panic and scattering, outdoors, short, no music",
+      "duration": 1.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-scream-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-scream-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-scream, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small crowd screaming in panic and scattering, outdoors, short, no music (variation 2, a different take)",
+      "duration": 1.8,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-scream-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-whoa-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-whoa, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A few people saying a long surprised \"whoa\" together, outdoors",
+      "duration": 1.4,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-whoa-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-whoa-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-whoa, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A few people saying a long surprised \"whoa\" together, outdoors (variation 2, a different take)",
+      "duration": 1.4,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-whoa-2.mp3"
+   }
+  },
+  {
+   "id": "foley-umbrella-pop-1",
+   "note": "Foley (crowd) for js/sfx.js: umbrella-pop, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: an umbrella snapping open, canopy fabric snap and ribs clicking, close recording",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/umbrella-pop-1.mp3"
+   }
+  },
+  {
+   "id": "foley-umbrella-pop-2",
+   "note": "Foley (crowd) for js/sfx.js: umbrella-pop, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: an umbrella snapping open, canopy fabric snap and ribs clicking, close recording (variation 2, a different take)",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/umbrella-pop-2.mp3"
+   }
+  },
+  {
+   "id": "foley-car-pass-1",
+   "note": "Foley (city) for js/sfx.js: car-pass, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A single car driving past on a wet city street, tyres on asphalt, approaching and receding, no music",
+      "duration": 3,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/car-pass-1.mp3"
+   }
+  },
+  {
+   "id": "foley-car-pass-2",
+   "note": "Foley (city) for js/sfx.js: car-pass, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A single car driving past on a wet city street, tyres on asphalt, approaching and receding, no music (variation 2, a different take)",
+      "duration": 3,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/car-pass-2.mp3"
+   }
+  },
+  {
+   "id": "foley-car-horn-1",
+   "note": "Foley (city) for js/sfx.js: car-horn, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A short car horn, two quick beeps, city street, a bit distant",
+      "duration": 1.2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/car-horn-1.mp3"
+   }
+  },
+  {
+   "id": "foley-car-horn-2",
+   "note": "Foley (city) for js/sfx.js: car-horn, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A short car horn, two quick beeps, city street, a bit distant (variation 2, a different take)",
+      "duration": 1.2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/car-horn-2.mp3"
+   }
+  },
+  {
+   "id": "foley-siren-far-1",
+   "note": "Foley (city) for js/sfx.js: siren-far, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A distant city siren wailing far away between buildings at night, soft",
+      "duration": 3.2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/siren-far-1.mp3"
+   }
+  },
+  {
+   "id": "foley-siren-far-2",
+   "note": "Foley (city) for js/sfx.js: siren-far, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A distant city siren wailing far away between buildings at night, soft (variation 2, a different take)",
+      "duration": 3.2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/siren-far-2.mp3"
+   }
+  },
+  {
+   "id": "foley-pigeon-1",
+   "note": "Foley (city) for js/sfx.js: pigeon, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Pigeons cooing and wing flaps on a rooftop, close, no music",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/pigeon-1.mp3"
+   }
+  },
+  {
+   "id": "foley-pigeon-2",
+   "note": "Foley (city) for js/sfx.js: pigeon, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Pigeons cooing and wing flaps on a rooftop, close, no music (variation 2, a different take)",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/pigeon-2.mp3"
+   }
+  },
+  {
+   "id": "foley-bird-1",
+   "note": "Foley (city) for js/sfx.js: bird, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Small songbirds chirping in a city park in the morning, short, no music",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/bird-1.mp3"
+   }
+  },
+  {
+   "id": "foley-bird-2",
+   "note": "Foley (city) for js/sfx.js: bird, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Small songbirds chirping in a city park in the morning, short, no music (variation 2, a different take)",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/bird-2.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-press-1",
+   "note": "Foley (ui) for js/sfx.js: ui-press, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A soft clean UI button press click, tactile, short, no music",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-press-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-press-2",
+   "note": "Foley (ui) for js/sfx.js: ui-press, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A soft clean UI button press click, tactile, short, no music (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-press-2.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-toast-1",
+   "note": "Foley (ui) for js/sfx.js: ui-toast, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A gentle UI notification pop, two soft notes, short",
+      "duration": 0.6,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-toast-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-unlock-1",
+   "note": "Foley (ui) for js/sfx.js: ui-unlock, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A bright UI unlock sparkle, rising soft chime, short",
+      "duration": 0.9,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-unlock-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-goal-1",
+   "note": "Foley (ui) for js/sfx.js: ui-goal, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A satisfying goal-complete chime, two rising notes, short, clean",
+      "duration": 0.9,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-goal-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-fail-1",
+   "note": "Foley (ui) for js/sfx.js: ui-fail, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A low soft UI fail thud with a descending tone, short",
+      "duration": 0.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-fail-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-rank-1",
+   "note": "Foley (ui) for js/sfx.js: ui-rank, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A rank stamp: heavy rubber stamp thump on paper with a small shimmer",
+      "duration": 0.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-rank-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-open-1",
+   "note": "Foley (ui) for js/sfx.js: ui-open, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A soft UI menu opening swish, short",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-open-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-close-1",
+   "note": "Foley (ui) for js/sfx.js: ui-close, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A soft UI menu closing swish, short, descending",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-close-1.mp3"
+   }
   }
  ]
 }

@@ -127,6 +127,17 @@ day.weather.now = () => ({ state: 'clear', wet: 0 });
 frames(60 * 20);
 ok((heard().bird || 0) >= 1, 'no birds in 20 s of a clear morning');
 
+// The foley bank: a recorded clip plays when one is loaded (never the same file twice in a row, pitch jittered), else synthesis.
+ok(day.sfx.info().sources.ui === 'synth' || day.sfx.info().sources.ui === 'file', 'info().sources has no ui entry');
+const bank = day.sfx._bank;
+bank.buffers['jump'] = [{ url: 'audio/foley/jump-1.mp3', b: {} }, { url: 'audio/foley/jump-2.mp3', b: {} }, { url: 'audio/foley/jump-3.mp3', b: {} }];
+for (let i = 0; i < 30; i++) day.sfx.play('jump', false);
+const pl = day.sfx.info().plays.filter((p) => p.kind === 'jump');
+ok(pl.length === 30, `jump clips played ${pl.length} of 30 times`);
+ok(pl.every((p, i) => i === 0 || p.file !== pl[i - 1].file), 'the same jump file played twice in a row');
+ok(pl.every((p) => p.rate >= 0.888 && p.rate <= 1.112 && Math.abs(p.rate - 1) >= 0.035), 'jump pitch jitter outside 5-10%');
+ok(day.sfx.info().sources.jump === 'file', 'info().sources.jump is not file after a clip played');
+
 if (problems.length) {
   console.error('check-sfx: ' + problems.length + ' problem(s)\n - ' + problems.join('\n - '));
   process.exit(1);
