@@ -10,6 +10,7 @@
      not), show cues graded perfect / good / off, the ending.
    - Story: every line in the episode dialogue and every neighbor bubble gets a short babble, a voice of
      its own per speaker (pitch from the name), so the story is heard as well as read.
+   - Recorded foley first (audio/foley, see the bank below), the synthesis only as the fallback.
    - The city: birds by day in fair weather, cars passing (more in rush hour, from the crowd), a far siren
      now and then at night.
 
@@ -137,6 +138,88 @@
     osc.stop(t + o.dur + 0.05);
   }
   const notes = (freqs, gap, vol, wave, dur) => freqs.forEach((f, i) => tone({ freq: f, dur: dur || 0.5, vol, wave: wave || "triangle", delay: i * gap }));
+
+
+  /* ---------------- the foley bank (audio/foley/*.mp3, made with Hawkes Gen audio.sfx) ----------------
+     Recorded clips first, the synthesis below only as the fallback for a clip that isn't in the build. audio/foley/index.json
+     (vite.config.js writes it from the files on disk) lists what exists, so nothing 404s. A clip is <kind>-<n>.mp3; a kind
+     belongs to a lazy group: `ui` and `move` load when Sound comes on, `crowd` and `city` on the first time one is wanted.
+     Every play picks a variant that isn't the one before, with 5-10% pitch and 5-10% volume jitter. */
+  const GROUPS = [
+    [/^(jump|land-)/, "move"],
+    [/^(crowd-|umbrella-)/, "crowd"],
+    [/^(car-|siren|pigeon|bird)/, "city"],
+    [/^ui-/, "ui"],
+  ];
+  const groupOf = (kind) => { for (const [re, g] of GROUPS) if (re.test(kind)) return g; return "misc"; };
+  const bank = { index: null, indexing: false, files: {}, buffers: {}, groups: {}, last: {}, plays: [], sources: {}, bytes: 0 };
+  const lastRate = {};
+  function loadGroup(g) {
+    if (bank.groups[g] || !bank.index) return;
+    bank.groups[g] = "loading";
+    const a = audio;
+    const todo = Object.keys(bank.files).filter((k) => groupOf(k) === g);
+    let left = todo.reduce((n, k) => n + bank.files[k].length, 0);
+    if (!left) { bank.groups[g] = "empty"; return; }
+    todo.forEach((kind) => bank.files[kind].forEach((url) => {
+      fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status)))).then((buf) => {
+        bank.bytes += buf.byteLength;
+        return new Promise((ok, no) => a.c.decodeAudioData(buf, ok, no));
+      }).then((b) => { (bank.buffers[kind] = bank.buffers[kind] || []).push({ url, b }); }).catch(() => {}).then(() => { if (--left === 0) bank.groups[g] = "ready"; });
+    }));
+  }
+  function wantGroup(g) {
+    if (!audio) return;
+    if (!bank.index) {
+      if (!bank.indexing && typeof fetch === "function") {
+        bank.indexing = true;
+        fetch("audio/foley/index.json").then((r) => (r.ok ? r.json() : { files: [] })).catch(() => ({ files: [] })).then((j) => {
+          (j.files || []).forEach((f) => {
+            const m = /([^/]+?)-(\d+)\.mp3$/.exec(f);
+            if (m) (bank.files[m[1]] = bank.files[m[1]] || []).push(f);
+          });
+          bank.index = true;
+          Object.keys(bank.pending || {}).forEach(loadGroup);
+        });
+      }
+      (bank.pending = bank.pending || {})[g] = 1;
+      return;
+    }
+    loadGroup(g);
+  }
+  /** Play a recorded clip for `kind`; false when there isn't one loaded (the caller synthesizes instead). */
+  function sample(kind, o) {
+    o = o || {};
+    const a = ctx();
+    if (!a) return true; // Sound off: silence, nothing to fall back to
+    wantGroup(groupOf(kind));
+    const list = bank.buffers[kind];
+    if (!list || !list.length) return false;
+    let pick = list[Math.floor(Math.random() * list.length)];
+    if (list.length > 1 && pick.url === bank.last[kind]) pick = list[(list.indexOf(pick) + 1) % list.length];
+    bank.last[kind] = pick.url;
+    let rate = 1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1); // 5-10% either way
+    if (Math.abs(rate - (lastRate[pick.url] || 0)) < 0.01) rate += 0.012;
+    lastRate[pick.url] = rate;
+    const vol = (o.gain == null ? 1 : o.gain) * (1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1));
+    const src = a.c.createBufferSource();
+    src.buffer = pick.b;
+    src.playbackRate.value = rate;
+    const g = a.c.createGain();
+    g.gain.value = Math.max(0.0002, vol);
+    src.connect(g);
+    g.connect(out(a, o.pan));
+    src.start(a.c.currentTime + (o.delay || 0));
+    const tag = groupOf(kind) === "move" ? (kind === "jump" ? "jump" : "landing") : kind.split("-")[0] === "crowd" || kind === "umbrella-pop" ? "crowd" : kind.startsWith("car") || kind === "siren-far" ? "car" : kind === "bird" || kind === "pigeon" ? "bird" : "ui";
+    bank.sources[tag] = "file";
+    bank.plays.push({ kind, file: pick.url, rate: +rate.toFixed(3), t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
+    if (bank.plays.length > 60) bank.plays.shift();
+    note("file-" + kind);
+    return true;
+  }
+  /** What a sound kind is for info(): a recorded clip played, or the synthesis stood in. */
+  const synthTag = (tag) => { if (bank.sources[tag] !== "file") bank.sources[tag] = "synth"; };
+  const fx = (kind, tag, o, synth) => { if (sample(kind, o)) return; synthTag(tag); synth(); };
 
   /* ---------------- surface detection (rooftop gravel, metal, tar, puddle + street) ---------------- */
   const SURFACES = ["gravel", "metal", "tar", "puddle", "pavement", "grass", "wood"];
@@ -270,11 +353,16 @@
     },
     jump(air) {
       note("jump");
+      if (sample("jump", { gain: air ? 0.8 : 1 })) return;
+      synthTag("jump");
       noise({ type: "bandpass", freq: air ? 600 : 400, to: air ? 2400 : 1600, q: 1.2, dur: 0.28, vol: 0.09, attack: 0.03 });
     },
-    land(h) {
+    land(h, surf) {
       note("land");
       const k = Math.max(0.2, Math.min(1, h / 6));
+      const sk = surf === "metal" ? "grating" : surf === "gravel" || surf === "tar" ? surf : "pavement";
+      if (sample(`land-${sk}-${h > 2.2 ? "hard" : "soft"}`, { gain: 0.6 + 0.4 * k })) return;
+      synthTag("landing");
       noise({ type: "lowpass", freq: 260 + 300 * k, dur: 0.18 + 0.3 * k, vol: 0.1 + 0.25 * k });
       tone({ freq: 90, to: 45, dur: 0.15 + 0.25 * k, vol: 0.08 + 0.22 * k });
     },
@@ -296,7 +384,7 @@
       note("denied");
       tone({ freq: 220, to: 180, dur: 0.16, vol: 0.06, wave: "square", band: 600 });
     },
-    chimeUp() { note("goal"); notes([660, 990], 0.1, 0.09); },
+    chimeUp() { note("goal"); fx("ui-goal", "ui", {}, () => notes([660, 990], 0.1, 0.09)); },
     /* neighbour body gestures (peoplekit ask / thanks / surprise) */
     wave(pan, gain) {
       const g = gain == null ? 1 : gain;
@@ -307,6 +395,8 @@
     clap(pan, gain) {
       const g = gain == null ? 1 : gain;
       note("gesture-thanks");
+      if (sample("crowd-laugh", { gain: 0.7 * g, pan })) return;
+      synthTag("crowd");
       noise({ type: "bandpass", freq: 1800, to: 900, q: 0.8, dur: 0.08, vol: 0.12 * g, attack: 0.001, pan });
       tone({ freq: 240, to: 120, dur: 0.12, vol: 0.06 * g, pan });
       setTimeout(() => {
@@ -316,6 +406,8 @@
     gasp(pan, gain) {
       const g = gain == null ? 1 : gain;
       note("gesture-surprise");
+      if (sample("crowd-gasp", { gain: 0.8 * g, pan })) return;
+      synthTag("crowd");
       tone({ freq: 380, to: 520, dur: 0.28, vol: 0.05 * g, wave: "sine", attack: 0.04, pan });
       noise({ type: "highpass", freq: 600, dur: 0.2, vol: 0.04 * g, attack: 0.02, pan });
     },
@@ -323,6 +415,8 @@
     scream(pan, gain) {
       const g = gain == null ? 1 : gain;
       note("scream");
+      if (sample("crowd-scream", { gain: g, pan })) return;
+      synthTag("crowd");
       for (let i = 0; i < 3; i++) {
         const f = 420 + i * 90 + Math.random() * 80;
         tone({ freq: f, to: f * 1.35, dur: 0.35, vol: 0.045 * g, wave: "sawtooth", band: 1400, delay: i * 0.07, pan: (pan || 0) + (i - 1) * 0.15 });
@@ -332,20 +426,25 @@
     umbSnap(pan, gain) {
       const g = gain == null ? 1 : gain;
       note("umbrella");
+      if (sample("umbrella-pop", { gain: g, pan })) return;
+      synthTag("crowd");
       noise({ type: "lowpass", freq: 400, to: 1200, q: 1, dur: 0.25, vol: 0.08 * g, attack: 0.01, pan });
       tone({ freq: 180, to: 90, dur: 0.2, vol: 0.05 * g, pan });
     },
-    thud() { note("fail"); tone({ freq: 120, to: 55, dur: 0.45, vol: 0.18 }); tone({ freq: 127, to: 58, dur: 0.45, vol: 0.08, wave: "sawtooth", band: 300 }); },
-    blip() { note("blip"); tone({ freq: 1250, to: 1600, dur: 0.12, vol: 0.06, wave: "triangle" }); },
+    thud() { note("fail"); if (sample("ui-fail")) return; synthTag("ui"); tone({ freq: 120, to: 55, dur: 0.45, vol: 0.18 }); tone({ freq: 127, to: 58, dur: 0.45, vol: 0.08, wave: "sawtooth", band: 300 }); },
+    blip() { note("blip"); if (sample("ui-toast")) return; synthTag("ui"); tone({ freq: 1250, to: 1600, dur: 0.12, vol: 0.06, wave: "triangle" }); },
     rumble() { note("rumble"); noise({ type: "lowpass", freq: 120, dur: 0.9, vol: 0.25, attack: 0.05 }); },
-    sparkle() { note("unlock"); notes([784, 988, 1175, 1568], 0.07, 0.07, "triangle", 0.7); },
-    flourish(major) { note(major ? "fanfare" : "fanfare-minor"); notes(major ? [523, 659, 784, 1047] : [523, 622, 784, 932], 0.13, 0.1, "triangle", 1.1); },
+    sparkle() { note("unlock"); if (sample("ui-unlock")) return; synthTag("ui"); notes([784, 988, 1175, 1568], 0.07, 0.07, "triangle", 0.7); },
+    flourish(major) { note(major ? "fanfare" : "fanfare-minor"); if (sample("ui-rank")) return; synthTag("ui"); notes(major ? [523, 659, 784, 1047] : [523, 622, 784, 932], 0.13, 0.1, "triangle", 1.1); },
     tick(grade) {
       note("cue-" + grade);
       if (grade === "perfect") notes([1320, 1760], 0.05, 0.08, "triangle", 0.4);
       else if (grade === "good") tone({ freq: 880, dur: 0.25, vol: 0.07, wave: "triangle" });
       else tone({ freq: 180, dur: 0.12, vol: 0.06, wave: "square", band: 500 });
     },
+    cheer(pan, gain) { note("cheer"); fx("crowd-cheer", "crowd", { gain: gain == null ? 1 : gain, pan }, () => S.clap(pan, gain)); },
+    whoa(pan, gain) { note("whoa"); fx("crowd-whoa", "crowd", { gain: gain == null ? 1 : gain, pan }, () => S.gasp(pan, gain)); },
+    horn(pan, gain) { note("horn"); fx("car-horn", "car", { gain: 0.8 * (gain == null ? 1 : gain), pan }, () => tone({ freq: 410, dur: 0.3, vol: 0.02, wave: "square", band: 900, pan })); },
     pad(freqs) { note("pad"); freqs.forEach((f) => tone({ freq: f, dur: 3, vol: 0.05, attack: 0.8 })); },
     /* A voice of sorts: syllables through a formant band, the pitch from the speaker's name. */
     babble(who, text, pan, gain) {
@@ -362,12 +461,16 @@
     },
     bird(pan, gain) {
       note("bird");
+      if (sample(Math.random() < 0.3 ? "pigeon" : "bird", { gain: 0.8 * gain, pan })) return;
+      synthTag("bird");
       const f = 2600 + Math.random() * 1800;
       const n = 2 + Math.floor(Math.random() * 3);
       for (let i = 0; i < n; i++) tone({ freq: f, to: f * (1.2 + Math.random() * 0.4), dur: 0.08, vol: 0.025 * gain, delay: i * 0.11, pan });
     },
     car(pan, gain) {
       note("car");
+      if (sample("car-pass", { gain, pan: pan * 0.6 })) { if (Math.random() < 0.12) S.horn(pan, gain); return; }
+      synthTag("car");
       const a = ctx();
       if (!a) return;
       const t = a.c.currentTime;
@@ -396,6 +499,8 @@
     },
     siren() {
       note("siren");
+      if (sample("siren-far", { gain: 0.7, pan: -0.5 })) return;
+      synthTag("siren");
       for (let i = 0; i < 4; i++) tone({ freq: 700, to: 950, dur: 0.55, vol: 0.012, wave: "triangle", delay: i * 0.6, pan: -0.5 });
     },
   };
@@ -475,7 +580,7 @@
     if (st.grounded && !him.grounded) {
       const h = him.peak - st.y;
       if (h > 0.35) {
-        S.land(h);
+        S.land(h, surfaceAt(st.x, st.y, st.z, wet()));
         puff(st.x, st.y, st.z, Math.min(1, h / 6));
       }
     }
@@ -581,6 +686,34 @@
     }
   });
 
+
+  /* UI: a press on any button plays the press clip at once (the ability arc, Episodes, cards); the Episodes menu opens and closes
+     with its own swish. Capture phase, so it sounds even where a handler stops the event. Sound also starts loading the
+     `ui` and `move` groups on the first press (or when Sound turns on), so the first press already has its clip. */
+  let lastPress = 0;
+  const pressable = (el) => el && el.closest && el.closest("button, [role=button], .ability, a[href], #sound, #time-btn");
+  if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
+    if (!pressable(e.target) || !soundOn()) return;
+    const t = performance.now();
+    if (t - lastPress < 60) return;
+    lastPress = t;
+    if (!sample("ui-press", { gain: 0.8 })) { synthTag("ui"); tone({ freq: 1250, to: 1500, dur: 0.05, vol: 0.04, wave: "triangle" }); }
+    note("ui-press");
+  }, true);
+  if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
+  try {
+    if (typeof MutationObserver === "undefined") throw new Error("no observer");
+    const menuEl = () => document.getElementById("ep-menu") || document.querySelector(".ep-menu");
+    let menuWas = document.documentElement.classList.contains("ep-menu-up");
+    new MutationObserver(() => {
+      const up = document.documentElement.classList.contains("ep-menu-up");
+      if (up === menuWas) return;
+      menuWas = up;
+      if (!sample(up ? "ui-open" : "ui-close", { gain: 0.8 })) synthTag("ui");
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    void menuEl;
+  } catch (err) { /* no DOM observer: the press sound still plays */ }
+
   /* ---------------- events ---------------- */
   window.addEventListener("day:control", (e) => {
     const d = e.detail || {};
@@ -622,6 +755,13 @@
   });
   window.addEventListener("day:crowd", (e) => {
     const d = e.detail || {};
+    if (d.action === "reaction") {
+      if (d.kind === "storm") S.whoa(0, 0.9);
+      else if (d.kind === "sun") S.cheer(0, 0.8);
+      else if (d.kind === "wind") S.clap(0, 0.8);
+      return;
+    }
+    if (d.action === "flinch") { S.gasp(0, 0.7); return; }
     if (d.action === "scatter" || d.action === "scream") {
       const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
       S.scream(at.pan, at.gain);
@@ -675,7 +815,12 @@
       lastSurface,
       recentSteps: recentSteps.slice(),
       tornado: !!roar,
+      sources: { jump: "synth", landing: "synth", crowd: "synth", car: "synth", bird: "synth", ui: "synth", ...bank.sources },
+      bank: { indexed: bank.index ? Object.keys(bank.files).reduce((n, k) => n + bank.files[k].length, 0) : 0, groups: { ...bank.groups }, loaded: Object.keys(bank.buffers).length, bytes: bank.bytes },
+      plays: bank.plays.slice(),
     }),
+    sample,
+    _bank: bank, // the check injects buffers here
     surfaceAt,
     step: (wetOrSurface, pan, surf) => S.step(wetOrSurface, pan, surf),
     play: (name, ...args) => (S[name] ? (S[name](...args), true) : false),

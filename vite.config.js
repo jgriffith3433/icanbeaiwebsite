@@ -27,6 +27,11 @@ function copyStatic() {
       fs.mkdirSync(dlgDir, { recursive: true });
       const files = fs.existsSync('audio/dialogue') ? fs.readdirSync('audio/dialogue').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/dialogue/' + n) : [];
       fs.writeFileSync(path.join(dlgDir, 'index.json'), JSON.stringify({ files }) + '\n');
+      // js/sfx.js's foley bank plays only the clips this lists (audio/foley/<kind>-<n>.mp3)
+      const folDir = path.join(outDir, 'audio', 'foley');
+      fs.mkdirSync(folDir, { recursive: true });
+      const fol = fs.existsSync('audio/foley') ? fs.readdirSync('audio/foley').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/foley/' + n) : [];
+      fs.writeFileSync(path.join(folDir, 'index.json'), JSON.stringify({ files: fol }) + '\n');
     },
   };
 }

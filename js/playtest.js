@@ -4688,6 +4688,48 @@ async function lightningBolt(options, t) {
 // Spoken dialogue: with Sound on, an episode's opening lines play as their own Hawkes Gen clips (audio/dialogue/*.mp3),
 // not the babble. Checks the build's clip list, that a sample of clips loads and decodes, and that Part 1's opening
 // lines are spoken through day.dialogue (day:dialogue say). Events dialogue-index / dialogue-decode / dialogue-say.
+// Foley: with Sound on, taps on the ability arc and Episodes play the UI press, jumps, landings and the city use the recorded
+// bank (day.sfx.info() sources), and in two minutes no clip file plays twice within 60 s. Plays by touch (phone-sized window).
+async function foley(options, t) {
+  t.scene("Outside");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const X = window.day.sfx;
+  const C = window.day.control;
+  if (!X || !C) return t.problem("bug", "day.sfx or Take control isn't installed");
+  const bytes = () => performance.getEntriesByType("resource").filter((r) => /\/audio\/foley\//.test(r.name)).reduce((n, r) => n + (r.transferSize || r.encodedBodySize || 0), 0);
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") !== "true") await tapEl(sound);
+  await sleep(600);
+  t.event("sound-on", sound && sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+  const pressesBefore = (X.info().heard["ui-press"] || 0);
+  if (C.touch) C.touch(true);
+  await tapEl($("control"));
+  await t.until(() => C.mode() === "control", 8000, "control taken");
+  // the ability arc: one tap per verb button
+  const arc = [...document.querySelectorAll("button[data-ability]")].filter((b) => b.getBoundingClientRect().width > 0);
+  for (const b of arc.slice(0, 3)) { await tapEl(b); await sleep(700); }
+  const arcPresses = (X.info().heard["ui-press"] || 0) - pressesBefore;
+  t.event("ui-arc", `${arcPresses} UI presses for ${Math.min(3, arc.length)} ability taps`);
+  if (arcPresses < Math.min(3, arc.length)) t.problem("bug", `Ability-arc taps played ${arcPresses} UI sounds for ${Math.min(3, arc.length)} taps`);
+  const ep = $("episodes");
+  if (ep) { const n = X.info().heard["ui-press"] || 0; await tapEl(ep); await sleep(500); if ((X.info().heard["ui-press"] || 0) <= n) t.problem("bug", "Tapping Episodes played no UI sound"); await tapEl(ep.ownerDocument.querySelector("#ep-menu .close, .ep-menu .close") || ep); await sleep(400); }
+  // jumps and landings by the touch Jump button
+  for (let i = 0; i < 6; i++) { await tapEl($("jump-btn") || $("control")); await sleep(1500); }
+  const t0 = performance.now();
+  while (performance.now() - t0 < 100000) { await sleep(5000); t.progress(Math.min(0.9, (performance.now() - t0) / 100000)); }
+  const info = X.info();
+  t.event("sfx-sources", JSON.stringify(info.sources));
+  t.metric("foley.bytes", bytes());
+  t.metric("foley.indexed", info.bank.indexed);
+  for (const k of ["jump", "landing", "crowd", "car", "bird", "ui"]) if (info.sources[k] !== "file") t.problem("bug", `day.sfx.info().sources.${k} is ${info.sources[k]}, not a recorded file`);
+  const last = {};
+  let repeats = 0;
+  for (const p of info.plays) { if (last[p.file] != null && p.t - last[p.file] < 60000) repeats++; last[p.file] = p.t; }
+  t.event("foley-repeats", `${repeats} clip files replayed within 60 s of themselves out of ${info.plays.length} plays`);
+  if (repeats) t.problem("bug", `${repeats} foley files played again within 60 s`);
+  if (bytes() > 400 * 1024) t.problem("bug", `Foley transfer is ${Math.round(bytes() / 1024)} KB, over 400 KB`);
+}
 async function spokenDialogue(options, t) {
   t.scene("Outside");
   checkBasics(t);
@@ -9097,6 +9139,7 @@ installPlaytest({
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
+    { id: "foley", title: "Foley: recorded jump, landing, crowd, car, bird and UI sounds in lazy groups, taps on the ability arc and Episodes play the UI press, no clip file twice within 60 s, foley transfer under 400 KB", seconds: 130, tags: ["audio", "phone"], description: "Load with ?playtest=foley. Sound on, Take control by touch, taps on the ability arc and Episodes, Jump taps, then a two-minute listen. Events sound-on / ui-arc / sfx-sources / foley-repeats; metrics foley.bytes, foley.indexed." },
     { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "voice-director", title: "Voice director: take control and first power uses speak with a caption clear of the ability bar; lines never overlap; Voices mute leaves music/effects alone; day end speaks", seconds: 90, tags: ["voice", "audio"], description: "Load with ?playtest=voice-director. Sound on (real pointer), Enter, E then R, Voices off in Settings, day-end recap (setup). Optional {\"touch\":true}. Events voice-take / voice-power-first / voice-caption / voice-no-overlap / voices-mute / voice-dayend. Run at desktop and 390x844." },
@@ -9181,6 +9224,7 @@ installPlaytest({
       else if (id === "voice") await voice(options, t);
       else if (id === "voice-director") await voiceDirector(options, t);
       else if (id === "spoken-dialogue") await spokenDialogue(options, t);
+      else if (id === "foley") await foley(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);
       else if (id === "turning-moments") await turningMoments(options, t);
