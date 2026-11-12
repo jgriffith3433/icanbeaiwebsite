@@ -1346,7 +1346,7 @@ window.DAY_CONFIG = {
           fx: [
             { at: 0.2, weather: "rain", intensity: 0.7 },
             { at: 10.2, lawnAnim: 1, lawnFrom: 0.15, lawnSecs: 5 },
-            { at: 20.2, celebrate: 14 },
+            { at: 20.2, celebrate: 14, x: 118, z: 26, r: 22 },
           ],
           lines: [
             { who: "Birdie", at: 12, text: "The lawn drank. Thank you.", caption: "The lawn drank. Thank you." },
@@ -1360,7 +1360,7 @@ window.DAY_CONFIG = {
             { at: 0, tx: [-6, 0], ty: 3.2, tz: [44, 42], alpha: [-1.9, -1.5], beta: [1.05, 1.12], radius: [26, 18] },
             { at: 12, tx: [154, 150], ty: 6.2, tz: [2, 4], alpha: [-1.1, -1.55], beta: [1.0, 1.08], radius: [28, 20] },
           ],
-          places: [{ id: "dex", x: 154, z: 4.5, gesture: "ask" }, { id: "birdie", x: -8, z: 26, gesture: null }, { id: "ines", x: 158, z: 2, gesture: "surprise" }],
+          places: [{ id: "dex", x: 154, z: 4.5, gesture: "work" }, { id: "birdie", x: -8, z: 26, gesture: null }, { id: "ines", x: 158, z: 2, gesture: "surprise" }],
           fx: [
             { at: 0.2, lawn: 0.45 },
             { at: 0.4, weather: "clouds", intensity: 0.55 },

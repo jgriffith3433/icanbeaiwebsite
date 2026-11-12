@@ -515,12 +515,17 @@ export function installCrowd(world) {
       p.phase += dt * 3;
       return;
     }
-    if (rKind) {
+    if (p.celebrate && celebrateLeft > 0) {
+      // plaza rain-dance: blend in like a sun cheer without switching district weather reaction
+      if (p.rdelay > 0) p.rdelay -= dt;
+      else p.rk = Math.min(1, p.rk + dt / 0.25);
+    } else if (rKind) {
       if (p.rdelay > 0) p.rdelay -= dt;
       else p.rk = Math.min(1, p.rk + dt / 0.25);
     } else p.rk = Math.max(0, p.rk - dt / REACT_SEC);
     const rk = p.rk;
-    if (rKind === "rain") run = run || rk > 0.5;
+    const dancing = !!(p.celebrate && celebrateLeft > 0 && rk > 0.2);
+    if (rKind === "rain" && !dancing) run = run || rk > 0.5;
     if (rKind === "lookup" && p.look > 0 && rk > 0.5 && p.state !== "door-in" && p.state !== "door-out") {
       p.look -= dt; // stop and look up at the flash
       p.phase += dt * 2;
@@ -531,11 +536,11 @@ export function installCrowd(world) {
       if (crossOpen(p) || p.wait > 40) { p.state = "walk"; p.wait = 0; }
       else { p.phase += dt * 2; return; }
     }
-    const reactK = rKind === "gale" ? 1 - 0.35 * rk : rKind === "fog" ? 1 - 0.2 * rk : rKind === "sun" ? 1 - 0.4 * rk : 1;
-    const hurry = wxK.raining && !run ? 1.3 : 1; // rain: everyone walks quicker
+    const reactK = rKind === "gale" ? 1 - 0.35 * rk : rKind === "fog" ? 1 - 0.2 * rk : (rKind === "sun" || dancing) ? 1 - 0.4 * rk : 1;
+    const hurry = wxK.raining && !run && !dancing ? 1.3 : 1; // rain: everyone walks quicker (dancers stroll)
     const sp = p.speed * hurry * (run ? 1.9 : 1) * reactK * (p.state === "door-in" || p.state === "door-out" ? 0.8 : 1);
     // step cadence from the speed they actually move at, so feet keep pace (a run takes longer strides)
-    p.phase += dt * (run ? 11 / 1.9 : 7.5) * (sp / 1.3) * (rKind === "sun" ? 1 + rk * 0.3 : 1);
+    p.phase += dt * (run ? 11 / 1.9 : 7.5) * (sp / 1.3) * ((rKind === "sun" || dancing) ? 1 + rk * 0.3 : 1);
     p.t += (sp * dt) / p.len;
     if (p.state === "door-out") p.scale = Math.min(1, p.t * 1.8);
     if (p.state === "door-in") p.scale = Math.max(0, 1 - Math.max(0, p.t - 0.35) / 0.65);
@@ -635,8 +640,8 @@ export function installCrowd(world) {
     const fog = wx.state === "fog" || (wx.fog || 0) > 0.05;
     const sky = (look && look.info && look.info().sky) || { night: 0, dusk: 0 };
     let kind = "";
-    if (celebrateLeft > 0) kind = "sun";
-    else if (hushLeft > 0) kind = "rain";
+    // celebrate is per-person (plaza dance in the rain); don't force a district-wide sun reaction
+    if (hushLeft > 0) kind = "rain";
     else if (wx.manual) {
       if (wx.state === "storm") kind = "lookup";
       else if (wx.state === "rain") kind = "rain";
@@ -673,16 +678,22 @@ export function installCrowd(world) {
         return;
       }
       if (d.action === "celebrate") {
-        // Fair Weather ending: dance in the rain on the plaza (cheer hops even while raining)
+        // Fair Weather ending: dance in the rain on the plaza only (hop + hands up; fold umbrellas in-zone)
         celebrateLeft = Math.max(4, d.secs || 12);
         hushLeft = 0;
-        startReaction("sun");
+        const cx = d.x != null ? +d.x : 118;
+        const cz = d.z != null ? +d.z : 26;
+        const cr = d.r != null ? +d.r : 22;
         for (let i = 0; i < MAXP; i++) {
           const p = people[i];
           if (!p || !p.active) continue;
+          const inZone = Math.hypot(p.x - cx, p.z - cz) < cr;
+          p.celebrate = inZone;
+          if (!inZone) continue;
           p.leaving = false;
           p.umbForceClose = true;
           p.rdelay = rng() * 0.25;
+          p.rk = Math.max(p.rk, 0.15);
         }
         return;
       }
@@ -693,6 +704,7 @@ export function installCrowd(world) {
         for (let i = 0; i < MAXP; i++) {
           const p = people[i];
           if (!p || !p.active) continue;
+          p.celebrate = false;
           p.leaving = false;
           p.umbForceClose = false;
           p.hasUmb = true;
@@ -897,7 +909,15 @@ export function installCrowd(world) {
 
     const minutes = dayNow.minutes;
     hourNow = ((minutes % 1440) + 1440) % 1440 / 60;
-    if (celebrateLeft > 0) celebrateLeft = Math.max(0, celebrateLeft - dt);
+    if (celebrateLeft > 0) {
+      celebrateLeft = Math.max(0, celebrateLeft - dt);
+      if (celebrateLeft === 0) {
+        for (let i = 0; i < MAXP; i++) {
+          const p = people[i];
+          if (p) { p.celebrate = false; p.umbForceClose = false; }
+        }
+      }
+    }
     if (hushLeft > 0) hushLeft = Math.max(0, hushLeft - dt);
     const d = densityAt(curve, hourNow);
     const w = weatherK();
@@ -1022,7 +1042,8 @@ export function installCrowd(world) {
       const looking = rKind === "lookup" && p.look > 0 && rk > 0.5;
       if (rk > 0.3) reacting++;
       if (rk > 0.3 && rKind === "lookup" && looking) lookingUp++;
-      const cheer = rKind === "sun" ? rk * 0.16 * Math.abs(Math.sin(p.phase * 0.9)) : 0;
+      const dancing = !!(p.celebrate && celebrateLeft > 0);
+      const cheer = (rKind === "sun" || dancing) ? rk * 0.16 * Math.abs(Math.sin(p.phase * 0.9)) : 0;
       const bob = Math.abs(Math.sin(p.phase)) * 0.035 * (p.state === "wait" ? 0 : 1) + cheer;
       const gale = rKind === "gale" ? rk : 0;
       const sway = Math.sin(p.phase) * (p.state === "wait" ? 0 : 0.13) + gale * (0.16 + 0.1 * Math.sin(clock * 9 + p.phase));
@@ -1045,7 +1066,7 @@ export function installCrowd(world) {
       if (!lk.dog || quality === "low" || !near) hide(mDog, i);
       else put(mDog, i, p.x + Math.cos(p.yaw) * 0.65 + Math.sin(p.yaw) * 0.3, PED_Y + Math.abs(Math.sin(p.phase * 2)) * 0.015, p.z - Math.sin(p.yaw) * 0.65 + Math.cos(p.yaw) * 0.3, p.yaw, 1, 1);
       if (gale > 0.3) { put(mHand, i, p.x + Math.sin(p.yaw) * lean * 1.6, y + 1.76 * h, p.z + Math.cos(p.yaw) * lean * 1.6, p.yaw, p.scale * 1.1, 1); hats++; }
-      else if (rKind === "sun" && rk > 0.3) { put(mHand, i, p.x, y + 1.95 * h + cheer, p.z, p.yaw, p.scale * 2.2, 1); cheering++; }
+      else if ((rKind === "sun" || dancing) && rk > 0.3) { put(mHand, i, p.x, y + 1.95 * h + cheer, p.z, p.yaw, p.scale * 2.2, 1); cheering++; }
       else hide(mHand, i);
       /* Umbrellas: up in the rain; a strong gust (js/windfog.js) snatches the ones carried open, then turns each inside out
          once the wind passes its own threshold (0.5-0.9), and it stays flipped until the wind is nearly gone.
@@ -1133,7 +1154,7 @@ export function installCrowd(world) {
         for (let i = 0; i < MAXP; i++) if (people[i]) people[i].umbForceClose = false;
       }
     }
-    handMesh.setEnabled(rKind === "gale" || rKind === "sun");
+    handMesh.setEnabled(rKind === "gale" || rKind === "sun" || celebrateLeft > 0);
     wiperMesh.setEnabled(wxK.raining);
     lampMatF.emissiveColor.set(lampK * 0.9, lampK * 0.85, lampK * 0.7);
     lampMatR.emissiveColor.set(lampK * 0.7, lampK * 0.07, lampK * 0.07);
