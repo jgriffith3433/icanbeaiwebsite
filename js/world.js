@@ -1506,10 +1506,16 @@
        still places, tilts and seats him (its boxes hide). The figure's pose and gesture pick the clip. */
     let skin = null;
     const SEATED = ["sitChair", "sitCouch", "sitBed", "toilet", "sitCar"];
+    let skinHour = 12;
     function skinClip(pose, hand) {
       if (pose === "walk") return "walk";
       if (pose === "lie" || pose === "side" || pose === "recline") return pose;
-      if (SEATED.includes(pose)) return ["type", "wheel", "phone", "remote", "eat", "cook", "hold"].includes(hand) ? "type" : "sit";
+      if (SEATED.includes(pose)) {
+        if (["type", "wheel", "phone", "remote", "eat", "cook", "hold"].includes(hand)) return "type";
+        // Autopilot evenings: sit-at-the-window idle (js/small-weather.js `window` clip)
+        if (skinHour >= 18.5 && skinHour < 22.5) return "window";
+        return "sit";
+      }
       if (hand === "phone" || hand === "remote" || hand === "brush" || hand === "face" || hand === "drink") return "phone";
       if (hand === "stretch" || hand === "towel") return "cast";
       return "idle";
@@ -1880,6 +1886,7 @@
       const things = fr.things || things0;
       const minutes = fr.minutes;
       const hour = (minutes % 1440) / 60;
+      skinHour = hour;
       const day = daylight(hour);
       const snap = !!opts.snap;
 

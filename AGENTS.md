@@ -132,9 +132,10 @@ each of those is heard and that Sound off is silent. New player-facing beats get
   `icanbe/small-weather` keeps the takes.
 - **The clips** are made here, not downloaded: `node scripts/small-weather-clips.mjs` writes
   `art/small-weather/clips/*.glb` from PH Origins' ch33 hero's Mixamo rig (`phoriginswebsite/assets/models/ch33-hero.glb`
-  next to this repo): Idle, Walk, Run, Jump (push-off to the top) and Sitting Idle in place, and posed ones (fall,
-  float, cast with both arms up, a lightning throw, and the day's type, phone, lie, side, recline), by bone directions
-  (`scripts/gltf-skeleton.mjs`). Upload a changed clip to the entity's `clip-src/<name>` slot and rig again.
+  next to this repo) or from `models/small-weather.glb`: Idle, Walk, Run, Jump (push-off to the top) and Sitting Idle in place, and posed ones (fall,
+  float, cast with both arms up, a lightning throw, the day's type, phone, lie, side, recline, and hero beats lookup / windbolt / windrain / triumph / shelter / window), by bone directions
+  (`scripts/gltf-skeleton.mjs`). Hero beats also land in `models/clips/` and load at runtime onto his Mixamo bones. Upload a changed clip to the entity's `clip-src/<name>` slot and rig again.
+- **Hero plant:** `js/small-weather.js` runs two-bone foot IK (Havok / `world.groundAt` raycasts) so boots sit on roof gravel, stairs and the ramp, with a pelvis offset on slopes, stride-matched walk/run (`WALK_STRIDE` / `RUN_STRIDE`), landing crouch on hard impacts, and a rim light that follows him. Playtest: `hero-move`.
 - **In the page:** `js/app.js` imports `js/small-weather.js` (its own chunk, with `@babylonjs/loaders`) once the page
   is up and calls `world.setSkin()`. The model is parented to the figure's `spin` node, so the day's placing, tilting
   (in bed) and seating still work; the boxes hide (the phone, cup and bag stay). The clip comes from the controller's

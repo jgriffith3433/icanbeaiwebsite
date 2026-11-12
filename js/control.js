@@ -1402,6 +1402,7 @@ function install() {
       route: mover.route() ? mover.route().path.length : 0,
       updrafts: mover.updrafts().length,
       cameraPull: Math.round(glidePull * 100) / 100,
+      vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
     }),
     move: mover.move,
     /** Game seconds simulated while he's the player's (sum of the control steps' dt). */
