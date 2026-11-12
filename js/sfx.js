@@ -677,9 +677,9 @@
     },
     jump(air) {
       note("jump");
-      if (sample("jump", { gain: air ? 0.8 : 1 })) return;
+      if (sample("jump", { gain: air ? 0.7 : 0.85 })) return;
       synthTag("jump");
-      noise({ type: "bandpass", freq: air ? 600 : 400, to: air ? 2400 : 1600, q: 1.2, dur: 0.28, vol: 0.09, attack: 0.03 });
+      noise({ type: "bandpass", freq: air ? 600 : 400, to: air ? 2400 : 1600, q: 1.2, dur: 0.22, vol: 0.05, attack: 0.03 });
     },
     land(h, surf) {
       note("land");
