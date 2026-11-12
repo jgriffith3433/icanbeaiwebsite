@@ -5529,7 +5529,22 @@ async function windFog(options, t) {
   t.metric("quality", quality === "low" ? 0 : 1);
   if (P.abilities && P.abilities.reset) P.abilities.reset(100);
   await t.until(() => P.now().pressure >= 40, 8000, "Charge").catch(() => {});
-  const calm = () => { const n = W.now(); return n.rain < 0.05 && n.fog < 0.015 && n.wind < 0.2; };
+
+  /* opening beat: within 10 s of control, a Gust visibly pushes the fog (Fog, then Wind, both real input) */
+  t.scene("Gust on the fog");
+  const tOpen = performance.now();
+  if (touch) await tapEl($("ability-fog")); else await holdVerb("c", 120);
+  await t.until(() => wf.info().fog >= 0.3, 4000, "fog to gather").catch(() => {});
+  const push0 = wf.info().fogPush;
+  if (touch) await tapEl($("ability-wind")); else await holdVerb("v", 120);
+  await sleep(2500);
+  const pushed = Math.round((wf.info().fogPush - push0) * 10) / 10;
+  const openSec = Math.round((performance.now() - tOpen) / 100) / 10;
+  t.metric("gustFogPushM", pushed);
+  t.metric("gustFogSeconds", openSec);
+  if (pushed < 1.5 || openSec > 10) t.problem("bug", `The gust moved the fog ${pushed} m in ${openSec} s (want 1.5+ m within 10 s)`);
+  else t.event("gust-pushes-fog", `a gust slid the fog ${pushed} m downwind, ${openSec} s after control`);
+  const calm =() => { const n = W.now(); return n.rain < 0.05 && n.fog < 0.015 && n.wind < 0.2; };
   await t.until(calm, 8000, "a calm sky").catch(() => {});
   const base = wf.info();
   t.event("wind-baseline", `wind ${base.wind}, ${base.flags} flags, ${base.laundry} laundry, ${base.cloth} cloth, ${base.plugins} shader bends, ${base.slices} fog slices (${quality})`);
@@ -11124,7 +11139,10 @@ function sensorScene() {
     // The ground plane is flat (no height), so the size test below skips it: with it unpickable the floor ray found
     // nothing under him in the street, and any float or fall of 2 s off a roof read as "fell out of the world".
     if (m.name === "ground") { m.isPickable = true; n++; continue; }
-    const e = m.getBoundingInfo().boundingBox.extendSizeWorld;
+    // a mesh that is mid-build or disposed can have no bounding info or box yet: skip it rather than throw "reading 'y'"
+    let e = null;
+    try { e = m.getBoundingInfo && m.getBoundingInfo() && m.getBoundingInfo().boundingBox && m.getBoundingInfo().boundingBox.extendSizeWorld; } catch (err) { e = null; }
+    if (!e) continue;
     if (e.y * 2 >= 2 && (e.x > 1 || e.z > 1)) { m.isPickable = true; n++; }
   }
   window.__feelPickable = n;

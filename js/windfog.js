@@ -354,7 +354,7 @@ export function createWindFog(B, scene, deps) {
 
   const U = new B.Vector4(prevailing[0], prevailing[1], 0.05, 0);
   const W = { dx: prevailing[0], dz: prevailing[1], tx: prevailing[0], tz: prevailing[1], ambient: 0, gust: 0, k: 0.05, t: 0, flips: 0, lastGustAt: -99, gusts: 0 };
-  const F = { target: 0, k: 0, bank: 0, drift: 0, density: 0 };
+  const F = { target: 0, k: 0, bank: 0, drift: 0, push: 0, density: 0 };
   const stats = { plugins: 0, ribbons: 0, leaves: 0, flags: 0, laundry: 0, cloth: 0, slices: 0, shafts: 0, cones: 0, veils: 0 };
   const hold = []; // everything to dispose
 
@@ -884,6 +884,7 @@ export function createWindFog(B, scene, deps) {
     const sc = scene.fogColor;
     fogCol.copyFromFloats(clamp(sc.r * 1.02 + 0.04, 0, 1), clamp(sc.g * 1.02 + 0.04, 0, 1), clamp(sc.b * 1.04 + 0.05, 0, 1));
     F.drift += dt;
+    if (show) F.push += (0.9 + 0.35) * (0.4 + 1.4 * Math.min(1, W.k)) * dt; // metres the fog pattern has slid downwind (the playtest reads it)
     const sn = Math.hypot(sc.r, sc.g, sc.b);
     void sn;
     const gx = Math.round(f.x / 8) * 8;
@@ -1041,7 +1042,7 @@ export function createWindFog(B, scene, deps) {
     info() {
       return {
         quality, wind: Number(W.k.toFixed(3)), gust: Number(W.gust.toFixed(3)), gusts: W.gusts, dir: [Number(W.dx.toFixed(3)), Number(W.dz.toFixed(3))],
-        ambient: W.ambient, fog: Number(F.k.toFixed(3)), bank: Number(F.bank.toFixed(3)), flips: W.flips,
+        ambient: W.ambient, fog: Number(F.k.toFixed(3)), bank: Number(F.bank.toFixed(3)), fogPush: Number(F.push.toFixed(2)), flips: W.flips,
         ribbons: stats.ribbons, leaves: stats.leaves, swirling: stats.swirling || 0, flags: stats.flags, laundry: stats.laundry, cloth: stats.cloth,
         clothSpread: cloths.map((c) => Number(c.spread().toFixed(2))), plugins: stats.plugins,
         slices: stats.slices, visibleSlices: FOG.slices.filter((s) => s.mesh.isVisible).length, veils: stats.veils, shafts: stats.shafts, cones: stats.cones,
