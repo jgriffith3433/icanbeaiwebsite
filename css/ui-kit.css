@@ -1,0 +1,252 @@
+/* ==========================================================================
+   UI art kit: self-hosted type, 9-slice frames, verb/rank/bust art, micro-feel.
+   Placement stays in hud.css; this file is look + motion only.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../fonts/outfit-text.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src: url("../fonts/fraunces-display.woff2") format("woff2");
+}
+
+:root {
+  --ui-navy: #0e1420;
+  --ui-ink: #f6f1e8;
+  --ui-cyan: #7ec8ff;
+  --ui-gold: #f0c27a;
+  --ui-frame: none;
+  --ui-slide-ms: 150ms;
+  --font-display: Fraunces, Georgia, serif;
+  --font-text: Outfit, "Segoe UI", system-ui, sans-serif;
+}
+
+html.ui-kit body,
+html.ui-kit .ep-panel,
+html.ui-kit .ep-hud,
+html.ui-kit .nb-panel,
+html.ui-kit .abilitybar,
+html.ui-kit .settings-pop,
+html.ui-kit .voice-caption,
+html.ui-kit .ep-toast,
+html.ui-kit .ep-btn {
+  font-family: var(--font-text);
+}
+html.ui-kit .ep-panel h2,
+html.ui-kit .title-screen .logo,
+html.ui-kit .mo-end h2,
+html.ui-kit #loading h2 {
+  font-family: var(--font-display);
+}
+
+/* 9-slice frame from the kit's panel art (border-image; SVG/webp). */
+.ui-frame {
+  border: 12px solid transparent !important;
+  border-radius: 4px !important;
+  border-image: var(--ui-frame) 28 fill / 12px / 0 stretch;
+  background-color: rgba(10, 14, 22, 0.88);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(126, 200, 255, 0.18);
+}
+.ep-toast.ui-frame,
+#ability-toast.ui-frame,
+#neighbor-toast.ui-frame,
+.voice-caption.ui-frame {
+  border-width: 8px !important;
+  border-image-width: 8px;
+  border-radius: 999px !important;
+}
+
+/* Rank stamp image beside the letter */
+.ui-rank {
+  position: relative;
+}
+.ui-rank .ui-rank-img {
+  display: block;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 4px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(126, 200, 255, 0.35));
+}
+.ep-menu .ep-row .rk.ui-rank-inline {
+  width: 1.35em;
+  height: 1.35em;
+  background: center / contain no-repeat var(--ui-rank);
+  color: transparent;
+  text-shadow: none;
+}
+
+/* Goal row verb chip */
+.ep-hud li .g-ico {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(126, 200, 255, 0.45));
+}
+.ep-hud .prompt .g-ico {
+  width: 20px;
+  height: 20px;
+  vertical-align: -4px;
+  margin-right: 6px;
+}
+
+/* Neighbors busts */
+.nb-panel .row .bust {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(240, 194, 122, 0.45);
+}
+.voice-caption .bust,
+.co-say .bust {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Ability bar: painted icons, press scale, ready glow, radial cooldown wipe */
+.abilitybar .ab {
+  border-radius: 14px;
+  transition: transform 80ms ease, box-shadow 120ms ease, border-color 120ms ease, filter 120ms ease;
+}
+.abilitybar .ab .face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 80ms ease;
+}
+.abilitybar .ab:active .face,
+.abilitybar .ab[data-hawkes-pressed] .face,
+.abilitybar .ab.pressed .face {
+  transform: scale(0.9);
+}
+.abilitybar .ab .ico {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px rgba(126, 200, 255, 0.25));
+  transition: filter 150ms ease, opacity 150ms ease;
+}
+.abilitybar .ab .k,
+.abilitybar .ab .n {
+  display: none;
+}
+.abilitybar .ab .wipe {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from -90deg, rgba(3, 6, 12, 0.78) calc(var(--cd, 0) * 360deg), transparent 0);
+  opacity: 0;
+  transition: opacity 80ms ease;
+}
+.abilitybar .ab.cooling .wipe {
+  opacity: 1;
+}
+.abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor) {
+  border-color: #9fd4ff;
+  box-shadow: 0 0 0 1px rgba(159, 212, 255, 0.35), 0 0 18px rgba(126, 200, 255, 0.75);
+}
+.abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor) .ico {
+  filter: drop-shadow(0 0 10px rgba(126, 200, 255, 0.85)) brightness(1.12);
+}
+.abilitybar .ab.locked .ico {
+  filter: grayscale(1) brightness(0.7);
+  opacity: 0.55;
+}
+.abilitybar .ab.cooling .ico {
+  opacity: 0.55;
+  filter: grayscale(0.35) brightness(0.85);
+}
+.abilitybar .ab .cd {
+  z-index: 2;
+  background: transparent;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+html.touch-ui .abilitybar .ab {
+  width: 48px;
+  height: 48px;
+  min-width: 44px;
+  min-height: 44px;
+}
+html.touch-ui .abilitybar .ab .ico {
+  width: 78%;
+  height: 78%;
+}
+/* Keep arc placement transforms on the button; press scale stays on .face */
+html.touch-ui .abilitybar .ab:active,
+html.touch-ui .abilitybar .ab[data-hawkes-pressed],
+html.touch-ui .abilitybar .ab.pressed {
+  /* do not override translate() used for the arc */
+}
+
+/* 150 ms menu slides (0 ms with reduced motion) */
+.ui-slide {
+  transition: opacity var(--ui-slide-ms) ease, transform var(--ui-slide-ms) ease;
+}
+.ui-slide-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+.ep-menu.ui-slide:not(.ui-slide-in),
+.ep-score.ui-slide:not(.ui-slide-in),
+.settings-pop.ui-slide:not([hidden]),
+.nb-panel.ui-slide:not(.ui-slide-in) {
+  /* shown state handled by .ui-slide-in */
+}
+.ep-menu:not([hidden]),
+.ep-score:not([hidden]),
+.ep-offer:not([hidden]),
+.ep-ending:not([hidden]) {
+  animation: uiMenuIn var(--ui-slide-ms) ease both;
+}
+.ep-menu .ep-panel,
+.ep-score .ep-panel,
+.ep-offer .ep-panel,
+.nb-panel:not([hidden]),
+.settings-pop:not([hidden]) {
+  animation: uiPanelIn var(--ui-slide-ms) ease both;
+}
+@keyframes uiMenuIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes uiPanelIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --ui-slide-ms: 0ms; }
+  .abilitybar .ab .face,
+  .abilitybar .ab .ico,
+  .abilitybar .ab .wipe { transition: none; }
+  .ep-menu:not([hidden]),
+  .ep-score:not([hidden]),
+  .ep-offer:not([hidden]),
+  .ep-ending:not([hidden]),
+  .ep-menu .ep-panel,
+  .ep-score .ep-panel,
+  .ep-offer .ep-panel,
+  .nb-panel:not([hidden]),
+  .settings-pop:not([hidden]) {
+    animation: none;
+  }
+}

@@ -379,6 +379,16 @@ The episodes are one arc of five chapters. Each chapter has a line (what he want
 
 The sky is a painted, moving thing: dawn peach at 6:30, a bright cumulus noon, a golden-hour sun low in the west, an amber-and-navy dusk, and a starry night with the moon to the right of the default view. Weather is the drama: a Storm or Lightning thickens and darkens the cloud deck and brings in the storm shelf cloud; every strike lights the deck from inside; Sun break tears a ragged gap with a sun in it and god rays through it (high quality), and the glass and wet streets reflect whichever sky is up. No new characters or areas; Small Weather's line "Sky's mine for a minute." is the beat this serves.
 
+## UI art kit (js/ui-art.js, css/ui-kit.css, textures/ui/)
+
+One storm-navy HUD language across every player-facing screen (Persona-bold frames, not a second skin).
+- **Areas:** ability arc, Episodes / Neighbors / Settings menus, toasts, voice captions, episode HUD goals, score card ranks.
+- **Landmarks:** five painted verb icons (Lightning, Rain, Wind, Fog, Sun) with lit/unlit states; 9-slice panel frame; S/A/B/C rank stamps; busts of Birdie, Dex, Ines; Pilot wrist-ring glyph.
+- **Who lives here:** the same five verbs and three neighbours; Pilot's glyph tags his caption.
+- **Characters:** unchanged wants/arcs; the kit only paints how they appear in menus.
+- **What happens:** ready verbs glow; a cast runs a radial cooldown wipe; menus slide 150 ms; goal rows show an icon plus words with no bracketed key letters. Self-hosted Fraunces (display) + Outfit (text) woff2 ≤80 KB total.
+- **Story beats:** none of their own — the kit makes every menu read as the same game. Playtest: `ui-art-kit`. Gen recipes `ui-verbs-lit` / `ui-verbs-unlit` / `ui-panel-frame` / `ui-ranks` / `ui-busts` / `ui-pilot` in `hawkes.assets.json`; SVG stand-ins ship until Gen credits refill.
+
 ## Sun-break aftermath (js/aftermath.js, config `aftermath`)
 
 - **Areas:** the whole district under an open sky — roofs, asphalt, car bonnets, gutters, awnings, the apt/shop/annex roofs where pigeons land.

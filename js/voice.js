@@ -118,6 +118,7 @@ html.touch-ui .voice-caption b{display:none}
 html.touch-ui .voice-caption{max-width:92vw;padding:8px 14px;font-size:.92rem}
 html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .voice-caption b{font:600 .65rem/1 Outfit,system-ui,sans-serif;letter-spacing:.28em;text-transform:uppercase;color:#7ec8ff}
+.voice-caption .bust{flex:0 0 28px;width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid rgba(126,200,255,.4)}
 `;
   document.head.appendChild(style);
   const caption = document.createElement("div");
@@ -125,15 +126,25 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
   caption.className = "voice-caption";
   caption.hidden = true;
   caption.setAttribute("role", "status");
-  caption.innerHTML = `<b>Small Weather</b><span id="voice-caption-text"></span>`;
+  caption.innerHTML = `<img class="bust" alt="" hidden/><b>Small Weather</b><span id="voice-caption-text"></span>`;
   document.body.appendChild(caption);
   const captionText = caption.querySelector("#voice-caption-text");
+  const captionBust = caption.querySelector(".bust");
 
   const captionWho = caption.querySelector("b");
   function showCaption(text, who, secs) {
     if (captionTimer) clearTimeout(captionTimer);
-    captionWho.textContent = who || "Small Weather";
+    const name = who || "Small Weather";
+    captionWho.textContent = name;
     captionText.textContent = text || "";
+    const art = window.uiArt || (window.day && window.day.uiArt);
+    if (art && art.bust && captionBust) {
+      const src = art.bust(name);
+      if (src && /pilot|birdie|dex|ines/i.test(name)) {
+        captionBust.src = src;
+        captionBust.hidden = false;
+      } else captionBust.hidden = true;
+    } else if (captionBust) captionBust.hidden = true;
     caption.hidden = false;
     caption.classList.remove("leaving");
     live.caption = text || null;

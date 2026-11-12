@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9fd4ff"/><stop offset="50%" stop-color="#3a6fb0"/><stop offset="100%" stop-color="#f0c27a"/>
+    </linearGradient>
+  </defs>
+  <!-- outer plate -->
+  <path d="M10 22 L22 10 H106 L118 22 V106 L106 118 H22 L10 106 Z" fill="#0e1420" stroke="url(#edge)" stroke-width="3"/>
+  <!-- inner cut -->
+  <path d="M24 30 L30 24 H98 L104 30 V98 L98 104 H30 L24 98 Z" fill="none" stroke="#7ec8ff" stroke-width="2" opacity=".85"/>
+  <!-- corner ticks -->
+  <path d="M18 34 V22 H34 M94 22 H110 V34 M110 94 V110 H94 M34 110 H18 V94" fill="none" stroke="#f0c27a" stroke-width="2.5" stroke-linecap="square"/>
+  <!-- transparent center marker (hollow) -->
+  <rect x="32" y="32" width="64" height="64" fill="black" opacity="0"/>
+</svg>
