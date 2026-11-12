@@ -1,2 +1,0 @@
-- canon: Pilot — the calm, dry, faintly fond AI that runs Small Weather's day; it keeps him on schedule and safe, the player is the part of him that wants the sky. It speaks through a radio filter and a holographic ring on his left wrist.
-- Gen audio.voice array jobs return one concatenated clip, not one per line: queue single-line jobs.
