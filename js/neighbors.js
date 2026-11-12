@@ -1,10 +1,13 @@
 import { buildFigure, detectAnimProblems, FOOT_SLIDE_LIMIT } from "./peoplekit.js";
+import { buildArcProps, stepArcProps, nextBeat, powerMatches, clampBeat, emptyArcs } from "./neighbor-arcs.js";
 /* ==========================================================================
    Neighbors — three people on his avenue with their own look, home and day
    (day.config.js `neighbors`). Each has an ask (answer it with an ability, close by),
    a thank-you and a surprise, shown as speech bubbles. Beats trigger by the clock and by
    how close he is; a finished beat pays score and Pressure and shows it (toast, stars on
-   the name tag, a floating +score, the tally). Figures come from js/peoplekit.js (docs/characters.md);
+   the name tag, a floating +score, the tally). Personal arcs (neighbors.arcs): 3 beats each
+   persisted in js/memory.js across real days, with world props and 3 pips in the menu.
+   Figures come from js/peoplekit.js (docs/characters.md);
    their limbs are driven procedurally (stride from route speed, beat gestures, weather posture).
    Pure helpers are exported for scripts/check-neighbors.mjs.
    ========================================================================== */
@@ -71,15 +74,46 @@ function install() {
   try { total = (JSON.parse(localStorage.getItem(key)) || {}).score | 0; } catch (e) { /* private mode */ }
   let dayKey = null;
   const st = {}; // id -> { stage, askOpen, askAt, shown: [{beat, until}], missed }
-  const fresh = () => people.forEach((p) => (st[p.id] = { stage: 0, doneBeats: [], bubble: null, bubbleUntil: 0, thanksAt: 0, askOpen: false, remembered: false }));
+  const fresh = () => people.forEach((p) => (st[p.id] = { stage: 0, doneBeats: [], bubble: null, bubbleUntil: 0, thanksAt: 0, askOpen: false, remembered: false, arcOpen: false, arcAsk: false, arcThanksAt: 0, arcLinesAt: 0, arcLineI: 0 }));
   fresh();
   let dayScore = 0;
   const events = [];
   function emit(action, detail) {
     events.push(Object.assign({ action, t: performance.now() }, detail));
-    if (events.length > 60) events.shift();
+    if (events.length > 80) events.shift();
     try { window.dispatchEvent(new window.CustomEvent("day:neighbor", { detail: Object.assign({ action }, detail) })); } catch (e) { /* node */ }
   }
+
+  /* ---- personal arcs (persisted in day.memory.arcs) ---- */
+  const arcsCfg = cfg.arcs || {};
+  const arcsList = arcsCfg.list || {};
+  const arcNear = arcsCfg.near || cfg.near || 10;
+  const arcRange = arcsCfg.range || cfg.range || 18;
+  let arcBuilt = null;
+  const readArcs = () => {
+    const M = day.memory;
+    if (M && M.arcs) return M.arcs();
+    return emptyArcs();
+  };
+  const writeArc = (id, beat) => {
+    const M = day.memory;
+    if (M && M.setArc) M.setArc(id, beat);
+    rebuildArcProps();
+    renderPanel();
+  };
+  function rebuildArcProps() {
+    if (arcBuilt && arcBuilt.root) {
+      try { arcBuilt.root.dispose(false, true); } catch (e) { /* gone */ }
+    }
+    arcBuilt = buildArcProps(B, scene, world, arcsCfg, readArcs());
+    emit("arc-props", { arcs: readArcs(), info: arcBuilt.info });
+  }
+  rebuildArcProps();
+  window.addEventListener("day:memory", (e) => {
+    const d = (e && e.detail) || {};
+    // apply() emits action "apply" with why "reload"/"load"/"reset"; setArc emits "arc"
+    if (d.action === "arc" || d.action === "reset" || d.why === "reload" || d.why === "load" || d.why === "reset") rebuildArcProps();
+  });
 
   /* ---- figures + animation detectors ---- */
   const animStats = { footSlide: 0, mismatch: 0, samples: 0, dayKey: null };
@@ -111,7 +145,6 @@ function install() {
 @keyframes nbPlus{from{opacity:1;margin-top:0}to{opacity:0;margin-top:-70px}}
 .nb-btn{z-index:7;appearance:none;border:1px solid rgba(246,241,232,.22);background:rgba(14,16,22,.62);color:#f6f1e8;border-radius:14px;padding:10px 16px;font:600 0.84rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(12px)}
 .nb-btn:hover{background:rgba(240,194,122,.16)}
-.preview-public .nb-btn,html.touch-ui .nb-btn{display:none}
 .nb-panel{z-index:7;width:min(300px,calc(100vw - 36px));background:rgba(10,14,22,.82);border:1px solid rgba(240,194,122,.4);border-radius:16px;padding:12px 14px;color:#e7eef8;font:600 0.78rem/1.35 Outfit,system-ui,sans-serif;backdrop-filter:blur(14px)}
 .nb-panel[hidden]{display:none}
 .nb-panel h3{margin:0 0 8px;font-size:0.95rem}
@@ -120,9 +153,15 @@ function install() {
 .nb-panel .bust{flex:0 0 36px;width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid rgba(240,194,122,.45)}
 .nb-panel .row small{display:block;color:rgba(231,238,248,.62);font-weight:500}
 .nb-panel .stars{margin-left:auto;color:#f0c27a;letter-spacing:1px}
+.nb-panel .pips{margin-left:auto;display:flex;gap:5px;align-items:center;flex:0 0 auto}
+.nb-panel .pip{width:10px;height:10px;border-radius:50%;border:1.5px solid rgba(240,194,122,.7);background:transparent;box-sizing:border-box}
+.nb-panel .pip.on{background:#f0c27a;border-color:#f0c27a;box-shadow:0 0 6px rgba(240,194,122,.55)}
 .nb-panel .tally{margin-top:8px;color:#f0c27a}
 .nb-toast{z-index:9;transform:translate(-50%,-8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(14,16,22,.92);border:1px solid #f0c27a;color:#f6f1e8;font:600 0.95rem Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap;max-width:calc(100vw - 24px)}
 .nb-toast.on{opacity:1;transform:translate(-50%,0)}
+/* Phone: Neighbors menu stays reachable (3 arc pips); public view still hides it. */
+html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-items:center;justify-content:center}
+.preview-public .nb-btn{display:none}
 `;
   document.head.appendChild(style);
   const layer = document.createElement("div");
@@ -145,6 +184,7 @@ function install() {
   document.body.append(layer, panel, toast);
   btn.addEventListener("click", () => {
     panel.hidden = !panel.hidden;
+    if (!panel.hidden) renderPanel();
   });
   people.forEach((p) => {
     const tag = document.createElement("div");
@@ -187,6 +227,126 @@ function install() {
     const d = st[p.id].doneBeats.length;
     return "★".repeat(d) + "☆".repeat(Math.max(0, n - d));
   };
+  const pipsHtml = (id) => {
+    const n = clampBeat(readArcs()[id] || 0);
+    return `<span class="pips" data-id="${id}" data-beat="${n}" aria-label="${n} of 3">${[1, 2, 3].map((i) => `<span class="pip${i <= n ? " on" : ""}" data-i="${i}"></span>`).join("")}</span>`;
+  };
+  const whoName = (p) => (p.name || "").split(" ")[0];
+  function speakLine(p, who, text, via) {
+    const V = day.voice;
+    if (!V || !V.speakAs) return false;
+    if (who === "He") {
+      V.speakAs("He", text, { via: via || "neighbor-arc" });
+      return true;
+    }
+    V.speakAs(whoName(p), text, { x: p.__pos.x, z: p.__pos.z, via: via || "neighbor-arc" });
+    return true;
+  }
+  function finishArcBeat(p, beatIndex, beat) {
+    const done = beatIndex;
+    writeArc(p.id, done);
+    const s = st[p.id];
+    s.arcOpen = false;
+    s.arcAsk = false;
+    s.arcThanksAt = 0;
+    s.arcLinesAt = 0;
+    s.arcLineI = 0;
+    if (beat && beat.wave) {
+      // Dex's payoff: stand in the shop doorway and wave
+      p.__force = { x: 46.2, z: 9.6 };
+      p.__gestureWant = "thanks";
+    } else if (beat && beat.kind === "scene") p.__gestureWant = "surprise";
+    else if (beat && beat.kind === "cue") p.__gestureWant = "ask";
+    emit("arc-beat", {
+      id: p.id, beat: done, beatId: beat && beat.id, kind: beat && beat.kind, prop: beat && beat.prop,
+      x: p.__pos.x, z: p.__pos.z, arcs: readArcs(),
+    });
+    emit("gesture", { id: p.id, kind: beat && beat.wave ? "thanks" : (beat && beat.kind === "scene" ? "surprise" : "ask"), beat: beat && beat.id, x: p.__pos.x, z: p.__pos.z });
+    if (day.note && beat) day.note(`${p.name}: arc ${done}`);
+  }
+  function playArcLines(p, beat, beatIndex, nowMs) {
+    const s = st[p.id];
+    const lines = beat.lines || [];
+    if (!lines.length) {
+      finishArcBeat(p, beatIndex, beat);
+      return;
+    }
+    if (!s.arcOpen) {
+      s.arcOpen = true;
+      s.arcLineI = 0;
+      s.arcLinesAt = nowMs;
+      const L0 = lines[0];
+      const spoken = speakLine(p, L0.who, L0.text, "neighbor-arc-" + beat.id);
+      s.bubble = { id: beat.id + "-0", kind: "arc", text: L0.text, spoken };
+      s.bubbleUntil = nowMs + 5500;
+      p.__gestureWant = beat.kind === "scene" ? "surprise" : "ask";
+      emit("arc-scene", { id: p.id, beat: beatIndex, beatId: beat.id, line: 0, who: L0.who, text: L0.text, x: p.__pos.x, z: p.__pos.z });
+      return;
+    }
+    if (nowMs < s.arcLinesAt + 3200) return;
+    const next = s.arcLineI + 1;
+    if (next >= lines.length) {
+      s.bubble = null;
+      finishArcBeat(p, beatIndex, beat);
+      return;
+    }
+    s.arcLineI = next;
+    s.arcLinesAt = nowMs;
+    const L = lines[next];
+    const spoken = speakLine(p, L.who, L.text, "neighbor-arc-" + beat.id);
+    s.bubble = { id: beat.id + "-" + next, kind: "arc", text: L.text, spoken };
+    s.bubbleUntil = nowMs + 5500;
+    emit("arc-scene", { id: p.id, beat: beatIndex, beatId: beat.id, line: next, who: L.who, text: L.text, x: p.__pos.x, z: p.__pos.z });
+  }
+  function stepArc(p, h, here, nowMs) {
+    const spec = arcsList[p.id];
+    if (!spec || !spec.beats) return;
+    const progress = clampBeat(readArcs()[p.id] || 0);
+    const want = nextBeat(progress);
+    if (!want) {
+      // beat 3 done: Dex keeps waving when near (doorway hold)
+      if (p.id === "dex" && progress >= 3 && here && distTo(p, here) < arcNear) p.__gestureWant = p.__gestureWant || "thanks";
+      return;
+    }
+    const beat = spec.beats[want - 1];
+    if (!beat) return;
+    if (!inWindow(h, beat.from, beat.to)) return;
+    // payoff scenes can finish at the doorway even if their stop says inside; cues/asks need them out
+    if (p.__pos.inside && beat.kind !== "scene") return;
+    const near = distTo(p, here) < arcNear;
+    const s = st[p.id];
+    // while an arc scene is rolling, keep feeding lines
+    if (s.arcOpen && (beat.kind === "cue" || beat.kind === "scene")) {
+      playArcLines(p, beat, want, nowMs);
+      return;
+    }
+    if (beat.kind === "ask") {
+      if (s.arcAsk && s.arcThanksAt && nowMs >= s.arcThanksAt) {
+        s.arcThanksAt = 0;
+        const thanks = beat.thanks || "";
+        if (thanks) {
+          const spoken = speakLine(p, whoName(p), thanks, "neighbor-arc-" + beat.id);
+          s.bubble = { id: beat.id + "-thanks", kind: "thanks", text: thanks, spoken };
+          s.bubbleUntil = nowMs + 5500;
+          p.__gestureWant = "thanks";
+          emit("arc-scene", { id: p.id, beat: want, beatId: beat.id, line: "thanks", who: whoName(p), text: thanks, x: p.__pos.x, z: p.__pos.z });
+        }
+        finishArcBeat(p, want, beat);
+        return;
+      }
+      if (near && !s.arcAsk && !s.askOpen) {
+        s.arcAsk = true;
+        const spoken = speakLine(p, whoName(p), beat.text, "neighbor-arc-" + beat.id);
+        s.bubble = { id: beat.id, kind: "ask", text: beat.text, spoken, ability: beat.ability || (beat.abilities && beat.abilities[0]) };
+        s.bubbleUntil = Infinity;
+        p.__gestureWant = "ask";
+        emit("arc-scene", { id: p.id, beat: want, beatId: beat.id, line: "ask", who: whoName(p), text: beat.text, x: p.__pos.x, z: p.__pos.z });
+      }
+      return;
+    }
+    // cue / scene: start when near
+    if (near && !s.arcOpen && !s.askOpen && !s.arcAsk) playArcLines(p, beat, want, nowMs);
+  }
 
   /* ---- beats ---- */
   function grant(p, beat) {
@@ -329,10 +489,22 @@ function install() {
   /* answering an ask: he calls its ability close to them */
   window.addEventListener("day:power", (e) => {
     const d = (e && e.detail) || {};
-    if (!d.power || d.action === "denied") return;
+    if ((!d.power && !d.action) || d.action === "denied") return;
     const here = hero();
     people.forEach((p) => {
       const s = st[p.id];
+      // personal-arc ask (takes priority when open)
+      if (s.arcAsk && !p.__pos.inside) {
+        const progress = clampBeat(readArcs()[p.id] || 0);
+        const want = nextBeat(progress);
+        const arcBeat = want && arcsList[p.id] && arcsList[p.id].beats[want - 1];
+        if (arcBeat && arcBeat.kind === "ask" && powerMatches(arcBeat, d.power, d.action) && distTo(p, here) <= arcRange) {
+          s.bubble = null;
+          s.arcThanksAt = performance.now() + 1100;
+          emit("arc-cast", { id: p.id, beat: want, beatId: arcBeat.id, power: d.power || d.action });
+          return;
+        }
+      }
       const beat = (p.beats || [])[s.stage];
       if (!beat || beat.kind !== "ask" || !s.askOpen || p.__pos.inside) return;
       if (d.power !== beat.ability && d.action !== beat.ability) return;
@@ -360,7 +532,8 @@ function install() {
       const face = art && art.bust
         ? `<img class="bust" alt="" src="${art.bust(p.id || p.name)}"/>`
         : `<span class="dot" style="background:${p.color}"></span>`;
-      return `<div class="row">${face}<div>${p.name}<small>${p.role} · ${where}</small></div><span class="stars">${stars(p)}</span></div>`;
+      const arcTitle = (arcsList[p.id] && arcsList[p.id].title) || "";
+      return `<div class="row" data-neighbor="${p.id}">${face}<div>${p.name}<small>${p.role}${arcTitle ? " · " + arcTitle : ""} · ${where}</small></div>${pipsHtml(p.id)}</div>`;
     }).join("") + `<div class="tally">${L.score || "Good neighbor"}: ${total}</div>`;
     if (art && art.applyFrame) art.applyFrame(panel);
   }
@@ -498,7 +671,9 @@ function install() {
           });
         }
       }
+      // same-day ask/thanks first; personal arcs fill in when that conversation is free
       stepBeats(p, h, here, nowMs);
+      if (!(st[p.id].askOpen || st[p.id].thanksAt)) stepArc(p, h, here, nowMs);
 
       // the name tag and bubble above their head
       const tag = p.__tag;
@@ -531,6 +706,7 @@ function install() {
         if (p.__stars.textContent !== sr) p.__stars.textContent = sr;
       }
     });
+    stepArcProps(arcBuilt, dt);
     if (!panel.hidden && nowMs - lastPanel > 500) {
       lastPanel = nowMs;
       renderPanel();
@@ -541,6 +717,8 @@ function install() {
     now: () => ({
       score: total,
       dayScore,
+      arcs: readArcs(),
+      arcProps: arcBuilt ? Object.assign({}, arcBuilt.info) : null,
       footSlideFails: animStats.footSlide,
       mismatchFails: animStats.mismatch,
       animSamples: animStats.samples,
@@ -557,8 +735,12 @@ function install() {
           stage: st[p.id].stage,
           done: st[p.id].doneBeats.slice(),
           asking: st[p.id].askOpen,
+          arcAsk: !!st[p.id].arcAsk,
+          arcOpen: !!st[p.id].arcOpen,
+          arc: clampBeat(readArcs()[p.id] || 0),
           bubble: st[p.id].bubble ? st[p.id].bubble.text : "",
           stars: stars(p),
+          pips: clampBeat(readArcs()[p.id] || 0),
           parts: p.__meshes.length,
           look: p.color,
           anim: s.state || "idle",
@@ -614,6 +796,48 @@ function install() {
       if (x == null || z == null) { p.__force = null; return true; }
       p.__force = { x: +x, z: +z };
       p.__pos = { x: +x, z: +z, inside: false, moving: false, sit: false };
+      return true;
+    },
+    /** Open or close the Neighbors panel (playtest / phone pips). */
+    panel: (on) => {
+      panel.hidden = on === false;
+      if (!panel.hidden) renderPanel();
+      return !panel.hidden;
+    },
+    /** Current arc progress { birdie, dex, quill }. */
+    arcs: () => readArcs(),
+    /** Arc world marks currently drawn (ribbon, openSign, chartBeacon, …). */
+    arcProps: () => (arcBuilt ? Object.assign({}, arcBuilt.info) : null),
+    /** Playtest setup: set one neighbour's arc beat 0..3 and rebuild props. */
+    setArc: (id, beat) => {
+      writeArc(id, beat);
+      const s = st[id];
+      if (s) { s.arcOpen = false; s.arcAsk = false; s.arcThanksAt = 0; s.arcLineI = 0; }
+      return readArcs();
+    },
+    /** Advance the next pending arc beat as if the scene finished (playtest shortcut after real cast). */
+    advanceArc: (id) => {
+      const cur = clampBeat(readArcs()[id] || 0);
+      if (cur >= 3) return readArcs();
+      const spec = arcsList[id];
+      const beat = spec && spec.beats[cur];
+      const p = people.find((q) => q.id === id);
+      if (p && beat) finishArcBeat(p, cur + 1, beat);
+      else writeArc(id, cur + 1);
+      return readArcs();
+    },
+    /** Playtest setup: mark today's ask/thanks done so a personal arc can speak without the morning ask. */
+    quietDay: (id) => {
+      const s = st[id];
+      if (!s) return false;
+      s.stage = 2;
+      s.askOpen = false;
+      s.thanksAt = 0;
+      s.bubble = null;
+      ["ask", "thanks"].forEach((k) => {
+        const bid = `${id}-${k}`;
+        if (!s.doneBeats.includes(bid)) s.doneBeats.push(bid);
+      });
       return true;
     },
   };

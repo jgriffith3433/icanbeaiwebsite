@@ -52,11 +52,18 @@ export function strength(madeKey, todayKey) {
   return n <= 0 ? 1 : Math.max(0, 1 - n / FADE_DAYS);
 }
 
-export function emptyStore() { return { v: 1, days: {} }; }
+export function emptyArcs() { return { birdie: 0, dex: 0, quill: 0 }; }
+export function emptyStore() { return { v: 1, days: {}, arcs: emptyArcs() }; }
 export function parse(raw) {
   try {
     const s = raw ? JSON.parse(raw) : null;
-    return s && s.v === 1 && s.days && typeof s.days === "object" ? s : emptyStore();
+    if (!(s && s.v === 1 && s.days && typeof s.days === "object")) return emptyStore();
+    if (!s.arcs || typeof s.arcs !== "object") s.arcs = emptyArcs();
+    ["birdie", "dex", "quill"].forEach((id) => {
+      const n = Number(s.arcs[id]) || 0;
+      s.arcs[id] = n < 0 ? 0 : n > 3 ? 3 : (n | 0);
+    });
+    return s;
   } catch (e) { return emptyStore(); }
 }
 function dayOf(store, key) {
@@ -304,6 +311,11 @@ export function installMemory(day, world) {
     else if (d.action === "beat-missed") record("askBotched", "botched", d.id);
     else if (d.action === "reward" && d.id === "birdie") record("birdieRain", "park", "rain");
     else if (d.action === "reward") record("neighborReward", undefined, d.id);
+    else if (d.action === "arc-beat" && d.id && d.beat != null) {
+      // neighbors.js already wrote the beat via setArc; record a deed so Let go / facts can name it
+      record("arc-" + d.id, d.id, "beat" + d.beat);
+      if (d.id === "birdie" && d.beat >= 2) record("birdieRain", "park", "rain");
+    }
   });
   window.addEventListener("day:episode", (e) => {
     const d = e.detail || {};
@@ -385,6 +397,17 @@ export function installMemory(day, world) {
     skyDays: () => Object.keys(store.days).filter((k) => Object.keys(store.days[k].deeds).length > 0).length,
     /** For the playtest: write a deed as if he had done it (named setup shortcut). */
     note: (kind, zone, power) => { record(kind, zone, power); return api.facts(); },
+    /** Neighbor personal arcs (0..3 each). Persists across real days; same-day reload keeps beat-3 marks. */
+    arcs: () => Object.assign(emptyArcs(), store.arcs || {}),
+    /** Set one neighbour's arc beat (0..3). Emits day:memory action `arc`. */
+    setArc(id, beat) {
+      if (!store.arcs) store.arcs = emptyArcs();
+      if (!(id in store.arcs) && id !== "birdie" && id !== "dex" && id !== "quill") return api.arcs();
+      store.arcs[id] = Math.max(0, Math.min(3, beat | 0));
+      save();
+      emit("arc", { id, beat: store.arcs[id], arcs: api.arcs() });
+      return api.arcs();
+    },
     /** Tornado wreck that stayed: keep a few solid marks (skip paper/leaf) so scorches aren't flooded out. */
     noteDebris(marks) {
       const keep = (marks || []).filter((m) => m && m.x != null && m.z != null
@@ -407,6 +430,8 @@ export function installMemory(day, world) {
     apply: () => apply("api"),
     reset() { store = emptyStore(); session = {}; factsCache = null; save(); apply("reset"); },
   };
+  // keep arcs on the store after reload
+  if (!store.arcs) store.arcs = emptyArcs();
   window.addEventListener("day:tornado-debris", (e) => {
     const d = (e && e.detail) || {};
     if (d.marks && d.marks.length) api.noteDebris(d.marks);

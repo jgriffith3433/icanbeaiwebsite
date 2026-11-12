@@ -2503,6 +2503,66 @@ window.DAY_CONFIG = {
         ],
       },
     ],
+    /* PERSONAL ARCS (3 beats each, persisted in js/memory.js `arcs` across real days). Beat kinds:
+       `cue` — voiced when he walks up (in-world prop already showing the problem);
+       `ask` — answered by calling `ability` (or any of `abilities`) within `range` m;
+       `scene` — payoff voiced scene + persistent mark (ribbon / lit sign / chart+beacon).
+       Neighbors menu shows progress as 3 pips. Playtest: `neighbor-arcs`. */
+    arcs: {
+      near: 10,
+      range: 18,
+      list: {
+        birdie: {
+          title: "Tomatoes",
+          beats: [
+            { id: "birdie-arc-1", kind: "cue", from: 7, to: 12, prop: "wiltPots",
+              lines: [
+                { who: "Birdie", text: "They're going. The pots are dust." },
+                { who: "He", text: "I see them." },
+              ] },
+            { id: "birdie-arc-2", kind: "ask", from: 7, to: 14, ability: "rain", prop: "greenPots",
+              text: "Rain on the pots. Before they're gone for good?",
+              thanks: "Green again. Bless you." },
+            { id: "birdie-arc-3", kind: "scene", from: 16, to: 20, prop: "ribbonBasket",
+              lines: [
+                { who: "Birdie", text: "First at the block show. Ribbon's on the balcony. Basket's by your door." },
+              ] },
+          ],
+        },
+        dex: {
+          title: "Open sign",
+          beats: [
+            { id: "dex-arc-1", kind: "cue", from: 7, to: 15, prop: "turbinesStill",
+              lines: [
+                { who: "Dex", text: "Shop turbines stalled. No wind, no open sign." },
+              ] },
+            { id: "dex-arc-2", kind: "ask", from: 7, to: 16, abilities: ["gust", "gale", "tornado"], prop: "turbinesSpin",
+              text: "A gust on the shop roof. Keep us turning?",
+              thanks: "They're spinning. We're open." },
+            { id: "dex-arc-3", kind: "scene", from: 17, to: 19.8, prop: "openSign", wave: true,
+              lines: [
+                { who: "Dex", text: "New sign went up. Come by. I'll wave you in." },
+              ] },
+          ],
+        },
+        quill: {
+          title: "Chart wall",
+          beats: [
+            { id: "quill-arc-1", kind: "cue", from: 17, to: 5, prop: "blankChart",
+              lines: [
+                { who: "Ines", text: "Charts are blank. Streetlights eat every star." },
+              ] },
+            { id: "quill-arc-2", kind: "ask", from: 17, to: 5, ability: "fog", prop: "readingChart",
+              text: "Fog over the annex. Soften the lights for one reading?",
+              thanks: "Orion. Hold still." },
+            { id: "quill-arc-3", kind: "scene", from: 20, to: 5, prop: "chartBeacon",
+              lines: [
+                { who: "Ines", text: "Your weather is on my wall. The roof light stays on for you." },
+              ] },
+          ],
+        },
+      },
+    },
   },
 
   /* ------------------------------------------------------------------------

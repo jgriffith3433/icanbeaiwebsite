@@ -2771,6 +2771,1014 @@
    }
   },
   {
+   "id": "pilot-chapter-1",
+   "note": "Pilot chapter-opener line: \"Schedule says desk. The sky is not on it.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Schedule says desk. The sky is not on it.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-1.mp3"
+   }
+  },
+  {
+   "id": "pilot-chapter-2",
+   "note": "Pilot chapter-opener line: \"Seven requests logged. Answer them in order.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Seven requests logged. Answer them in order.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-2.mp3"
+   }
+  },
+  {
+   "id": "pilot-chapter-3",
+   "note": "Pilot chapter-opener line: \"So do I. You are close to the limit.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "So do I. You are close to the limit.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-3.mp3"
+   }
+  },
+  {
+   "id": "pilot-chapter-4",
+   "note": "Pilot chapter-opener line: \"You can also hurt them. Think before you call.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "You can also hurt them. Think before you call.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-4.mp3"
+   }
+  },
+  {
+   "id": "pilot-chapter-5",
+   "note": "Pilot chapter-opener line: \"Tonight the whole sky is yours. No schedule.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Tonight the whole sky is yours. No schedule.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-5.mp3"
+   }
+  },
+  {
+   "id": "sky-dawn",
+   "note": "Sky panorama 'dawn' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_f759c8039a5a.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, clear dawn: pale peach and rose glow low on the eastern horizon fading to soft teal then clear light blue overhead, a few thin pink streak clouds, calm and open, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1101
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-dawn.webp"
+   }
+  },
+  {
+   "id": "sky-noon",
+   "note": "Sky panorama 'noon' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_d02e73c29d0e.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, bright clear noon: saturated blue sky, big soft white cumulus clouds scattered all around, high sun, haze at the horizon, readable and bright, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1102
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-noon.webp"
+   }
+  },
+  {
+   "id": "sky-golden",
+   "note": "Sky panorama 'golden' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_05b83316878d.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, golden hour: low warm sun glowing orange gold in the west, long amber lit clouds, blue sky turning to peach near the horizon, rays of warm light, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1103
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-golden.webp"
+   }
+  },
+  {
+   "id": "sky-dusk",
+   "note": "Sky panorama 'dusk' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_627f3b36350e.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, dusk: deep navy and violet overhead, amber and electric blue band at the horizon, dramatic dark clouds edged with magenta and orange light, cinematic, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1104
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-dusk.webp"
+   }
+  },
+  {
+   "id": "sky-night",
+   "note": "Sky panorama 'night' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_047d360d1234.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, starry night: deep navy black sky full of crisp stars and a faint milky way band, a bright full moon with soft glow on the right side, a few wispy dark clouds, faint blue glow at the horizon, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1105
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-night.webp"
+   }
+  },
+  {
+   "id": "sky-storm",
+   "note": "Sky panorama 'storm' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_2ba334579597.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, storm shelf cloud: a huge dark arcus shelf cloud rolling across the whole sky, slate grey and teal green underside, heavy rain curtains in the distance, a thin bright gap of pale light low at the horizon, ominous, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1106
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-storm.webp"
+   }
+  },
+  {
+   "id": "neon-sign-noodles",
+   "note": "Neon shop sign NOODLES for js/props.js (textures/neon/noodles.webp). image.generate then cutout. Stylized DoD neon, navy night, electric pink.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading NOODLES only, bold tube neon letters, hot pink and magenta glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/noodles.webp"
+   }
+  },
+  {
+   "id": "neon-sign-bar",
+   "note": "Neon shop sign BAR for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading BAR only, bold tube neon letters, electric cyan glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/bar.webp"
+   }
+  },
+  {
+   "id": "neon-sign-24h",
+   "note": "Neon shop sign 24H for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading 24H only, bold tube neon letters, mint green glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/24h.webp"
+   }
+  },
+  {
+   "id": "neon-sign-cafe",
+   "note": "Neon shop sign CAFE for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading CAFE only, bold tube neon letters, warm amber gold glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/cafe.webp"
+   }
+  },
+  {
+   "id": "neon-sign-arcade",
+   "note": "Neon shop sign ARCADE for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading ARCADE only, bold tube neon letters, violet purple glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/arcade.webp"
+   }
+  },
+  {
+   "id": "neon-sign-books",
+   "note": "Neon shop sign BOOKS for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading BOOKS only, bold tube neon letters, orange coral glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/books.webp"
+   }
+  },
+  {
+   "id": "neon-sign-hotel",
+   "note": "Neon shop sign HOTEL for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading HOTEL only, bold tube neon letters, electric cyan glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/hotel.webp"
+   }
+  },
+  {
+   "id": "neon-sign-pharmacy",
+   "note": "Neon shop sign PHARMACY for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading PHARMACY only, bold tube neon letters, mint green glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/pharmacy.webp"
+   }
+  },
+  {
+   "id": "power-crack-1",
+   "note": "Power SFX for js/sfx.js: crack variant 1/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice",
+      "duration": 0.7,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4215
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/crack-1.mp3"
+   }
+  },
+  {
+   "id": "power-crack-2",
+   "note": "Power SFX for js/sfx.js: crack variant 2/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 2, a different take)",
+      "duration": 0.7,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4226
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/crack-2.mp3"
+   }
+  },
+  {
+   "id": "power-crack-3",
+   "note": "Power SFX for js/sfx.js: crack variant 3/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 3, a different take)",
+      "duration": 0.7,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4237
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/crack-3.mp3"
+   }
+  },
+  {
+   "id": "power-crack-4",
+   "note": "Power SFX for js/sfx.js: crack variant 4/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 4, a different take)",
+      "duration": 0.7,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4248
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/crack-4.mp3"
+   }
+  },
+  {
+   "id": "power-body-1",
+   "note": "Power SFX for js/sfx.js: body variant 1/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music",
+      "duration": 1.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4212
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/body-1.mp3"
+   }
+  },
+  {
+   "id": "power-body-2",
+   "note": "Power SFX for js/sfx.js: body variant 2/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 2, a different take)",
+      "duration": 1.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4223
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/body-2.mp3"
+   }
+  },
+  {
+   "id": "power-body-3",
+   "note": "Power SFX for js/sfx.js: body variant 3/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 3, a different take)",
+      "duration": 1.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4234
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/body-3.mp3"
+   }
+  },
+  {
+   "id": "power-body-4",
+   "note": "Power SFX for js/sfx.js: body variant 4/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 4, a different take)",
+      "duration": 1.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4245
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/body-4.mp3"
+   }
+  },
+  {
+   "id": "power-rumble-1",
+   "note": "Power SFX for js/sfx.js: rumble variant 1/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music",
+      "duration": 3.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4218
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/rumble-1.mp3"
+   }
+  },
+  {
+   "id": "power-rumble-2",
+   "note": "Power SFX for js/sfx.js: rumble variant 2/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 2, a different take)",
+      "duration": 3.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4229
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/rumble-2.mp3"
+   }
+  },
+  {
+   "id": "power-rumble-3",
+   "note": "Power SFX for js/sfx.js: rumble variant 3/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 3, a different take)",
+      "duration": 3.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4240
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/rumble-3.mp3"
+   }
+  },
+  {
+   "id": "power-rumble-4",
+   "note": "Power SFX for js/sfx.js: rumble variant 4/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 4, a different take)",
+      "duration": 3.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4251
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/rumble-4.mp3"
+   }
+  },
+  {
+   "id": "power-whoosh-1",
+   "note": "Power SFX for js/sfx.js: whoosh variant 1/3. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music",
+      "duration": 1.1,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4218
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/whoosh-1.mp3"
+   }
+  },
+  {
+   "id": "power-whoosh-2",
+   "note": "Power SFX for js/sfx.js: whoosh variant 2/3. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music (variation 2, a different take)",
+      "duration": 1.1,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4229
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/whoosh-2.mp3"
+   }
+  },
+  {
+   "id": "power-whoosh-3",
+   "note": "Power SFX for js/sfx.js: whoosh variant 3/3. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music (variation 3, a different take)",
+      "duration": 1.1,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4240
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/whoosh-3.mp3"
+   }
+  },
+  {
+   "id": "power-gale-loop-1",
+   "note": "Power SFX for js/sfx.js: gale-loop variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Sustained gale wind loop for a city street, strong continuous rush, seamless loop, no music",
+      "duration": 4,
+      "loop": true,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4227
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/gale-loop-1.mp3"
+   }
+  },
+  {
+   "id": "power-tornado-roar-1",
+   "note": "Power SFX for js/sfx.js: tornado-roar variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Seamless looping tornado roar, thick swirling wind funnel over city streets, no music",
+      "duration": 4,
+      "loop": true,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4236
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/tornado-roar-1.mp3"
+   }
+  },
+  {
+   "id": "power-tornado-debris-1",
+   "note": "Power SFX for js/sfx.js: tornado-debris variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Tornado debris rattle loop, wood and metal scrap clatter in wind, seamless, no music",
+      "duration": 4,
+      "loop": true,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4242
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/tornado-debris-1.mp3"
+   }
+  },
+  {
+   "id": "power-tornado-pressure-1",
+   "note": "Power SFX for js/sfx.js: tornado-pressure variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Deep pressure drone under a tornado, low humming air pressure, seamless loop, no music",
+      "duration": 4,
+      "loop": true,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4248
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/tornado-pressure-1.mp3"
+   }
+  },
+  {
+   "id": "power-sun-shimmer-1",
+   "note": "Power SFX for js/sfx.js: sun-shimmer variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Warm sun break shimmer swell, soft bright air opening after rain, hint of distant birds, no music",
+      "duration": 2.5,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4233
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/sun-shimmer-1.mp3"
+   }
+  },
+  {
+   "id": "pilot-ending-a",
+   "note": "Pilot ending-scene line: \"Fair weather. Logged.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Fair weather. Logged.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-ending-a.mp3"
+   }
+  },
+  {
+   "id": "pilot-ending-c",
+   "note": "Pilot ending-scene line: \"Sky's still thinking. Stay in.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Sky's still thinking. Stay in.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-ending-c.mp3"
+   }
+  },
+  {
+   "id": "ui-verbs-lit",
+   "note": "UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game HUD icon sheet, five weather ability icons in a horizontal row equally spaced, left to right: (1) jagged electric lightning bolt, (2) rain cloud with three heavy raindrops, (3) swirling wind gust ribbons, (4) soft fog bank wisps, (5) sun breaking through clouds with warm rays. Style: stylized painted cartoon UI icons, Dose Of Destruction look, clean bold silhouettes readable at 44 pixels, storm-navy and black with LIT glowing electric cyan-blue edge light and soft bloom, flat front orthographic, each icon centered in its cell, plain solid magenta background #ff00ff, no text, no letters, no watermark, no keycaps",
+      "width": 1280,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/verb-sheet-lit.png"
+   }
+  },
+  {
+   "id": "ui-verbs-unlit",
+   "note": "UI art kit: five unlit (dim) weather verb icons sheet. Same layout as ui-verbs-lit. Stand-ins: textures/ui/verb-*-unlit.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game HUD icon sheet, five weather ability icons in a horizontal row equally spaced, left to right: (1) jagged lightning bolt, (2) rain cloud with three raindrops, (3) swirling wind ribbons, (4) fog bank wisps, (5) sun behind clouds. Style: stylized painted cartoon UI icons, Dose Of Destruction look, clean bold silhouettes readable at 44 pixels, storm-navy and muted slate UNLIT state, dim desaturated blue-grey, no glow, flat front orthographic, each icon centered in its cell, plain solid magenta background #ff00ff, no text, no letters, no watermark",
+      "width": 1280,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/verb-sheet-unlit.png"
+   }
+  },
+  {
+   "id": "ui-panel-frame",
+   "note": "UI art kit: 9-slice panel frame (Persona-bold angular corners, storm-navy + cyan). Stand-in: textures/ui/panel-frame.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI 9-slice panel frame only, square frame with ornate sharp Persona-5-like angular corner pieces and a thin electric-blue neon edge on storm-navy metal, hollow center completely filled with solid magenta #ff00ff for cutout, bold AAA game menu frame, flat front orthographic, cinematic dark navy and black with cyan accents, no text, no icons inside, no watermark",
+      "width": 512,
+      "height": 512,
+      "count": 1
+     },
+     "save": "frame"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/panel-frame.png"
+   }
+  },
+  {
+   "id": "ui-ranks",
+   "note": "UI art kit: S/A/B/C rank stamps in one sheet. Stand-ins: textures/ui/rank-S.svg etc.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI rank stamp sheet, four stamps in a horizontal row: big letter S, letter A, letter B, letter C. Each is a bold painted wax-seal style stamp with sharp angular frame, storm-navy metal and electric blue glow, S brightest gold-cyan, A teal, B blue, C muted copper-red. Flat front orthographic, plain solid magenta background #ff00ff, stylized cartoon AAA game UI, readable at small size, no other text, no watermark",
+      "width": 1024,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/rank-sheet.png"
+   }
+  },
+  {
+   "id": "ui-busts",
+   "note": "UI art kit: portrait busts of Birdie (yellow raincoat, straw hat), Dex (orange jacket, white helmet), Ines (violet coat, glasses) in one sheet. Stand-ins: textures/ui/bust-*.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI portrait bust sheet, three character busts in a horizontal row on magenta #ff00ff: (1) Birdie Alvarez short gardener woman yellow raincoat straw hat warm skin, (2) Dex Moreno courier man orange jacket white helmet parcel strap, (3) Ines Quill tall woman violet coat round glasses dark hair. Stylized 3D cartoon Dose Of Destruction look, storm-navy rim light, front-facing busts from shoulders up, bold readable silhouettes, no text, no watermark",
+      "width": 1152,
+      "height": 384,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/bust-sheet.png"
+   }
+  },
+  {
+   "id": "ui-pilot",
+   "note": "UI art kit: Pilot glyph (holographic wrist-ring / AI mark). Stand-in: textures/ui/pilot.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI glyph icon, a holographic wrist ring and soft radio pulse mark for an AI called Pilot, electric cyan on storm-navy, circular badge, stylized painted cartoon, clean silhouette readable at 28 px, plain solid magenta background #ff00ff, no text, no letters, no watermark",
+      "width": 256,
+      "height": 256,
+      "count": 1
+     },
+     "save": "glyph"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/pilot.png"
+   }
+  },
+  {
    "id": "dlg-birdie-1s29egk",
    "note": "Spoken line (dry-park:start), Birdie: \"There you are. My tomatoes are sulking. The whole lawn is.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
@@ -5754,6 +6762,253 @@
    }
   },
   {
+   "id": "dlg-birdie-fwngib",
+   "note": "Spoken line (arc:birdie-arc-1), Birdie: \"They're going. The pots are dust.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're going. The pots are dust.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-fwngib.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1fau5dm",
+   "note": "Spoken line (arc:birdie-arc-1), He: \"I see them.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I see them.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1fau5dm.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-4d93xv",
+   "note": "Spoken line (arc:birdie-arc-2:ask), Birdie: \"Rain on the pots. Before they're gone for good?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain on the pots. Before they're gone for good?",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-4d93xv.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-sa1m1r",
+   "note": "Spoken line (arc:birdie-arc-2:thanks), Birdie: \"Green again. Bless you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Green again. Bless you.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-sa1m1r.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-dhyy88",
+   "note": "Spoken line (arc:birdie-arc-3), Birdie: \"First at the block show. Ribbon's on the balcony. Basket's by your door.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "First at the block show. Ribbon's on the balcony. Basket's by your door.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-dhyy88.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-sr2lqi",
+   "note": "Spoken line (arc:dex-arc-1), Dex: \"Shop turbines stalled. No wind, no open sign.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Shop turbines stalled. No wind, no open sign.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-sr2lqi.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-8912u9",
+   "note": "Spoken line (arc:dex-arc-2:ask), Dex: \"A gust on the shop roof. Keep us turning?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "A gust on the shop roof. Keep us turning?",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-8912u9.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1cm9ym6",
+   "note": "Spoken line (arc:dex-arc-2:thanks), Dex: \"They're spinning. We're open.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're spinning. We're open.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1cm9ym6.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-lj0d38",
+   "note": "Spoken line (arc:dex-arc-3), Dex: \"New sign went up. Come by. I'll wave you in.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "New sign went up. Come by. I'll wave you in.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-lj0d38.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-nvh5s",
+   "note": "Spoken line (arc:quill-arc-1), Ines: \"Charts are blank. Streetlights eat every star.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Charts are blank. Streetlights eat every star.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-nvh5s.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-14bmtu8",
+   "note": "Spoken line (arc:quill-arc-2:ask), Ines: \"Fog over the annex. Soften the lights for one reading?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Fog over the annex. Soften the lights for one reading?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-14bmtu8.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-dss53k",
+   "note": "Spoken line (arc:quill-arc-2:thanks), Ines: \"Orion. Hold still.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Orion. Hold still.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-dss53k.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-cpcdtw",
+   "note": "Spoken line (arc:quill-arc-3), Ines: \"Your weather is on my wall. The roof light stays on for you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Your weather is on my wall. The roof light stays on for you.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-cpcdtw.mp3"
+   }
+  },
+  {
    "id": "dlg-he-1thw15y",
    "note": "Spoken line (memory:8:05), He: \"Birdie's pots. Quick hello.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
@@ -7065,822 +8320,6 @@
    }
   },
   {
-   "id": "pilot-chapter-1",
-   "note": "Pilot chapter-opener line: \"Schedule says desk. The sky is not on it.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
-   "steps": [
-    {
-     "tool": "audio.voice",
-     "params": {
-      "text": "Schedule says desk. The sky is not on it.",
-      "voice": "gv_c2c9cdffeae27b99",
-      "direction": "calm, dry, faintly fond, radio-flat"
-     },
-     "save": "audio"
-    }
-   ],
-   "files": {
-    "audio": "audio/pilot/pilot-chapter-1.mp3"
-   }
-  },
-  {
-   "id": "pilot-chapter-2",
-   "note": "Pilot chapter-opener line: \"Seven requests logged. Answer them in order.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
-   "steps": [
-    {
-     "tool": "audio.voice",
-     "params": {
-      "text": "Seven requests logged. Answer them in order.",
-      "voice": "gv_c2c9cdffeae27b99",
-      "direction": "calm, dry, faintly fond, radio-flat"
-     },
-     "save": "audio"
-    }
-   ],
-   "files": {
-    "audio": "audio/pilot/pilot-chapter-2.mp3"
-   }
-  },
-  {
-   "id": "pilot-chapter-3",
-   "note": "Pilot chapter-opener line: \"So do I. You are close to the limit.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
-   "steps": [
-    {
-     "tool": "audio.voice",
-     "params": {
-      "text": "So do I. You are close to the limit.",
-      "voice": "gv_c2c9cdffeae27b99",
-      "direction": "calm, dry, faintly fond, radio-flat"
-     },
-     "save": "audio"
-    }
-   ],
-   "files": {
-    "audio": "audio/pilot/pilot-chapter-3.mp3"
-   }
-  },
-  {
-   "id": "pilot-chapter-4",
-   "note": "Pilot chapter-opener line: \"You can also hurt them. Think before you call.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
-   "steps": [
-    {
-     "tool": "audio.voice",
-     "params": {
-      "text": "You can also hurt them. Think before you call.",
-      "voice": "gv_c2c9cdffeae27b99",
-      "direction": "calm, dry, faintly fond, radio-flat"
-     },
-     "save": "audio"
-    }
-   ],
-   "files": {
-    "audio": "audio/pilot/pilot-chapter-4.mp3"
-   }
-  },
-  {
-   "id": "pilot-chapter-5",
-   "note": "Pilot chapter-opener line: \"Tonight the whole sky is yours. No schedule.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
-   "steps": [
-    {
-     "tool": "audio.voice",
-     "params": {
-      "text": "Tonight the whole sky is yours. No schedule.",
-      "voice": "gv_c2c9cdffeae27b99",
-      "direction": "calm, dry, faintly fond, radio-flat"
-     },
-     "save": "audio"
-    }
-   ],
-   "files": {
-    "audio": "audio/pilot/pilot-chapter-5.mp3"
-   }
-  },
-  {
-   "id": "sky-dawn",
-   "note": "Sky panorama 'dawn' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_f759c8039a5a.",
-   "steps": [
-    {
-     "tool": "image.panorama",
-     "params": {
-      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, clear dawn: pale peach and rose glow low on the eastern horizon fading to soft teal then clear light blue overhead, a few thin pink streak clouds, calm and open, empty distant flat horizon, no buildings, no ground detail, no people, no text",
-      "width": 2048,
-      "height": 1024,
-      "seed": 1101
-     },
-     "save": "pano"
-    }
-   ],
-   "files": {
-    "pano": "textures/sky/sky-dawn.webp"
-   }
-  },
-  {
-   "id": "sky-noon",
-   "note": "Sky panorama 'noon' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_d02e73c29d0e.",
-   "steps": [
-    {
-     "tool": "image.panorama",
-     "params": {
-      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, bright clear noon: saturated blue sky, big soft white cumulus clouds scattered all around, high sun, haze at the horizon, readable and bright, empty distant flat horizon, no buildings, no ground detail, no people, no text",
-      "width": 2048,
-      "height": 1024,
-      "seed": 1102
-     },
-     "save": "pano"
-    }
-   ],
-   "files": {
-    "pano": "textures/sky/sky-noon.webp"
-   }
-  },
-  {
-   "id": "sky-golden",
-   "note": "Sky panorama 'golden' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_05b83316878d.",
-   "steps": [
-    {
-     "tool": "image.panorama",
-     "params": {
-      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, golden hour: low warm sun glowing orange gold in the west, long amber lit clouds, blue sky turning to peach near the horizon, rays of warm light, empty distant flat horizon, no buildings, no ground detail, no people, no text",
-      "width": 2048,
-      "height": 1024,
-      "seed": 1103
-     },
-     "save": "pano"
-    }
-   ],
-   "files": {
-    "pano": "textures/sky/sky-golden.webp"
-   }
-  },
-  {
-   "id": "sky-dusk",
-   "note": "Sky panorama 'dusk' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_627f3b36350e.",
-   "steps": [
-    {
-     "tool": "image.panorama",
-     "params": {
-      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, dusk: deep navy and violet overhead, amber and electric blue band at the horizon, dramatic dark clouds edged with magenta and orange light, cinematic, empty distant flat horizon, no buildings, no ground detail, no people, no text",
-      "width": 2048,
-      "height": 1024,
-      "seed": 1104
-     },
-     "save": "pano"
-    }
-   ],
-   "files": {
-    "pano": "textures/sky/sky-dusk.webp"
-   }
-  },
-  {
-   "id": "sky-night",
-   "note": "Sky panorama 'night' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_047d360d1234.",
-   "steps": [
-    {
-     "tool": "image.panorama",
-     "params": {
-      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, starry night: deep navy black sky full of crisp stars and a faint milky way band, a bright full moon with soft glow on the right side, a few wispy dark clouds, faint blue glow at the horizon, empty distant flat horizon, no buildings, no ground detail, no people, no text",
-      "width": 2048,
-      "height": 1024,
-      "seed": 1105
-     },
-     "save": "pano"
-    }
-   ],
-   "files": {
-    "pano": "textures/sky/sky-night.webp"
-   }
-  },
-  {
-   "id": "sky-storm",
-   "note": "Sky panorama 'storm' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_2ba334579597.",
-   "steps": [
-    {
-     "tool": "image.panorama",
-     "params": {
-      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, storm shelf cloud: a huge dark arcus shelf cloud rolling across the whole sky, slate grey and teal green underside, heavy rain curtains in the distance, a thin bright gap of pale light low at the horizon, ominous, empty distant flat horizon, no buildings, no ground detail, no people, no text",
-      "width": 2048,
-      "height": 1024,
-      "seed": 1106
-     },
-     "save": "pano"
-    }
-   ],
-   "files": {
-    "pano": "textures/sky/sky-storm.webp"
-   }
-  },
-  {
-   "id": "neon-sign-noodles",
-   "note": "Neon shop sign NOODLES for js/props.js (textures/neon/noodles.webp). image.generate then cutout. Stylized DoD neon, navy night, electric pink.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Neon shop sign reading NOODLES only, bold tube neon letters, hot pink and magenta glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
-      "width": 512,
-      "height": 256,
-      "transparent": true
-     },
-     "save": "sign"
-    }
-   ],
-   "files": {
-    "sign": "textures/neon/noodles.webp"
-   }
-  },
-  {
-   "id": "neon-sign-bar",
-   "note": "Neon shop sign BAR for js/props.js.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Neon shop sign reading BAR only, bold tube neon letters, electric cyan glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
-      "width": 512,
-      "height": 256,
-      "transparent": true
-     },
-     "save": "sign"
-    }
-   ],
-   "files": {
-    "sign": "textures/neon/bar.webp"
-   }
-  },
-  {
-   "id": "neon-sign-24h",
-   "note": "Neon shop sign 24H for js/props.js.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Neon shop sign reading 24H only, bold tube neon letters, mint green glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
-      "width": 512,
-      "height": 256,
-      "transparent": true
-     },
-     "save": "sign"
-    }
-   ],
-   "files": {
-    "sign": "textures/neon/24h.webp"
-   }
-  },
-  {
-   "id": "neon-sign-cafe",
-   "note": "Neon shop sign CAFE for js/props.js.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Neon shop sign reading CAFE only, bold tube neon letters, warm amber gold glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
-      "width": 512,
-      "height": 256,
-      "transparent": true
-     },
-     "save": "sign"
-    }
-   ],
-   "files": {
-    "sign": "textures/neon/cafe.webp"
-   }
-  },
-  {
-   "id": "neon-sign-arcade",
-   "note": "Neon shop sign ARCADE for js/props.js.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Neon shop sign reading ARCADE only, bold tube neon letters, violet purple glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
-      "width": 512,
-      "height": 256,
-      "transparent": true
-     },
-     "save": "sign"
-    }
-   ],
-   "files": {
-    "sign": "textures/neon/arcade.webp"
-   }
-  },
-  {
-   "id": "neon-sign-books",
-   "note": "Neon shop sign BOOKS for js/props.js.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Neon shop sign reading BOOKS only, bold tube neon letters, orange coral glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
-      "width": 512,
-      "height": 256,
-      "transparent": true
-     },
-     "save": "sign"
-    }
-   ],
-   "files": {
-    "sign": "textures/neon/books.webp"
-   }
-  },
-  {
-   "id": "neon-sign-hotel",
-   "note": "Neon shop sign HOTEL for js/props.js.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Neon shop sign reading HOTEL only, bold tube neon letters, electric cyan glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
-      "width": 512,
-      "height": 256,
-      "transparent": true
-     },
-     "save": "sign"
-    }
-   ],
-   "files": {
-    "sign": "textures/neon/hotel.webp"
-   }
-  },
-  {
-   "id": "neon-sign-pharmacy",
-   "note": "Neon shop sign PHARMACY for js/props.js.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Neon shop sign reading PHARMACY only, bold tube neon letters, mint green glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
-      "width": 512,
-      "height": 256,
-      "transparent": true
-     },
-     "save": "sign"
-    }
-   ],
-   "files": {
-    "sign": "textures/neon/pharmacy.webp"
-   }
-  },
-  {
-   "id": "power-crack-1",
-   "note": "Power SFX for js/sfx.js: crack variant 1/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice",
-      "duration": 0.7,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4215
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/crack-1.mp3"
-   }
-  },
-  {
-   "id": "power-crack-2",
-   "note": "Power SFX for js/sfx.js: crack variant 2/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 2, a different take)",
-      "duration": 0.7,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4226
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/crack-2.mp3"
-   }
-  },
-  {
-   "id": "power-crack-3",
-   "note": "Power SFX for js/sfx.js: crack variant 3/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 3, a different take)",
-      "duration": 0.7,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4237
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/crack-3.mp3"
-   }
-  },
-  {
-   "id": "power-crack-4",
-   "note": "Power SFX for js/sfx.js: crack variant 4/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 4, a different take)",
-      "duration": 0.7,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4248
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/crack-4.mp3"
-   }
-  },
-  {
-   "id": "power-body-1",
-   "note": "Power SFX for js/sfx.js: body variant 1/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music",
-      "duration": 1.2,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4212
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/body-1.mp3"
-   }
-  },
-  {
-   "id": "power-body-2",
-   "note": "Power SFX for js/sfx.js: body variant 2/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 2, a different take)",
-      "duration": 1.2,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4223
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/body-2.mp3"
-   }
-  },
-  {
-   "id": "power-body-3",
-   "note": "Power SFX for js/sfx.js: body variant 3/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 3, a different take)",
-      "duration": 1.2,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4234
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/body-3.mp3"
-   }
-  },
-  {
-   "id": "power-body-4",
-   "note": "Power SFX for js/sfx.js: body variant 4/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 4, a different take)",
-      "duration": 1.2,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4245
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/body-4.mp3"
-   }
-  },
-  {
-   "id": "power-rumble-1",
-   "note": "Power SFX for js/sfx.js: rumble variant 1/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music",
-      "duration": 3.2,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4218
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/rumble-1.mp3"
-   }
-  },
-  {
-   "id": "power-rumble-2",
-   "note": "Power SFX for js/sfx.js: rumble variant 2/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 2, a different take)",
-      "duration": 3.2,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4229
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/rumble-2.mp3"
-   }
-  },
-  {
-   "id": "power-rumble-3",
-   "note": "Power SFX for js/sfx.js: rumble variant 3/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 3, a different take)",
-      "duration": 3.2,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4240
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/rumble-3.mp3"
-   }
-  },
-  {
-   "id": "power-rumble-4",
-   "note": "Power SFX for js/sfx.js: rumble variant 4/4. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 4, a different take)",
-      "duration": 3.2,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4251
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/rumble-4.mp3"
-   }
-  },
-  {
-   "id": "power-whoosh-1",
-   "note": "Power SFX for js/sfx.js: whoosh variant 1/3. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music",
-      "duration": 1.1,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4218
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/whoosh-1.mp3"
-   }
-  },
-  {
-   "id": "power-whoosh-2",
-   "note": "Power SFX for js/sfx.js: whoosh variant 2/3. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music (variation 2, a different take)",
-      "duration": 1.1,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4229
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/whoosh-2.mp3"
-   }
-  },
-  {
-   "id": "power-whoosh-3",
-   "note": "Power SFX for js/sfx.js: whoosh variant 3/3. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music (variation 3, a different take)",
-      "duration": 1.1,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4240
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/whoosh-3.mp3"
-   }
-  },
-  {
-   "id": "power-gale-loop-1",
-   "note": "Power SFX for js/sfx.js: gale-loop variant 1/1. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Sustained gale wind loop for a city street, strong continuous rush, seamless loop, no music",
-      "duration": 4,
-      "loop": true,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4227
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/gale-loop-1.mp3"
-   }
-  },
-  {
-   "id": "power-tornado-roar-1",
-   "note": "Power SFX for js/sfx.js: tornado-roar variant 1/1. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Seamless looping tornado roar, thick swirling wind funnel over city streets, no music",
-      "duration": 4,
-      "loop": true,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4236
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/tornado-roar-1.mp3"
-   }
-  },
-  {
-   "id": "power-tornado-debris-1",
-   "note": "Power SFX for js/sfx.js: tornado-debris variant 1/1. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Tornado debris rattle loop, wood and metal scrap clatter in wind, seamless, no music",
-      "duration": 4,
-      "loop": true,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4242
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/tornado-debris-1.mp3"
-   }
-  },
-  {
-   "id": "power-tornado-pressure-1",
-   "note": "Power SFX for js/sfx.js: tornado-pressure variant 1/1. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Deep pressure drone under a tornado, low humming air pressure, seamless loop, no music",
-      "duration": 4,
-      "loop": true,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4248
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/tornado-pressure-1.mp3"
-   }
-  },
-  {
-   "id": "power-sun-shimmer-1",
-   "note": "Power SFX for js/sfx.js: sun-shimmer variant 1/1. Mono, under 120 KB.",
-   "steps": [
-    {
-     "tool": "audio.sfx",
-     "params": {
-      "text": "Warm sun break shimmer swell, soft bright air opening after rain, hint of distant birds, no music",
-      "duration": 2.5,
-      "loop": false,
-      "sampleRate": 22050,
-      "provider": "open",
-      "normalize": true,
-      "targetLufs": -18,
-      "seed": 4233
-     },
-     "save": "sfx"
-    }
-   ],
-   "files": {
-    "sfx": "audio/sfx/power/sun-shimmer-1.mp3"
-   }
-  },
-  {
    "id": "dlg-birdie-19yu9tc",
    "note": "Spoken line (ending:A), Birdie: \"The lawn drank. Thank you.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
@@ -7973,198 +8412,6 @@
    ],
    "files": {
     "audio": "audio/dialogue/dlg-he-1fnrim7.mp3"
-   }
-  },
-  {
-   "id": "pilot-ending-a",
-   "note": "Pilot ending-scene line: \"Fair weather. Logged.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
-   "steps": [
-    {
-     "tool": "audio.voice",
-     "params": {
-      "text": "Fair weather. Logged.",
-      "voice": "gv_c2c9cdffeae27b99",
-      "direction": "calm, dry, faintly fond, radio-flat"
-     },
-     "save": "audio"
-    }
-   ],
-   "files": {
-    "audio": "audio/pilot/pilot-ending-a.mp3"
-   }
-  },
-  {
-   "id": "pilot-ending-c",
-   "note": "Pilot ending-scene line: \"Sky's still thinking. Stay in.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
-   "steps": [
-    {
-     "tool": "audio.voice",
-     "params": {
-      "text": "Sky's still thinking. Stay in.",
-      "voice": "gv_c2c9cdffeae27b99",
-      "direction": "calm, dry, faintly fond, radio-flat"
-     },
-     "save": "audio"
-    }
-   ],
-   "files": {
-    "audio": "audio/pilot/pilot-ending-c.mp3"
-   }
-  },
-  {
-   "id": "ui-verbs-lit",
-   "note": "UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Game HUD icon sheet, five weather ability icons in a horizontal row equally spaced, left to right: (1) jagged electric lightning bolt, (2) rain cloud with three heavy raindrops, (3) swirling wind gust ribbons, (4) soft fog bank wisps, (5) sun breaking through clouds with warm rays. Style: stylized painted cartoon UI icons, Dose Of Destruction look, clean bold silhouettes readable at 44 pixels, storm-navy and black with LIT glowing electric cyan-blue edge light and soft bloom, flat front orthographic, each icon centered in its cell, plain solid magenta background #ff00ff, no text, no letters, no watermark, no keycaps",
-      "width": 1280,
-      "height": 256,
-      "count": 1
-     },
-     "save": "sheet"
-    },
-    {
-     "tool": "image.remove-background",
-     "inputs": {
-      "image": "$prev"
-     },
-     "save": "cut"
-    }
-   ],
-   "files": {
-    "cut": "textures/ui/verb-sheet-lit.png"
-   }
-  },
-  {
-   "id": "ui-verbs-unlit",
-   "note": "UI art kit: five unlit (dim) weather verb icons sheet. Same layout as ui-verbs-lit. Stand-ins: textures/ui/verb-*-unlit.svg.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Game HUD icon sheet, five weather ability icons in a horizontal row equally spaced, left to right: (1) jagged lightning bolt, (2) rain cloud with three raindrops, (3) swirling wind ribbons, (4) fog bank wisps, (5) sun behind clouds. Style: stylized painted cartoon UI icons, Dose Of Destruction look, clean bold silhouettes readable at 44 pixels, storm-navy and muted slate UNLIT state, dim desaturated blue-grey, no glow, flat front orthographic, each icon centered in its cell, plain solid magenta background #ff00ff, no text, no letters, no watermark",
-      "width": 1280,
-      "height": 256,
-      "count": 1
-     },
-     "save": "sheet"
-    },
-    {
-     "tool": "image.remove-background",
-     "inputs": {
-      "image": "$prev"
-     },
-     "save": "cut"
-    }
-   ],
-   "files": {
-    "cut": "textures/ui/verb-sheet-unlit.png"
-   }
-  },
-  {
-   "id": "ui-panel-frame",
-   "note": "UI art kit: 9-slice panel frame (Persona-bold angular corners, storm-navy + cyan). Stand-in: textures/ui/panel-frame.svg.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Game UI 9-slice panel frame only, square frame with ornate sharp Persona-5-like angular corner pieces and a thin electric-blue neon edge on storm-navy metal, hollow center completely filled with solid magenta #ff00ff for cutout, bold AAA game menu frame, flat front orthographic, cinematic dark navy and black with cyan accents, no text, no icons inside, no watermark",
-      "width": 512,
-      "height": 512,
-      "count": 1
-     },
-     "save": "frame"
-    },
-    {
-     "tool": "image.remove-background",
-     "inputs": {
-      "image": "$prev"
-     },
-     "save": "cut"
-    }
-   ],
-   "files": {
-    "cut": "textures/ui/panel-frame.png"
-   }
-  },
-  {
-   "id": "ui-ranks",
-   "note": "UI art kit: S/A/B/C rank stamps in one sheet. Stand-ins: textures/ui/rank-S.svg etc.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Game UI rank stamp sheet, four stamps in a horizontal row: big letter S, letter A, letter B, letter C. Each is a bold painted wax-seal style stamp with sharp angular frame, storm-navy metal and electric blue glow, S brightest gold-cyan, A teal, B blue, C muted copper-red. Flat front orthographic, plain solid magenta background #ff00ff, stylized cartoon AAA game UI, readable at small size, no other text, no watermark",
-      "width": 1024,
-      "height": 256,
-      "count": 1
-     },
-     "save": "sheet"
-    },
-    {
-     "tool": "image.remove-background",
-     "inputs": {
-      "image": "$prev"
-     },
-     "save": "cut"
-    }
-   ],
-   "files": {
-    "cut": "textures/ui/rank-sheet.png"
-   }
-  },
-  {
-   "id": "ui-busts",
-   "note": "UI art kit: portrait busts of Birdie (yellow raincoat, straw hat), Dex (orange jacket, white helmet), Ines (violet coat, glasses) in one sheet. Stand-ins: textures/ui/bust-*.svg.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Game UI portrait bust sheet, three character busts in a horizontal row on magenta #ff00ff: (1) Birdie Alvarez short gardener woman yellow raincoat straw hat warm skin, (2) Dex Moreno courier man orange jacket white helmet parcel strap, (3) Ines Quill tall woman violet coat round glasses dark hair. Stylized 3D cartoon Dose Of Destruction look, storm-navy rim light, front-facing busts from shoulders up, bold readable silhouettes, no text, no watermark",
-      "width": 1152,
-      "height": 384,
-      "count": 1
-     },
-     "save": "sheet"
-    },
-    {
-     "tool": "image.remove-background",
-     "inputs": {
-      "image": "$prev"
-     },
-     "save": "cut"
-    }
-   ],
-   "files": {
-    "cut": "textures/ui/bust-sheet.png"
-   }
-  },
-  {
-   "id": "ui-pilot",
-   "note": "UI art kit: Pilot glyph (holographic wrist-ring / AI mark). Stand-in: textures/ui/pilot.svg.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Game UI glyph icon, a holographic wrist ring and soft radio pulse mark for an AI called Pilot, electric cyan on storm-navy, circular badge, stylized painted cartoon, clean silhouette readable at 28 px, plain solid magenta background #ff00ff, no text, no letters, no watermark",
-      "width": 256,
-      "height": 256,
-      "count": 1
-     },
-     "save": "glyph"
-    },
-    {
-     "tool": "image.remove-background",
-     "inputs": {
-      "image": "$prev"
-     },
-     "save": "cut"
-    }
-   ],
-   "files": {
-    "cut": "textures/ui/pilot.png"
    }
   }
  ]

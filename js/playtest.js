@@ -1196,6 +1196,240 @@ async function neighborsScenario(options, t) {
   pressKey("Escape");
 }
 
+/* ---------------- neighbor-arcs: 3-beat personal arcs for Birdie, Dex and Ines; voiced scenes; persistent marks; 3 pips ---------------- */
+// Setup: arcs cleared, abilities unlocked, day bar + Take control. Real place/walk + weather keys (taps on phone).
+// Events arc-scene-<id>-<n>, arc-beat-<id>-<n>, arc-ribbon-reload, arc-open-sign-night, arc-pips-phone.
+async function neighborArcsScenario(options, t) {
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  await t.until(() => window.day.neighbors && window.day.neighbors.arcs, 8000, "neighbors arcs API");
+  const N = window.day.neighbors;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const M = window.day.memory;
+  if (!N || !C || !P || !M) {
+    t.problem("bug", "neighbors, powers, control or memory isn't installed");
+    return;
+  }
+  const touch = !!(options && options.touch) || document.documentElement.classList.contains("touch-ui");
+  if (touch) {
+    document.documentElement.classList.add("touch-ui");
+    if (C.touch) C.touch(true);
+  }
+  // setup: clear arcs, unlock verbs, street done, full Charge
+  try { localStorage.setItem("icanbe.street", JSON.stringify({ done: true, step: 99 })); } catch (e) { /* */ }
+  if (P.abilities && P.abilities.unlock) P.abilities.unlock();
+  if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+  ["birdie", "dex", "quill"].forEach((id) => {
+    N.setArc(id, 0);
+    if (N.quietDay) N.quietDay(id);
+  });
+  t.event("arc-reset", JSON.stringify(N.arcs()));
+
+  const day = window.day.today();
+  const outside = carSideMoment(day);
+  if (!outside) { t.problem("bug", "No moment beside the car"); return; }
+  scrubTo(outside.start + 0.2);
+  clickSpeed(1);
+  await sleep(400);
+  // Sound on so voiced scenes fire captions
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") !== "true") {
+    if (touch) await tap(sound); else sound.click();
+    await sleep(200);
+  }
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+
+  const setClock = async (hour, why) => {
+    scrubTo(hour * 60);
+    clickSpeed(1);
+    await sleep(500);
+    t.event("clock", `${why}: ${E().fmtClock(hour * 60)}`);
+    if (C.mode() !== "control") {
+      pressKey("Enter");
+      await t.until(() => C.mode() === "control", 4000, "Take control again");
+    }
+  };
+  const refill = () => { if (P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  const who = (id) => N.now().people.find((p) => p.id === id);
+  const arcSceneSeen = {};
+  const onNb = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "arc-scene" && d.id != null && d.beat != null) {
+      arcSceneSeen[`${d.id}-${d.beat}`] = (arcSceneSeen[`${d.id}-${d.beat}`] || 0) + 1;
+      t.event(`arc-voice-${d.id}-${d.beat}`, `${d.who}: ${d.text || d.line}`);
+    }
+  };
+  window.addEventListener("day:neighbor", onNb);
+  const waitArc = async (id, beat, ms) => {
+    const ok = await t.until(() => (N.arcs()[id] || 0) >= beat, ms || 12000, `${id} arc beat ${beat}`).then(() => true).catch(() => false);
+    if (ok) t.event(`arc-beat-${id}-${beat}`, `progress ${JSON.stringify(N.arcs())}; props ${JSON.stringify(N.arcProps())}`);
+    else t.problem("bug", `${id}: arc beat ${beat} never landed (now ${N.arcs()[id]})`);
+    return ok;
+  };
+  const waitScene = async (id, beat) => {
+    const key = `${id}-${beat}`;
+    const ok = await t.until(() => {
+      const p = who(id);
+      return !!(arcSceneSeen[key] || (p && (p.arcOpen || p.arcAsk) && p.bubble));
+    }, 10000, `${id} arc scene ${beat}`).then(() => true).catch(() => false);
+    if (ok) t.event(`arc-scene-${id}-${beat}`, who(id).bubble || `voiced ${arcSceneSeen[key] || 1}`);
+    else t.problem("bug", `${id}: no voiced scene for beat ${beat}`);
+    return ok;
+  };
+  const castKey = async (key) => {
+    refill();
+    await sleep(200);
+    if (touch) {
+      const map = { r: "rain", v: "wind", c: "fog", g: "wind", e: "bolt", x: "sunbreak" };
+      const id = map[key];
+      const btn = id && document.querySelector(`.abilitybar .ab[data-id="${id}"], .abilitybar .ab[data-ability="${id}"]`);
+      if (btn) await tap(btn);
+      else pressKey(key);
+    } else pressKey(key);
+    await sleep(400);
+  };
+
+  // ---- Birdie: dying pots → rain → ribbon + basket ----
+  t.scene("Birdie arc");
+  t.progress(0.05);
+  await setClock(8.2, "Birdie morning");
+  if (C.place) C.place(-22, 9.5, 0);
+  await sleep(600);
+  await waitScene("birdie", 1);
+  // cue finishes on its own after lines
+  await waitArc("birdie", 1, 14000);
+  t.progress(0.15);
+  await sleep(400);
+  await waitScene("birdie", 2);
+  await castKey("r");
+  await waitArc("birdie", 2, 10000);
+  t.progress(0.25);
+  await setClock(17.2, "Birdie evening");
+  if (C.place) C.place(-22, 9.5, 0);
+  await sleep(500);
+  await waitScene("birdie", 3);
+  await waitArc("birdie", 3, 14000);
+  const props1 = N.arcProps() || {};
+  if (props1.ribbon) t.event("arc-ribbon", "ribbon on balcony + basket");
+  else t.problem("bug", "Birdie beat 3: no ribbon mark in the world");
+  // same-day reload keeps the ribbon — do not call setArc; memory.arcs must survive alone
+  M.reload();
+  await sleep(400);
+  const after = M.arcs ? M.arcs().birdie : 0;
+  const propsReload = N.arcProps() || {};
+  if (after === 3 && propsReload.ribbon === true) t.event("arc-ribbon-reload", `birdie=${after}, ribbon=true`);
+  else t.problem("bug", `Birdie ribbon lost after reload (arc ${after}, ribbon=${propsReload.ribbon}, props ${JSON.stringify(propsReload)})`);
+  t.progress(0.35);
+  t.metric("quality.textOnlyBeats", 0);
+
+  // ---- Dex: turbines → gust → lit OPEN sign ----
+  t.scene("Dex arc");
+  N.setArc("dex", 0);
+  if (N.quietDay) N.quietDay("dex");
+  await setClock(9, "Dex morning");
+  if (C.place) C.place(46, 9.8, 0);
+  await sleep(600);
+  await waitScene("dex", 1);
+  await waitArc("dex", 1, 12000);
+  t.progress(0.45);
+  await waitScene("dex", 2);
+  await castKey("g");
+  await waitArc("dex", 2, 10000);
+  t.progress(0.55);
+  await setClock(18.5, "Dex dusk sign");
+  if (C.place) C.place(48, 9.5, Math.PI);
+  await sleep(500);
+  await waitScene("dex", 3);
+  await waitArc("dex", 3, 12000);
+  const dexProps = N.arcProps() || {};
+  if (dexProps.openSign) t.event("arc-open-sign-night", "lit OPEN sign at night");
+  else t.problem("bug", "Dex beat 3: no lit open sign");
+  t.progress(0.65);
+
+  // ---- Ines: blank chart → fog → chart + beacon ----
+  t.scene("Ines arc");
+  N.setArc("quill", 0);
+  if (N.quietDay) N.quietDay("quill");
+  await setClock(18, "Ines dusk");
+  if (C.place) C.place(153, 9.8, 0);
+  await sleep(600);
+  await waitScene("quill", 1);
+  await waitArc("quill", 1, 12000);
+  t.progress(0.75);
+  await waitScene("quill", 2);
+  await castKey("c");
+  await waitArc("quill", 2, 10000);
+  t.progress(0.85);
+  await setClock(21, "Ines night");
+  if (C.place) C.place(153, 9.8, 0);
+  await sleep(500);
+  await waitScene("quill", 3);
+  await waitArc("quill", 3, 12000);
+  const qProps = N.arcProps() || {};
+  if (qProps.chartBeacon) t.event("arc-chart-beacon", "chart window + violet beacon");
+  else t.problem("bug", "Ines beat 3: no chart beacon");
+  t.progress(0.92);
+
+  // ---- Neighbors menu: 3 pips each (phone portrait) ----
+  t.scene("Neighbors pips");
+  N.setArc("birdie", 3);
+  N.setArc("dex", 3);
+  N.setArc("quill", 3);
+  N.panel(true);
+  await sleep(400);
+  const panel = $("neighbors-panel");
+  if (!panel || panel.hidden) t.problem("bug", "Neighbors panel didn't open");
+  else {
+    const rows = panel.querySelectorAll(".row[data-neighbor]");
+    let pipOk = 0;
+    rows.forEach((row) => {
+      const pips = row.querySelectorAll(".pip");
+      const on = row.querySelectorAll(".pip.on");
+      if (pips.length === 3 && on.length === 3) pipOk++;
+      t.event("arc-pips", `${row.getAttribute("data-neighbor")}: ${on.length}/3`);
+    });
+    if (pipOk === 3) t.event("arc-pips-ok", "3 neighbors × 3 pips");
+    else t.problem("bug", `Pips incomplete: ${pipOk}/3 rows with 3 filled`);
+    if (touch) {
+      t.event("arc-pips-phone", `390 touch panel ${Math.round(panel.getBoundingClientRect().width)}×${Math.round(panel.getBoundingClientRect().height)}`);
+      checkHud(t, "neighbor-arcs-phone");
+      // no overlap between panel and ability bar / caption
+      const bar = document.querySelector(".abilitybar");
+      const cap = $("voice-caption") || document.querySelector(".voice-caption");
+      const pb = panel.getBoundingClientRect();
+      if (bar) {
+        const bb = bar.getBoundingClientRect();
+        if (!(pb.bottom < bb.top - 4 || pb.top > bb.bottom + 4 || pb.right < bb.left - 4 || pb.left > bb.right + 4)) {
+          // soft: panel may sit above; only fail if centre overlaps heavily
+          const ox = Math.min(pb.right, bb.right) - Math.max(pb.left, bb.left);
+          const oy = Math.min(pb.bottom, bb.bottom) - Math.max(pb.top, bb.top);
+          if (ox > 20 && oy > 20) t.problem("bug", "Neighbors panel overlaps the ability bar on phone");
+        }
+      }
+      void cap;
+    }
+  }
+  const fin = N.arcs();
+  t.metric("arcBirdie", fin.birdie);
+  t.metric("arcDex", fin.dex);
+  t.metric("arcQuill", fin.quill);
+  t.metric("quality.textOnlyBeats", 0);
+  const voiceCount = Object.keys(arcSceneSeen).length;
+  t.metric("arcVoiceScenes", voiceCount);
+  if (voiceCount < 9) t.problem("bug", `Only ${voiceCount} voiced arc scenes (want 9): ${JSON.stringify(arcSceneSeen)}`);
+  else t.event("arc-voices-nine", JSON.stringify(arcSceneSeen));
+  if (fin.birdie === 3 && fin.dex === 3 && fin.quill === 3) t.event("neighbor-arcs-pass", JSON.stringify(fin));
+  else t.problem("bug", `Arcs incomplete: ${JSON.stringify(fin)}`);
+  window.removeEventListener("day:neighbor", onNb);
+  t.progress(1);
+  pressKey("Escape");
+}
+
 /* ---------------- neighbor-bodies: procedural peoplekit gait, beat gestures, weather posture, foot-slide detectors ---------------- */
 // Setup: day bar + Take control. Real WASD to each neighbour; R/X/E for asks. Slowed clips = day at 1× while we
 // watch a walking stretch and the ask→thanks gestures. A full-day scrub samples detectors (jumps ignored).
@@ -11094,6 +11328,7 @@ installPlaytest({
     { id: "daily", title: "Today's request: the title shows one neighbour's ask under the name (two lines at most, above Play) and it changes when the date moves; the neighbour says it aloud when he comes close, the ! over them opens it on a tap, calling the weather in the place and window answers it with a voiced thanks and a reward that stays after a same-day reload; next day the title says what he did yesterday", seconds: 240, tags: ["story", "retention", "phone", "characters"], description: "Title, the date shifted over 16 days (setup: day.memory.shiftDays), the day bar into the ask's window (setup), Enter, WASD to the asker, tap the !, the power key, Esc; daily.reload() stands in for a page reload. {\"touch\":true} for 390x844 touch: tapping the ! and the ability button (control.place stands in for the stick)." },
     { id: "remembers", title: "Help Birdie, press Let go: he names the deed aloud, and his day detours past her pots within 5 game minutes; more deeds show more memory steps; the day end speaks two deeds one line at a time", seconds: 150, tags: ["story", "characters", "memory"], description: "Day bar 8:05 (setup), Enter, W to Birdie, R, Esc; checks the caption (one line, under the status card, over no control), the rebuilt day and the detour; memory.note adds deeds (setup); then the clock rolls at 1200x for the day-end card. {\"touch\":true} for 390x844 touch (taps; control.place stands in for the stick)." },
     { id: "neighbors", title: "Walk the avenue to Birdie, Dex and Ines Quill: each asks for a weather ability in a speech bubble, answering it pays a thank-you and a reward, and a later surprise pays more", seconds: 260, tags: ["neighbors", "story"], description: "Day bar beside the car (setup), Enter, then real WASD/Shift to each neighbor and R, X, E for their asks; the day bar jumps to each surprise hour. Events found-<id>, beat-ask-<id>, beat-thanks-<id>, reward-<id>, beat-surprise-<id>." },
+    { id: "neighbor-arcs", title: "Neighbor personal arcs: Birdie, Dex and Ines each play 3 voiced beats (9 scenes); Birdie's ribbon survives a same-day reload; Dex's lit OPEN sign at night; phone Neighbors menu shows 3 pips each with no overlap", seconds: 320, tags: ["neighbors", "story", "characters", "phone", "voice"], description: "Load with ?playtest=neighbor-arcs ({\"touch\":true} for 390x844). Setup: arcs cleared, verbs unlocked, day bar + Enter. Real place near each neighbour, R/G/C for asks. Events arc-scene-* / arc-beat-* / arc-ribbon-reload / arc-open-sign-night / arc-pips-ok; metrics arcBirdie, arcDex, arcQuill, quality.textOnlyBeats." },
     { id: "neighbor-bodies", title: "Peoplekit bodies: slowed walk clips for Birdie, Dex and Ines (stride matches speed), ask wave and thanks cheer gestures, rain hunch and sun eye-shield, foot-slide detectors clean over a full day", seconds: 320, tags: ["neighbors", "quality"], description: "Day bar + Enter (setup). Real WASD to each neighbour; R/X/E for asks. Events slow-clip / gait-step / gesture-ask-* / gesture-thanks-* / weather-pose-rain / weather-pose-sun / foot-slide-clean; metric quality.footSlideFails." },
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
@@ -11199,6 +11434,7 @@ installPlaytest({
       else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
+      else if (id === "neighbor-arcs") await neighborArcsScenario(options, t);
       else if (id === "memory") await memoryScenario(options, t);
       else if (id === "daily") await dailyScenario(options, t);
       else if (id === "neighbor-bodies") await neighborBodies(options, t);

@@ -80,6 +80,17 @@ export function dialogueLines(config) {
     [st.ask, st.call, st.thanks].forEach((t) => add(who, t, `street:${st.id}`));
     if (st.then) add(who, st.then.thanks, `street:${st.id}-then`);
   });
+  // Personal arcs (neighbors.arcs): cue / ask / thanks / payoff lines in each speaker's voice.
+  const arcs = (C.neighbors && C.neighbors.arcs && C.neighbors.arcs.list) || {};
+  Object.keys(arcs).forEach((id) => {
+    const p = people.find((x) => x.id === id);
+    const who = p ? neighborWho(p) : id;
+    (arcs[id].beats || []).forEach((b) => {
+      (b.lines || []).forEach((L) => add(L.who, L.text, `arc:${b.id}`));
+      if (b.text) add(who, b.text, `arc:${b.id}:ask`);
+      if (b.thanks) add(who, b.thanks, `arc:${b.id}:thanks`);
+    });
+  });
   // The autopilot's memory steps (`say` on a spine step or a pool entry with `remembers`): his voice.
   const walk = (steps, where) => (steps || []).forEach((st) => {
     if (!st) return;

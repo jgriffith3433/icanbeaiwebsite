@@ -26,6 +26,9 @@ ok(M.liveMarks(s, "2026-11-11").length === M.CAP, "at most 20 decals kept");
 ok(M.liveMarks(s, "2026-11-11", M.LOW_CAP).length === M.LOW_CAP, "low quality draws 6");
 ok(M.sinceDays(s, "2026-11-11", 1).zones.park.rain === 1 && M.sinceDays(s, "2026-11-13", 1).zones.park === undefined, "since()");
 ok(M.parse("not json").v === 1, "parse survives junk");
+ok(M.emptyArcs && M.emptyArcs().birdie === 0 && M.emptyArcs().quill === 0, "emptyArcs");
+const withArcs = M.parse(JSON.stringify({ v: 1, days: {}, arcs: { birdie: 2, dex: 9, quill: -1 } }));
+ok(withArcs.arcs.birdie === 2 && withArcs.arcs.dex === 3 && withArcs.arcs.quill === 0, "parse clamps arcs 0..3");
 M.prune(s, "2026-12-30"); ok(!Object.keys(s.days).length, "prune");
 if (problems.length) { console.error("check-memory failed:"); problems.forEach((p) => console.error(" -", p)); process.exit(1); }
 console.log("check-memory: ok");

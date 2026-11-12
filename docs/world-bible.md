@@ -138,13 +138,13 @@ Home Block landmark is a vertical-slice deliverable (crown light strip + tomato 
 Same storm caller as Dose Of Destruction (`AllTheCharacters/SmallWeather`). Black messy hair, glasses, navy tech jacket with glowing blue seams, cargo pants, glowing boots. Lives a developer's day on autopilot (`day.config.js` spine); player Take control for third-person walk/run/jump/float and weather powers. Voice: DoD Eric, short first-person; log/barks say "He", never "they". Spoken barks (`voice.spoken`, director in `js/voice.js`): take control, let go, each power's first use, rooftop rescue, neighbour thanks, day end, idle — caption clear of the ability bar, no overlap, ~5 min per-line cooldown; Voices mute separate from Sound. **Five verbs, one Charge:** Lightning (E; hold → Storm), Rain (R), Wind (V; tap Gust, hold Gale, full Tornado; G aliases Gust), Fog (C), Sun (X). Only Charge shows on the ability bar (amber bolt); the old Pressure chip is gone; Body panel **Energy** is fatigue only. Keys 1–7 and hold Q are **Sky studio** in Settings (off by default). On a phone the five verbs sit in an arc on the right with Charge as a ring; the Storm/Bolt/Gust/Tornado pad is gone. Strain ("Sky") is what the district absorbs in the arc. Reacts with barks to needs and sky changes; crowd answers his *manual* weather. Main character model is always Small Weather, never a placeholder while loading. Live log shows only what has happened; when the clock is held, status and clock say Paused.
 
 ### Birdie Alvarez
-Gardener, yellow raincoat and straw hat; apt block. Stops: inside overnight, pots at −21,9.5 from 7, park bench −6,22.5 at noon, home by 20. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). Canon: she asks him for rain for her tomatoes. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* 3–4 idle barks/gestures after the ask (wave from pots, lawn-state comment); second day-keyed beat when lawn is damp; readable hat silhouette before Gen model.
+Gardener, yellow raincoat and straw hat; apt block. Stops: inside overnight, pots at −21,9.5 from 7, park bench −6,22.5 at noon, home by 20. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). **Personal arc (3 beats):** dying pots → rain saves them → garden-show ribbon on her balcony + basket at his door (`neighbors.arcs.birdie`, persisted in memory). Canon: she asks him for rain for her tomatoes. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* 3–4 idle barks/gestures after the ask; readable hat silhouette before Gen model.
 
 ### Dex Moreno
-Courier, orange jacket, white helmet, parcel on his back; lives over the shop. Stoop by day, plaza at lunch. Ask: sun break for damp parcels; thanks; evening humming parcel surprise. Briefs and closes the lunch rescue. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* idle route jokes and helmet silhouette; parcel-carry handoff as a non-weather verb.
+Courier, orange jacket, white helmet, parcel on his back; lives over the shop. Stoop by day, plaza at lunch. Ask: sun break for damp parcels; thanks; evening humming parcel surprise. Briefs and closes the lunch rescue. **Personal arc (3 beats):** stalled shop turbines → Gust keeps them spinning → lit OPEN sign + wave from the doorway (`neighbors.arcs.dex`). *Short:* box figure until GPU neighbor pass. *Build (queue 5):* idle route jokes and helmet silhouette; parcel-carry handoff as a non-weather verb.
 
 ### Ines Quill
-Stargazer, violet coat, glasses, telescope; annex. Inside by day, out from 16:30 through the night. Ask: one bolt for her lens (not at her); thanks; night surprise. Reads the sky in Part 2; names the lunch cell as something "clearing its throat." *Short:* box figure until GPU neighbor pass. *Build (queue 5):* dusk star-point gesture and chart mutter; scope silhouette readable at range.
+Stargazer, violet coat, glasses, telescope; annex. Inside by day, out from 16:30 through the night. Ask: one bolt for her lens (not at her); thanks; night surprise. Reads the sky in Part 2; names the lunch cell as something "clearing its throat." **Personal arc (3 beats):** blank charts under streetlights → Fog for one reading → chart in her window + violet roof beacon (`neighbors.arcs.quill`). *Short:* box figure until GPU neighbor pass. *Build (queue 5):* dusk star-point gesture and chart mutter; scope silhouette readable at range.
 
 ### The District Board *(candidate loudspeaker faction)*
 Utilities voice on the Storm Tank speaker. Plain official tone; does not name him. Reservoir advisories and Weather Warning. *Not settled as full canon* until J answers beat-sheet Q3; lines already play in Parts 1/3 dialogue data. *Build:* physical speaker staging (queue 3).
@@ -182,27 +182,27 @@ Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather end
 - Animations: idle (dim wrist-ring pulse), walk (ring follows the left wrist while he moves), talk (bright voice-synced pulse). No separate body — Pilot is the ring and the radio voice.
 
 ### Birdie Alvarez
-- Want: rain for her tomatoes.
-- Arc: morning ask → rain thanks → evening tomato surprise.
-- Moment: Rain near her pots or park bench; lawn drinks.
+- Want: rain for her tomatoes, and the block's garden-show ribbon.
+- Arc: dying pots on the stoop → rain that greens them → tomatoes win the block show (ribbon on her balcony, a basket at his door). Same-day ask/thanks/surprise still loop; the arc persists across real days in `icanbe.memory` `arcs.birdie`.
+- Moment: Rain near her pots; then the ribbon and basket standing after beat 3 (same-day reload keeps them).
 - Personality: warm, plain, grateful.
-- Voice: dialogue cast `birdie` (ElevenLabs id in `day.config.js` `dialogue.cast`).
+- Voice: dialogue cast `Birdie` `EXAVITQu4vr4xnSDxMaL` (Sarah).
 - Animations: idle, walk, talk (peoplekit; Gen model later).
 
 ### Dex Moreno
-- Want: dry parcels and a clear lunch plaza.
-- Arc: sun-break ask → thanks → briefs the lunch rescue.
-- Moment: Sun break over the shop stoop or plaza.
+- Want: dry parcels, spinning shop-roof turbines, and a shop that stays open.
+- Arc: shop turbines stalled (no open sign) → player's Gust/Gale keeps them turning → a new lit OPEN sign and Dex waving from the doorway. Progress in `icanbe.memory` `arcs.dex`.
+- Moment: Gust or Gale on the shop roof; night screenshot of the lit sign after beat 3.
 - Personality: brisk, practical, upbeat.
-- Voice: dialogue cast `dex`.
+- Voice: dialogue cast `Dex` `TX3LPaxmHKxFdv7VOQHJ` (Liam).
 - Animations: idle, walk, talk (peoplekit; Gen model later).
 
 ### Ines Quill
 - Want: a clean sky reading for her lens and charts.
-- Arc: bolt ask → thanks → night surprise; names the lunch cell.
-- Moment: Lightning near the annex (not at her); dusk telescope.
+- Arc: blank charts under drowning streetlights → Fog softens the annex lights for one reading → her chart hangs in the annex window with a soft violet roof beacon. Progress in `icanbe.memory` `arcs.quill`. Grounded in her existing fog/stars/chart writing (street teach + daily photo asks).
+- Moment: Fog near the annex; chart + violet beacon after beat 3.
 - Personality: precise, quiet, curious.
-- Voice: dialogue cast `ines`.
+- Voice: dialogue cast `Ines` `Xb7hH8MSUJpSbSDYk0k2` (Alice).
 - Animations: idle, walk, talk (peoplekit; Gen model later).
 
 ## What happens
@@ -301,6 +301,7 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 | 9 | Tank low + ending | ~22:20 Tank / after Part 3 | Board critical on pulsing speaker; Ines charge line; two Lightning hits + mast flash/thunder; Rain fills gauge (bolt-storm does not count); Strain as flood patch or held storm + Warning on speaker; **ending:** three in-engine scenes (A rain+bloom+plaza dance; B half-green park + Dex on a turbine; C flood/umbrellas + Pilot/He), ≤40 s, Skip + one caption, ends on the rank stamp; no ending text card; memory keeps the park green after A | caption under camera |
 | 10 | Light show finale | ~22:05 plaza | Walk into plaza; 18 cues on beat; stage beams/pools/aurora; grand salvo; closing holds crowd (Birdie, Dex, Ines) while cityFared stingers + his last line by rank are spoken | card captions audio |
 | 11 | Neighbor surprises | evening windows | Bubble + reward + Pressure; spoken when clips exist, else babble + bubble — never log-only | toast ≤1 line |
+| 11b | Neighbor personal arcs | Birdie pots / Dex shop / Ines annex, across real days | Three beats each (cue → weather ask → payoff scene); voiced exchange + persistent prop/light; Neighbors menu shows 3 pips; `js/memory.js` `arcs` | caption ≤1 line |
 | 12 | Day end recap | clock rolls next day | Dim score; sign-off voice; three in-world flashes tied to log events; one last spoken breath; Skip/Esc/timer | ≤1 line under flashes |
 | 13 | Crowd weather breath | any day under control | Manual weather → look-up, run, hats, cheer, umbrellas, wipers; hold then fade | none |
 | 14 | Pilot on the wrist | every day / take / let-go | Schedule nudge + radio chirp + wrist-ring pulse; take-over and let-go Pilot lines (let-go names the deed); worried on chaos; night hold | caption ≤1 line labelled Pilot |
@@ -328,10 +329,17 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 ## The city remembers (js/memory.js)
 
 - **Areas:** the park lawn (green after rain), the avenue (scorch, puddles, toppled bins, a leaning sign), roofs and plaza (scorch where a bolt landed), Birdie's tomato wall (fuller after her rain).
-- **Landmarks:** the scorch on the road, the leaning sign by the kerb, the green lawn seen from the bandstand.
-- **Who lives here:** Birdie's tomatoes answer her rain; the pigeons and the crowd are unchanged. No new characters.
-- **What happens:** the deeds he does under control (asks answered or botched, each power by zone, rescues, scars, endings) are kept by real local date in `icanbe.memory`. Marks are full for the rest of that real day and fade over 3 real days; 20 decals at most, 6 on a phone.
-- **Story beats:** none new. The city simply shows what he did, the way the Goose's bell pile does: come back later the same day and it's still there.
+- **Landmarks:** the scorch on the road, the leaning sign by the kerb, the green lawn seen from the bandstand; after neighbor arcs — Birdie's balcony ribbon + door basket, Dex's lit shop OPEN sign, Ines's chart window and violet annex beacon.
+- **Who lives here:** Birdie's tomatoes answer her rain; Dex's shop turbines and sign answer his gusts; Ines's charts answer her fog. No new characters.
+- **What happens:** the deeds he does under control (asks answered or botched, each power by zone, rescues, scars, endings) are kept by real local date in `icanbe.memory`. Marks are full for the rest of that real day and fade over 3 real days; 20 decals at most, 6 on a phone. Neighbor personal arcs live in `icanbe.memory.arcs` (`birdie`/`dex`/`quill` = 0..3) and rebuild their props on load/reload so a same-day refresh keeps beat-3 marks.
+- **Story beats:** neighbor arc payoffs (11b) leave a lasting mark the city shows without a card.
+
+## Neighbor personal arcs (js/neighbors.js, data `neighbors.arcs`)
+
+Stardew-style heart progress for Birdie, Dex and Ines: three beats each the player drives, persisted across real days, shown in the world and as 3 pips in the Neighbors menu. Playtest: `neighbor-arcs`.
+- **Birdie — Tomatoes:** (1) dying pots on the stoop, voiced cue; (2) Rain near the pots greens them; (3) garden-show ribbon on her balcony + basket at his door.
+- **Dex — Open sign:** (1) shop-roof turbines stalled; (2) Gust/Gale spins them and keeps the shop open; (3) lit OPEN sign at night, Dex waves from the doorway.
+- **Ines — Chart wall:** (1) blank chart under drowning streetlights; (2) Fog at the annex for one reading; (3) chart in her window + violet roof beacon.
 
 ## He remembers (Let go, his day, the neighbors; js/deeds.js, js/schedule.js `remembers`)
 
