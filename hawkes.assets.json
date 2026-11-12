@@ -7176,6 +7176,158 @@
    "files": {
     "pano": "textures/sky/sky-storm.webp"
    }
+  },
+  {
+   "id": "neon-sign-noodles",
+   "note": "Neon shop sign NOODLES for js/props.js (textures/neon/noodles.webp). image.generate then cutout. Stylized DoD neon, navy night, electric pink.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading NOODLES only, bold tube neon letters, hot pink and magenta glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/noodles.webp"
+   }
+  },
+  {
+   "id": "neon-sign-bar",
+   "note": "Neon shop sign BAR for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading BAR only, bold tube neon letters, electric cyan glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/bar.webp"
+   }
+  },
+  {
+   "id": "neon-sign-24h",
+   "note": "Neon shop sign 24H for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading 24H only, bold tube neon letters, mint green glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/24h.webp"
+   }
+  },
+  {
+   "id": "neon-sign-cafe",
+   "note": "Neon shop sign CAFE for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading CAFE only, bold tube neon letters, warm amber gold glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/cafe.webp"
+   }
+  },
+  {
+   "id": "neon-sign-arcade",
+   "note": "Neon shop sign ARCADE for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading ARCADE only, bold tube neon letters, violet purple glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/arcade.webp"
+   }
+  },
+  {
+   "id": "neon-sign-books",
+   "note": "Neon shop sign BOOKS for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading BOOKS only, bold tube neon letters, orange coral glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/books.webp"
+   }
+  },
+  {
+   "id": "neon-sign-hotel",
+   "note": "Neon shop sign HOTEL for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading HOTEL only, bold tube neon letters, electric cyan glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/hotel.webp"
+   }
+  },
+  {
+   "id": "neon-sign-pharmacy",
+   "note": "Neon shop sign PHARMACY for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading PHARMACY only, bold tube neon letters, mint green glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/pharmacy.webp"
+   }
   }
  ]
 }

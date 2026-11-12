@@ -322,6 +322,48 @@ export function installCrowd(world) {
   const lampMatR = stdMat("crowd-taillamp", null, new B.Color3(0.1, 0.02, 0.02));
   const mLampF = instanced("crowd-headlamps", lampF, MAXC, colorsFor(MAXC, () => "#fff6dc"), lampMatF);
   const mLampR = instanced("crowd-taillamps", lampR, MAXC, colorsFor(MAXC, () => "#8a1d1d"), lampMatR);
+  /* Lens-flare sprites for the nearest cars at night (emissive billboards — no extra point lights). */
+  const FLARE_N = 4;
+  const flareMat = new B.StandardMaterial("crowd-flare", scene);
+  flareMat.diffuseColor = new B.Color3(0, 0, 0);
+  flareMat.emissiveColor = new B.Color3(1.0, 0.92, 0.7);
+  flareMat.disableLighting = true;
+  flareMat.alpha = 0.55;
+  flareMat.alphaMode = B.Engine.ALPHA_ADD;
+  flareMat.backFaceCulling = false;
+  flareMat.disableDepthWrite = true;
+  try {
+    const ft = new B.DynamicTexture("crowd-flare-tex", 64, scene, false);
+    const fg = ft.getContext();
+    const grd = fg.createRadialGradient(32, 32, 1, 32, 32, 30);
+    grd.addColorStop(0, "rgba(255,245,210,1)");
+    grd.addColorStop(0.35, "rgba(255,210,120,0.55)");
+    grd.addColorStop(1, "rgba(255,180,80,0)");
+    fg.clearRect(0, 0, 64, 64);
+    fg.fillStyle = grd;
+    fg.fillRect(0, 0, 64, 64);
+    // cross streak
+    fg.fillStyle = "rgba(255,240,200,0.55)";
+    fg.fillRect(2, 30, 60, 4);
+    fg.fillRect(30, 2, 4, 60);
+    ft.hasAlpha = true;
+    ft.update();
+    flareMat.diffuseTexture = ft;
+    flareMat.emissiveTexture = ft;
+    flareMat.opacityTexture = ft;
+    flareMat.useAlphaFromDiffuseTexture = true;
+  } catch (e) { /* NullEngine */ }
+  const flares = [];
+  for (let i = 0; i < FLARE_N; i++) {
+    const f = B.MeshBuilder.CreatePlane("crowd-flare-" + i, { size: 1.4 }, scene);
+    f.material = flareMat;
+    f.isPickable = false;
+    f.billboardMode = B.Mesh.BILLBOARDMODE_ALL;
+    f.setEnabled(false);
+    f.alphaIndex = 20;
+    flares.push(f);
+  }
+  let flareCount = 0;
   const mWipers = instanced("crowd-wipers", wiperMesh, MAXC, colorsFor(MAXC, () => "#101012"), stdMat("crowd-wipers"));
   wiperMesh.setEnabled(false);
   [legsMesh, torsoMesh, headMesh, hairMesh, bagMesh, dogMesh, umbMesh, umbFlipMesh, handMesh, bodyMesh, cabinMesh, wheelsMesh, lampF, lampR, wiperMesh].forEach((m) => {
@@ -953,6 +995,7 @@ export function installCrowd(world) {
     }
     let nCars = 0, stopped = 0, nearC = 0, sumV = 0;
     const lampK = wxK.lights ? 1.5 : 0.08;
+    const flareCand = [];
     for (let i = 0; i < MAXC; i++) {
       const c = cars[i];
       if (!c.active) { hide(mBody, i); hide(mCabin, i); hide(mWheels, i); hide(mLampF, i); hide(mLampR, i); hide(mWipers, i); continue; }
@@ -969,7 +1012,28 @@ export function installCrowd(world) {
         put(mWipers, i, c.x, 0.04, c.z, c.yaw + Math.sin(c.wiper) * 0.1, 1, 1);
       } else hide(mWipers, i);
       if (cam && Math.abs(c.x - cam.x) < 90 && Math.abs(c.z - cam.z) < 90) nearC++;
+      if (wxK.lights && cam) {
+        const dx = c.x - cam.x;
+        const dz = c.z - cam.z;
+        flareCand.push({ d2: dx * dx + dz * dz, x: c.x, z: c.z, yaw: c.yaw });
+      }
     }
+    // headlight / taillight lens flares on the nearest cars
+    flareCand.sort((a, b) => a.d2 - b.d2);
+    flareCount = 0;
+    for (let i = 0; i < flares.length; i++) {
+      const f = flares[i];
+      if (i < flareCand.length && wxK.lights) {
+        const c = flareCand[i];
+        const fx = c.x + Math.sin(c.yaw) * 2.15;
+        const fz = c.z + Math.cos(c.yaw) * 2.15;
+        f.position.set(fx, 0.85, fz);
+        f.scaling.setAll(0.9 + Math.min(1.4, 18 / Math.sqrt(c.d2 + 4)));
+        f.setEnabled(true);
+        flareCount++;
+      } else f.setEnabled(false);
+    }
+    flareMat.emissiveColor.set(lampK * 0.7, lampK * 0.62, lampK * 0.45);
     for (let n = 0; n < bufs.length; n++) bufs[n][0].thinInstanceBufferUpdated("matrix");
     umbMesh.setEnabled(wxK.raining || windK >= 0.3);
     umbFlipMesh.setEnabled(flipped > 0);
@@ -989,6 +1053,7 @@ export function installCrowd(world) {
       moving: sampleMoved, stopped, near: { people: nearP, cars: nearC }, phase: phaseAt(phases, hourNow), scale: Math.round(budgetScale() * 100) / 100,
       reaction: rKind, flinching, reacting, lookingUp, hats, cheering, running: rKind === "rain" ? reacting : 0,
       quality, umbrellas: umbs, flipped, flips: flipEvents, wipers: wxK.raining ? nCars : 0, carSpeed: nCars ? sumV / nCars : 0, hour: Math.round(hourNow * 100) / 100,
+      flares: flareCount, lights: !!wxK.lights,
     });
   }
 
