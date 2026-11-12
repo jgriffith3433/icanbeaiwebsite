@@ -1193,6 +1193,8 @@ window.DAY_CONFIG = {
       "City's thin. He's sleeping. We're not.",
       "Lamps are on. Schedule holds.",
     ],
+    /* Night Show farewell (js/episodes.js): spoken once when the plaza show begins. */
+    farewell: "Tonight you don't need me.",
     /* Flat table for Gen + playback (id, group, text, file). voiceId filled after design. */
     lines: [
       { id: "pilot-sch-alarm", group: "schedule", text: "Rise. The day is waiting.", file: "audio/pilot/pilot-sch-alarm.mp3" },
@@ -1268,6 +1270,7 @@ window.DAY_CONFIG = {
       { id: "pilot-chapter-3", group: "chapter", text: "So do I. You are close to the limit.", file: "audio/pilot/pilot-chapter-3.mp3" },
       { id: "pilot-chapter-4", group: "chapter", text: "You can also hurt them. Think before you call.", file: "audio/pilot/pilot-chapter-4.mp3" },
       { id: "pilot-chapter-5", group: "chapter", text: "Tonight the whole sky is yours. No schedule.", file: "audio/pilot/pilot-chapter-5.mp3" },
+      { id: "pilot-finale-farewell", group: "finale", text: "Tonight you don't need me.", file: "audio/pilot/pilot-finale-farewell.mp3" },
       { id: "pilot-ending-a", group: "ending", text: "Fair weather. Logged.", file: "audio/pilot/pilot-ending-a.mp3" },
       { id: "pilot-ending-c", group: "ending", text: "Sky's still thinking. Stay in.", file: "audio/pilot/pilot-ending-c.mp3" },
       { id: "pilot-worry-1", group: "worried", text: "That was a lot of sky. Ease up.", file: "audio/pilot/pilot-worry-1.mp3" },
@@ -1918,18 +1921,15 @@ window.DAY_CONFIG = {
         toasts: { "goal:charge": "The mast is charged.", "goal:fill": "The Tank is full." },
         scars: { flood: "the avenue flooded, the market closed for the night", overcast: "the sky stays on and the Board warns the city" },
       },
-      /* The finale. The city gathers on the plaza and he plays the sky: a choreographed light show of cues, each an
-         ability to call on its beat (`js/episodes.js` show logic, the stage in `js/finale.js`). A call inside `good`
-         seconds of its cue's `at` (seconds from the start) is a hit, inside `perfect` a perfect one; a wrong ability
-         or a call with no cue near it is off the beat. Score: Timing (perfect 1, good 0.6), Chain (best run of hits),
-         Clean calls (off-beat calls cost), Variety (distinct abilities hit, of 5). Afterwards the closing card ties the
-         day's stories together from the arc the three parts left (`cityFared`). */
+      /* The Night Show finale. Story payoff: Pilot hands him the sky, neighbors watch from the roofs, he
+         conducts 12+ weather cues on the beat, city lights answer, then a crane-out credits flyover and
+         tomorrow's sky request (`js/episodes.js` + `js/finale.js`). ≤3 minutes end to end. */
       {
         id: "night",
         chapter: 5,
         variety: 5,
         title: "Light show",
-        tagline: "The city is on the plaza. Play the sky on the beat: lightning, rain, fog, wind, sun.",
+        tagline: "Pilot steps aside. The roofs are watching. Play the sky on the beat.",
         chapters: ["computer", "bedtime"],
         clock: "22:05",
         timer: 150,
@@ -1941,8 +1941,23 @@ window.DAY_CONFIG = {
           lead: 8,
           perfect: 0.45,
           good: 1.1,
+          afterSec: 4,
+          closeAfter: 6,
           beatNeeded: 8,
           rowNames: { people: "Timing", time: "Chain", damage: "Clean calls", variety: "Variety" },
+          /* Pilot's last line before the first cue (also pilot.farewell / pilot-finale-farewell). */
+          farewell: { id: "pilot-finale-farewell", text: "Tonight you don't need me." },
+          /* Birdie / Dex / Ines on walkable roofs overlooking the plaza; each speaks once at `at` show-seconds. */
+          /* Roof lines sit in gaps between cues so a short cutaway can land without eating the next beat. */
+          roofs: [
+            { id: "birdie", who: "Birdie", x: -22, z: 2, at: 15.2, gesture: "surprise", text: "From up here the lawn drinks with us.",
+              shot: { tx: -22, ty: 8.2, tz: 2, alpha: -0.4, beta: 1.05, radius: 14 } },
+            { id: "dex", who: "Dex", x: 48, z: 2, at: 23.2, gesture: "thanks", text: "Best seat on the avenue. Keep the beat.",
+              shot: { tx: 48, ty: 5.5, tz: 2, alpha: -1.2, beta: 1.0, radius: 12 } },
+            { id: "quill", who: "Ines", x: 154, z: 2, at: 47.2, gesture: "surprise", text: "The sky is keeping time. So are we.",
+              shot: { tx: 154, ty: 7.8, tz: 2, alpha: -2.4, beta: 1.05, radius: 14 } },
+          ],
+          roofCutSec: 1.9,
           acts: [
             { at: 7, name: "Pulses" },
             { at: 17, name: "Neon rain" },
@@ -1980,6 +1995,30 @@ window.DAY_CONFIG = {
             off: "Off the beat",
             done: "Curtain call. The sky takes a bow.",
           },
+          /* Journey-style crane out over the skyline; cast scrolls with the motif. */
+          credits: {
+            secs: 26,
+            skip: "Skip",
+            kicker: "I Can Be",
+            title: "The Night Show",
+            motif: "credits",
+            shot: { tx: [118, 92], ty: [5, 32], tz: [26, 48], alpha: [-1.85, -2.55], beta: [1.12, 0.82], radius: [20, 62] },
+            cast: [
+              { role: "Small Weather", name: "He" },
+              { role: "Pilot", name: "The day AI" },
+              { role: "Birdie Alvarez", name: "Gardener" },
+              { role: "Dex Moreno", name: "Courier" },
+              { role: "Ines Quill", name: "Stargazer" },
+              { role: "Hawkes Studio", name: "Made here" },
+            ],
+          },
+          /* After the credits: tomorrow's daily sky request (js/daily.js). */
+          postCredits: {
+            secs: 7,
+            skip: "Continue",
+            kicker: "Tomorrow",
+            fallback: "Tomorrow the sky will ask again.",
+          },
           closing: {
             kicker: "Closing night",
             title: "The district, tonight",
@@ -2010,11 +2049,14 @@ window.DAY_CONFIG = {
             ["He", "They came to look up. Fair enough."],
             ["Ines", "Whatever you do, do it on time. The sky keeps a beat."],
           ],
-          gather: [["Birdie", "Front row! My tomatoes get the front row."]],
+          gather: [["Birdie", "Front row. The tomatoes get the view."]],
+          "roof:birdie": [["Birdie", "From up here the lawn drinks with us."]],
+          "roof:dex": [["Dex", "Best seat on the avenue. Keep the beat."]],
+          "roof:quill": [["Ines", "The sky is keeping time. So are we."]],
           "act:Neon rain": [["Dex", "Mind the puddles. They are about to be very pink."]],
           "act:Grand finish": [["He", "All of it."]],
           "end:S": [["Ines", "Every cue. I'll put it in the charts."], ["He", "Thank you, everyone."]],
-          "end:A": [["Birdie", "Again! Again!"]],
+          "end:A": [["Birdie", "Again. One more for the tomatoes."]],
           "end:B": [["Dex", "Some of that was perfect. Some of that was weather."]],
           "end:C": [["Board", "The show has ended. Please go home. Thank you."]],
         },
