@@ -5513,14 +5513,41 @@ async function windFog(options, t) {
     try { window.day.look.quality("low"); } catch (e) { /* */ }
     C.touch(true);
   }
+  /* sound: the title's night-city ambience loops, Continue clicks, and the first Gust whooshes (js/titlesound.js) */
+  const TS = window.day.titlesound;
+  const T = window.day.title;
+  if (!TS || !T) t.problem("bug", "js/titlesound.js or the title isn't installed");
+  else {
+    t.scene("Title sound");
+    T.show("playtest");
+    await sleep(2200);
+    const ti = TS.info();
+    t.metric("titleAmbience", ti.ambience ? 1 : 0);
+    if (!ti.ambience) t.problem("bug", "No night-city ambience loop on the title screen");
+    else t.event("title-ambience", `looping night-city bed on the title (audio context ${ti.ctx})`);
+    const playB = document.querySelector("#title-play");
+    const clicks0 = TS.info().clicks;
+    if (playB) {
+      const r = playB.getBoundingClientRect();
+      touchOn(playB, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 11);
+      await sleep(120);
+      t.metric("titleClickSounds", TS.info().clicks - clicks0);
+      t.event("title-continue-click", `"${playB.textContent}" pressed; UI click ${TS.info().clicks > clicks0 ? "played" : "left to the sound kit (Sound already on)"}`);
+      touchOn(playB, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 11);
+      playB.click();
+      await sleep(600);
+    }
+  }
   const sound = $("sound");
-  if (sound) {
+  if (sound && sound.getAttribute("aria-pressed") !== "true") {
     const r = sound.getBoundingClientRect();
     sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: touch ? "touch" : "mouse" }));
     sound.click();
     await sleep(200);
   }
-  if (touch) await tapEl($("control")); else pressKey("Enter");
+  if (C.mode() !== "control") {
+    if (touch) await tapEl($("control")); else pressKey("Enter");
+  }
   await t.until(() => C.mode() === "control", 4000, "Take control");
   t.event("control-taken", touch ? "by touch, low quality" : "Enter");
   if (C.place) C.place(112, 24, -Math.PI / 2); // setup: on the plaza, a flag pole and the avenue's trees in view
@@ -5549,8 +5576,13 @@ async function windFog(options, t) {
   if (touch) await tapEl($("ability-fog")); else await holdVerb("c", 120);
   await t.until(() => wf.info().fog >= 0.3, 4000, "fog to gather").catch(() => {});
   const push0 = wf.info().fogPush;
+  const whooshes0 = (window.day.titlesound ? window.day.titlesound.info().whooshes : 0) + ((window.day.sfx && window.day.sfx.info().heard && window.day.sfx.info().heard["gust-whoosh"]) || 0);
   if (touch) await tapEl($("ability-wind")); else await holdVerb("v", 120);
   await sleep(2500);
+  const whooshes1 = (window.day.titlesound ? window.day.titlesound.info().whooshes : 0) + ((window.day.sfx && window.day.sfx.info().heard && window.day.sfx.info().heard["gust-whoosh"]) || 0);
+  t.metric("gustWhooshes", whooshes1 - whooshes0);
+  if (whooshes1 <= whooshes0) t.problem("bug", "The Gust made no wind whoosh");
+  else t.event("gust-whoosh", "a wind whoosh answered the Gust");
   const pushed = Math.round((wf.info().fogPush - push0) * 10) / 10;
   const openSec = Math.round((performance.now() - tOpen) / 100) / 10;
   t.metric("gustFogPushM", pushed);
