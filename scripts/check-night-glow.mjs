@@ -1,6 +1,7 @@
 // Night glow under NullEngine: window schedules (dusk on, bedtime off), interior rooms,
 // dynamic lamp caps (8 high / 4 low), and cityscape.info() fields the playtest reads.
 //   node scripts/check-night-glow.mjs   (part of npm test)
+import fs from "node:fs";
 import * as core from "@babylonjs/core";
 
 const B = core;
@@ -50,6 +51,19 @@ if (!(info.windows && typeof info.windows.on === "number")) fails.push("info().w
 if (!(info.dynamicLights && info.dynamicLights.max === 8)) fails.push("dynamicLights.max should be 8");
 if (!(info.lamps > 10)) fails.push(`too few lamps (${info.lamps})`);
 if (!(info.props && info.props.signs >= 4)) fails.push(`fewer than 4 neon signs (${info.props && info.props.signs})`);
+// Gen neon cutouts on disk (index.json is the no-404 gate props.js reads)
+{
+  const neonDir = new URL("../textures/neon/", import.meta.url);
+  let list = [];
+  try { list = JSON.parse(fs.readFileSync(new URL("index.json", neonDir), "utf8")); } catch (e) { list = null; }
+  if (!Array.isArray(list) || list.length < 4) fails.push(`textures/neon/index.json needs >= 4 Gen signs (have ${Array.isArray(list) ? list.length : "none"})`);
+  else {
+    for (const w of list) {
+      const p = new URL(String(w).toLowerCase() + ".webp", neonDir);
+      if (!fs.existsSync(p)) fails.push(`textures/neon/${w}.webp missing (listed in index)`);
+    }
+  }
+}
 // low quality cap
 if (world.look && world.look.quality) {
   const prev = world.look.quality();
