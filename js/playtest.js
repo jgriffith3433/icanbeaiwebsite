@@ -8731,12 +8731,12 @@ async function storyEnding(options, t) {
   t.progress(1);
 }
 
-/* ---------------- light show: the finale on the plaza, scored on timing and variety, then the closing card ---------------- */
+/* ---------------- light show: Night Show payoff — Pilot farewell, roof neighbors, 12+ cues, credits, tomorrow ask ---------------- */
 // Setup shortcuts: the day bar to a moment outdoors and then to 22:05, Pressure refilled by the show itself, the episode started by
-// its API, and the story arc seeded in localStorage so the closing card has three stories to tie together. Everything else is real
-// input: Enter, WASD with Shift to the plaza, and E / R / C / V / X pressed on each cue as the HUD counts down to it.
-// Run 1 plays every cue on the beat; run 2 presses only Lightning, late. Events: show-opening / show-gather / show-begin / show-act /
-// show-cue / show-miss / show-off / show-stage / show-over / show-card / show-closing / show-compare; metrics showPoints*, showAurora, showBursts.
+// its API, and the story arc seeded in localStorage. Everything else is real input: Enter, WASD with Shift to the plaza, and
+// E / R / C / V / X (or touch verb taps) on each cue. Run 1 hits every cue; run 2 is late Lightning only. Then credits + post-credits.
+// Events: show-opening / show-farewell / show-roof / show-gather / show-begin / show-act / show-cue / show-miss / show-off /
+// show-stage / show-over / show-card / show-credits / show-post / show-compare; metrics showPoints*, showAurora, showCreditsFontPx.
 async function lightShow(options, t) {
   // A setup that can't be reached is a failed run, never 'done': the harness reports 'done' when the bot just returns.
   const bail = (msg) => { t.problem("bug", msg); t.finish("fail"); };
@@ -8790,9 +8790,35 @@ async function lightShow(options, t) {
     if (d.action === "show-miss") t.event("show-miss", `cue ${d.cue} ${d.power} missed`);
     if (d.action === "show-off") t.event("show-off", `${d.power} off the beat at ${d.t} s (${d.off} off)`);
     if (d.action === "show-act") t.event("show-act", d.act);
+    if (d.action === "show-farewell") t.event("show-farewell", d.text || "Pilot farewell");
+    if (d.action === "show-roof") t.event("show-roof", `${d.who || d.neighbor}: ${d.text}`);
+    if (d.action === "credits-start" || d.action === "credits") t.event("show-credits", `${d.action} cast ${d.cast || "?"}`);
+    if (d.action === "post-credits-show" || d.action === "post-credits") t.event("show-post", d.line || d.how || "tomorrow");
   };
   window.addEventListener("day:episode", onEp);
+  const touch = !!(options && options.touch) || document.documentElement.classList.contains("touch-ui") || innerWidth <= 700;
   const keyFor = (power) => String((P.abilities.get(power) || {}).key || "").toLowerCase();
+  async function castPower(power) {
+    if (touch) {
+      const id = power === "gale" ? "wind" : power === "sunbreak" ? "sunbreak" : power === "bolt" ? "bolt" : power;
+      const btn = $("ability-" + (id === "bolt" ? "bolt" : id === "rain" ? "rain" : id === "fog" ? "fog" : id === "sunbreak" ? "sunbreak" : "wind"));
+      if (btn) {
+        if (power === "gale") {
+          btn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1, pointerType: "touch" }));
+          await sleep(700);
+          btn.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, pointerType: "touch" }));
+        } else {
+          btn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1, pointerType: "touch" }));
+          await sleep(40);
+          btn.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, pointerType: "touch" }));
+        }
+        return;
+      }
+    }
+    const k = keyFor(power === "gale" ? "gale" : power);
+    if (power === "gale") await holdVerb(k || "v", 700);
+    else pressKey(k);
+  }
   async function walkTo(x, z, progress) {
     await goTo(C.state().x, sideZ, t, { sprint: true, progress, ms: 12000, close: 1.2 });
     for (let k = 0; k < 16; k++) {
@@ -8809,21 +8835,18 @@ async function lightShow(options, t) {
     t.event("show-stage", `${label}: ${st.gathered} of ${st.spectators} in place, beams ${st.beams} (${st.beamsLit} lit), aurora ${st.aurora}, bursts ${st.bursts} (${st.lastBurst}), ${st.washes} neon pools, ${st.particles} sparks`);
     return st;
   };
-  // Presses each cue's key as the HUD counts down to it. "perfect": on the beat; "sloppy": Lightning only, 0.7 s late.
+  // Presses each cue's key (or taps the thumb-arc verb) as the HUD counts down. "perfect" / "sloppy".
   async function play(mode) {
     const cues = Ep.show().cues;
     const limit = performance.now() + 150000;
     let i = 0;
-    let act = "";
     while (i < cues.length && performance.now() < limit) {
       const s = Ep.show();
       if (!s) break;
       const c = cues[i];
       const at = c.at + (mode === "perfect" ? 0 : 0.7);
       if (s.t >= at - 0.04) {
-        const k = mode === "perfect" ? keyFor(c.power) : keyFor("bolt");
-        if (mode === "perfect" && c.power === "gale") await holdVerb(k || "v", 700);
-        else pressKey(k);
+        await castPower(mode === "perfect" ? c.power : "bolt");
         i++;
         if (i === 6 || i === 12 || i === cues.length - 1) await sleep(900), stage(`after cue ${i}`);
       } else await sleep(Math.max(15, Math.min(120, (at - s.t) * 1000 - 60)));
@@ -8844,23 +8867,40 @@ async function lightShow(options, t) {
   t.scene("Walking to the plaza");
   Ep.start("night", "playtest");
   await t.until(() => Ep.now() && Ep.now().id === "night" && Ep.show(), 4000, "the Light show running");
+  if (!(ep.finale.cues && ep.finale.cues.length >= 12)) t.problem("bug", `Finale needs 12+ beat cues, has ${ep.finale.cues ? ep.finale.cues.length : 0}`);
   t.event("show-opening", `${ep.finale.cues.length} cues, ${ep.finale.spectators} spectators, goals: ${Ep.now().goals.map((g) => g.label).join(" · ")}`);
+  const roofs0 = Ep.roofs ? Ep.roofs() : [];
+  t.event("show-roofs", roofs0.map((r) => `${r.id}@${r.x != null ? Math.round(r.x) + "," + Math.round(r.z) : "?"}${r.onRoof ? " roof" : ""}`).join(" · ") || "none");
+  if (roofs0.length < 3 || roofs0.filter((r) => r.onRoof).length < 3) t.problem("bug", "Birdie, Dex and Ines are not standing on their rooftops for the show");
   const hudText = () => (($("episode-hud") || {}).textContent || "").replace(/\s+/g, " ");
   t.event("show-hud", hudText().slice(0, 200));
+  if (touch) {
+    const verbs = ["bolt", "rain", "wind", "fog", "sunbreak"].map((id) => $("ability-" + id)).filter(Boolean);
+    t.event("show-touch-arc", `${verbs.length} verb buttons in the thumb arc`);
+    if (verbs.length < 5) t.problem("bug", "Phone thumb arc is missing weather verbs for the beat cues");
+    verbs.forEach((btn) => {
+      const r = btn.getBoundingClientRect();
+      if (r.width < 44 || r.height < 44) t.problem("bug", `Verb ${btn.id} is under 44 px (${Math.round(r.width)}x${Math.round(r.height)})`);
+    });
+  }
   if (!(await walkTo(117, 27.5, 0.25))) t.problem("bug", "He didn't reach the plaza");
   await t.until(() => Ep.show() && Ep.show().started, 6000, "the show to begin");
+  await t.until(() => Ep.show() && Ep.show().farewell, 4000, "Pilot's farewell before the show").catch(() => {});
+  if (!(Ep.show() && Ep.show().farewell)) t.problem("bug", "Pilot's farewell line did not play before the show");
+  else t.event("show-farewell", "Tonight you don't need me.");
   const g0 = stage("the plaza");
   t.event("show-gather", `${g0 ? g0.gathered : 0} of ${g0 ? g0.spectators : 0} people gathered; the cue line reads: ${(($("episode-hud").querySelector(".cue") || {}).textContent || "").replace(/\s+/g, " ")}`);
   if (!g0 || g0.spectators < 20) t.problem("bug", "The city didn't gather on the plaza");
   t.event("show-begin", "the first cue is on its way");
-  t.progress(0.35);
+  t.progress(0.3);
 
   /* ---- run 1: every cue on the beat ---- */
   t.scene("The show, on the beat");
   await play("perfect");
   await t.until(() => Ep.show() && Ep.show().over, 12000, "the show to end");
   const so = Ep.show();
-  t.event("show-over", `${so.hits} hits, ${so.perfect} perfect, ${so.off} off the beat, best chain ${so.best}, effects ${so.used.join("+")}`);
+  t.event("show-over", `${so.hits} hits, ${so.perfect} perfect, ${so.off} off the beat, best chain ${so.best}, effects ${so.used.join("+")}, roofs ${so.roofsSaid}`);
+  if ((so.roofsSaid || 0) < 3) t.problem("bug", `Only ${so.roofsSaid || 0} of 3 roof neighbor lines played`);
   t.scene("Grand finish");
   await sleep(1800);
   const gs = stage("the grand finish");
@@ -8874,20 +8914,31 @@ async function lightShow(options, t) {
   const good = await card("run 1, on the beat");
   t.metric("showPointsOnBeat", good.points);
   if (good.rows.length !== 4) t.problem("bug", `The card shows ${good.rows.length} rows, wanted 4 (Timing, Chain, Clean calls, Variety)`);
-  t.progress(0.6);
+  t.progress(0.55);
 
-  /* ---- the closing card comes by itself (or on OK), after the show ---- */
-  t.scene("The closing card");
-  await t.until(() => !$("closing-card").hidden, 16000, "the closing card after the show");
-  const cl = Ep.closing();
-  const tally = ($("closing-card").querySelector(".tally") || {}).textContent || "";
-  t.event("show-closing", `ending ${cl.ending}, rank ${cl.rank}, ${cl.fared.join(" ")} | neighbors ${cl.neighbors.join(", ")} | ${tally}`);
-  if (cl.fared.length < 4 || cl.neighbors.length < 3) t.problem("bug", "The closing card doesn't tie the stories and the neighbors together");
-  if (!$("episode-score").hidden) t.problem("bug", "The score card is still up under the closing card");
-  await sleep(2500);
-  $("closing-card").querySelector("button.again").click();
+  /* ---- credits flyover, then tomorrow's sky request ---- */
+  t.scene("Credits");
+  await t.until(() => Ep.credits && Ep.credits().shown, 18000, "the credits roll after the show");
+  const cr = Ep.credits();
+  t.event("show-credits", `cast ${cr.cast.join(", ")}; font ${cr.fontPx} px`);
+  t.metric("showCreditsFontPx", cr.fontPx || 0);
+  if (!(cr.cast && cr.cast.length >= 5)) t.problem("bug", "Credits are missing the cast names");
+  if ((cr.fontPx || 0) < 14) t.problem("bug", `Credits text is under 14 px (${cr.fontPx})`);
+  if (!$("episode-score").hidden) t.problem("bug", "The score card is still up under the credits");
+  await sleep(1200);
+  const skipCr = $("credits-roll") && $("credits-roll").querySelector("button.skip");
+  if (skipCr) skipCr.click();
+  else pressKey("Escape");
+  await t.until(() => Ep.postCredits && Ep.postCredits().shown, 8000, "tomorrow's sky request after the credits");
+  const pc = Ep.postCredits();
+  t.event("show-post", pc.line || "");
+  t.metric("showPostFontPx", pc.fontPx || 0);
+  if (!(pc.line && /tomorrow/i.test(pc.line))) t.problem("bug", "Post-credits did not show tomorrow's sky request");
+  if ((pc.fontPx || 0) < 14) t.problem("bug", `Post-credits text is under 14 px (${pc.fontPx})`);
+  const skipPc = $("post-credits") && $("post-credits").querySelector("button.skip");
+  if (skipPc) skipPc.click();
   await sleep(400);
-  if (!$("closing-card").hidden) t.problem("bug", "The closing card didn't close");
+  t.progress(0.75);
 
   /* ---- run 2: one note, late ---- */
   t.scene("The show, sloppy");
@@ -8899,8 +8950,16 @@ async function lightShow(options, t) {
   t.event("show-over", `sloppy: ${sl.hits} hits, ${sl.perfect} perfect, ${sl.off} off the beat, best chain ${sl.best}, effects ${sl.used.join("+")}`);
   const bad = await card("run 2, Lightning only and late");
   t.metric("showPointsSloppy", bad.points);
-  await t.until(() => !$("closing-card").hidden, 16000, "the closing card again").catch(() => {});
-  if (!$("closing-card").hidden) $("closing-card").querySelector("button.again").click();
+  await t.until(() => Ep.credits && Ep.credits().shown, 18000, "credits after the sloppy run").catch(() => {});
+  if (Ep.credits && Ep.credits().shown) {
+    const sk = $("credits-roll") && $("credits-roll").querySelector("button.skip");
+    if (sk) sk.click();
+  }
+  await t.until(() => Ep.postCredits && Ep.postCredits().shown, 8000, "post-credits again").catch(() => {});
+  if (Ep.postCredits && Ep.postCredits().shown) {
+    const sk = $("post-credits") && $("post-credits").querySelector("button.skip");
+    if (sk) sk.click();
+  }
   if (!(good.points > bad.points)) t.problem("bug", `Playing on the beat with every effect (${good.points}) didn't beat one late note (${bad.points})`);
   t.event("show-compare", `on the beat, five effects: rank ${good.rank}, ${good.points} points; one note, late: rank ${bad.rank}, ${bad.points} points`);
   window.removeEventListener("day:episode", onEp);
@@ -11376,7 +11435,7 @@ installPlaytest({
     { id: "story-parts", title: "Story Parts 1 and 2 as episodes: rain on the park (not the market), sun break and the stalls; overusing rain floods the park and scars the card; Part 2 wind for the turbines, a gale in the plaza topples a stall; neighbor dialogue from the beat sheet", seconds: 420, tags: ["episodes", "story"], description: "Day bar to a moment outdoors (setup), Enter, the parts started by their API (setup) and Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza and the annex, R, X and V. Events story-list / story-menu / story-say / story-goal / story-strain / story-kick / story-wind / story-card (clean vs scarred)." },
     { id: "lunch-rescue", title: "Rooftop storm (lunch): a surprise storm strands people in the plaza, on the shop roof and in the avenue; helping them with Sun break, Lightning and Gale changes the score and the S-C rank; the twist turns the rain to fog; an ending line per rank", seconds: 300, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the plaza cafe, the shop and the avenue, X, E, V, Esc. Run 1 helps one person and lets go (low rank); run 2 plays all three set pieces. Events lunch-opening / lunch-piece / lunch-help / lunch-score / lunch-twist / lunch-sky / lunch-goal / lunch-card / lunch-rank / lunch-say." },
     { id: "hurricane-drive", title: "Hurricane drive (commute home): four closures on the way home (fallen sign, flooded underpass, dead bus, closing bridge); the right ability at each helps, the wrong one hurts (rain on the debris, gale at the bus); a storm twist; an ending line and an S-C rank on the score card", seconds: 360, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift along the avenue, R then V at the fallen sign, V, X, E and C at the four set pieces, Esc. Run 1 uses rain on the debris (hurt) then a gale and lets go (low rank); run 2 plays all four set pieces right and gets home. Events drive-opening / drive-piece / drive-hurt / drive-help / drive-twist / drive-sky / drive-goal / drive-card / drive-rank / drive-say." },
-    { id: "light-show", title: "Light show finale: the city gathers on the plaza, he calls Lightning, Rain, Fog, Gale and Sun break on their cues; beams, fireworks, neon pools and an aurora answer; the score depends on timing and variety; the closing card ties the day's stories together", seconds: 330, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors and then to 22:05 (setup), Enter, the episode started by its API (setup), the story arc seeded in localStorage (setup). Real keys: WASD with Shift to the plaza, then E / R / C / V / X pressed on each cue as the HUD counts down. Run 1 hits every cue on the beat with all five effects; run 2 presses only Lightning, 0.7 s late. Events show-opening / show-hud / show-gather / show-begin / show-act / show-cue / show-miss / show-off / show-stage / show-over / show-card / show-closing / show-compare; metrics showAurora, showBursts, showPointsOnBeat, showPointsSloppy." },
+    { id: "light-show", title: "Night Show finale: Pilot farewell, Birdie/Dex/Ines on roofs with voiced lines, 12+ beat cues, city lights answer, credits flyover with the cast, then tomorrow's sky request; phone taps the thumb arc", seconds: 360, tags: ["episodes", "story", "rank", "phone"], description: "Day bar to outdoors then 22:05 (setup), Enter, episode API start, arc seeded. Real input: WASD/Shift to the plaza, then E/R/C/V/X or touch verb taps on each cue. Run 1 on the beat; run 2 late Lightning only. Events show-opening / show-farewell / show-roof / show-roofs / show-gather / show-begin / show-cue / show-over / show-card / show-credits / show-post / show-compare; metrics showAurora, showBursts, showPointsOnBeat, showPointsSloppy, showCreditsFontPx, showPostFontPx. Run at 1280x720 and 390x844 touch {\"touch\":true}." },
     { id: "phone", title: "Phone: the game by touch only, in portrait or landscape: take control, stick, jump, the five abilities and a power by tap, the Episodes menu and an episode card, the first-visit card and the tutorial episode (start and Skip), the day timeline dragged; every tapped control at least 44 px and on screen, HUD overlap checked", seconds: 240, tags: ["phone", "smoke-phone", "control", "tutorial"], description: "Day bar to a quiet moment at home (setup); day.control.touch(true) on a desktop-sized window (setup). Every press is a pointer tap measured first (44 px, on screen). Option {\"orientation\":\"landscape\"} turns a portrait window to landscape if the page can resize it, else the orientation event says it ran portrait only. Events touch-layout / orientation / take-control-tap / tutorial-card-skipped / tutorial-started / tutorial-skipped / stick-move / jump-tap / ability-tap-<id> / power-tap / episodes-open / episodes-closed / episode-card / timeline-drag / hud-clear / phone-taps." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],

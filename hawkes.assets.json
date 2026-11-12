@@ -2861,6 +2861,24 @@
    }
   },
   {
+   "id": "pilot-finale-farewell",
+   "note": "Pilot Night Show farewell before the first cue: \"Tonight you don't need me.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Tonight you don't need me.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat, handing over"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-finale-farewell.mp3"
+   }
+  },
+  {
    "id": "sky-dawn",
    "note": "Sky panorama 'dawn' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_f759c8039a5a.",
    "steps": [
@@ -5451,14 +5469,14 @@
    }
   },
   {
-   "id": "dlg-birdie-1s1s78s",
-   "note": "Spoken line (night:gather), Birdie: \"Front row! My tomatoes get the front row.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "id": "dlg-birdie-1ie71aw",
+   "note": "Spoken line (night:gather), Birdie: \"Front row. The tomatoes get the view.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "Front row! My tomatoes get the front row.",
+      "text": "Front row. The tomatoes get the view.",
       "voice": "EXAVITQu4vr4xnSDxMaL",
       "model": "eleven_v4"
      },
@@ -5466,7 +5484,64 @@
     }
    ],
    "files": {
-    "audio": "audio/dialogue/dlg-birdie-1s1s78s.mp3"
+    "audio": "audio/dialogue/dlg-birdie-1ie71aw.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-cx39rz",
+   "note": "Spoken line (night:roof:birdie), Birdie: \"From up here the lawn drinks with us.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "From up here the lawn drinks with us.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-cx39rz.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1t4o4zf",
+   "note": "Spoken line (night:roof:dex), Dex: \"Best seat on the avenue. Keep the beat.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Best seat on the avenue. Keep the beat.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1t4o4zf.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-glzsvo",
+   "note": "Spoken line (night:roof:quill), Ines: \"The sky is keeping time. So are we.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The sky is keeping time. So are we.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-glzsvo.mp3"
    }
   },
   {
@@ -5546,14 +5621,14 @@
    }
   },
   {
-   "id": "dlg-birdie-1fkchhm",
-   "note": "Spoken line (night:end:A), Birdie: \"Again! Again!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "id": "dlg-birdie-6fbp7f",
+   "note": "Spoken line (night:end:A), Birdie: \"Again. One more for the tomatoes.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "Again! Again!",
+      "text": "Again. One more for the tomatoes.",
       "voice": "EXAVITQu4vr4xnSDxMaL",
       "model": "eleven_v4"
      },
@@ -5561,7 +5636,7 @@
     }
    ],
    "files": {
-    "audio": "audio/dialogue/dlg-birdie-1fkchhm.mp3"
+    "audio": "audio/dialogue/dlg-birdie-6fbp7f.mp3"
    }
   },
   {
