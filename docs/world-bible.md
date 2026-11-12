@@ -174,7 +174,7 @@ Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather end
 - Arc: runs the quiet day alone → yields the sky on take-over with a dry aside → names what the player did on let-go → worries when chaos spikes → holds the night while he sleeps.
 - Moment: every Take control and Let go (voiced Pilot line + wrist-ring pulse); schedule nudge at each spine block on a 1200× day.
 - Personality: calm, dry, fond.
-- Voice: Hawkes Gen designed voice (id in `day.config.js` `pilot.voiceId` after `audio.voice-save`).
+- Voice: gv_c2c9cdffeae27b99
 - Animations: idle (dim wrist-ring pulse), walk (ring follows the left wrist while he moves), talk (bright voice-synced pulse). No separate body — Pilot is the ring and the radio voice.
 
 ### Birdie Alvarez
