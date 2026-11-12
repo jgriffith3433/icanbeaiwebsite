@@ -447,7 +447,8 @@ function install() {
       root.rotation.y = p.__yaw;
 
       const gest = p.__gestureWant;
-      if (gest && p.__fig.anim.gesture === gest) p.__gestureWant = null;
+      // work (Dex patching a turbine) stays held for the ending scene; other beats clear once played
+      if (gest && gest !== "work" && p.__fig.anim.gesture === gest) p.__gestureWant = null;
       const react = !!(sky.manual && (weatherState === "storm" || weatherState === "rain" || weatherState === "wind")
         && here && Math.hypot(here.x - pl.x, here.z - pl.z) < 22 && !gest && !pl.moving);
       const sample = p.__fig.step({

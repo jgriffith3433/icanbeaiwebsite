@@ -464,7 +464,11 @@ export function startMoments() {
     try {
       if (fx.weather && day.weather && day.weather.set) day.weather.set(fx.weather, fx.intensity != null ? fx.intensity : 0.6, "ending");
       if (fx.lawn != null && day.slice && day.slice.setLawn) day.slice.setLawn(fx.lawn > 0 ? "damp" : "straw", fx.lawn, true);
-      if (fx.celebrate) window.dispatchEvent(new window.CustomEvent("day:crowd", { detail: { action: "celebrate", secs: fx.celebrate } }));
+      if (fx.celebrate) {
+        window.dispatchEvent(new window.CustomEvent("day:crowd", {
+          detail: { action: "celebrate", secs: fx.celebrate, x: fx.x, z: fx.z, r: fx.r },
+        }));
+      }
       if (fx.umbrellas) window.dispatchEvent(new window.CustomEvent("day:crowd", { detail: { action: "hush", secs: fx.secs || 16 } }));
       if (fx.flood && day.episodes && day.episodes.floodAvenue) day.episodes.floodAvenue();
       if (fx.spin != null && day.episodes) {

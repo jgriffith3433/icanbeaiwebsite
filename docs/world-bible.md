@@ -308,7 +308,7 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 - Part 2 power ration → office lights dim and lift audio crawl *before* any log line.
 
 ### What already exists vs short
-- **In:** neighbors (box figures + beats), Parts 1–3, lunch rescue, hurricane drive, light show, tutorial, opening (text beats), moments, crowd reactions, landmarks, cityscape density, spoken dialogue pipeline for story/neighbor lines (~104 clips), Strain, Part 3 endings as in-engine scenes (A/B/C).
+- **In:** neighbors (box figures + beats), Parts 1–3, lunch rescue, hurricane drive, light show, tutorial, opening (text beats), moments, crowd reactions, landmarks, cityscape density, spoken dialogue pipeline for story/neighbor lines (~104 clips), Strain, Part 3 endings as in-engine scenes (A/B/C: plaza rain-dance, Dex work-pose on a turbine, silent umbrellas; ending voice clips still pending Gen credits).
 - **Must build next (matches fun-review gaps, same order as Build queue):** (1) always-on park / plaza stalls / annex turbines + day-keyed states; (2) micro-life + night/south-avenue density beads + playtest; (3) four non-weather verbs with Pressure at 0; (4) Tank loudspeaker + day-end flashes + ending camera/voice (`textOnlyBeats` = 0); (5) neighbor idle life past the ask + silhouettes; (6) Needle life; (7) second-slice gate shop→plaza; (8) GPU art when J approves budget.
 
 ### Canon flags (do not quietly flip)
