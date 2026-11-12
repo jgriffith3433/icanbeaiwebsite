@@ -52,7 +52,10 @@ import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 /* The loading card (index.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
 const loading = window.__loading || { set() {}, done() {}, fail() {} };
 const ready = { model: false, frame: false, title: false, lights: false };
-const maybeDone = () => { if (ready.model && ready.frame && ready.title && ready.lights) loading.done(); };
+/* The card does NOT wait for his 3 MB model: on a phone over Slow 4G that download alone kept it up past 20 s. He is hidden
+   until the model is on (world.js), the card goes once the scripts, first frame, title and shader warm-up are in, and the
+   model streams in behind the title (ready.model is kept for the record). */
+const maybeDone = () => { if (ready.frame && ready.title && ready.lights) loading.done(); };
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
@@ -91,7 +94,7 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
   window.__warmLights = () => (function afterFrame() {
     if (window.day.now && window.day.now().frame) go(); else requestAnimationFrame(afterFrame);
   })();
-  if (!(window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.model)) window.__warmLights();
+  window.__warmLights(); // now, not after the model: the model's own skinned shader is warmed again when it arrives (wear().then)
 })();
 
 const skinWorld = control.model && window.day && window.day.world();
