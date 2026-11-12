@@ -319,6 +319,17 @@ async function checkFoundation(t) {
   if (!/^9\./.test(String(info.babylon))) t.problem("bug", `Babylon ${info.babylon} is running, not Babylon 9`);
   if (info.physics !== "havok") t.problem("bug", `Physics isn't on (${info.physics}${info.error ? `: ${info.error}` : ""})`);
   const w = world();
+  // The shader-compile loop (uniform block limit): no uniform buffers, and no effect that failed to compile.
+  const eng = w && w.scene && w.scene.getEngine();
+  if (eng) {
+    t.metric("uniformBuffers", eng.supportsUniformBuffers ? 1 : 0);
+    if (eng.supportsUniformBuffers) t.problem("bug", "The engine uses uniform buffers: lights, plugins and prepass can pass the GPU's 14 vertex UBO limit (shader compile loop)");
+    let failed = 0;
+    if (eng.onEffectErrorObservable) eng.onEffectErrorObservable.add(() => { failed++; });
+    await sleep(2500);
+    t.metric("effectErrors", failed);
+    if (failed) t.problem("bug", `${failed} shader effect(s) failed to compile in 2.5 s`);
+  }
   const fr = window.day.now().frame;
   if (info.physics === "havok" && w && fr && !fr.person.inCar) {
     const g = w.groundAt(fr.person.x, fr.person.z, 3);
