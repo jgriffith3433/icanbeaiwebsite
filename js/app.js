@@ -17,6 +17,7 @@ import "./cityscape.js"; // the city's density: facades, lit windows, fillers, s
 import "./crowd.js"; // the district's people and cars, on the day's clock (thin instances)
 import "./control.js"; // the player can take control of him
 import "./weather.js"; // the day's forecast, and the weather he commands while he's the player's
+import "./mix.js"; // shared buses, reverb zones, HRTF/occlusion, voice duck, Settings sliders (before score/sfx/voice)
 import "./score.js"; // weather music beds, sampled ambience, take-control sting (after weather)
 import "./stems.js"; // the stem score under control: one 4-note motif, three synced layers, stings (after score.js)
 import "./daysound.js"; // autopilot diegetic soundscapes by schedule block (after score: uses ambience bus)
