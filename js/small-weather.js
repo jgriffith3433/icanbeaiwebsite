@@ -88,9 +88,10 @@ async function loadExtraClipGroups(B, scene, extras) {
         m.isVisible = false;
         m.isPickable = false;
         m.setEnabled(false);
-        if (m.getBoundingInfo) {
-          m.getBoundingInfo = () => ({ boundingBox: { minimumWorld: { x: 0, y: 0, z: 0 }, maximumWorld: { x: 0, y: 0, z: 0 } }, boundingSphere: { centerWorld: { x: 0, y: 0, z: 0 }, radius: 0 } });
-        }
+        // A real, empty BoundingInfo (not a stub object with half the fields): every scene scan that reads
+        // boundingBox.extendSizeWorld / extendSize / minimum / center (the playtest sensor's `get scene`, meshBox in
+        // world.js) gets numbers instead of a TypeError.
+        if (m.setBoundingInfo) m.setBoundingInfo(new B.BoundingInfo(B.Vector3.Zero(), B.Vector3.Zero()));
       });
       c.addAllToScene();
       out.push({ group: g, container: c, name });
