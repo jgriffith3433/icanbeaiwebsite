@@ -6854,7 +6854,7 @@
   },
   {
    "id": "title-logo",
-   "note": "The title's logo lockup \"I Can Be AI\" (js/title.js, day.config.js title.logo): 4 takes of image.generate, the pick goes through image.remove-background, then baked to images/logo-icanbe-ai.webp and title.logo set. Until then the title draws the lockup in type with the same lightning glint. Gen job j_b67c8eedbcff (project org_eb0d5c82e8da8c2d.icanbe).",
+   "note": "The title's logo lockup \"I Can Be AI\" (js/title.js, day.config.js title.logo): 4 takes of image.generate, the pick goes through image.remove-background, then baked to images/logo-icanbe-ai.png and title.logo set. Until then the title draws the lockup in type with the same lightning glint. Gen job j_b67c8eedbcff (project org_eb0d5c82e8da8c2d.icanbe).",
    "steps": [
     {
      "tool": "image.generate",
@@ -6875,7 +6875,7 @@
     }
    ],
    "files": {
-    "logo": "images/logo-icanbe-ai.webp"
+    "logo": "images/logo-icanbe-ai.png"
    }
   }
  ]

@@ -200,7 +200,7 @@ window.DAY_CONFIG = {
     settings: "Settings",
     continue: "Continue", // Play's word when a save exists
     logoText: ["I Can Be", "AI"], // the lockup in type until the Gen-made logo (logo) is in the repo
-    logo: null, // "images/logo-icanbe-ai.webp" once Hawkes Gen's lockup (hawkes.assets.json "title-logo") is baked in
+    logo: "images/logo-icanbe-ai.png", // Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
     // the key-art crane: ends on Small Weather on the apartment roof (the pose the cold open's camera starts from)
     crane: {
       secs: 7,
