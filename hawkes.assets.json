@@ -8243,14 +8243,14 @@
    }
   },
   {
-   "id": "dlg-he-ohbz70",
-   "note": "Spoken line (coldopen:he), He: \"That storm isn't mine. The rod on the shop roof is.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "id": "dlg-he-11qdggm",
+   "note": "Spoken line (coldopen:he), He: \"That storm isn't mine. That rod is.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "That storm isn't mine. The rod on the shop roof is.",
+      "text": "That storm isn't mine. That rod is.",
       "voice": "cjVigY5qzO86Huf0OWal",
       "model": "eleven_v4"
      },
@@ -8258,18 +8258,18 @@
     }
    ],
    "files": {
-    "audio": "audio/dialogue/dlg-he-ohbz70.mp3"
+    "audio": "audio/dialogue/dlg-he-11qdggm.mp3"
    }
   },
   {
-   "id": "dlg-birdie-na1dln",
-   "note": "Spoken line (coldopen:birdie), Birdie: \"Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "id": "dlg-birdie-1nzxnf0",
+   "note": "Spoken line (coldopen:birdie), Birdie: \"Small Weather! Send my tomatoes some rain.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain.",
+      "text": "Small Weather! Send my tomatoes some rain.",
       "voice": "EXAVITQu4vr4xnSDxMaL",
       "model": "eleven_v4"
      },
@@ -8277,7 +8277,7 @@
     }
    ],
    "files": {
-    "audio": "audio/dialogue/dlg-birdie-na1dln.mp3"
+    "audio": "audio/dialogue/dlg-birdie-1nzxnf0.mp3"
    }
   },
   {

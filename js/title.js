@@ -37,6 +37,7 @@ export function startTitle() {
   const html = document.documentElement;
 
   let quiet = false;
+  let autoTimer = 0;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
     if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches") quiet = true;
@@ -270,6 +271,10 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     clockTimer = setInterval(paintClock, 1000); // the clock text only: no fetches
     try { playBtn.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
     emit("show", { via: via || "load" });
+    clearTimeout(autoTimer);
+    if (!quiet && via === "load" && cfg.autoStart && cfg.autoStart.secs > 0 && day.coldopen && day.coldopen.pending()) {
+      autoTimer = setTimeout(() => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); }, cfg.autoStart.secs * 1000);
+    }
     return true;
   }
   function hide(action, via) {
@@ -292,10 +297,14 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
 
   function play(via) {
     if (!up) return false;
-    if (musicWanted) setSound(true);
+    clearTimeout(autoTimer);
+    const auto = via === "auto";
+    if (musicWanted && !auto) setSound(true); // no gesture yet on an auto-start: the browser would refuse
+    const craneDone = (performance.now() - shownAt) / 1000 >= ((cfg.crane && cfg.crane.secs) || 7);
     hide("play", via);
     // A new player's first Play is the cold open (js/coldopen.js): he is the player's in this same click, on the roof.
-    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via, { fromTitle: true })) return true;
+    // An auto-start cuts the crane short, so it takes the wide push-in instead of the dive from the crane's last pose.
+    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via, { fromTitle: !auto || craneDone })) return true;
     // A first Play opens with js/opening.js (skippable); it takes control when it ends.
     if (day.opening && day.opening.pending()) return day.opening.start(via) || true;
     // The page's own Take control button, so it counts as a button press. He can't be taken while driving:
@@ -310,6 +319,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   }
   function episodes(via) {
     if (!up) return false;
+    clearTimeout(autoTimer);
     if (musicWanted) setSound(true);
     hide("episodes", via);
     const menuBtn = document.getElementById("episodes");
@@ -346,6 +356,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     episodes,
     quiet() {
       quiet = true;
+      clearTimeout(autoTimer);
       if (up) {
         up = false;
         clearInterval(clockTimer);

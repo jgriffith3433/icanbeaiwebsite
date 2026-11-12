@@ -23,7 +23,7 @@ export function startColdOpen() {
   try {
     const id = new URLSearchParams(location.search).get("playtest");
     if (id && id !== "cold-start" && id !== "title-key-art") quiet = true;
-    else if (!id && navigator.webdriver) quiet = true; // the runner's start() without ?playtest=: the scenario arms it
+    // a cold bot (the first-five run, no ?playtest) plays it like a stranger; a runner's start(id) quiets the title first, which cancels the auto-start
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
@@ -141,7 +141,7 @@ export function startColdOpen() {
     let prog = 0;
     if (held) {
       held.t += dt;
-      prog = Math.min(1, held.t / cfg.holdSec);
+      prog = Math.min(1, held.t / (cfg.holdSec || 0.05));
       if (prog >= 1) fire(held.via);
     }
     const s = pulse * (1 - 0.18 * prog);
@@ -160,6 +160,7 @@ export function startColdOpen() {
       emit("input", { via, kind: "hold" });
     }
     if (held) return;
+    if (!(cfg.holdSec > 0)) { fire(via); return; } // one tap
     held = { via, t: 0 };
     bolt.classList.add("held");
     emit("hold", { via });
