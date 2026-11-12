@@ -97,7 +97,7 @@ const CLIPS = {
   fall: () =>
     frames(1.2, (u) => {
       const a = u * TAU;
-      const p = blendPose(sampleClip(sk, "Jump", 1.15), idleAt(0), 0.35);
+      const p = blendPose(sampleClip(sk, JUMP, 1.15), idleAt(0), 0.35);
       turn(sk, p, "Spine1", X, -0.12);
       turn(sk, p, "Head", X, -0.2);
       arms(p, [0.75, 0.55 + 0.15 * Math.sin(a), 0.1 * Math.cos(a)], [0.45, 0.85, 0.25 * Math.sin(a)], [-0.75, 0.55 + 0.15 * Math.sin(a + 2), 0.1 * Math.cos(a + 2)], [-0.45, 0.85, 0.25 * Math.sin(a + 2)]);
@@ -156,7 +156,7 @@ const CLIPS = {
   type: () =>
     frames(2, (u, t) => {
       const a = u * TAU;
-      const p = sampleClip(sk, "SitIdle", 0);
+      const p = sampleClip(sk, SIT, 0);
       turn(sk, p, "Head", X, 0.15);
       arms(p, [0.25, -0.7, 0.6], [0.12, -0.08 + 0.04 * Math.sin(a * 6), 1], [-0.25, -0.7, 0.6], [-0.12, -0.08 + 0.04 * Math.sin(a * 6 + 1.3), 1]);
       return inPlace(p);
@@ -266,7 +266,7 @@ const CLIPS = {
 
   /* Sit-at-the-window idle for autopilot evenings: perched, looking out */
   window: () => {
-    const sitName = sk.clips.SitIdle ? "SitIdle" : sk.clips.sit ? "sit" : "idle";
+    const sitName = SIT || "idle";
     const dur = sk.clips[sitName].duration || 2;
     return frames(4, (u, t) => {
       const a = u * TAU;
@@ -280,12 +280,19 @@ const CLIPS = {
   },
 };
 
-const HERO = new Set(["lookup", "windbolt", "windrain", "triumph", "shelter", "window"]);
+/* Posed clips that ship as separate files next to the model: the hero beats, plus cast, throw, fall and float, which
+   the model's own baked copies replace (js/small-weather.js drops a baked group when its extra loads). */
+const HERO = new Set(["lookup", "windbolt", "windrain", "triumph", "shelter", "window", "cast", "throw", "fall", "float"]);
+/* Mixamo-sourced: when the source is already models/small-weather.glb these are its own baked clips, so re-writing
+   them would only copy them onto themselves (and the jump window below assumes Mixamo's 2 s Jump). */
+const FROM_MODEL = path.resolve(SOURCE) === path.resolve(here, "..", "models", "small-weather.glb");
+const BASE = new Set(["idle", "walk", "run", "sit", "jump"]);
 fs.mkdirSync(OUT, { recursive: true });
 fs.mkdirSync(OUT_MODELS, { recursive: true });
 const only = process.argv.slice(3);
 for (const [name, make] of Object.entries(CLIPS)) {
   if (only.length && !only.includes(name)) continue;
+  if (!only.length && FROM_MODEL && BASE.has(name)) continue;
   const f = make();
   const file = path.join(OUT, `${name}.glb`);
   writeClipGlb(file, sk, name, f, FPS);
