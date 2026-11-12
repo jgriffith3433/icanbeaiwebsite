@@ -376,11 +376,28 @@ export function createWindFog(B, scene, deps) {
   /* ---- the vertex-shader bend on the world's own materials ---- */
   function bendMaterial(mat, mode, extra) {
     if (!mat || mat.__windBend) return mat;
+    // plugin + prepass (SSAO) + lights each cost a vertex uniform block; the GPU allows 14, so bent materials take at most 3 lights
+    if (mat.maxSimultaneousLights > 3) mat.maxSimultaneousLights = 3;
     const pl = makeBendPlugin(B, mat, mode, U, extra);
     if (pl) { mat.__windBend = pl; stats.plugins++; }
     return mat;
   }
   const bent = new Set();
+  // if a shader still fails on the uniform-block limit, drop the bend there once instead of recompiling every frame
+  try {
+    const eng = scene.getEngine();
+    if (eng && eng.onEffectErrorObservable) {
+      eng.onEffectErrorObservable.add((info) => {
+        const err = String((info && info.errors) || "");
+        const m = info && info.effect && info.effect.name;
+        if (!/uniform block|UNIFORM_BUFFERS/i.test(err) && !/WINDBEND/.test(String(m && m.fragmentSource || "") + err)) return;
+        scene.materials.forEach((mt) => {
+          const pl = mt && mt.__windBend;
+          if (pl && pl.isEnabled !== false) { pl._enable(false); mt.maxSimultaneousLights = Math.min(mt.maxSimultaneousLights, 2); mt.markAsDirty(B.Material.AllDirtyFlag); stats.bendOff = (stats.bendOff || 0) + 1; }
+        });
+      });
+    }
+  } catch (e) { /* no observable: the light cap alone */ }
   scene.meshes.forEach((m) => {
     if (m.name === "props-solid" && m.material) bent.add(bendMaterial(m.material, "alpha"));
     else if (m.name === "weather-awnings" && m.material) bent.add(bendMaterial(m.material, "cloth"));
