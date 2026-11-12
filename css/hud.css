@@ -196,6 +196,7 @@ html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-
 /* a turning-point moment (js/moments.js `play`): one caption line and Skip at the bottom, in the thumb's reach; the rest of the HUD steps aside */
 .mo-cine { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(36px, calc(env(safe-area-inset-bottom) + 28px)); width: min(94vw, 40em); z-index: 39; }
 .mo-cine-tap { position: fixed; inset: 0; z-index: 38; }
+.mo-stamp { position: fixed; inset: 0; z-index: 40; }
 html.cine-up .hud, html.cine-up .side, html.cine-up .hud-left, html.cine-up .abilitybar, html.cine-up .powerpad, html.cine-up .touchpad,
 html.cine-up .control-btn, html.cine-up .control-hint, html.cine-up .public-toggle, html.cine-up .version-tag, html.cine-up .update-pill,
 html.cine-up .quality-btn, html.cine-up .voices-btn, html.cine-up .tutorial, html.cine-up .nb-btn, html.cine-up .ep-btn, html.cine-up .ep-hud,

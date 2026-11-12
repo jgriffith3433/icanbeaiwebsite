@@ -7881,6 +7881,137 @@
    }
   },
   {
+   "id": "dlg-birdie-19yu9tc",
+   "note": "Spoken line (ending:A), Birdie: \"The lawn drank. Thank you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The lawn drank. Thank you.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-19yu9tc.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-13iwa7g",
+   "note": "Spoken line (ending:A), He: \"Clear skies. I stopped.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Clear skies. I stopped.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-13iwa7g.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1sya96w",
+   "note": "Spoken line (ending:B), Dex: \"Half green. Half still broken.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Half green. Half still broken.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1sya96w.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ydcp1r",
+   "note": "Spoken line (ending:B), He: \"It worked. It cost.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It worked. It cost.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ydcp1r.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1fnrim7",
+   "note": "Spoken line (ending:C), He: \"I asked for everything.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I asked for everything.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1fnrim7.mp3"
+   }
+  },
+  {
+   "id": "pilot-ending-a",
+   "note": "Pilot ending-scene line: \"Fair weather. Logged.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Fair weather. Logged.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-ending-a.mp3"
+   }
+  },
+  {
+   "id": "pilot-ending-c",
+   "note": "Pilot ending-scene line: \"Sky's still thinking. Stay in.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Sky's still thinking. Stay in.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-ending-c.mp3"
+   }
+  },
+  {
    "id": "ui-verbs-lit",
    "note": "UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
    "steps": [
@@ -7896,11 +8027,15 @@
     },
     {
      "tool": "image.remove-background",
-     "inputs": { "image": "$prev" },
+     "inputs": {
+      "image": "$prev"
+     },
      "save": "cut"
     }
    ],
-   "files": { "cut": "textures/ui/verb-sheet-lit.png" }
+   "files": {
+    "cut": "textures/ui/verb-sheet-lit.png"
+   }
   },
   {
    "id": "ui-verbs-unlit",
@@ -7918,11 +8053,15 @@
     },
     {
      "tool": "image.remove-background",
-     "inputs": { "image": "$prev" },
+     "inputs": {
+      "image": "$prev"
+     },
      "save": "cut"
     }
    ],
-   "files": { "cut": "textures/ui/verb-sheet-unlit.png" }
+   "files": {
+    "cut": "textures/ui/verb-sheet-unlit.png"
+   }
   },
   {
    "id": "ui-panel-frame",
@@ -7940,11 +8079,15 @@
     },
     {
      "tool": "image.remove-background",
-     "inputs": { "image": "$prev" },
+     "inputs": {
+      "image": "$prev"
+     },
      "save": "cut"
     }
    ],
-   "files": { "cut": "textures/ui/panel-frame.png" }
+   "files": {
+    "cut": "textures/ui/panel-frame.png"
+   }
   },
   {
    "id": "ui-ranks",
@@ -7962,11 +8105,15 @@
     },
     {
      "tool": "image.remove-background",
-     "inputs": { "image": "$prev" },
+     "inputs": {
+      "image": "$prev"
+     },
      "save": "cut"
     }
    ],
-   "files": { "cut": "textures/ui/rank-sheet.png" }
+   "files": {
+    "cut": "textures/ui/rank-sheet.png"
+   }
   },
   {
    "id": "ui-busts",
@@ -7984,11 +8131,15 @@
     },
     {
      "tool": "image.remove-background",
-     "inputs": { "image": "$prev" },
+     "inputs": {
+      "image": "$prev"
+     },
      "save": "cut"
     }
    ],
-   "files": { "cut": "textures/ui/bust-sheet.png" }
+   "files": {
+    "cut": "textures/ui/bust-sheet.png"
+   }
   },
   {
    "id": "ui-pilot",
@@ -8006,11 +8157,15 @@
     },
     {
      "tool": "image.remove-background",
-     "inputs": { "image": "$prev" },
+     "inputs": {
+      "image": "$prev"
+     },
      "save": "cut"
     }
    ],
-   "files": { "cut": "textures/ui/pilot.png" }
+   "files": {
+    "cut": "textures/ui/pilot.png"
+   }
   }
  ]
 }

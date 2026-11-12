@@ -1855,7 +1855,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       if (run.ep.part === 3) {
         const id = pickEnding(arc, run.strain, END.rules);
         arc.ending = { id, tank: run.strain };
-        pendingEnding = id;
+        pendingEnding = { id, rank: card.rank || "C" };
       }
       saveBest(arcKey, arc);
       mark("arc", { id: run.ep.id, part: run.ep.part, scarred: !!card.scarred, strain: run.strain });
@@ -1925,39 +1925,32 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     return card;
   }
   let pendingEnding = null;
-  /* The ending card: which of the three endings, how each need came out, his last line, the Sky total. */
-  function showEnding(id) {
+  /* The ending scene (not a text card): which of A/B/C, lived in-engine via js/moments.js `ending`. */
+  function showEnding(id, opts) {
+    opts = opts || {};
     const e = END[id];
     if (!e) return null;
     const arc = loadArc();
     const fared = cityFared(arc, END.fared);
-    const L2 = END.lines || {};
-    endKicker.textContent = L2.kicker || "How the district fared";
-    endTitle.textContent = e.name;
-    endScene.textContent = e.scene;
-    endFared.innerHTML = "";
-    fared.forEach((f) => {
-      const li = document.createElement("li");
-      li.className = f.state;
-      const b = document.createElement("b");
-      b.textContent = (END.needs && END.needs[f.need]) || f.need;
-      li.append(b, document.createTextNode(f.text));
-      li.dataset.need = f.need;
-      endFared.appendChild(li);
-    });
-    endLast.innerHTML = "";
-    const who = document.createElement("i");
-    who.textContent = e.last[0];
-    endLast.append(who, document.createTextNode(e.last[1]));
     const tank = (arc.ending && arc.ending.tank) || 0;
-    endTally.textContent = `${L2.tally || "Sky at the Tank"}: ${tank}`;
-    endAgain.textContent = L2.again || "Walk the city";
+    const rank = opts.rank || (arc.ending && arc.ending.rank) || "C";
+    endEl.hidden = true; // never the old summary card
     endEl.dataset.ending = id;
-    endEl.hidden = false;
-    if (day.note) day.note(`${e.name}. ${e.last[0]}: ${e.last[1]}`);
-    mark("ending", { id: "ending", ending: id, name: e.name, tank, fared: fared.map((f) => f.need + ":" + f.state).join(",") });
-    storyEvent("ending", { ending: id, name: e.name, tank, fared: fared.map((f) => ({ need: f.need, state: f.state })) });
-    return { id, name: e.name, fared };
+    if (day.note) day.note(`${e.name}.`);
+    mark("ending", { id: "ending", ending: id, name: e.name, tank, rank, fared: fared.map((f) => f.need + ":" + f.state).join(",") });
+    storyEvent("ending", { ending: id, name: e.name, tank, rank, fared: fared.map((f) => ({ need: f.need, state: f.state })) });
+    const M = day.moments;
+    const played = !!(M && M.ending && M.ending(id, {
+      rank,
+      onEnd: () => {
+        try { window.dispatchEvent(new window.CustomEvent("day:episode", { detail: { action: "ending-done", ending: id, name: e.name, rank } })); } catch (err) { /* */ }
+      },
+    }));
+    if (!played) {
+      // fallback: stamp only if moments aren't up yet (NullEngine / early boot)
+      mark("ending-scene", { id: "ending", ending: id, fallback: true });
+    }
+    return { id, name: e.name, fared, rank, scene: played };
   }
   /* Replay and Next episode on the score card. Next shows what it opens, or why it is shut. */
   function paintScoreButtons(why) {
@@ -1987,9 +1980,9 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     scoreEl.hidden = true;
     closeAuto = 0;
     if (pendingEnding) {
-      const id = pendingEnding;
+      const pe = pendingEnding;
       pendingEnding = null;
-      showEnding(id);
+      showEnding(typeof pe === "string" ? pe : pe.id, typeof pe === "string" ? {} : pe);
     } else if (pendingClosing) {
       const c = pendingClosing;
       pendingClosing = null;
@@ -2501,9 +2494,35 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     arc: () => loadArc(),
     ending: () => {
       const a = loadArc();
-      return a.ending ? { id: a.ending.id, name: (END[a.ending.id] || {}).name, tank: a.ending.tank, shown: !endEl.hidden, fared: cityFared(a, END.fared) } : null;
+      const sceneOn = !!(day.moments && day.moments.playing && day.moments.playing() && /^ending-/.test((day.moments.now() || {}).turning || ""));
+      const stamp = typeof document !== "undefined" && document.getElementById("ending-stamp");
+      return a.ending ? {
+        id: a.ending.id,
+        name: (END[a.ending.id] || {}).name,
+        tank: a.ending.tank,
+        shown: sceneOn || !!(stamp && !stamp.hidden),
+        card: !endEl.hidden,
+        fared: cityFared(a, END.fared),
+      } : null;
     },
-    showEnding: (id) => showEnding(id || (loadArc().ending || {}).id),
+    showEnding: (id, opts) => showEnding(id || (loadArc().ending || {}).id, opts),
+    /** Spin the annex turbines for a staged ending beat (0..1 of full). */
+    spinTurbines: (k) => {
+      const want = Math.max(0, Math.min(1, +k || 0)) * 6;
+      story.turbines.forEach((t) => { t.w = want; t.still = want < 0.4; });
+      story.spin = want;
+      story.momentSpin = want > 0.5;
+      return story.spin;
+    },
+    /** Make sure Part 2's turbines exist (Heavy Weather ending may run after Part 3 cleared them). */
+    ensureTurbines: () => {
+      if (story.turbines.length) return story.turbines.length;
+      const ep2 = list.find((e) => e.id === "still-blades");
+      if (ep2 && ep2.turbines) spawnTurbines(ep2.turbines);
+      return story.turbines.length;
+    },
+    /** Drop a flood patch on the avenue (Overcast ending). */
+    floodAvenue: () => patch("flood", 66, 12.6, 4.5, "#3a6a8a", 0.55),
     resetArc: () => saveBest(arcKey, { parts: {} }),
     chapterSeen: () => chaptersSeen(),
     resetChapters: () => { try { localStorage.removeItem(CH_KEY); } catch (e) { /* none */ } },

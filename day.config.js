@@ -1255,6 +1255,8 @@ window.DAY_CONFIG = {
       { id: "pilot-chapter-3", group: "chapter", text: "So do I. You are close to the limit.", file: "audio/pilot/pilot-chapter-3.mp3" },
       { id: "pilot-chapter-4", group: "chapter", text: "You can also hurt them. Think before you call.", file: "audio/pilot/pilot-chapter-4.mp3" },
       { id: "pilot-chapter-5", group: "chapter", text: "Tonight the whole sky is yours. No schedule.", file: "audio/pilot/pilot-chapter-5.mp3" },
+      { id: "pilot-ending-a", group: "ending", text: "Fair weather. Logged.", file: "audio/pilot/pilot-ending-a.mp3" },
+      { id: "pilot-ending-c", group: "ending", text: "Sky's still thinking. Stay in.", file: "audio/pilot/pilot-ending-c.mp3" },
       { id: "pilot-worry-1", group: "worried", text: "That was a lot of sky. Ease up.", file: "audio/pilot/pilot-worry-1.mp3" },
       { id: "pilot-worry-2", group: "worried", text: "Tornado on the avenue. Really.", file: "audio/pilot/pilot-worry-2.mp3" },
       { id: "pilot-worry-3", group: "worried", text: "The district felt that. Softly, next time.", file: "audio/pilot/pilot-worry-3.mp3" },
@@ -1301,12 +1303,14 @@ window.DAY_CONFIG = {
       scarPenalty: 25,
       lines: { clean: "Clean", scarred: "Scarred", meter: "Sky", of: "of" },
     },
-    /* The ending card after Part 3: chosen from the three parts' marks and the Strain at the Tank (rules.calm /
-       rules.overcast). Same sky each time, different weather. `fared` is the line per need and state
-       (ok, scar, open = never answered). */
+    /* The ending after Part 3: chosen from the three parts' marks and the Strain at the Tank (rules.calm /
+       rules.overcast). Same sky each time, different weather. Lived as an in-engine scene (`scenes`, ≤40 s)
+       with camera cuts, neighbour bodies, the score's resolution/failure sting, one caption + Skip, ending
+       on the Part 3 rank stamp — never a text card. `fared` / `last` stay as quiet labels; spoken lines are
+       in each scene. Outcome persists in js/memory.js for the rest of the real day. */
     endings: {
       rules: { calm: 6, overcast: 10 },
-      lines: { kicker: "How the district fared", tally: "Sky at the Tank", again: "Walk the city" },
+      lines: { kicker: "How the district fared", tally: "Sky at the Tank", again: "Walk the city", skip: "Skip" },
       needs: { park: "The park", turbines: "The turbines", market: "The market", reservoir: "The reservoir" },
       fared: {
         park: { ok: "Green. The pond is up a notch. Birdie's tomatoes are not sulking.", scar: "Green, with a brown patch and a pond that ran over the path.", open: "Still straw." },
@@ -1316,18 +1320,74 @@ window.DAY_CONFIG = {
       },
       A: {
         name: "Fair Weather",
-        scene: "Morning. The park is green, the turbines turn, the market is open, the Tank is full. Birdie waves from the bench. Ines is asleep on the annex roof with her chart.",
+        scene: "Rain on the Tank, the park blooms, the plaza dances in the rain.",
         last: ["He", "Clear skies. He did that, and then stopped."],
       },
       B: {
         name: "Heavy Weather",
-        scene: "The district has all four things, with scars: a brown patch on the lawn, a stall shut, a wet avenue. People nod to him on the street instead of speaking.",
+        scene: "Park half green, Dex on a turbine, a bittersweet exchange.",
         last: ["He", "It worked. It cost."],
       },
       C: {
         name: "Overcast",
-        scene: "The sky stays grey for a week. The Board's loudspeaker plays the Weather Warning on a loop. The neighbors watch from windows.",
+        scene: "Flood and umbrellas. Pilot is quiet. He answers.",
         last: ["He", "He asked the sky for everything. It's still thinking about it."],
+      },
+      /* In-engine scenes (js/moments.js `ending`). secs ≤ 40; one caption line; Skip ends it. */
+      scenes: {
+        A: {
+          secs: 36, sting: "resolution",
+          shots: [
+            { at: 0, tx: 190, ty: 5.5, tz: 40, alpha: [-1.45, -1.85], beta: [1.25, 1.2], radius: [26, 18] },
+            { at: 10, tx: [-6, 2], ty: 3.5, tz: [44, 40], alpha: [-1.95, -1.4], beta: [1.05, 1.12], radius: [28, 20] },
+            { at: 20, tx: [118, 116], ty: 3.2, tz: [26, 28], alpha: [-2.2, -1.7], beta: [1.05, 1.1], radius: [24, 16] },
+          ],
+          places: [{ id: "birdie", x: -6, z: 24.5, gesture: "thanks" }, { id: "dex", x: 114, z: 24, gesture: "thanks" }, { id: "ines", x: 120, z: 30, gesture: "surprise" }],
+          fx: [
+            { at: 0.2, weather: "rain", intensity: 0.7 },
+            { at: 10.2, lawnAnim: 1, lawnFrom: 0.15, lawnSecs: 5 },
+            { at: 20.2, celebrate: 14 },
+          ],
+          lines: [
+            { who: "Birdie", at: 12, text: "The lawn drank. Thank you.", caption: "The lawn drank. Thank you." },
+            { who: "He", at: 22, text: "Clear skies. I stopped.", caption: "Clear skies. I stopped." },
+            { who: "Pilot", at: 28, text: "Fair weather. Logged.", caption: "Fair weather. Logged.", id: "pilot-ending-a" },
+          ],
+        },
+        B: {
+          secs: 34, sting: "failure",
+          shots: [
+            { at: 0, tx: [-6, 0], ty: 3.2, tz: [44, 42], alpha: [-1.9, -1.5], beta: [1.05, 1.12], radius: [26, 18] },
+            { at: 12, tx: [154, 150], ty: 6.2, tz: [2, 4], alpha: [-1.1, -1.55], beta: [1.0, 1.08], radius: [28, 20] },
+          ],
+          places: [{ id: "dex", x: 154, z: 4.5, gesture: "ask" }, { id: "birdie", x: -8, z: 26, gesture: null }, { id: "ines", x: 158, z: 2, gesture: "surprise" }],
+          fx: [
+            { at: 0.2, lawn: 0.45 },
+            { at: 0.4, weather: "clouds", intensity: 0.55 },
+            { at: 12.2, spin: 0.35 },
+          ],
+          lines: [
+            { who: "Dex", at: 14, text: "Half green. Half still broken.", caption: "Half green. Half still broken." },
+            { who: "He", at: 22, text: "It worked. It cost.", caption: "It worked. It cost." },
+          ],
+        },
+        C: {
+          secs: 34, sting: "failure",
+          shots: [
+            { at: 0, tx: [66, 80], ty: 3.0, tz: [12.6, 14], alpha: [3.0, 3.4], beta: [1.05, 1.12], radius: [26, 18] },
+            { at: 14, tx: [118, 112], ty: 3.2, tz: [26, 24], alpha: [-2.1, -1.6], beta: [1.05, 1.12], radius: [24, 17] },
+          ],
+          places: [{ id: "birdie", x: -18, z: 10, gesture: null }, { id: "dex", x: 48, z: 8, gesture: null }, { id: "ines", x: 152, z: 4, gesture: null }],
+          fx: [
+            { at: 0.2, weather: "rain", intensity: 0.85 },
+            { at: 0.4, flood: true },
+            { at: 14.2, umbrellas: true, secs: 18 },
+          ],
+          lines: [
+            { who: "Pilot", at: 10, text: "Sky's still thinking. Stay in.", caption: "Sky's still thinking. Stay in.", id: "pilot-ending-c" },
+            { who: "He", at: 20, text: "I asked for everything.", caption: "I asked for everything." },
+          ],
+        },
       },
     },
     /* One score for every episode (js/episodes.js `liveScore`): people helped (or goals done), time left,

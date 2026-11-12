@@ -101,6 +101,7 @@ export function liveFlag(store, todayKey, test) {
   return best;
 }
 export const parkRain = (d) => !!((d.zones.park && d.zones.park.rain) || d.deeds.birdieRain);
+export const endingHalfLawn = (d) => !!(d.deeds && d.deeds.endingHalf);
 export const birdieRain = (d) => !!d.deeds.birdieRain;
 /** Add up the deeds and zones of the last `days` days (today counts as 1). */
 export function sinceDays(store, todayKey, days) {
@@ -234,8 +235,12 @@ export function installMemory(day, world) {
       counts[m.kind] = (counts[m.kind] || 0) + 1;
     });
     const lawn = liveFlag(store, t, parkRain);
+    const half = liveFlag(store, t, endingHalfLawn);
     const tom = liveFlag(store, t, birdieRain);
-    try { day.slice && day.slice.setLawn && day.slice.setLawn(lawn > 0 ? "damp" : "straw", lawn || 1, true); } catch (e) { /* slice not up */ }
+    try {
+      if (half > 0 && lawn > 0) day.slice && day.slice.setLawn && day.slice.setLawn("damp", 0.45 * half, true);
+      else day.slice && day.slice.setLawn && day.slice.setLawn(lawn > 0 ? "damp" : "straw", lawn || 1, true);
+    } catch (e) { /* slice not up */ }
     try { day.slice && day.slice.setTomatoes && day.slice.setTomatoes(tom); } catch (e) { /* slice not up */ }
     nowInfo = { lawn: +lawn.toFixed(2), tomatoes: +tom.toFixed(2), decals: list.length, quality: low ? "low" : "high", date: t, ...counts };
     emit("apply", Object.assign({ why }, nowInfo));
@@ -303,6 +308,28 @@ export function installMemory(day, world) {
   window.addEventListener("day:episode", (e) => {
     const d = e.detail || {};
     if (["score", "ending", "arc"].includes(d.action)) record("episode-" + d.action, undefined, d.id);
+    // Part 3 ending scenes: the district keeps the outcome for the rest of the real day.
+    if (d.action === "ending" || d.action === "ending-scene") {
+      const id = d.ending || d.id;
+      if (id === "A") {
+        // Fair Weather: park stays green on a same-day reload
+        record("power", "park", "rain");
+        record("birdieRain", "park", "rain");
+      } else if (id === "B") {
+        // Heavy Weather: half-green lawn + a leaning sign scar
+        record("endingHalf", "park", "B");
+        record("power", "park", "rain");
+        addMark(store, today(), { at: Date.now(), kind: "sign", x: 154, z: 4.5 });
+        save();
+        apply("ending-B");
+      } else if (id === "C") {
+        addMark(store, today(), { at: Date.now(), kind: "puddle", x: 66, z: 12.6, r: 3.2 });
+        addMark(store, today(), { at: Date.now(), kind: "puddle", x: 80, z: 13.2, r: 2.4 });
+        addMark(store, today(), { at: Date.now(), kind: "scorch", x: 70, z: 12.6, y: 0.05 });
+        save();
+        apply("ending-C");
+      }
+    }
   });
   window.addEventListener("day:story", (e) => {
     const d = e.detail || {};

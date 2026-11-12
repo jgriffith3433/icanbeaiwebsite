@@ -214,16 +214,19 @@ piece has an ability that helps and one or two that hurt, and the same key is ri
 
 ## Three endings
 
-Chosen at the day's end (the day key rolls over). All three are the same sky, different weather; none of them is the
-"bad" ending. Each is one still image of the district (a skybox/photo mode shot, see Costs) and one line.
+Chosen when Part 3's score card is dismissed. All three are the same sky, different weather; none of them is only
+a text card. Each plays an in-engine scene of at most 40 s (camera path clear of geometry, neighbour bodies, the
+score's resolution or failure sting, one caption line + Skip). The scene ends on the Part 3 rank stamp. The outcome
+persists in `icanbe.memory` for the rest of the real day (A keeps the park green on reload).
 
-| Ending | Condition | Scene | Last line |
+| Ending | Condition | Scene (lived) | Spoken lines |
 |---|---|---|---|
-| **A. Fair Weather** | All three parts clean; Strain 6 or lower at the Tank. | Morning. The park is green, the turbines turn, the market is open, the Tank is full. Birdie waves from the bench. Ines is asleep on the annex roof with her chart. | HE: "Clear skies. He did that, and then stopped." |
-| **B. Heavy Weather** | One or two parts scarred, or Strain 7 to 9 at the Tank. | The district has all four things, with scars: a brown patch on the lawn, a turbine in the avenue, a stall shut. People nod to him on the street instead of speaking. | HE: "It worked. It cost." |
-| **C. Overcast** | Strain 10 or more at the Tank, or all three parts scarred. | The sky stays grey for a week. The Board's loudspeaker is playing the Weather Warning on a loop. The neighbors watch from windows. | HE: "He asked the sky for everything. It's still thinking about it." |
+| **A. Fair Weather** | All three parts clean; Strain 6 or lower at the Tank. | Rain on the Storm Tank, park lawn blooms in a time-lapse, neighbours and crowd dance in the rain on the plaza. | BIRDIE: "The lawn drank. Thank you." / HE: "Clear skies. I stopped." / PILOT: "Fair weather. Logged." |
+| **B. Heavy Weather** | One or two parts scarred, or Strain 7 to 9 at the Tank. | Park half green, Dex patching a turbine on the annex roof, bittersweet exchange. | DEX: "Half green. Half still broken." / HE: "It worked. It cost." |
+| **C. Overcast** | Strain 10 or more at the Tank, or all three parts scarred. | Flood or scorch aftermath on the avenue, crowd silent under umbrellas, Pilot then He. | PILOT: "Sky's still thinking. Stay in." / HE: "I asked for everything." |
 
 Endings are reachable in one day of play for A and B; C needs deliberate overuse (about twice the Strain budget).
+The sheet's older third-person "last" lines stay as quiet narration labels in data; the scene speaks the lines above.
 
 ## Consistency with the four existing episodes
 

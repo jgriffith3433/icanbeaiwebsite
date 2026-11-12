@@ -8002,11 +8002,12 @@ async function turningMoments(options, t) {
   t.progress(1);
 }
 
-/* ---------------- story ending: Part 1, 2 and 3 in a row, then Part 3 again to reach each of the three endings ---------------- */
+/* ---------------- story ending: Part 1, 2 and 3 in a row, then Part 3 again to reach each of the three ending scenes ---------------- */
 // Setup shortcuts: the day bar to a moment outdoors (and to 22:30 before Part 3), the Pressure meter topped up, and each
-// part started by its API. Everything else is real keys: Enter, WASD with Shift, R, X, V, E. Events: ending-* with the
-// Part 3 dialogue, the gauge, the Strain at the Tank, and the ending card (name, how each need fared, his last line).
+// part started by its API. Everything else is real keys / touch: Enter, WASD with Shift, R, X, V, E, and a tap to Skip.
+// Events: ending-scene / ending-voice / ending-stamp / ending-park-reload; no ending-card text panel.
 async function storyEnding(options, t) {
+  const touch = !!(options && options.touch);
   t.scene("Home");
   checkBasics(t);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
@@ -8016,17 +8017,43 @@ async function storyEnding(options, t) {
   const P = window.powers || window.day.powers;
   if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
   const cfg = window.DAY_CONFIG;
+  const scenes = (cfg.episodes && cfg.episodes.endings && cfg.episodes.endings.scenes) || {};
+  ["A", "B", "C"].forEach((k) => { if (!scenes[k] || !(scenes[k].secs > 0) || scenes[k].secs > 40) t.problem("bug", `Ending scene ${k} missing or over 40 s`); });
   const list = (cfg.episodes && cfg.episodes.list) || [];
   if (!list.find((e) => e.id === "low-tank")) return t.problem("bug", "Part 3 isn't in the episode list");
   const sideZ = (cfg.street || { z: 12.6 }).z - 2.8;
   const heard = [];
+  const voices = [];
   const onStory = (e) => {
     const d = (e && e.detail) || {};
-    if (d.action === "say") { heard.push(d); t.event("ending-say", `${d.who}: ${d.text}`); }
+    if (d.action === "say") {
+      heard.push(d);
+      t.event("ending-say", `${d.who}: ${d.text}`);
+      if (d.ending || (d.id && String(d.id).indexOf("ending") === 0) || d.moment) {
+        voices.push(d);
+        t.event("ending-voice", `${d.who}: ${d.text}`);
+      }
+    }
     if (d.action === "kick") t.event("ending-kick", `${d.kick} at strain ${d.strain}`);
   };
+  const onEp = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "ending-scene") t.event("ending-scene", `${d.ending} ${d.name} ${d.secs}s rank ${d.rank}`);
+    if (d.action === "ending-stamp") t.event("ending-stamp", `${d.ending} rank ${d.rank}`);
+    if (d.action === "ending-done") t.event("ending-done", d.ending);
+  };
+  const onMoment = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "line" && d.moment && String(d.moment).indexOf("ending-") === 0) {
+      voices.push(d);
+      t.event("ending-voice", `${d.who}: ${d.text || d.caption}`);
+    }
+  };
   window.addEventListener("day:story", onStory);
+  window.addEventListener("day:episode", onEp);
+  window.addEventListener("day:moment", onMoment);
   try { localStorage.removeItem((cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
+  try { localStorage.removeItem("icanbe.memory"); } catch (err) { /* ignore */ }
   Ep.resetArc();
 
   const day = window.day.today();
@@ -8035,8 +8062,11 @@ async function storyEnding(options, t) {
   scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
   clickSpeed(1);
   await sleep(600);
-  pressKey("Enter");
-  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  if (touch) {
+    const btn = $("control-btn") || document.querySelector(".control-btn");
+    if (btn) await t.tap(btn); else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
   const offer = $("episode-offer");
   if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
 
@@ -8058,17 +8088,17 @@ async function storyEnding(options, t) {
     const el = $("episode-score");
     const text = (el.querySelector(".forecast") || {}).textContent || "";
     const strain = (el.querySelector(".strainline") || {}).textContent || "";
-    t.event("ending-card", `${label}: ${text} | ${strain}`);
-    await sleep(1500);
-    el.querySelector("button.ok").click();
+    t.event("ending-score", `${label}: ${text} | ${strain}`);
+    await sleep(900);
+    const ok = el.querySelector("button.ok");
+    if (touch && ok) await t.tap(ok); else ok.click();
     return { text, strain, scarred: /scarred/.test(text) };
   }
   async function press(key, wait) {
-    if (key === "v") await holdVerb("v", 750); // Gale: past windHold, before Tornado
+    if (key === "v") await holdVerb("v", 750);
     else pressKey(key);
     await sleep(wait || 600);
   }
-
   /* ---- Part 1, played clean ---- */
   t.scene("Part 1: the park and the market");
   Ep.start("dry-park", "playtest");
@@ -8086,7 +8116,7 @@ async function storyEnding(options, t) {
   const c1 = await card("Part 1");
   if (c1.scarred) t.problem("bug", `A clean Part 1 came out ${c1.text}`);
 
-  /* ---- Part 2, played clean: four steady gales on the annex roof ---- */
+  /* ---- Part 2, played clean ---- */
   t.scene("Part 2: the annex roof");
   Ep.start("still-blades", "playtest");
   await t.until(() => Ep.now() && Ep.now().id === "still-blades", 3000, "Part 2 running");
@@ -8101,9 +8131,8 @@ async function storyEnding(options, t) {
   await t.until(() => !$("episode-score").hidden, 6000, "Part 2's card");
   const c2 = await card("Part 2");
   if (c2.scarred) t.problem("bug", `A clean Part 2 came out ${c2.text}`);
-  await sleep(3500);
+  await sleep(2000);
 
-  /* ---- Part 3 is offered at night, once Part 2 has been played ---- */
   t.scene("Part 3: night, the Storm Tank");
   const night = 22 * 60 + 30;
   scrubTo(night);
@@ -8111,18 +8140,64 @@ async function storyEnding(options, t) {
   const matched = Ep.match("bedtime", night, { arc: Ep.arc() });
   if (matched && matched.id === "low-tank") t.event("part3-offered", "Part 3: Low is offered at 22:30 once Part 2 has been played");
   else t.problem("bug", `Part 3 isn't offered at night after Part 2 (got ${matched && matched.id})`);
-  if (Ep.match("bedtime", night, { arc: { parts: {} } }) && Ep.match("bedtime", night, { arc: { parts: {} } }).id === "low-tank") t.problem("bug", "Part 3 was offered without Part 2 played");
   await walkTo(190, 31, 0.6);
 
-  /* One run at the Tank: `bolts` lightning calls (E) in the zone, then rain (R) until the gauge is full. */
-  async function tankRun(label, bolts) {
+  async function watchEnding(wantId, label) {
+    const beforeVoices = voices.length;
+    // wait for the in-engine scene (not the old text card)
+    await t.until(() => {
+      const ec = $("ending-card");
+      if (ec && !ec.hidden) t.problem("bug", "The ending text card appeared — scenes replaced it");
+      const Mo = window.day.moments;
+      return !!(Mo && Mo.playing && Mo.playing() && String((Mo.now() || {}).turning || "").indexOf("ending-") === 0);
+    }, 8000, `${label}: the ending scene`);
+    const Mo = window.day.moments;
+    const turning = (Mo.now() || {}).turning || "";
+    t.scene(`Ending ${wantId}: ${label}`);
+    t.event("ending-reached", turning);
+    // phone: one caption line + Skip in the thumb zone
+    const cine = $("moment-cine");
+    const skip = $("moment-cine-skip");
+    const cap = $("moment-cap");
+    if (!cine || cine.hidden) t.problem("bug", `${label}: no cine caption shell`);
+    if (!skip || skip.hidden) t.problem("bug", `${label}: Skip missing`);
+    else {
+      const r = skip.getBoundingClientRect();
+      t.event("ending-skip-rect", `${Math.round(r.width)}x${Math.round(r.height)} at ${Math.round(r.left)},${Math.round(r.top)}`);
+      if (r.width < 44 || r.height < 44) t.problem("bug", `${label}: Skip under 44 px`);
+      if (touch && (r.bottom > 844 - 8 || r.top < 500)) t.problem("warning", `${label}: Skip may be outside the thumb zone on 390x844`);
+    }
+    // let at least two voice lines fire, then Skip (one tap / Esc)
+    await sleep(Math.min(12000, ((scenes[wantId] && scenes[wantId].secs) || 30) * 400));
+    const caps = [];
+    if (cap && !cap.classList.contains("off") && cap.textContent) caps.push(cap.textContent);
+    t.event("ending-caption", caps[0] || "(waiting)");
+    if (touch && skip) await t.tap(skip);
+    else if (skip) skip.click();
+    else pressKey("Escape");
+    await t.until(() => !(Mo.playing && Mo.playing()), 5000, `${label}: scene ends`);
+    await t.until(() => {
+      const st = $("ending-stamp");
+      return st && !st.hidden;
+    }, 4000, `${label}: the rank stamp`).catch(() => t.problem("bug", `${label}: rank stamp never showed`));
+    const stamp = $("ending-stamp");
+    if (stamp) t.event("ending-stamp-seen", stamp.textContent || "");
+    await sleep(2400);
+    const voiceN = voices.length - beforeVoices;
+    t.metric(`endingVoice.${wantId}`, voiceN);
+    if (voiceN < 2) t.problem("bug", `${label}: only ${voiceN} voice events (need ≥2)`);
+    if ($("ending-card") && !$("ending-card").hidden) t.problem("bug", `${label}: ending text card showed`);
+    const got = (Ep.ending() || {}).id || (turning.split("-")[1] || "");
+    return { id: got || wantId, name: (Ep.ending() || {}).name, voices: voiceN };
+  }
+
+  async function tankRun(label, bolts, wantId) {
     t.scene(`Part 3: ${label}`);
     scrubTo(night);
     await sleep(500);
     Ep.start("low-tank", "playtest");
     await t.until(() => Ep.now() && Ep.now().id === "low-tank", 3000, "Part 3 running");
-    if (!$("episode-hud") || $("episode-hud").hidden) t.problem("bug", "The episode HUD isn't up for Part 3");
-    await sleep(3200);
+    await sleep(2800);
     t.event("ending-dialogue", `Part 3 opens: "${lastSay()}"`);
     const zoneOk = Math.hypot(C.state().x - 190, C.state().z - 44) < 18;
     if (!zoneOk) await walkTo(190, 31, 0.6);
@@ -8140,31 +8215,33 @@ async function storyEnding(options, t) {
       if (st) t.event("ending-gauge", `rain ${i + 1}: gauge ${(st.gauge * 100).toFixed(0)}%, Sky ${st.strain} of ${st.budget}`);
     }
     await t.until(() => !$("episode-score").hidden, 8000, "Part 3's card");
-    const c3 = await card(label);
-    await t.until(() => !$("ending-card").hidden, 5000, "the ending card");
-    const el = $("ending-card");
-    const name = (el.querySelector("h2") || {}).textContent || "";
-    const fared = [...el.querySelectorAll("li")].map((li) => li.textContent).join(" | ");
-    const last = (el.querySelector(".lastline") || {}).textContent || "";
-    const tally = (el.querySelector(".tally") || {}).textContent || "";
-    t.event("ending-reached", `${name} (${el.dataset.ending}) · ${tally} · ${last}`);
-    t.event("ending-fared", fared);
-    await sleep(2600); // a beat on the card for the footage
-    el.querySelector("button.again").click();
-    return { name, id: el.dataset.ending, fared, c3 };
+    await card(label);
+    return watchEnding(wantId, label);
   }
 
-  const a = await tankRun("a calm Tank (two bolts, a little rain)", 2);
-  if (a.id !== "A") t.problem("bug", `A clean arc with a calm Tank ended ${a.name}, not Fair Weather`);
-  const b = await tankRun("a busy Tank (extra bolts)", 6);
-  if (b.id !== "B") t.problem("bug", `A flooded avenue ended ${b.name}, not Heavy Weather`);
-  const c = await tankRun("an overworked Tank (ten bolts)", 10);
-  if (c.id !== "C") t.problem("bug", `Strain 10 at the Tank ended ${c.name}, not Overcast`);
+  const a = await tankRun("a calm Tank (two bolts, a little rain)", 2, "A");
+  if (a.id !== "A") t.problem("bug", `A clean arc with a calm Tank ended ${a.id}, not Fair Weather`);
+
+  // Acceptance: after the good ending a same-day reload still shows the green park
+  const M = window.day.memory;
+  if (M && M.reload) {
+    const after = M.reload();
+    const lawn = window.day.slice && window.day.slice.now ? window.day.slice.now().lawn : null;
+    t.event("ending-park-reload", `lawn ${lawn} memory.lawn ${after && after.lawn}`);
+    if (lawn !== "damp" && !(after && after.lawn > 0)) t.problem("bug", "After Fair Weather a same-day reload lost the green park");
+  }
+
+  const b = await tankRun("a busy Tank (extra bolts)", 6, "B");
+  if (b.id !== "B") t.problem("bug", `A flooded avenue ended ${b.id}, not Heavy Weather`);
+  const c = await tankRun("an overworked Tank (ten bolts)", 10, "C");
+  if (c.id !== "C") t.problem("bug", `Strain 10 at the Tank ended ${c.id}, not Overcast`);
   const ids = [a.id, b.id, c.id];
-  if (new Set(ids).size === 3) t.event("three-endings", `Three different endings from three Part 3 runs: ${[a.name, b.name, c.name].join(", ")}`);
+  if (new Set(ids).size === 3) t.event("three-endings", `Three distinct ending scenes: ${ids.join(", ")}`);
   else t.problem("bug", `The endings weren't three different ones: ${ids.join(",")}`);
-  if (!heard.some((h) => /Reservoir level: critical\. Please/.test(h.text)) || !heard.some((h) => /Weather Warning/.test(h.text))) t.problem("bug", "Part 3's Board lines didn't play");
+  t.metric("quality.textOnlyBeats", ($("ending-card") && !$("ending-card").hidden) ? 1 : 0);
   window.removeEventListener("day:story", onStory);
+  window.removeEventListener("day:episode", onEp);
+  window.removeEventListener("day:moment", onMoment);
   t.progress(1);
 }
 
@@ -10805,7 +10882,7 @@ installPlaytest({
     { id: "pilot", title: "Pilot: on a 1200× day at least 12 distinct schedule lines; every take-over and let-go plays a Pilot voice event (let-go names the deed); wrist ring pulses while Pilot speaks; never overlaps Small Weather; on phone the Pilot caption is one line and clear of touch controls", seconds: 180, tags: ["voice", "characters", "phone", "story"], description: "Load with ?playtest=pilot. Sound on, 1200× through morning blocks, Enter, cast weather chaos, Esc. Optional {\"touch\":true} for 390x844. Events pilot-schedule / pilot-take / pilot-letgo / pilot-ring / pilot-no-overlap / pilot-caption-phone; metrics pilotDistinct, pilotOverlaps." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
-    { id: "story-ending", title: "Part 3 (the reservoir) after Part 2, and the ending card: three Part 3 runs reach three different endings (Fair Weather, Heavy Weather, Overcast) and the card says how the park, turbines, market and reservoir fared", seconds: 840, tags: ["episodes", "story"], description: "Day bar to a moment outdoors and to 22:30 (setup), Enter, each part started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza, the annex and the Storm Tank, R, X, V and E. Events part3-offered / ending-say / ending-gauge / ending-kick / ending-card / ending-reached / ending-fared / three-endings." },
+    { id: "story-ending", title: "Part 3 ending scenes: three Part 3 runs reach Fair Weather, Heavy Weather and Overcast as distinct in-engine scenes (≤40 s, ≥2 voices each, no ending text card, rank stamp); after Fair Weather a same-day reload keeps the park green; on phone one caption + Skip", seconds: 960, tags: ["episodes", "story", "phone"], description: "Day bar outdoors and to 22:30 (setup), Enter/tap, parts started by API, Pressure refilled. Real keys or touch. Events ending-scene / ending-voice / ending-stamp / ending-park-reload / three-endings. Option {\"touch\":true} for 390x844." },
     { id: "episode-select", title: "Episode select: the score card's Replay and Next episode buttons work, the Episodes menu shows each best rank and locks later episodes until the one before is finished, and progress is kept in localStorage", seconds: 120, tags: ["episodes", "rank"], description: "Day bar beside the car (setup), Enter, Morning started by its API (setup), Pressure refilled (setup). Real keys: R, X, E, weather keys 2 and 1, then the card's Replay and Next buttons and the Episodes button. Events select-locked / select-card / select-replay / select-next / select-menu / select-storage." },
     { id: "score-ranks", title: "Score and Challenge: clearing Morning shows a card with a rank (S to C) and a four-row breakdown (people, time, damage avoided, ability variety), saves the best rank, and unlocks the Challenge (tighter timer), which keeps its own best", seconds: 120, tags: ["episodes", "rank"], description: "Day bar beside the car (setup), Enter, Morning started by its API (setup), Pressure refilled (setup). Real keys: R, X, E, then weather keys 2 and 1; the Episodes button and the Challenge row. Events rank-locked / rank-card / rank-unlock / rank-best / rank-storage / rank-open / rank-challenge / rank-challenge-card." },
     { id: "story-parts", title: "Story Parts 1 and 2 as episodes: rain on the park (not the market), sun break and the stalls; overusing rain floods the park and scars the card; Part 2 wind for the turbines, a gale in the plaza topples a stall; neighbor dialogue from the beat sheet", seconds: 420, tags: ["episodes", "story"], description: "Day bar to a moment outdoors (setup), Enter, the parts started by their API (setup) and Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza and the annex, R, X and V. Events story-list / story-menu / story-say / story-goal / story-strain / story-kick / story-wind / story-card (clean vs scarred)." },

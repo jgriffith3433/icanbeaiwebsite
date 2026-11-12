@@ -293,7 +293,7 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 | 6 | Rooftop storm lunch | ~12:20 | Uncalled cell; Dex phone brief (voice); Shelter / Hollis rod / street clear; fog twist + debris; Ines throat line (voice); rank end line spoken | HUD goals ≤1 line each |
 | 7 | Still blades | work / evening annex | Office lights dim + lift crawl **before** any log; Ines; Gale 10 s spins turbines (visible + whoosh); intact stalls; kick: overspeed + stall topple | log may echo after |
 | 8 | Hurricane drive | ~17:53 lot→home | Board wind advisory (voice); four closures help/hurt; bus twist; reach parkHome; Board close-out by rank (voice) + his one line | HUD ≤1 line |
-| 9 | Tank low + ending | ~22:20 Tank / after Part 3 | Board critical on pulsing speaker; Ines charge line; two Lightning hits + mast flash/thunder; Rain fills gauge (bolt-storm does not count); Strain as flood patch or held storm + Warning on speaker; **ending:** in-engine camera (or Gen still once budgeted) over four needs, then his last voiced line; card is caption only | caption under camera |
+| 9 | Tank low + ending | ~22:20 Tank / after Part 3 | Board critical on pulsing speaker; Ines charge line; two Lightning hits + mast flash/thunder; Rain fills gauge (bolt-storm does not count); Strain as flood patch or held storm + Warning on speaker; **ending:** three in-engine scenes (A rain+bloom+plaza dance; B half-green park + Dex on a turbine; C flood/umbrellas + Pilot/He), ≤40 s, Skip + one caption, ends on the rank stamp; no ending text card; memory keeps the park green after A | caption under camera |
 | 10 | Light show finale | ~22:05 plaza | Walk into plaza; 18 cues on beat; stage beams/pools/aurora; grand salvo; closing holds crowd (Birdie, Dex, Ines) while cityFared stingers + his last line by rank are spoken | card captions audio |
 | 11 | Neighbor surprises | evening windows | Bubble + reward + Pressure; spoken when clips exist, else babble + bubble — never log-only | toast ≤1 line |
 | 12 | Day end recap | clock rolls next day | Dim score; sign-off voice; three in-world flashes tied to log events; one last spoken breath; Skip/Esc/timer | ≤1 line under flashes |
@@ -303,12 +303,12 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 ### Beats that must not stay text-only (hard fails until fixed)
 - Opening lines → voice (Eric) or cut.
 - Board advisories → loudspeaker mesh pulse + voice + world audio duck.
-- Ending / closing → camera or still of the district + voiced last line; card text is caption only.
+- Ending / closing → in-engine ending scene (A/B/C) or closing camera + voiced lines; no ending text card; caption under camera only.
 - Day end recap → sign-off voice + three staged flashes; no recap that is only a list of sentences.
 - Part 2 power ration → office lights dim and lift audio crawl *before* any log line.
 
 ### What already exists vs short
-- **In:** neighbors (box figures + beats), Parts 1–3, lunch rescue, hurricane drive, light show, tutorial, opening (text beats), moments, crowd reactions, landmarks, cityscape density, spoken dialogue pipeline for story/neighbor lines (~104 clips), Strain/endings as cards.
+- **In:** neighbors (box figures + beats), Parts 1–3, lunch rescue, hurricane drive, light show, tutorial, opening (text beats), moments, crowd reactions, landmarks, cityscape density, spoken dialogue pipeline for story/neighbor lines (~104 clips), Strain, Part 3 endings as in-engine scenes (A/B/C).
 - **Must build next (matches fun-review gaps, same order as Build queue):** (1) always-on park / plaza stalls / annex turbines + day-keyed states; (2) micro-life + night/south-avenue density beads + playtest; (3) four non-weather verbs with Pressure at 0; (4) Tank loudspeaker + day-end flashes + ending camera/voice (`textOnlyBeats` = 0); (5) neighbor idle life past the ask + silhouettes; (6) Needle life; (7) second-slice gate shop→plaza; (8) GPU art when J approves budget.
 
 ### Canon flags (do not quietly flip)

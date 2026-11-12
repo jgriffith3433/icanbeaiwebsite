@@ -400,7 +400,9 @@ function install() {
     const weatherState = sky.state || "clear";
     const sunK = typeof sky.sun === "number" ? sky.sun : 0;
     people.forEach((p) => {
-      const pl = placeAt(p.stops, h);
+      const pl = p.__force
+        ? { x: p.__force.x, z: p.__force.z, inside: false, moving: false, sit: false, yaw: p.__pos && p.__pos.yaw }
+        : placeAt(p.stops, h);
       const prevX = p.__pos.x;
       const prevZ = p.__pos.z;
       p.__pos = pl;
@@ -603,6 +605,15 @@ function install() {
       const p = people.find((q) => q.id === id);
       if (p) p.__gestureWant = kind;
       return !!p;
+    },
+    /** Hold them at a spot for a staged scene (ending / finale). null clears the hold. */
+    stand: (id, x, z) => {
+      const p = people.find((q) => q.id === id);
+      if (!p) return false;
+      if (x == null || z == null) { p.__force = null; return true; }
+      p.__force = { x: +x, z: +z };
+      p.__pos = { x: +x, z: +z, inside: false, moving: false, sit: false };
+      return true;
     },
   };
   window.neighbors = api;
