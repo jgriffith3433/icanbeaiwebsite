@@ -269,6 +269,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
           playing = null;
           playPri = 0;
           live.playing = false;
+          drainPilot();
         }
       });
       audioEls[line.file] = a;
@@ -290,6 +291,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     playing = null;
     playPri = 0;
     live.playing = false;
+    if (day.pilot && day.pilot.pulse) day.pilot.pulse(false);
   }
 
   function emit(detail) {
@@ -467,6 +469,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
       done = true;
       if (playing && playing.id === id) { playing = null; playPri = 0; live.playing = false; }
       if (opts.onend) opts.onend();
+      drainPilot();
     };
     let a = null;
     if (canPlay) {
@@ -626,6 +629,135 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     });
   }
 
+  /* Pilot (day.config.js `pilot`): calm AI lines, radio-filtered, caption labelled Pilot.
+     Never talks over Small Weather or a neighbor: waits until the channel is free, then holds it. */
+  let audioCtxPilot = null;
+  const pilotQueue = [];
+  function drainPilot() {
+    if (playing || !pilotQueue.length) return;
+    const next = pilotQueue.shift();
+    if (next) next();
+  }
+  function wireRadio(el, radio) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      audioCtxPilot = audioCtxPilot || new AC();
+      if (el.__radio) return;
+      const src = audioCtxPilot.createMediaElementSource(el);
+      const hp = audioCtxPilot.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = (radio && radio.highpass) || 520;
+      const lp = audioCtxPilot.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = (radio && radio.lowpass) || 2900;
+      const g = audioCtxPilot.createGain();
+      g.gain.value = 1;
+      src.connect(hp);
+      hp.connect(lp);
+      lp.connect(g);
+      g.connect(audioCtxPilot.destination);
+      el.__radio = { hp, lp, g };
+    } catch (err) {
+      /* no web audio: plain playback */
+    }
+  }
+  /**
+   * Speak a Pilot line. opts: { via, force, queue (default true), onend, radio }.
+   * Returns the line once playback starts, or null if refused / Voices off.
+   */
+  function speakPilot(line, opts) {
+    opts = opts || {};
+    if (!line || !line.text) return null;
+    if (!voicesOn()) return null;
+    const run = () => {
+      if (playing) {
+        if (opts.queue !== false) pilotQueue.push(run);
+        return;
+      }
+      const radio = opts.radio || ((window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.radio) || {});
+      const file = line.file;
+      const have = file && !missing[file];
+      const canPlay = have && soundOn() && voicesOn();
+      let secs = Math.max(2.2, Math.min(6.5, 1.1 + line.text.length * 0.05));
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (playing && playing.id === line.id) {
+          playing = null;
+          playPri = 0;
+          live.playing = false;
+        }
+        if (day.pilot && day.pilot.pulse) day.pilot.pulse(false);
+        if (opts.onend) opts.onend();
+        drainPilot();
+      };
+      live.last = {
+        id: line.id,
+        group: "pilot-" + (line.group || "line"),
+        text: line.text,
+        file: have ? file : null,
+        who: "Pilot",
+        via: opts.via || "pilot",
+        at: performance.now() / 1000,
+      };
+      lastAt = performance.now() / 1000;
+      heard++;
+      live.heard = heard;
+      let a = null;
+      if (canPlay) {
+        a = audioEls[file];
+        if (!a) {
+          a = new Audio(file);
+          a.preload = "auto";
+          a.addEventListener("error", () => {
+            missing[file] = true;
+          });
+          audioEls[file] = a;
+        }
+        a.onended = finish;
+        a.playbackRate = 1;
+        a.volume = Math.min(1, (window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.volume) || 0.8);
+        wireRadio(a, radio);
+      }
+      showCaption(line.text, "Pilot", secs);
+      quietNote(`Pilot: ${line.text}`);
+      if (day.pilot && day.pilot.pulse) day.pilot.pulse(true);
+      if (a) {
+        try {
+          a.currentTime = 0;
+          const p = a.play();
+          if (p && p.catch) p.catch(() => finish());
+          playing = { id: line.id, group: live.last.group, text: line.text, file, who: "Pilot", el: a };
+          playPri = 85;
+          live.playing = true;
+          if (isFinite(a.duration) && a.duration > 0) secs = a.duration + 0.35;
+        } catch (err) {
+          a = null;
+        }
+      }
+      if (!a) setTimeout(finish, secs * 1000);
+      emit({
+        action: "play",
+        id: line.id,
+        group: live.last.group,
+        text: line.text,
+        file: a ? file : null,
+        who: "Pilot",
+        via: opts.via || "pilot",
+        radio: true,
+        caption: true,
+      });
+    };
+    if (playing && opts.queue !== false) {
+      pilotQueue.push(run);
+      return line;
+    }
+    run();
+    return line;
+  }
+
   const api = {
     now: () => ({
       last: live.last,
@@ -639,9 +771,11 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
       voiceId: cfg().voiceId,
       lines: cfg().lines.length,
       spoken: Object.keys(cfg().spoken).length,
+      who: playing && playing.who ? playing.who : live.last && live.last.who ? live.last.who : null,
     }),
     say,
     speakAs,
+    speakPilot,
     play: (id, opts) => say(id, Object.assign({ force: true, ignoreCooldown: true, ignoreLineCooldown: true }, opts || {})),
     groups: () => Object.keys(Object.assign({}, groups, cfg().spoken)),
     lines: () => cfg().lines.slice(),

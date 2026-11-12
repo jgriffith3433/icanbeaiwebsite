@@ -25,6 +25,7 @@ import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he
 import "./windfog.js"; // wind and fog you can see: a shader bend, ribbons, leaves, flags, cloth, umbrellas, ground-fog slices (after powers, weather, crowd)
 import "./barks.js"; // Small Weather's needs and weather reactions in the log, once each per day (docs/voice-style.md)
 import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
+import "./pilot.js"; // Pilot: the AI that runs his day — schedule nudges, take/let-go, wrist ring (after voice.js)
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
