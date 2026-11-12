@@ -3,6 +3,7 @@
 //   node scripts/check-neighbors.mjs
 //
 import { inWindow, hourOf, placeAt } from "../js/neighbors.js";
+import { nextBeat, powerMatches, clampBeat, arcLines, emptyArcs } from "../js/neighbor-arcs.js";
 
 const root = new URL("../", import.meta.url);
 const problems = [];
@@ -161,8 +162,38 @@ for (const p of list) {
 
   scene.dispose();
 }
+
+// Personal arcs: 3 beats each, ability asks match powers, lines short
+{
+  const arcs = nb.arcs;
+  ok(arcs && arcs.list, "neighbors.arcs is missing");
+  const ids = ["birdie", "dex", "quill"];
+  ok(nextBeat(0) === 1 && nextBeat(2) === 3 && nextBeat(3) === 0 && clampBeat(9) === 3, "nextBeat/clampBeat");
+  ok(JSON.stringify(emptyArcs()) === JSON.stringify({ birdie: 0, dex: 0, quill: 0 }), "emptyArcs");
+  for (const id of ids) {
+    const a = arcs && arcs.list && arcs.list[id];
+    ok(a && (a.beats || []).length === 3, `${id}: arc needs 3 beats`);
+    if (!a) continue;
+    ok(a.beats[0].kind === "cue" && a.beats[1].kind === "ask" && a.beats[2].kind === "scene", `${id}: arc kinds cue/ask/scene`);
+    a.beats.forEach((b) => {
+      ok(b.id && b.prop, `${b.id}: needs id and prop`);
+      if (b.kind === "ask") {
+        ok(b.text && b.thanks, `${b.id}: ask needs text and thanks`);
+        ok(b.ability || (b.abilities && b.abilities.length), `${b.id}: ask needs ability`);
+        if (b.ability) ok(powerMatches(b, b.ability), `${b.id}: powerMatches ability`);
+        if (b.abilities) ok(powerMatches(b, b.abilities[0]), `${b.id}: powerMatches abilities`);
+      } else {
+        ok((b.lines || []).length >= 1, `${b.id}: cue/scene needs lines`);
+        (b.lines || []).forEach((L) => ok(L.who && L.text && L.text.length < 140, `${b.id}: line long or missing`));
+      }
+    });
+  }
+  const lines = arcLines(arcs);
+  ok(lines.length >= 9, `arc lines sparse: ${lines.length}`);
+}
+
 if (problems.length) {
   console.error("check-neighbors FAILED:\n - " + problems.join("\n - "));
   process.exit(1);
 }
-console.log(`check-neighbors: ${list.length} neighbors, ${list.reduce((n, p) => n + p.beats.length, 0)} beats ok`);
+console.log(`check-neighbors: ${list.length} neighbors, ${list.reduce((n, p) => n + p.beats.length, 0)} beats + arcs ok`);

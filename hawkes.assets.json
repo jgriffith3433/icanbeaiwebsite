@@ -6837,6 +6837,253 @@
    }
   },
   {
+   "id": "dlg-birdie-fwngib",
+   "note": "Spoken line (arc:birdie-arc-1), Birdie: \"They're going. The pots are dust.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're going. The pots are dust.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-fwngib.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1fau5dm",
+   "note": "Spoken line (arc:birdie-arc-1), He: \"I see them.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I see them.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1fau5dm.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-4d93xv",
+   "note": "Spoken line (arc:birdie-arc-2:ask), Birdie: \"Rain on the pots. Before they're gone for good?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain on the pots. Before they're gone for good?",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-4d93xv.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-sa1m1r",
+   "note": "Spoken line (arc:birdie-arc-2:thanks), Birdie: \"Green again. Bless you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Green again. Bless you.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-sa1m1r.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-dhyy88",
+   "note": "Spoken line (arc:birdie-arc-3), Birdie: \"First at the block show. Ribbon's on the balcony. Basket's by your door.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "First at the block show. Ribbon's on the balcony. Basket's by your door.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-dhyy88.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-sr2lqi",
+   "note": "Spoken line (arc:dex-arc-1), Dex: \"Shop turbines stalled. No wind, no open sign.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Shop turbines stalled. No wind, no open sign.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-sr2lqi.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-8912u9",
+   "note": "Spoken line (arc:dex-arc-2:ask), Dex: \"A gust on the shop roof. Keep us turning?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "A gust on the shop roof. Keep us turning?",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-8912u9.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1cm9ym6",
+   "note": "Spoken line (arc:dex-arc-2:thanks), Dex: \"They're spinning. We're open.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're spinning. We're open.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1cm9ym6.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-lj0d38",
+   "note": "Spoken line (arc:dex-arc-3), Dex: \"New sign went up. Come by. I'll wave you in.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "New sign went up. Come by. I'll wave you in.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-lj0d38.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-nvh5s",
+   "note": "Spoken line (arc:quill-arc-1), Ines: \"Charts are blank. Streetlights eat every star.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Charts are blank. Streetlights eat every star.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-nvh5s.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-14bmtu8",
+   "note": "Spoken line (arc:quill-arc-2:ask), Ines: \"Fog over the annex. Soften the lights for one reading?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Fog over the annex. Soften the lights for one reading?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-14bmtu8.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-dss53k",
+   "note": "Spoken line (arc:quill-arc-2:thanks), Ines: \"Orion. Hold still.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Orion. Hold still.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-dss53k.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-cpcdtw",
+   "note": "Spoken line (arc:quill-arc-3), Ines: \"Your weather is on my wall. The roof light stays on for you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Your weather is on my wall. The roof light stays on for you.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-cpcdtw.mp3"
+   }
+  },
+  {
    "id": "dlg-he-1thw15y",
    "note": "Spoken line (memory:8:05), He: \"Birdie's pots. Quick hello.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [

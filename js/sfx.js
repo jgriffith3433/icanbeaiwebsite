@@ -1245,6 +1245,15 @@
       S.umbSnap(at.pan, at.gain);
     } else if (d.action === "reward") S.chimeUp();
     else if (d.action === "beat-missed") tone({ freq: 440, to: 330, dur: 0.35, vol: 0.05, wave: "triangle" });
+    else if (d.action === "arc-scene") {
+      // voice.speakAs already carries the line + caption; no second babble
+    } else if (d.action === "arc-beat") {
+      // mark appears / beat lands: soft chime (beat 3 is a brighter goal chime)
+      if ((d.beat | 0) >= 3) S.chimeUp();
+      else tone({ freq: 520, to: 780, dur: 0.22, vol: 0.06, wave: "triangle" });
+    } else if (d.action === "arc-cast") {
+      S.wave(0, 0.7);
+    }
   });
 
   day.sfx = {
