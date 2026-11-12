@@ -21,6 +21,13 @@ const DEFAULTS = {
   touchHint: "",
   day: "Day",
   night: "Night",
+  settings: "Settings",
+  continue: "Continue",
+  logoText: ["I Can Be", "AI"],
+  logo: null,
+  crane: null,
+  hero: null,
+  glintEvery: [2.6, 5.2],
 };
 
 export function startTitle() {
@@ -32,33 +39,46 @@ export function startTitle() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start" && id !== "street-teaches") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
   style.textContent = `
-.title-screen{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;padding:max(28px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) max(64px,calc(env(safe-area-inset-bottom) + 48px)) max(48px,env(safe-area-inset-left));background:linear-gradient(180deg,rgba(6,9,16,.55) 0%,rgba(6,9,16,0) 26%,rgba(6,9,16,0) 46%,rgba(6,9,16,.78) 100%);color:#f6f1e8;font:500 1rem/1.4 Outfit,system-ui,sans-serif;opacity:1;transition:opacity .45s ease}
+.title-screen{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:max(26px,calc(env(safe-area-inset-top) + 18px)) max(20px,env(safe-area-inset-right)) max(30px,calc(env(safe-area-inset-bottom) + 22px)) max(20px,env(safe-area-inset-left));background:linear-gradient(180deg,rgba(6,9,16,.5) 0%,rgba(6,9,16,0) 30%,rgba(6,9,16,0) 58%,rgba(6,9,16,.82) 100%);color:#f6f1e8;font:500 1rem/1.4 Outfit,system-ui,sans-serif;opacity:1;transition:opacity .35s ease;text-align:center}
 .title-screen[hidden]{display:none}
 .title-screen.leaving{opacity:0;pointer-events:none}
-.title-screen .kicker{margin:0;font:600 .8rem/1 Outfit,system-ui,sans-serif;letter-spacing:.32em;text-transform:uppercase;color:#7ec8ff;text-shadow:0 0 18px rgba(126,200,255,.55)}
-.title-screen h1{margin:10px 0 0;font:600 clamp(2.6rem,7vw,5.2rem)/0.98 Fraunces,Georgia,serif;letter-spacing:-.01em;text-shadow:0 4px 30px rgba(0,0,0,.55)}
-.title-screen .daily{margin:12px 0 0;max-width:30em;color:#f0c27a;font:600 1.02rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.7);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.title-screen .top,.title-screen .bottom{display:flex;flex-direction:column;align-items:center;width:100%}
+.title-screen .logo{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;line-height:.9;opacity:0;transform:translateY(-8px);animation:t-in 1.2s ease 2.4s forwards}
+.title-screen .logo img{display:block;width:min(82vw,560px);height:auto;filter:drop-shadow(0 6px 28px rgba(0,0,0,.6))}
+.title-screen .logo .l1{font:600 clamp(.95rem,3.4vw,1.5rem)/1 Outfit,system-ui,sans-serif;letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#7ec8ff;text-shadow:0 0 20px rgba(126,200,255,.65)}
+.title-screen .logo .l2{margin-top:6px;font:700 clamp(4.4rem,17vw,9rem)/.9 Fraunces,Georgia,serif;letter-spacing:.02em;color:transparent;background:linear-gradient(100deg,#dcefff 0%,#9fd2ff 38%,#fff 50%,#9fd2ff 62%,#6aa9ee 100%) 140% 0/260% 100% no-repeat;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 26px rgba(40,90,170,.7));animation:t-glint 5.2s ease-in-out 3.4s infinite}
+.title-screen .logo.zap img{filter:drop-shadow(0 0 26px rgba(160,210,255,.95)) brightness(1.35)}
+.title-screen .logo.zap .l2{filter:drop-shadow(0 0 30px rgba(170,215,255,.95)) brightness(1.4)}
+@keyframes t-in{to{opacity:1;transform:none}}
+@keyframes t-glint{0%,55%{background-position:140% 0}85%,100%{background-position:-40% 0}}
+.title-screen .daily{margin:14px 0 0;max-width:30em;color:#f0c27a;font:600 1rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .daily[hidden],.title-screen .yday[hidden]{display:none}
-.title-screen .yday{margin:4px 0 0;max-width:30em;color:rgba(246,241,232,.72);font:500 .9rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.7);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.title-screen .line{margin:10px 0 0;max-width:30em;color:rgba(246,241,232,.84);font-size:1.05rem;text-shadow:0 2px 12px rgba(0,0,0,.6)}
-.title-screen .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
-.title-screen button{appearance:none;min-height:48px;min-width:44px;padding:12px 28px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:rgba(14,16,22,.55);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s,border-color .15s,transform .15s}
+.title-screen .yday{margin:4px 0 0;max-width:30em;color:rgba(246,241,232,.78);font:500 .88rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.title-screen .actions{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;opacity:0;animation:t-in .9s ease 3.2s forwards}
+.title-screen .row{display:flex;flex-wrap:nowrap;justify-content:center;gap:10px;width:100%}
+.title-screen button{appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:rgba(14,16,22,.58);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s,border-color .15s,transform .15s}
 .title-screen button:hover{background:rgba(126,200,255,.16);border-color:rgba(126,200,255,.6)}
+.title-screen button:active{transform:scale(.97)}
 .title-screen button:focus-visible{outline:2px solid #7ec8ff;outline-offset:3px}
-.title-screen button.play{background:#f0c27a;border-color:#f0c27a;color:#141210;padding:12px 40px}
+.title-screen button.play{width:min(86vw,340px);min-height:64px;font-size:1.3rem;letter-spacing:.04em;background:#f0c27a;border-color:#f0c27a;color:#141210;box-shadow:0 0 30px rgba(240,194,122,.35)}
 .title-screen button.play:hover{background:#f6d39b;transform:translateY(-1px)}
-.title-screen .foot{display:flex;align-items:center;gap:14px;margin-top:18px;font-size:.82rem;color:rgba(246,241,232,.6)}
-.title-screen .foot button{min-height:36px;padding:6px 14px;font-size:.8rem;font-weight:500}
-.title-screen .foot button[aria-pressed="false"]{color:rgba(246,241,232,.55)}
-.title-screen .clock{position:absolute;top:max(22px,env(safe-area-inset-top));right:max(24px,env(safe-area-inset-right));margin:0;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(246,241,232,.7)}
+.title-screen .row button{flex:0 1 auto}
+.title-screen button[aria-pressed="false"]{color:rgba(246,241,232,.6)}
+.title-screen .hint{font-size:.78rem;color:rgba(246,241,232,.55);min-height:1.1em}
+.title-screen .tset{width:min(92vw,360px);margin:0;padding:10px;border-radius:16px;background:rgba(10,13,22,.82);border:1px solid rgba(246,241,232,.22);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.title-screen .tset[hidden]{display:none}
+.title-screen .tset .settings-pop{position:static;margin:0;padding:0;align-items:stretch}
+.title-screen .clock{position:absolute;top:max(10px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));margin:0;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(246,241,232,.6)}
 .title-screen .clock i{display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:50%;background:#e2574c;box-shadow:0 0 10px #e2574c;vertical-align:1px;font-style:normal}
+.title-screen .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .control-hint,html.title-up #episodes,html.title-up #neighbors-btn,html.title-up .tutorial,html.title-up #episode-offer,html.title-up .public-toggle,html.title-up .version-tag{visibility:hidden}
-@media (max-width:700px){.title-screen{align-items:stretch;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));padding-bottom:max(40px,calc(env(safe-area-inset-bottom) + 28px))}.title-screen .actions button{flex:1}.title-screen .foot .hint{display:none}}
+@media (max-width:700px){.title-screen .clock{display:none}.title-screen .hint{display:none}}
+@media (prefers-reduced-motion:reduce){.title-screen .logo,.title-screen .actions{animation-duration:.01s;animation-delay:0s}.title-screen .logo .l2{animation:none;background-position:30% 0}}
 `;
   document.head.appendChild(style);
 
@@ -67,19 +87,40 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   el.className = "title-screen";
   el.hidden = true;
   el.setAttribute("role", "dialog");
-  el.setAttribute("aria-label", `${cfg.kicker}: ${cfg.name}`);
-  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><p class="kicker"></p><h1></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="line"></p><div class="actions"><button type="button" class="play" id="title-play"></button><button type="button" class="episodes" id="title-episodes"></button></div><div class="foot"><button type="button" id="title-music" aria-pressed="true"></button><span class="hint"></span></div>`;
-  el.querySelector(".kicker").textContent = cfg.kicker;
-  el.querySelector("h1").textContent = cfg.name;
-  el.querySelector(".line").textContent = cfg.line;
+  el.setAttribute("aria-label", `${cfg.logoText.join(" ")}`);
+  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
+  const logoEl = el.querySelector("#title-logo");
+  logoEl.querySelector(".sr").textContent = cfg.logoText.join(" ");
+  if (cfg.logo) {
+    // Hawkes Gen's lockup (hawkes.assets.json "title-logo"); the type below is the stand-in until it is in the repo.
+    const img = document.createElement("img");
+    img.alt = "";
+    img.src = cfg.logo;
+    img.decoding = "async";
+    img.addEventListener("error", () => { img.remove(); typeLogo(); });
+    logoEl.appendChild(img);
+  } else typeLogo();
+  function typeLogo() {
+    const l1 = document.createElement("span");
+    l1.className = "l1";
+    l1.setAttribute("aria-hidden", "true");
+    l1.textContent = cfg.logoText[0];
+    const l2 = document.createElement("span");
+    l2.className = "l2";
+    l2.setAttribute("aria-hidden", "true");
+    l2.textContent = cfg.logoText[1] || "";
+    logoEl.append(l1, l2);
+  }
   const dailyEl = el.querySelector("#title-daily");
   const ydayEl = el.querySelector("#title-yday");
   const playBtn = el.querySelector("#title-play");
   const epBtn = el.querySelector("#title-episodes");
+  const setBtn = el.querySelector("#title-settings");
+  const setPanel = el.querySelector("#title-settings-panel");
   const musicBtn = el.querySelector("#title-music");
   const clockEl = el.querySelector("#title-clock span");
-  playBtn.textContent = cfg.play;
   epBtn.textContent = cfg.episodes;
+  setBtn.textContent = cfg.settings;
   document.body.appendChild(el);
 
   let up = false;
@@ -133,8 +174,81 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   }
   function camera(on) {
     const w = day.world && day.world();
-    if (w && w.titleShot) w.titleShot(on);
+    if (!w || !w.titleShot) return;
+    if (!on) { w.titleShot(false); return; }
+    // The key-art crane over the district, landing on Small Weather on the apartment roof (the pose the cold open dives from).
+    const opts = {};
+    if (cfg.crane) opts.crane = { secs: reduced() ? 0.01 : cfg.crane.secs, from: cfg.crane.from, to: cfg.crane.to };
+    if (cfg.hero) opts.hero = cfg.hero;
+    w.titleShot(opts);
   }
+  const reduced = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
+
+  /* the storm forms behind him (a new player's: the cold open carries the same cell on) and glints in the clouds every few seconds */
+  let glintTimer = 0;
+  let stormTimers = [];
+  const hasSave = () => !(day.coldopen && day.coldopen.pending && day.coldopen.pending());
+  function glint() {
+    if (!up) return;
+    const w = window.weather;
+    if (w && w.triggerFlash) { try { w.triggerFlash(140 + Math.random() * 220, (Math.random() - 0.5) * 1.2); } catch (e) { /* no weather */ } }
+    logoEl.classList.add("zap");
+    setTimeout(() => logoEl.classList.remove("zap"), 220);
+    emit("glint", {});
+    const g = cfg.glintEvery || [2.6, 5.2];
+    glintTimer = setTimeout(glint, (g[0] + Math.random() * (g[1] - g[0])) * 1000);
+  }
+  function stormStart() {
+    stormTimers.forEach(clearTimeout);
+    stormTimers = [];
+    const w = window.weather;
+    if (!w || !w.set || hasSave()) return;
+    w.set("clouds", 0.35, "cell");
+    stormTimers.push(setTimeout(() => { if (up) w.set("rain", 0.45, "cell"); }, 3500));
+    stormTimers.push(setTimeout(() => { if (up) w.set("rain", 0.75, "cell"); }, 7000));
+  }
+  function stormStop(played) {
+    clearTimeout(glintTimer);
+    stormTimers.forEach(clearTimeout);
+    stormTimers = [];
+    const w = window.weather;
+    if (played || !w || !w.set || hasSave()) return;
+    // left by Episodes: give the sky back as the forecast had it
+    const n = w.now && w.now();
+    if (n && n.forecast) w.set(n.forecast, n.forecastIntensity, "cell");
+  }
+
+  /* parallax: the mouse, or the phone's tilt */
+  let tiltOn = false;
+  function par(x, y) {
+    const w = day.world && day.world();
+    if (w && w.titleParallax) w.titleParallax(x, y);
+  }
+  window.addEventListener("pointermove", (e) => {
+    if (!up || e.pointerType === "touch") return;
+    par((e.clientX / Math.max(1, innerWidth)) * 2 - 1, (e.clientY / Math.max(1, innerHeight)) * 2 - 1);
+  }, { passive: true });
+  window.addEventListener("deviceorientation", (e) => {
+    if (!up || e.gamma == null || e.beta == null) return;
+    tiltOn = true;
+    par(Math.max(-1, Math.min(1, e.gamma / 22)), Math.max(-1, Math.min(1, (e.beta - 55) / 22)));
+  }, { passive: true });
+
+  /* Settings: the page's own settings group (quality, voice, ...) moves in here while the panel is open */
+  function settingsPanel(open) {
+    const pop = document.getElementById("settings-pop");
+    if (!pop) return;
+    setBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    setPanel.hidden = !open;
+    if (open) { pop.hidden = false; setPanel.appendChild(pop); }
+    else if (pop.parentElement === setPanel) {
+      pop.hidden = true;
+      const tools = document.querySelector(".tools");
+      if (tools) tools.appendChild(pop);
+    }
+    emit("settings", { open });
+  }
+  setBtn.addEventListener("click", () => settingsPanel(setPanel.hidden));
 
   function show(via) {
     if (up) return false;
@@ -144,7 +258,11 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     el.hidden = false;
     html.classList.add("title-up");
     el.querySelector(".hint").textContent = touchy() ? cfg.touchHint : cfg.hint;
+    playBtn.textContent = hasSave() ? cfg.continue : cfg.play;
     camera(true);
+    stormStart();
+    clearTimeout(glintTimer);
+    glintTimer = setTimeout(glint, (reduced() ? 1 : 3.2) * 1000);
     paintMusic();
     paintClock();
     paintDaily();
@@ -159,6 +277,9 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     up = false;
     clearInterval(clockTimer);
     html.classList.remove("title-up");
+    stormStop(action === "play");
+    settingsPanel(false);
+    par(0, 0);
     camera(false);
     el.classList.add("leaving");
     setTimeout(() => {
@@ -174,7 +295,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     if (musicWanted) setSound(true);
     hide("play", via);
     // A new player's first Play is the cold open (js/coldopen.js): he is the player's in this same click, on the roof.
-    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via)) return true;
+    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via, { fromTitle: true })) return true;
     // A first Play opens with js/opening.js (skippable); it takes control when it ends.
     if (day.opening && day.opening.pending()) return day.opening.start(via) || true;
     // The page's own Take control button, so it counts as a button press. He can't be taken while driving:
@@ -229,6 +350,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
         up = false;
         clearInterval(clockTimer);
         html.classList.remove("title-up");
+        stormStop(false);
+        settingsPanel(false);
         camera(false);
         el.hidden = true;
       }
@@ -240,6 +363,10 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
       daily: dailyEl.hidden ? "" : dailyEl.textContent,
       yesterday: ydayEl.hidden ? "" : ydayEl.textContent,
       sound: soundOn(),
+      crane: day.world && day.world() && day.world().titleCrane ? day.world().titleCrane() : null,
+      logo: cfg.logo ? "image" : "type",
+      continueLabel: playBtn.textContent,
+      tilt: tiltOn,
       camera: !!(day.world && day.world() && day.world().titleShotOn && day.world().titleShotOn()),
       log: log.slice(),
     }),
