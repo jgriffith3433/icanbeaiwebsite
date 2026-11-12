@@ -360,6 +360,7 @@ export function startWeather(world, dayApi) {
     flashLight: 0,
     particles: "off",
     puddles: 0,
+    reflectProbe: false,
     ripples: 0,
     reflect: 0,
     awnings: 0,
@@ -456,6 +457,34 @@ export function startWeather(world, dayApi) {
   let pmat = null;
   let puddleTex = null;
   let rippleClock = 0;
+  /* Low-quality wet-street reflections: a small ReflectionProbe of neon/lamps instead of SSR. */
+  let streetProbe = null;
+  let streetProbeOn = false;
+  let streetProbeAcc = 1;
+  let streetProbeReady = false;
+  function fillStreetProbeList() {
+    if (!streetProbe) return;
+    streetProbe.renderList.length = 0;
+    scene.meshes.forEach((m) => {
+      if (!m || !m.name) return;
+      // cityscape names: city-brick-*, city-shops-*, city-skyline, facade-apt/office, cs-lamp*, sign-*, props-glow
+      if (/^(city-|facade-|cs-lamp|sign-|props-glow|city-beacon)/.test(m.name)) {
+        try { streetProbe.renderList.push(m); } catch (e) { /* */ }
+      }
+    });
+    streetProbeReady = streetProbe.renderList.length > 0;
+  }
+  try {
+    if (B.ReflectionProbe && roadIsPbr && roadMat) {
+      streetProbe = new B.ReflectionProbe("wetStreetProbe", 64, scene, true);
+      streetProbe.refreshRate = -1; // manual: only while wet on low
+      if (streetProbe.cubeTexture) {
+        streetProbe.cubeTexture.coordinatesMode = B.Texture.CUBIC_MODE;
+      }
+      // list fills late: facades and signs arrive after weather.js boots (cityscape imports after)
+      scene.onAfterRenderObservable.addOnce(() => fillStreetProbeList());
+    }
+  } catch (e) { streetProbe = null; }
   function paintPuddleRipple(phase, rippleAmt) {
     if (!puddleTex) return;
     try {
@@ -1326,6 +1355,38 @@ export function startWeather(world, dayApi) {
             roadMat.clearCoat.intensity = wetR * 0.62;
             roadMat.clearCoat.roughness = 0.12 + (1 - wetR) * 0.18;
           }
+          // phone / low: SSR is off — bind the wet-street ReflectionProbe so neon and lamps still mirror
+          if (low && streetProbe && streetProbe.cubeTexture) {
+            if (!streetProbeReady) fillStreetProbeList();
+            const wantProbe = wetR > 0.15;
+            if (wantProbe !== streetProbeOn) {
+              streetProbeOn = wantProbe;
+              roadMat.reflectionTexture = wantProbe ? streetProbe.cubeTexture : null;
+              // metallic workflow: environmentIntensity lifts the probe; reflectivityColor alone is ignored
+              if (roadMat.__dryMetallic == null && roadMat.metallic != null) roadMat.__dryMetallic = roadMat.metallic;
+              if (roadMat.metallic != null) roadMat.metallic = wantProbe ? Math.max(roadMat.__dryMetallic || 0, 0.35) : (roadMat.__dryMetallic != null ? roadMat.__dryMetallic : 0.08);
+              if (roadMat.environmentIntensity != null) {
+                if (roadMat.__dryEnv == null) roadMat.__dryEnv = roadMat.environmentIntensity;
+                roadMat.environmentIntensity = wantProbe ? Math.max(0.85, roadMat.__dryEnv) : roadMat.__dryEnv;
+              }
+              streetProbe.refreshRate = wantProbe ? 12 : -1;
+            }
+            if (wantProbe) {
+              streetProbeAcc += 0.3;
+              if (streetProbeAcc > 1.2) {
+                streetProbeAcc = 0;
+                const cam = scene.activeCamera;
+                if (cam) {
+                  const p = cam.globalPosition || cam.position;
+                  streetProbe.position.set(p.x, 0.4, p.z);
+                }
+              }
+            }
+          } else if (streetProbeOn) {
+            streetProbeOn = false;
+            roadMat.reflectionTexture = null;
+            if (streetProbe) streetProbe.refreshRate = -1;
+          }
         } else {
           dryDiffuse.scaleToRef(1 - wet * 0.52, scratch.diff);
           scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
@@ -1336,6 +1397,7 @@ export function startWeather(world, dayApi) {
         }
       }
       live.gloss = g;
+      live.reflectProbe = streetProbeOn;
     }
     const cam = scene.activeCamera;
     const px = cam && cam.target ? cam.target.x : 0;
@@ -1531,6 +1593,7 @@ export function startWeather(world, dayApi) {
       puddles: live.puddles,
       ripples: live.ripples,
       reflect: live.reflect || 0,
+      reflectProbe: !!live.reflectProbe,
       awnings: live.awnings,
       treeSway: live.treeSway,
       awningSway: live.awningSway,

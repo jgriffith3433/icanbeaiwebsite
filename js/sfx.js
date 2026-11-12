@@ -503,6 +503,30 @@
       synthTag("siren");
       for (let i = 0; i < 4; i++) tone({ freq: 700, to: 950, dur: 0.55, vol: 0.012, wave: "triangle", delay: i * 0.6, pan: -0.5 });
     },
+    /** Soft 120 Hz neon tube buzz under the shop signs at night (called from props.js). */
+    neonBuzz(level) {
+      note("neon");
+      const a = ctx();
+      if (!a) return;
+      const t = a.c.currentTime;
+      const osc = a.c.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(120, t);
+      const f = a.c.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.setValueAtTime(240, t);
+      f.Q.setValueAtTime(4, t);
+      const g = a.c.createGain();
+      const vol = 0.012 * Math.max(0.2, Math.min(1, level == null ? 0.7 : level));
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      osc.connect(f);
+      f.connect(g);
+      g.connect(a.master);
+      osc.start(t);
+      osc.stop(t + 0.6);
+    },
   };
 
   /* ---------------- him: steps, jumps, landings, dust ---------------- */

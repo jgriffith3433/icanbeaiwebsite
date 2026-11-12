@@ -3219,6 +3219,126 @@ async function fillOut(options, t) {
   t.progress(1);
 }
 
+/* ---------------- night-glow: lit windows with rooms, neon, lamp pools, headlights; schedules; SSR / probe; phone light cap ---------------- */
+// Setup: day bar beside the car and to the hours. Real input: Enter, WASD along the avenue, key 3 (rain),
+// optional Quality: low / touch. Events night-glow-* ; metrics windowOnDusk, windowOnLate, dynamicLights, nightFps.
+async function nightGlow(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene("Night glow setup");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.cityscape && window.day.cityscape.info, 8000, "the cityscape");
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    if (window.day.control && window.day.control.touch) window.day.control.touch(true);
+  }
+  const day = window.day.today();
+  const cfg = window.DAY_CONFIG;
+  const street = cfg.street || { z: 12.6 };
+  const outside = carSideMoment(day);
+  if (!outside) {
+    t.problem("bug", "No moment beside the car for night-glow");
+    return;
+  }
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  await sleep(400);
+  const C = window.day.control;
+  if (touch) {
+    const btn = document.getElementById("control-btn") || document.querySelector("[data-control]");
+    if (btn) btn.click();
+    else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  t.progress(0.1);
+
+  // 1. window schedules across a fast day: on between 18–20, half off after 23:30
+  const cs = window.day.cityscape;
+  const paint = (h) => (cs.paintWindows ? cs.paintWindows(h) : cs.info().windows);
+  const at17 = paint(17.0);
+  const at18 = paint(18.0);
+  const at20 = paint(20.0);
+  const at2330 = paint(23.5);
+  const at01 = paint(1.0);
+  t.event("night-glow-schedule", `windows on@17=${at17.on} @18=${at18.on} @20=${at20.on} @23:30=${at2330.on} @01=${at01.on}; rooms ${at20.rooms}; interior ${cs.info().windows && cs.info().windows.interior}`);
+  t.metric("windowOnDusk", at18.on);
+  t.metric("windowOnNight", at20.on);
+  t.metric("windowOnLate", at01.on);
+  if (!(at18.on > at17.on && at20.on > at18.on)) t.problem("bug", `Windows did not switch on across dusk (${at17.on} → ${at18.on} → ${at20.on})`);
+  if (!(at01.on <= at20.on * 0.55)) t.problem("bug", `Fewer than half the night windows stayed off after bedtime (${at01.on} still on vs ${at20.on} at 20:00)`);
+  if (!(at20.rooms > 0 && (at20.warm > 0 || at20.cool > 0))) t.problem("bug", "Lit windows have no interior-mapped rooms");
+  if (!(at2330.on <= at20.on * 0.75)) t.problem("bug", `Windows barely dimmed by 23:30 (${at2330.on} vs ${at20.on} at 20:00)`);
+  t.progress(0.35);
+
+  // 2. 22:00 street: lit windows, neon, lamp pools, dynamic lights
+  scrubTo(22 * 60);
+  await sleep(1500);
+  if (cs.paintWindows) cs.paintWindows(22);
+  await goTo(48, street.z - 3.2, t, { sprint: true, progress: 0.5, ms: 28000 });
+  await sleep(1000);
+  t.scene("Avenue at 22:00");
+  const info = cs.info();
+  const props = info.props || {};
+  const dyn = info.dynamicLights || {};
+  t.event("night-glow-street", `windows ${info.lit.windows.toFixed(2)} on=${(info.windows && info.windows.on) || 0} neon ${props.lit && props.lit.neon} lamps ${info.lit.lamps.toFixed(2)} pools ${info.lamps} dynLights ${dyn.active}/${dyn.cap} signs ${props.signs}`);
+  t.metric("dynamicLights", dyn.active || 0);
+  t.metric("nightNeonSigns", props.signs || 0);
+  if (info.lit.windows < 0.7) t.problem("bug", `Windows aren't lit at 22:00 (${info.lit.windows})`);
+  if ((props.signs || 0) < 4) t.problem("bug", `Fewer than 4 neon signs (${props.signs})`);
+  if (info.lit.lamps < 0.7) t.problem("bug", `Lamp pools aren't on (${info.lit.lamps})`);
+  if (touch && (dyn.active || 0) > 4) t.problem("bug", `Phone has ${dyn.active} dynamic lights (cap 4)`);
+  if (!touch && (dyn.active || 0) < 1) t.problem("warning", "No dynamic lamp lights near the camera");
+  t.progress(0.6);
+
+  // 3. rain at night: neon + headlights reflect
+  const W = window.weather;
+  pressKey("3");
+  await t.until(() => W.now().state === "rain" && W.now().reflect > 0.5, 12000, "wet street reflections").catch(() => {});
+  await sleep(1200);
+  const wet = W.now();
+  const crowd = window.day.crowd && window.day.crowd.info ? window.day.crowd.info() : {};
+  const render = window.day.render && window.day.render.info ? window.day.render.info() : {};
+  t.scene("Night rain reflections");
+  t.event("night-glow-reflect", `reflect ${wet.reflect.toFixed(2)} puddles ${wet.puddles} probe ${wet.reflectProbe} ssr ${!!render.ssr} carFlares ${crowd.flares || 0} lights ${crowd.lights}`);
+  if (!(wet.manual && wet.reflect > 0.5)) t.problem("bug", `Rain at night didn't shine the street (${JSON.stringify({ reflect: wet.reflect, manual: wet.manual })})`);
+  if (touch && render.ssr) t.problem("bug", "SSR is on at low/phone quality");
+  if (!touch && !render.ssr) t.problem("bug", "SSR is off at high quality (wet streets need ScreenSpaceReflection)");
+  t.metric("nightReflect", Math.round(wet.reflect * 100) / 100);
+  t.progress(0.8);
+
+  // 4. phone fps
+  const samples = [];
+  const t0 = performance.now();
+  while (performance.now() - t0 < 2500) {
+    samples.push(1000 / Math.max(1, window.day.world().engine.getDeltaTime()));
+    await sleep(50);
+  }
+  const avg = samples.reduce((a, b) => a + b, 0) / samples.length;
+  t.metric("nightFps", Math.round(avg * 10) / 10);
+  t.event("night-glow-fps", `${avg.toFixed(1)} fps avg over ${samples.length} samples at ${touch ? "390 touch low" : "desktop"}`);
+  if (touch && avg < 30) t.problem("bug", `Phone night glow averages ${avg.toFixed(1)} fps (needs 30)`);
+
+  // 5. lightning flicker reaches windows (real bolt via E, plus day:strike listener)
+  const hadFlicker = { on: false };
+  const onStrike = () => { if (cs.flickering && cs.flickering()) hadFlicker.on = true; };
+  window.addEventListener("day:strike", onStrike);
+  try {
+    if (window.abilities && window.abilities.reset) window.abilities.reset();
+  } catch (e) { /* */ }
+  keyDown("E");
+  await sleep(120);
+  keyUp("E");
+  await sleep(500);
+  window.removeEventListener("day:strike", onStrike);
+  if (!hadFlicker.on && cs.flicker) {
+    cs.flicker(0.8);
+    await sleep(120);
+  }
+  if (!(cs.flickering() || hadFlicker.on)) t.problem("warning", "Bolt did not flicker city lights");
+  else t.event("night-glow-flicker", hadFlicker.on ? "day:strike flickered lamps and windows" : "cityscape.flicker stuttered lights");
+  pressKey("Escape");
+  t.progress(1);
+}
+
 /* ---------------- city-audit: props sit on their roofs and pavements; no flicker; he walks every roof ---------------- */
 // Setup shortcuts: the audit runs on the built scene, and six probe cameras (three rooftops, three street spots) are put
 // where a player's camera could be for two frames each, the second 2 cm to the side. Real input: Enter, then WASD with
@@ -9604,6 +9724,7 @@ installPlaytest({
     { id: "crowd", title: "The street's people and cars follow the clock: quiet at 3 AM, busy at the 8:30 rush, full at lunch and dinner, thin again late; they walk, cross, go in and out of buildings; rain opens umbrellas; Quality: low thins them; frame rate at each", seconds: 90, tags: ["crowd", "photos"], description: "Day bar beside the car and to each hour (setup), then 1x. Enter, WASD with Shift to the shops, key 3, the quality button. Events crowd-night / crowd-rush / crowd-lunch / crowd-dinner / crowd-late / crowd-follows-clock / crowd-rain / crowd-quality-low / photo-fps; metrics crowd<Hour>People, crowd<Hour>Cars, photoFpsMin, photoFpsAvg." },
     { id: "city-audit", title: "City audit: every prop from props.js and cityscape.js sits on its roof or pavement (nothing floating, sunk, coplanar or inside out); six probe cameras (three rooftops, three streets) show no flicker between two frames; he walks each walkable roof along its AC units; shots at desktop and 844x390", seconds: 240, tags: ["look", "photos"], description: "Setup: scrubs to noon, runs day.cityscape.audit(), places six probe cameras for two frames each (the second moved 2 cm). Real input: Enter, WASD with Shift up each walkable roof's ramp and along its row of units, Esc. Events city-audit / city-shots-size / flicker-<spot> / roof-walk-<block>; metrics cityAuditFailures, flickerBlocks." },
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
+    { id: "night-glow", title: "District glow after dusk: windows light on schedules with interior-mapped rooms, neon flickers, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares; wet street uses SSR on high and a reflection probe on low; a bolt flickers windows", seconds: 160, tags: ["look", "photos", "phone", "feel"], description: "Day bar beside the car (setup), Enter / Take control tap, scrub 17→01 for window counts, walk the avenue at 22:00, key 3 for rain reflections. Events night-glow-schedule / -street / -reflect / -fps / -flicker; metrics windowOnDusk, windowOnNight, windowOnLate, dynamicLights, nightNeonSigns, nightReflect, nightFps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
     { id: "stem-score", title: "Stem score: Play opens on the 4-note motif (title, then the cold open), three stems stream after the first input and play in sync, a held bolt raises the tension layer within one bar, a tornado brings the storm layer, an episode success plays the resolution sting; on a phone the stems stay under 1.5 MB", seconds: 90, tags: ["audio", "music", "phone", "opening"], description: "Load with ?playtest=stem-score. Setup: every icanbe.* key cleared, cold open armed, title up. Real input: click or tap Play, hold the bolt (E or the Bolt button). Shortcuts: powers.command('tornado'), a day:episode score event. Events stem-motif-title / -coldopen / -ready / -windup / -storm / -sting / -transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. Run at 1280x720 and 390x844 touch." },
@@ -9680,6 +9801,7 @@ installPlaytest({
       else if (id === "sky-cast") await skyCast(options, t);
       else if (id === "photos") await photos(options, t);
       else if (id === "fill-out") await fillOut(options, t);
+      else if (id === "night-glow") await nightGlow(options, t);
       else if (id === "city-audit") await cityAudit(options, t);
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
