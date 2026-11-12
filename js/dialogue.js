@@ -98,6 +98,8 @@ export function dialogueLines(config) {
   // The cold open's lines ([who, text] pairs in coldopen.lines): his in Eric's voice, Birdie's in hers.
   const cold = (C.coldopen && C.coldopen.lines) || {};
   Object.keys(cold).forEach((k) => add(cold[k][0], cold[k][1], `coldopen:${k}`));
+  // The chapter openers' lines (day.config.js `chapters`): his in Eric's voice; Pilot's are `pilot.lines`, not here.
+  (C.arc || []).forEach((ch) => ((ch.opener && ch.opener.lines) || []).forEach((L) => { if (L.who !== "Pilot") add(L.who, L.text, `chapter:${ch.id}`); }));
   return out;
 }
 

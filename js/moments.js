@@ -303,11 +303,12 @@ export function startMoments() {
   let turnOn = true;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "turning-moments") turnOn = false;
+    if (id && id !== "turning-moments" && id !== "chapter-openers") turnOn = false;
     else if (!id && navigator.webdriver) turnOn = false;
   } catch (e) { /* no location */ }
   let cur = null; // { id, spec, t0, timers, raf, said }
   const MAX_SECS = 8;
+  const MAX_OPENER = 20; // a chapter opener: 20 s at most
   function fitCaption() {
     cineCap.style.fontSize = "";
     let px = parseFloat(getComputedStyle(cineCap).fontSize) || 16;
@@ -327,6 +328,7 @@ export function startMoments() {
     cancelAnimationFrame(c.raf);
     c.timers.forEach(clearTimeout);
     const w = day.world && day.world();
+    if (w && w.chapterSign) w.chapterSign(null);
     const info = w && w.cineInfo ? w.cineInfo() : null;
     if (w && w.cineShot) w.cineShot(null);
     if (day.control && day.control.hold) day.control.hold(false);
@@ -350,7 +352,7 @@ export function startMoments() {
     const w = day.world();
     if (lineUp) endLine("skip", "moment");
     if (endUp) return false;
-    const secs = Math.min(MAX_SECS, spec.secs || 6);
+    const secs = Math.min(spec.max || MAX_SECS, spec.secs || 6);
     cur = { id: spec.id, spec, t0: performance.now(), timers: [], raf: 0 };
     const c = cur;
     html.classList.add("cine-up");
@@ -359,18 +361,19 @@ export function startMoments() {
     const camera = !!(w && w.cineShot && spec.shot && w.cineShot(Object.assign({ secs }, spec.shot)));
     let sting = false;
     try { sting = !!(day.score && day.score.momentSting && day.score.momentSting(spec.sting)); } catch (e) { /* no audio */ }
+    const sign = !!(w && w.chapterSign && spec.sign && w.chapterSign(spec.sign));
     cineCap.textContent = "";
     cineWho.textContent = "";
     cineCap.classList.add("off");
     cine.hidden = false;
     tap.hidden = false;
-    emit(spec.id, "start", { title: spec.title || "", secs, camera, sting: spec.sting || null, stingPlayed: sting, lines: (spec.lines || []).length, shot: spec.shot ? { tx: spec.shot.tx, tz: spec.shot.tz } : null });
+    emit(spec.id, "start", { title: spec.title || "", secs, camera, sign: sign && w.chapterSignInfo ? w.chapterSignInfo() : null, chapter: spec.chapter || 0, motif: !!spec.motif, sting: spec.sting || null, stingPlayed: sting, lines: (spec.lines || []).length, shot: spec.shot ? { tx: spec.shot.tx, tz: spec.shot.tz } : null });
     try { spec.onStart && spec.onStart(); } catch (e) { console.error("[moments]", e); }
     (spec.lines || []).forEach((L, i) => {
       c.timers.push(setTimeout(() => {
         if (cur !== c) return;
-        showCaption(L.who, L.caption || L.text);
-        emit(spec.id, "line", { index: i, who: L.who, text: L.text, caption: L.caption || L.text });
+        showCaption(L.label || L.who, L.caption || L.text);
+        emit(spec.id, "line", { index: i, who: L.who, voiced: !!L.voiced, text: L.text, caption: L.caption || L.text });
         if (spec.speak) spec.speak(L.who, L.text);
         const hold = Math.max(1.8, Math.min(5.2, 1.2 + L.text.length * 0.065));
         c.timers.push(setTimeout(() => { if (cur === c) cineCap.classList.add("off"); }, hold * 1000));
@@ -379,6 +382,7 @@ export function startMoments() {
     const loop = () => {
       if (cur !== c) return;
       const k = Math.min(1, (performance.now() - c.t0) / (secs * 1000));
+      if (sign && spec.sign) { const f = spec.sign.from || 0, e = spec.sign.to || 6; w.chapterSignK(Math.max(0, Math.min(1, (k * secs - f) / Math.max(0.5, e - f)))); }
       try { spec.tick && spec.tick(k, secs); } catch (e) { /* a tick must not end the moment */ }
       c.raf = requestAnimationFrame(loop);
     };
@@ -386,6 +390,37 @@ export function startMoments() {
     c.timers.push(setTimeout(() => endTurn("end", "auto"), secs * 1000));
     try { cineSkip.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
     return true;
+  }
+
+  /* ---------- 4. chapter openers (config `arc`): the arc's five in-engine scenes ---------- */
+  const chapters = () => (window.DAY_CONFIG && window.DAY_CONFIG.arc) || [];
+  const ENGINE = { He: "Small Weather", Pilot: "Pilot" };
+  /** Play chapter n's opener (<= 20 s): the title written in the sky, the motif, one spoken He / Pilot exchange. opts.onEnd(how, d). */
+  function chapter(which, opts) {
+    opts = opts || {};
+    const ch = chapters().find((c) => c.n === which || c.id === which);
+    if (!ch || !ch.opener) return false;
+    const O = ch.opener;
+    const pilotLines = (window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.lines) || [];
+    const ok = play({
+      id: "chapter-" + ch.n, chapter: ch.n, title: ch.title, secs: O.secs || 16, max: MAX_OPENER, sting: O.sting, shot: O.shot,
+      sign: Object.assign({ text: ch.title }, O.sign || {}), motif: true,
+      lines: (O.lines || []).map((L) => ({ who: L.who, label: ENGINE[L.who] || L.who, text: L.text, at: L.at, caption: L.caption, voiced: true })),
+      speak: (who, text) => {
+        if (who === "Pilot") {
+          const line = pilotLines.find((p) => p.text === text);
+          try { if (line && day.voice && day.voice.speakPilot) day.voice.speakPilot(line, { via: "chapter", queue: false, radio: window.DAY_CONFIG.pilot.radio }); } catch (e) { /* no voice */ }
+        } else {
+          // dialogue.js speaks a `day:story` say in his Eric voice (clip under audio/dialogue)
+          try { window.dispatchEvent(new window.CustomEvent("day:story", { detail: { action: "say", who, text, moment: true, id: "chapter-" + ch.n } })); } catch (e) { /* node */ }
+        }
+      },
+      onStart: () => {
+        try { day.stems && day.stems.motif && day.stems.motif("chapter-" + ch.n); } catch (e) { /* no stems */ }
+      },
+      onEnd: (how, d) => { try { opts.onEnd && opts.onEnd(how, d); } catch (e) { console.error("[moments]", e); } },
+    });
+    return ok;
   }
   cineSkip.addEventListener("click", (e) => { e.stopPropagation(); endTurn("skip", "click"); });
   cineSkip.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch") { e.stopPropagation(); endTurn("skip", "tap"); } });
@@ -406,6 +441,8 @@ export function startMoments() {
     pickEvents,
     pickDeeds: (key, n) => pickDeeds(key || day.now().key, n || D.speakDeeds || 2),
     play,
+    chapter,
+    chapters: () => chapters().map((c) => ({ n: c.n, id: c.id, title: c.title, line: c.line, episodes: c.episodes.slice(), secs: c.opener && c.opener.secs })),
     playing: () => !!cur,
     turning: (id) => (id ? TURN[id] || null : Object.assign({}, TURN)),
     enabled: () => turnOn,

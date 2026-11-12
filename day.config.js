@@ -327,6 +327,85 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     ARC (`arc`) — the five-chapter arc (docs/world-bible.md "The five chapters"; js/moments.js `chapter`, js/episodes.js)
+     ------------------------------------------------------------------------
+     Each chapter has a line (what he wants, shown under its name in the Episodes menu), the episodes in it, and an
+     OPENER: the first time one of its episodes starts, a staged in-engine scene of 20 s at most plays before the
+     episode: a camera that sweeps round the title hung in the sky over the place (`sign.kind` "cloud" = clouds
+     forming the words, "billboard" = a lit neon sign; never a text card), the score's four-note motif and a sting, one
+     spoken exchange between him (`who: "He"`, his Eric voice, clips under audio/dialogue) and Pilot (`who: "Pilot"`,
+     `pilot.lines` id `pilot-chapter-N`, clips under audio/pilot), one caption line at a time, Skip at the bottom
+     (a tap anywhere, Esc or the button). The camera orbits `shot.t*` (the sign hangs there, 34 m up, above every roof).
+     ------------------------------------------------------------------------ */
+  arc: [
+    {
+      n: 1, id: "sky", title: "The Sky", line: "He wants it.",
+      episodes: ["tutorial", "morning"],
+      opener: {
+        secs: 16, sting: "drought",
+        sign: { kind: "cloud", text: "The Sky", w: 17, from: 0.8, to: 6.5 },
+        shot: { tx: [-22, -14], ty: 34, tz: 12, alpha: [-2.25, -1.55], beta: [1.34, 1.28], radius: [34, 28], fov: 0.05 },
+        lines: [
+          { who: "He", at: 2.4, text: "Every day runs on rails. The sky is the one thing that doesn't.", caption: "The sky is the one thing that doesn't." },
+          { who: "Pilot", at: 9.2, text: "Schedule says desk. The sky is not on it.", caption: "The sky is not on it.", id: "pilot-chapter-1" },
+        ],
+      },
+    },
+    {
+      n: 2, id: "neighbours", title: "The Neighbours", line: "The city needs him.",
+      episodes: ["dry-park"],
+      opener: {
+        secs: 16, sting: "turbines",
+        sign: { kind: "cloud", text: "The Neighbours", w: 18, from: 0.8, to: 6.5 },
+        shot: { tx: [-6, 2], ty: 34, tz: 44, alpha: [-2.2, -1.5], beta: [1.34, 1.28], radius: [34, 29], fov: 0.05 },
+        lines: [
+          { who: "He", at: 2.4, text: "Birdie's tomatoes. Dex's parcels. The whole street is asking.", caption: "The whole street is asking." },
+          { who: "Pilot", at: 9.2, text: "Seven requests logged. Answer them in order.", caption: "Answer them in order.", id: "pilot-chapter-2" },
+        ],
+      },
+    },
+    {
+      n: 3, id: "drought", title: "The Long Drought", line: "Power has a cost.",
+      episodes: ["still-blades", "low-tank"],
+      opener: {
+        secs: 17, sting: "twist",
+        sign: { kind: "cloud", text: "The Long Drought", w: 19, from: 0.8, to: 7 },
+        shot: { tx: [150, 158], ty: 34, tz: 10, alpha: [-2.3, -1.6], beta: [1.34, 1.28], radius: [35, 30], fov: 0.05 },
+        lines: [
+          { who: "He", at: 2.6, text: "Every call costs something. The district keeps count.", caption: "Every call costs something." },
+          { who: "Pilot", at: 9.6, text: "So do I. You are close to the limit.", id: "pilot-chapter-3" },
+        ],
+      },
+    },
+    {
+      n: 4, id: "chasers", title: "Storm Chasers", line: "He saves people. Pilot doubts him.",
+      episodes: ["lunch", "commute-home"],
+      opener: {
+        secs: 17, sting: "bridge",
+        sign: { kind: "cloud", text: "Storm Chasers", w: 18, from: 0.8, to: 6.5 },
+        shot: { tx: [60, 68], ty: 34, tz: 10, alpha: [-2.2, -1.5], beta: [1.34, 1.28], radius: [34, 29], fov: 0.05 },
+        lines: [
+          { who: "He", at: 2.4, text: "Somebody is stuck out there. I can reach them.", caption: "Somebody is stuck out there." },
+          { who: "Pilot", at: 9.0, text: "You can also hurt them. Think before you call.", caption: "Think before you call.", id: "pilot-chapter-4" },
+        ],
+      },
+    },
+    {
+      n: 5, id: "night", title: "The Night Show", line: "Pilot gives him the sky.",
+      episodes: ["night"],
+      opener: {
+        secs: 17, sting: "tank",
+        sign: { kind: "billboard", text: "The Night Show", w: 18, from: 0.8, to: 6 },
+        shot: { tx: [112, 120], ty: 34, tz: 28, alpha: [-2.2, -1.5], beta: [1.34, 1.28], radius: [34, 29], fov: 0.05 },
+        lines: [
+          { who: "Pilot", at: 2.6, text: "Tonight the whole sky is yours. No schedule.", caption: "Tonight the whole sky is yours.", id: "pilot-chapter-5" },
+          { who: "He", at: 9.0, text: "Then let's give them a show.", caption: "Then let's give them a show." },
+        ],
+      },
+    },
+  ],
+
+  /* ------------------------------------------------------------------------
      FIRST VISIT — one minute, then it stays quiet
      ------------------------------------------------------------------------
      The first time the page opens, a card walks the player through taking
@@ -1056,6 +1135,11 @@ window.DAY_CONFIG = {
       { id: "pilot-letgo-rescue", group: "letgo", text: "Everyone down. Thank you.", file: "audio/pilot/pilot-letgo-rescue.mp3" },
       { id: "pilot-letgo-answered", group: "letgo", text: "A neighbour said thanks. Logged.", file: "audio/pilot/pilot-letgo-answered.mp3" },
       { id: "pilot-letgo-default", group: "letgo", text: "Back on schedule. I'll catch him up.", file: "audio/pilot/pilot-letgo-default.mp3" },
+      { id: "pilot-chapter-1", group: "chapter", text: "Schedule says desk. The sky is not on it.", file: "audio/pilot/pilot-chapter-1.mp3" },
+      { id: "pilot-chapter-2", group: "chapter", text: "Seven requests logged. Answer them in order.", file: "audio/pilot/pilot-chapter-2.mp3" },
+      { id: "pilot-chapter-3", group: "chapter", text: "So do I. You are close to the limit.", file: "audio/pilot/pilot-chapter-3.mp3" },
+      { id: "pilot-chapter-4", group: "chapter", text: "You can also hurt them. Think before you call.", file: "audio/pilot/pilot-chapter-4.mp3" },
+      { id: "pilot-chapter-5", group: "chapter", text: "Tonight the whole sky is yours. No schedule.", file: "audio/pilot/pilot-chapter-5.mp3" },
       { id: "pilot-worry-1", group: "worried", text: "That was a lot of sky. Ease up.", file: "audio/pilot/pilot-worry-1.mp3" },
       { id: "pilot-worry-2", group: "worried", text: "Tornado on the avenue. Really.", file: "audio/pilot/pilot-worry-2.mp3" },
       { id: "pilot-worry-3", group: "worried", text: "The district felt that. Softly, next time.", file: "audio/pilot/pilot-worry-3.mp3" },
@@ -1164,6 +1248,7 @@ window.DAY_CONFIG = {
          Not tied to a chapter or the clock: it plays wherever he stands. */
       {
         id: "tutorial",
+        chapter: 1,
         tutorial: true,
         title: "Learn the weather",
         tagline: "Lightning, Rain, Wind, Fog and Sun, one at a time.",
@@ -1183,6 +1268,7 @@ window.DAY_CONFIG = {
       },
       {
         id: "morning",
+        chapter: 1,
         variety: 2,
         title: "Clear the sky",
         tagline: "Break up the forecast's clouds before he leaves.",
@@ -1204,6 +1290,7 @@ window.DAY_CONFIG = {
          is when Birdie is on the bench and Dex is in the plaza, so one run needs no clock jump. */
       {
         id: "dry-park",
+        chapter: 2,
         variety: 2,
         part: 1,
         title: "Part 1: Dry",
@@ -1264,6 +1351,7 @@ window.DAY_CONFIG = {
          Rank S..C is points over `max`. Everything the episode says is `say` ([who, text]). */
       {
         id: "lunch",
+        chapter: 4,
         title: "Rooftop storm",
         tagline: "A storm nobody called. Get the stranded out of it: the plaza, the shop roof, the avenue.",
         chapters: ["lunch"],
@@ -1375,6 +1463,7 @@ window.DAY_CONFIG = {
          gale turns them; too much wind (or wind in the plaza) costs the market its stalls. */
       {
         id: "still-blades",
+        chapter: 3,
         variety: 2,
         part: 2,
         title: "Part 2: Still",
@@ -1436,6 +1525,7 @@ window.DAY_CONFIG = {
          break dries it. He is on foot (Take control is locked in the car); driving the car himself is not built. */
       {
         id: "commute-home",
+        chapter: 4,
         title: "Hurricane drive",
         tagline: "The way home is shut in four places. Wind clears, sun dries, rain floods. Pick the right weather at each.",
         /* Offer as he leaves the office / walks the lot (still "work"), and
@@ -1598,6 +1688,7 @@ window.DAY_CONFIG = {
          the sky won't stop. Offered once Part 2 has been played; always in the Episodes menu. */
       {
         id: "low-tank",
+        chapter: 3,
         variety: 2,
         part: 3,
         afterPart: 2,
@@ -1647,6 +1738,7 @@ window.DAY_CONFIG = {
          day's stories together from the arc the three parts left (`cityFared`). */
       {
         id: "night",
+        chapter: 5,
         variety: 5,
         title: "Light show",
         tagline: "The city is on the plaza. Play the sky on the beat: lightning, rain, fog, wind, sun.",

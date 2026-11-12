@@ -6401,6 +6401,118 @@ async function hurricaneDrive(options, t) {
   t.progress(1);
 }
 
+/* ---------------- chapter-openers: the five chapters each open on a staged, voiced, skippable in-engine scene ---------------- */
+// ?playtest=chapter-openers ({"touch":true} or a 390x844 phone for the touch run). Setup shortcuts (named): the earlier
+// episodes marked finished (so the menu's chain is open) and the chapter-seen flags cleared. Everything else is real input:
+// the Episodes button and a chapter's first row (click, or a tap on the phone), then Esc, a tap on Skip, or waiting.
+// Events chapter-<n>-start / -layout / -end, chapter-summary; metrics chapterMaxSeconds, chapterCameraInsideFrames,
+// chapterLines (voiced lines over all five), chapterSkipMinY.
+async function chapterOpeners(options, t) {
+  const bail = (msg) => { t.problem("bug", msg); t.finish("fail"); };
+  t.scene("Home");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  const M = window.day.moments;
+  if (!Ep || !C || !M || !M.chapter) return bail("episodes, Take control or the chapter openers aren't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  if (touch) { try { C.touch(true); } catch (e) { /* desktop */ } }
+  M.enable(true);
+  forcePublicView();
+  const sound = $("sound");
+  if (sound && sound.getAttribute("aria-pressed") !== "true") await clickEl(sound);
+  const cfg = window.DAY_CONFIG;
+  const chapters = cfg.arc || [];
+  if (chapters.length !== 5) return bail(`the arc has ${chapters.length} chapters, not 5`);
+  const key = (cfg.episodes && cfg.episodes.storageKey) || "icanbe.episodes.best";
+  const done = {};
+  cfg.episodes.list.filter((e) => !e.tutorial).forEach((e) => { done[e.id] = { rank: "B", pct: 60, done: true, cleared: true }; });
+  try { localStorage.setItem(key, JSON.stringify(done)); } catch (err) { /* ignore */ }
+  Ep.resetChapters();
+  const evs = [];
+  window.addEventListener("day:moment", (e) => { if (e.detail && /^chapter-/.test(e.detail.moment || "")) evs.push(e.detail); });
+  const voice = [];
+  ["day:voice", "day:dialogue"].forEach((n) => window.addEventListener(n, (e) => voice.push({ n, t: performance.now(), d: (e && e.detail) || {} })));
+  const day = window.day.today();
+  const outside = carSideMoment(day);
+  if (!outside) return bail("No moment outdoors to take control");
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  let maxSecs = 0, inside = 0, lines = 0, minSkipY = 9999;
+  const how = ["wait", "esc", "skip", "skip", "wait"];
+  for (let i = 0; i < 5; i++) {
+    const ch = chapters[i];
+    const id = "chapter-" + ch.n;
+    t.scene(`Chapter ${ch.n}: ${ch.title}`);
+    const first = ch.episodes[0];
+    const btn = $("episodes");
+    if (touch) await tapEl(btn); else await clickEl(btn);
+    await t.until(() => $("ep-row-" + first), 3000, "the Episodes menu");
+    const head = $("ep-chapter-" + ch.n);
+    if (!head || head.textContent.indexOf(ch.line) < 0) t.problem("bug", `the Episodes menu has no "${ch.line}" under Chapter ${ch.n}`);
+    const row = $("ep-row-" + first);
+    if (touch) await tapEl(row); else await clickEl(row);
+    await t.until(() => M.now().turning === id, 6000, `the ${id} opener`);
+    const w = window.day.world();
+    const start = evs.filter((e) => e.moment === id && e.action === "start").pop();
+    if (!start) { t.problem("bug", `${id}: no start event`); continue; }
+    const sign = w.chapterSignInfo && w.chapterSignInfo();
+    t.event(`${id}-start`, `"${start.title}" ${start.secs} s, camera ${start.camera}, sign ${sign ? sign.kind + " '" + sign.text + "'" : "NONE"}, motif ${start.motif}, ${start.lines} lines`);
+    if (!start.camera || !w.cineOn()) t.problem("bug", `${id}: no camera move`);
+    if (!sign || sign.text.toUpperCase() !== ch.title.toUpperCase()) t.problem("bug", `${id}: the title isn't written in the world`);
+    if (start.secs > 20) t.problem("bug", `${id}: ${start.secs} s is over 20`);
+    await sleep(3200);
+    // the screen: the title in the sky, no card, one caption line, Skip in reach
+    const cap = $("moment-cap"), skip = $("moment-cine-skip");
+    const cb = boxOf(cap), sb = boxOf(skip);
+    const cs = getComputedStyle(cap);
+    const lineH = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.25;
+    const nLines = cb ? Math.round((cb.h - 18) / lineH) : 0;
+    const info = w.chapterSignInfo();
+    const cards = ["day-end", "episode-offer", "episode-score", "ending-card", "closing-card", "tutorial", "moment-line"].filter((c) => { const el = $(c); return el && !el.hidden && el.offsetParent !== null; });
+    t.event(`${id}-layout`, `caption "${cap.textContent}" ${nLines} line(s), Skip y ${sb ? Math.round(sb.y) : "-"} (${sb ? Math.round(sb.w) + "x" + Math.round(sb.h) : "-"}), sign ${info ? Math.round(info.scale * 100) / 100 : "-"}x, cards up: ${cards.join(",") || "none"}, ${innerWidth}x${innerHeight}`);
+    if (cards.length) t.problem("bug", `${id}: a card is up during the opener (${cards.join(", ")})`);
+    if (nLines > 1) t.problem("bug", `${id}: the caption is ${nLines} lines`);
+    if (cap.scrollWidth > cap.clientWidth + 1) t.problem("bug", `${id}: the caption is cut off`);
+    if (!sb || sb.w < 44 || sb.h < 44 || sb.x < 0 || sb.x + sb.w > innerWidth || sb.y + sb.h > innerHeight + 1) t.problem("bug", `${id}: Skip isn't a visible 44 px target`);
+    if (sb) { minSkipY = Math.min(minSkipY, sb.y); if (touch && innerHeight >= 800 && sb.y < 563) t.problem("bug", `${id}: Skip is above the bottom third`); }
+    if (!document.documentElement.classList.contains("cine-up")) t.problem("bug", `${id}: the HUD didn't step aside`);
+    // both voices have spoken before it ends (Skip only after the exchange, so the exchange is seen)
+    await t.until(() => evs.filter((e) => e.moment === id && e.action === "line").length >= 2, 15000, `both ${id} lines`).catch(() => t.problem("bug", `${id}: fewer than 2 lines spoke`));
+    await sleep(400);
+    const mode = touch ? (how[i] === "wait" ? "wait" : "skip") : how[i];
+    if (mode === "wait") await t.until(() => !M.now().turning, 20000, `the ${id} opener to end by itself`).catch(() => t.problem("bug", `${id}: didn't end by itself`));
+    else if (mode === "esc") { pressKey("Escape"); await sleep(250); }
+    else if (touch) await tapEl($("moment-cine-skip")); else await clickEl($("moment-cine-skip"));
+    await t.until(() => !M.now().turning, 2500, `the ${id} opener to end`).catch(() => t.problem("bug", `${id}: ${mode} didn't end it`));
+    const end = evs.filter((e) => e.moment === id && (e.action === "end" || e.action === "skip")).pop();
+    if (!end) { t.problem("bug", `${id}: no end event`); continue; }
+    const n = evs.filter((e) => e.moment === id && e.action === "line").length;
+    lines += n;
+    maxSecs = Math.max(maxSecs, end.seconds);
+    inside += end.insideFrames || 0;
+    if (end.seconds > 20.05) t.problem("bug", `${id}: ran ${end.seconds} s`);
+    if (end.insideFrames > 0) t.problem("bug", `${id}: the camera was inside geometry for ${end.insideFrames} of ${end.frames} frames`);
+    t.event(`${id}-end`, `${end.action} by ${end.via} after ${end.seconds} s, ${n} lines, camera inside ${end.insideFrames} of ${end.frames} frames`);
+    // skipping still starts the chapter's episode
+    await t.until(() => Ep.now() && Ep.now().id === first, 3000, `${first} to start after the opener`).catch(() => t.problem("bug", `${id}: the episode didn't start after the opener`));
+    Ep.end("api");
+    const sc = $("episode-score"); if (sc && !sc.hidden) { const ok = sc.querySelector("button.ok"); if (ok) ok.click(); }
+    t.progress((i + 1) / 5);
+    await sleep(500);
+  }
+  t.metric("chapterMaxSeconds", maxSecs);
+  t.metric("chapterCameraInsideFrames", inside);
+  t.metric("chapterLines", lines);
+  t.metric("chapterVoiceEvents", voice.length);
+  t.metric("chapterSkipMinY", Math.round(minSkipY));
+  t.event("chapter-summary", `5 openers, longest ${maxSecs} s, camera inside ${inside} frames, ${lines} lines, ${voice.length} voice events`);
+  t.finish();
+}
+
 /* ---------------- turning-moments: each episode's turning point plays as a staged, skippable moment ---------------- */
 // ?playtest=turning-moments ({"touch":true} or a 390x844 phone for the touch run). Setup shortcuts (named): each episode
 // started by its API, the Pressure meter topped up, and control.place putting him at the beat (the stick can't be driven
@@ -9342,6 +9454,7 @@ installPlaytest({
   scenarios: [
     { id: "charge-log-pause", title: "Charge vs Body Energy, Live log has no future rows, pause/scrub say Paused and hold the clock, resume continues in order", seconds: 70, tags: ["hud", "smoke"], description: "Load with ?playtest=charge-log-pause. Real input: Esc, Space, day bar scrub, Play/10x, Enter. Events live-log-clean / paused-status / paused-clock / coming-up / resumed / log-order / charge-bar / body-energy. Run at 1280x720 and 390x844." },
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
+    { id: "chapter-openers", title: "Chapter openers: each of the five chapters (The Sky, The Neighbours, The Long Drought, Storm Chasers, The Night Show) opens on a voiced in-engine scene of 20 s or less: the title in the sky (clouds or a billboard), a camera move clear of geometry, the motif, a He and Pilot exchange, one caption line, Skip in thumb reach, no text card", seconds: 300, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=chapter-openers ({\"touch\":true} for the phone run). Setup: earlier episodes marked finished, chapter-seen flags cleared. Real input: the Episodes button and each chapter's first row, Esc, a tap on Skip. Events chapter-<n>-start / -layout / -end, chapter-summary; metrics chapterMaxSeconds, chapterCameraInsideFrames, chapterLines, chapterSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "street-teaches", title: "The street teaches: after the cold open's bolt, Rain, Sun break, Fog and Wind each unlock on a neighbor's voiced ask (Birdie, Dex, Ines) with a cue on the target, a glow, a vibrate and a voiced thanks, and no text card", seconds: 330, tags: ["first-minute", "phone", "voice", "neighbors", "abilities"], description: "Load with ?playtest=street-teaches. Setup: every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate recorded. Real input: Play, the bolt's hold, then keys (taps on the thumb arc and the stick on a phone) to answer each neighbor in turn. Events street-ask / -unlock / -arc / -cast / -thanks / -done / -practice; metrics secondsToRain, secondsToSun, secondsToFog, secondsToWind, secondsToAllFive. Run at 1280x720 and 390x844 touch." },
@@ -9477,6 +9590,7 @@ installPlaytest({
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);
       else if (id === "turning-moments") await turningMoments(options, t);
+      else if (id === "chapter-openers") await chapterOpeners(options, t);
       else if (id === "score-ranks") await scoreRanks(options, t);
       else if (id === "episode-select") await episodeSelect(options, t);
       else if (id === "story-ending") await storyEnding(options, t);
