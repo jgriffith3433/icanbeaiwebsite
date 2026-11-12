@@ -274,7 +274,12 @@ export function episodeDone(best, id) {
 
 /** The playable episodes in menu order (the tutorial is always open and is not part of the chain). */
 export function chainOf(list) {
-  return (Array.isArray(list) ? list : []).filter((e) => e && e.id && !e.tutorial);
+  // the story's order is the chapters' (`ep.chapter`); inside a chapter, the list's own order
+  return (Array.isArray(list) ? list : [])
+    .filter((e) => e && e.id && !e.tutorial)
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => (a.e.chapter || 0) - (b.e.chapter || 0) || a.i - b.i)
+    .map((x) => x.e);
 }
 
 /** Why an episode is locked: the title of the episode before it that is not finished yet, or null when it is open.
@@ -425,6 +430,9 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
 .ep-menu .ep-list{max-height:min(60vh,520px);overflow:auto}
 .ep-panel .unlockline{margin:6px 0 0;font-size:.9rem;color:#9fd4ff;font-weight:700}
 .ep-menu .ep-row.chal{padding-left:24px;border-style:dashed}
+.ep-menu .ep-chapter{display:flex;flex-direction:column;gap:1px;margin:12px 2px 2px;padding:0 2px;color:#f6f1e8}
+.ep-menu .ep-chapter b{font:700 .72rem Outfit,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#7ec8ff}
+.ep-menu .ep-chapter small{font:italic 500 .95rem Fraunces,Georgia,serif;opacity:.85}
 .ep-menu .ep-row.chal[disabled]{opacity:.45;cursor:default}
 .ep-panel .bestline{font-size:0.82rem;color:rgba(246,241,232,.55)}
 .ep-ending .ep-panel{width:min(520px,100%)}
@@ -1651,7 +1659,34 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     cueJudge.textContent = S.judge || "";
     cueJudge.className = "cj " + (S.judgeKind || "");
   }
+  /* ---- chapter openers (js/moments.js `chapter`, config `arc`): the first start of any episode in a chapter plays
+     that chapter's opener first (once per player: localStorage icanbe.chapters); skipping it still starts the episode. ---- */
+  const CH_KEY = "icanbe.chapters";
+  const chapterList = () => (window.DAY_CONFIG && window.DAY_CONFIG.arc) || [];
+  const chapterOf = (id) => { const c = chapterList().find((x) => x.episodes.indexOf(id) >= 0); return c ? c.n : 0; };
+  function chaptersSeen() { try { return JSON.parse(localStorage.getItem(CH_KEY) || "[]"); } catch (e) { return []; } }
+  function chapterSeen(n) { const a = chaptersSeen(); if (a.indexOf(n) < 0) { a.push(n); try { localStorage.setItem(CH_KEY, JSON.stringify(a)); } catch (e) { /* private mode */ } } }
   function start(ep, via, opts) {
+    if (!ep) return false;
+    const n = chapterOf(ep.id);
+    if (n && !(opts && opts.noOpener) && chaptersSeen().indexOf(n) < 0 && day.moments && day.moments.chapter && day.moments.enabled && day.moments.enabled()) {
+      hideOffer();
+      hideMenu();
+      if (active) endQuiet();
+      if (ep.clock && day.jump) day.jump(ep.clock);
+      chapterSeen(n);
+      const played = day.moments.chapter(n, {
+        onEnd: (how, d) => {
+          // let-go or another moment replacing it means he didn't mean to start the episode
+          if (d && (d.via === "let-go" || d.via === "replaced")) return;
+          startNow(ep, via, Object.assign({}, opts, { noOpener: true }));
+        },
+      });
+      if (played) { mark("chapter", { chapter: n, id: ep.id }); return true; }
+    }
+    return startNow(ep, via, opts);
+  }
+  function startNow(ep, via, opts) {
     if (!ep) return false;
     if (opts && opts.challenge && !ep.tutorial) ep = challengeEp(ep, cfg.challenge);
     hideOffer();
@@ -1986,7 +2021,26 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   function showMenu() {
     const best = loadBest(storageKey);
     menuList.innerHTML = "";
-    list.forEach((ep) => {
+    // grouped by chapter: each chapter's name and line, then its episodes (the tutorial sits in the first)
+    const order = [];
+    chapterList().forEach((c) => {
+      const eps = list.filter((e) => e.chapter === c.n);
+      if (!eps.length) return;
+      order.push({ head: c });
+      eps.forEach((e) => order.push({ ep: e }));
+    });
+    list.filter((e) => !chapterOf(e.id)).forEach((e) => order.push({ ep: e }));
+    order.forEach((row) => {
+      if (row.head) {
+        const h = document.createElement("div");
+        h.className = "ep-chapter";
+        h.id = "ep-chapter-" + row.head.n;
+        h.dataset.chapter = String(row.head.n);
+        h.innerHTML = `<b>Chapter ${row.head.n} · ${row.head.title}</b><small>${row.head.line}</small>`;
+        menuList.appendChild(h);
+        return;
+      }
+      const ep = row.ep;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ep-row";
@@ -2414,6 +2468,9 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     },
     showEnding: (id) => showEnding(id || (loadArc().ending || {}).id),
     resetArc: () => saveBest(arcKey, { parts: {} }),
+    chapterSeen: () => chaptersSeen(),
+    resetChapters: () => { try { localStorage.removeItem(CH_KEY); } catch (e) { /* none */ } },
+    chapterOf,
   };
   day.episodes = api;
   window.episodes = api;

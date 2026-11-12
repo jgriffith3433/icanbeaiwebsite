@@ -1738,6 +1738,105 @@
       c.frames++;
       c.minClear = Math.min(c.minClear, pos.y - (surfaceAt ? surfaceAt(pos.x, pos.z) : 0));
       if (cineInside(pos)) c.inside++;
+      followChapterSign(tx, ty, tz, r, e);
+    }
+
+
+    /* js/moments.js's chapter openers: the chapter's title written in the world, never a card. A camera-facing sign
+       (billboard mode, front face only, vertex-order and scale all positive, so the words read the right way round)
+       hung at the cut-away camera's target: `kind` "cloud" = puffs of cloud that form the letters one by one, "billboard"
+       = a lit neon panel that flickers on. It scales to the screen (a 390 px-wide phone gets a narrower sign), so the
+       whole title is always in frame. `chapterSignK(k)` is how much of it has formed (0..1). */
+    let sign = null;
+    function setChapterSign(spec) {
+      if (sign) { sign.mesh.dispose(); sign.mat.dispose(); sign.tex.dispose(); sign = null; }
+      if (!spec || !spec.text) return false;
+      const W = 1024, H = 256;
+      const tex = new B.DynamicTexture("chapter-sign-tex", { width: W, height: H }, scene, true);
+      tex.hasAlpha = true;
+      const mat = new B.StandardMaterial("chapter-sign-mat", scene);
+      mat.disableLighting = true;
+      mat.emissiveTexture = tex;
+      mat.opacityTexture = tex;
+      mat.backFaceCulling = true;
+      mat.fogEnabled = false;
+      const w = spec.w || 16;
+      const mesh = B.MeshBuilder.CreatePlane("chapter-sign", { width: w, height: w / 4 }, scene);
+      mesh.material = mat;
+      mesh.billboardMode = B.Mesh.BILLBOARDMODE_ALL;
+      mesh.isPickable = false;
+      mesh.alphaIndex = 50;
+      mesh.isVisible = false; // placed on the first cut-away frame (followChapterSign)
+      const off = document.createElement("canvas");
+      off.width = W; off.height = H;
+      const o = off.getContext("2d");
+      const text = String(spec.text).toUpperCase();
+      let px = 200;
+      o.font = `800 ${px}px Outfit, system-ui, sans-serif`;
+      while (o.measureText(text).width > W * 0.9 && px > 40) { px -= 6; o.font = `800 ${px}px Outfit, system-ui, sans-serif`; }
+      o.textAlign = "center"; o.textBaseline = "middle"; o.fillStyle = "#fff";
+      o.fillText(text, W / 2, H / 2 + px * 0.04);
+      const puffs = [];
+      if (spec.kind !== "billboard") {
+        const d = o.getImageData(0, 0, W, H).data;
+        let seed = 7919;
+        const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+        for (let y = 4; y < H; y += 6) for (let x = 4; x < W; x += 6) if (d[(y * W + x) * 4 + 3] > 128) puffs.push({ x: x + (rnd() - 0.5) * 6, y: y + (rnd() - 0.5) * 6, r: 11 + rnd() * 11, o: rnd() });
+        puffs.sort((a, b) => a.o - b.o);
+      }
+      sign = { mesh, mat, tex, w, kind: spec.kind === "billboard" ? "billboard" : "cloud", k: 0, drawn: -1, text, px, puffs, off, W, H, formed: 0 };
+      paintChapterSign(0);
+      return true;
+    }
+    function paintChapterSign(k) {
+      const S = sign;
+      if (!S) return;
+      const step = S.kind === "cloud" ? Math.floor(S.puffs.length * Math.min(1, k)) : Math.round(Math.min(1, k) * 24);
+      const key = S.kind === "cloud" ? Math.floor(step / Math.max(1, S.puffs.length / 28)) : step;
+      if (key === S.drawn) return;
+      S.drawn = key;
+      const c = S.tex.getContext();
+      c.clearRect(0, 0, S.W, S.H);
+      if (S.kind === "cloud") {
+        const pass = (dy, rgb, a) => {
+          for (let i = 0; i < step; i++) {
+            const p = S.puffs[i];
+            const g = c.createRadialGradient(p.x, p.y + dy, 0, p.x, p.y + dy, p.r);
+            g.addColorStop(0, `rgba(${rgb},${a})`);
+            g.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = g;
+            c.fillRect(p.x - p.r, p.y + dy - p.r, p.r * 2, p.r * 2);
+          }
+        };
+        pass(5, "150,168,200", 0.55); // the cloud's shaded underside
+        pass(0, "255,255,255", 0.95);
+      } else {
+        const lit = step >= 24 || (step > 3 && step % 3 !== 1); // it flickers on, then holds
+        c.fillStyle = "rgba(8,12,24,0.9)";
+        c.fillRect(8, 24, S.W - 16, S.H - 48);
+        c.lineWidth = 6;
+        c.strokeStyle = lit ? "rgba(126,200,255,1)" : "rgba(60,90,120,0.6)";
+        c.strokeRect(14, 30, S.W - 28, S.H - 60);
+        c.font = `800 ${Math.round(S.px * 0.86)}px Outfit, system-ui, sans-serif`;
+        c.textAlign = "center"; c.textBaseline = "middle";
+        c.shadowColor = lit ? "rgba(126,200,255,1)" : "rgba(0,0,0,0)";
+        c.shadowBlur = lit ? 28 : 0;
+        c.fillStyle = lit ? "#eaf7ff" : "rgba(80,100,130,0.7)";
+        c.fillText(S.text, S.W / 2, S.H / 2 + S.px * 0.03);
+        c.shadowBlur = 0;
+      }
+      S.tex.update();
+    }
+    function followChapterSign(tx, ty, tz, dist, e) {
+      const S = sign;
+      if (!S) return;
+      S.mesh.position.set(tx, ty, tz);
+      const aspect = engine.getAspectRatio ? engine.getAspectRatio(camera) : 1.6;
+      const visW = 2 * Math.max(4, dist) * Math.tan(camera.fov / 2) * aspect;
+      const fit = Math.min(1.1, (0.82 * visW) / S.w);
+      const grow = 0.94 + 0.06 * Math.min(1, e * 3);
+      S.mesh.scaling.set(fit * grow, fit * grow, 1);
+      S.mesh.isVisible = true;
     }
 
     /* How far a camera at target + dir * r can sit before a building is in the way: a ray from the target
@@ -2602,6 +2701,9 @@
       officePower: (k) => { officePowerK = Math.max(0, Math.min(1, k)); return officePowerK; },
       officePowerNow: () => officePowerK,
       cineShot: setCineShot,
+      chapterSign: setChapterSign,
+      chapterSignK: (k) => { if (sign) { sign.k = k; paintChapterSign(k); } },
+      chapterSignInfo: () => (sign ? { kind: sign.kind, text: sign.text, k: sign.k, puffs: sign.puffs.length, scale: sign.mesh.scaling.x, w: sign.w, position: [sign.mesh.position.x, sign.mesh.position.y, sign.mesh.position.z] } : null),
       cineOn: () => !!cine,
       cameraInside,
       cineInfo: () => (cine ? { frames: cine.frames, inside: cine.inside, minClear: cine.minClear, t: cine.t } : cineLast),
