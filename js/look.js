@@ -589,6 +589,10 @@ export function installLook(world) {
   let lastSnow = -1;
   let lastIbl = -1;
   let lastLow = null;
+  let smoothExp = 0.94;
+  let smoothFog = 0.0045;
+  let lastHourLook = null;
+  let scrubUntil = 0;
   scene.fogMode = B.Scene.FOGMODE_EXP2;
 
   function weightsNow() {
@@ -646,8 +650,24 @@ export function installLook(world) {
     w.dusk /= s;
     w.night /= s;
     const defaultExp = 0.94 * w.day + 0.85 * w.dusk + 0.78 * w.night;
-    const exposure = override && override.exposure != null ? override.exposure : defaultExp;
-    const fogDensity = override && override.fogDensity != null ? override.fogDensity : 0.0045 + w.night * 0.0038 + w.dusk * 0.0015;
+    const defaultFog = 0.0045 + w.night * 0.0038 + w.dusk * 0.0015;
+    // Weather overrides (lightning flash, storm) snap; only the clock's own exposure/fog crossfades on a scrub.
+    const hourNow = clockHour();
+    const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (lastHourLook != null) {
+      let dh = Math.abs(hourNow - lastHourLook);
+      if (dh > 12) dh = 24 - dh;
+      if (dh > 0.05) scrubUntil = nowMs + 1400;
+    }
+    lastHourLook = hourNow;
+    const eng = scene.getEngine && scene.getEngine();
+    const dt = Math.min(0.1, ((eng && eng.getDeltaTime ? eng.getDeltaTime() : 16) / 1000));
+    const tau = nowMs < scrubUntil ? 0.7 : 0.25;
+    const k = 1 - Math.exp(-dt / tau);
+    smoothExp += (defaultExp - smoothExp) * k;
+    smoothFog += (defaultFog - smoothFog) * k;
+    const exposure = override && override.exposure != null ? override.exposure : smoothExp;
+    const fogDensity = override && override.fogDensity != null ? override.fogDensity : smoothFog;
     if (pipeline && pipeline.imageProcessing) {
       const safeExp = Math.abs(exposure - 1) < 1e-4 ? 1.0002 : exposure;
       const ipc = pipeline.imageProcessing.imageProcessingConfiguration;

@@ -1056,7 +1056,8 @@ export function installCrowd(world) {
       put(mHead, i, p.x + Math.sin(p.yaw) * lean * 1.6 + hx, y + (1.58 + (looking ? 0.05 * rk : 0)) * h, p.z + Math.cos(p.yaw) * lean * 1.6 + hz, p.yaw, p.scale, h);
       const lk = looks[i];
       const near = !cam || (Math.abs(p.x - cam.x) < 45 && Math.abs(p.z - cam.z) < 45);
-      const lod = quality === "low" ? near && (!cam || Math.abs(p.x - cam.x) < 25) : near;
+      // Keep hair/bags in to 32 m on low so nothing pops inside the 30 m seamless-transition bar.
+      const lod = quality === "low" ? near && (!cam || Math.abs(p.x - cam.x) < 32) : near;
       const hw = lk.girth;
       if (lk.bald || !lod) hide(mHair, i);
       else put(mHair, i, p.x + Math.sin(p.yaw) * lean * 1.6 + hx - Math.sin(p.yaw) * 0.02, y + (lk.hairLong ? 1.6 : 1.63) * h, p.z + Math.cos(p.yaw) * lean * 1.6 + hz - Math.cos(p.yaw) * 0.02, p.yaw, p.scale, h * (lk.hairLong ? 0.9 : 0.62));

@@ -1231,10 +1231,18 @@ export function startScore(dayApi) {
     duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + 3200;
   });
 
-  // Heroic sting when the player takes him.
+  // Heroic sting + whoosh when the player takes him; whoosh again on let-go (pairs with the camera blend).
   window.addEventListener("day:control", (ev) => {
     const d = (ev && ev.detail) || {};
-    if (d.action === "take") sting();
+    if (d.action === "take") { sting(); whoosh(); }
+    else if (d.action === "let-go") whoosh();
+  });
+  // Loading card → title crane: arm the beds under the fade when Sound is already on.
+  window.addEventListener("day:loading", (ev) => {
+    const d = (ev && ev.detail) || {};
+    if ((d.action === "handoff" || d.action === "done") && soundOn()) {
+      try { unlock(); } catch (e) { /* needs a gesture on some browsers */ }
+    }
   });
 
   const api = {
