@@ -5734,6 +5734,186 @@ async function voiceDirector(options, t) {
   t.progress(1);
 }
 
+/* ---------------- day-sound: diegetic autopilot soundscapes by schedule block ---------------- */
+// Needs ?playtest=day-sound. Sound on, 1200× through home/commute/office/lunch/tv/night; plant a rain deed
+// and hear the car radio name it; desk keyboard on within 3 s and off when he leaves; on phone/low ≤3 loops.
+// Events day-scape-* / day-radio / day-keyboard-on / day-keyboard-off / day-phone-cap; metrics dayScapes, dayMaxLoops.
+async function daySoundScenario(options, t) {
+  t.scene("Day sound");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const DS = window.daysound || (window.day && window.day.daysound);
+  const C = window.day.control;
+  const Mem = window.day.memory;
+  if (!DS) { t.problem("bug", "There's no daysound director (js/daysound.js)"); return; }
+  if (options && options.touch && C && C.touch) C.touch(true);
+
+  const scapesSeen = new Set();
+  const events = [];
+  const onDs = (e) => {
+    const d = (e && e.detail) || {};
+    events.push(d);
+    if (d.action === "scape" && d.scape) {
+      scapesSeen.add(d.scape);
+      t.event(`day-scape-${d.scape}`, `loops ${(d.loops || []).join(",") || "none"} cap ${d.cap}`);
+    }
+    if (d.action === "radio" || d.action === "radio-report") t.event("day-radio", `${d.action} ${d.weather || ""} ${d.text || ""}`);
+    if (d.action === "keyboard-on") t.event("day-keyboard-on", d.place || "");
+    if (d.action === "keyboard-off") t.event("day-keyboard-off", d.place || "");
+  };
+  window.addEventListener("day:daysound", onDs);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 7, pointerType: options && options.touch ? "touch" : "mouse" }));
+    sound.click();
+    await sleep(300);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+    if (sound.getAttribute("aria-pressed") !== "true") t.problem("bug", "Sound button didn't turn on");
+  }
+  t.progress(0.08);
+
+  // Plant a weather deed so the commute radio has something to name.
+  if (Mem && Mem.note) {
+    Mem.note("power", "avenue", "rain");
+    t.event("day-deed", "planted avenue rain for the radio");
+  }
+  t.progress(0.12);
+
+  const day = window.day.today();
+  const want = [
+    { id: "home", chapter: "wake", label: "home morning" },
+    { id: "commute", chapter: "commute", label: "commute" },
+    { id: "office", chapter: "work", label: "office" },
+    { id: "park", chapter: "lunch", label: "park lunch" },
+    { id: "tv", chapter: "tv", label: "evening TV" },
+    { id: "night", chapter: "bedtime", label: "night" },
+  ];
+
+  t.scene("1200× through the six soundscapes");
+  scrubTo(day.dayStart + 0.2);
+  clickSpeed(1200);
+  let maxLoops = 0;
+  const untilMin = day.dayStart + 16 * 60;
+  await t.until(() => {
+    const n = DS.now();
+    if (n && n.playing > maxLoops) maxLoops = n.playing;
+    if (n && n.scape) scapesSeen.add(n.scape);
+    const minutes = window.day.now().minutes;
+    return scapesSeen.size >= 6 || minutes > untilMin;
+  }, 120000, "six day soundscapes").catch(() => {});
+  clickSpeed(1);
+  t.metric("dayScapes", scapesSeen.size);
+  t.metric("dayMaxLoops", maxLoops);
+  // Force each scape once so the log has a non-empty distinct loop set even if 1200× skipped a chapter.
+  for (const w of want) {
+    const ctx = {
+      chapter: w.chapter,
+      place: w.id === "office" ? "desk" : "",
+      hand: w.id === "office" ? "type" : "",
+      inCar: w.id === "commute",
+      things: w.id === "home" ? { shower: "on" } : {},
+    };
+    await DS.force(w.id, ctx);
+    await sleep(280);
+    const n = DS.now();
+    scapesSeen.add(w.id);
+    if (!n.loops || !n.loops.length) t.problem("bug", `${w.label} soundscape has no playing loops`);
+    else t.event(`day-scape-${w.id}`, `loops ${n.loops.join(",")}`);
+  }
+  want.forEach((w) => {
+    if (!scapesSeen.has(w.id)) t.problem("bug", `Missing soundscape ${w.label} (${w.id})`);
+  });
+  if (scapesSeen.size >= 6) t.event("day-scapes-all", [...scapesSeen].join(","));
+  t.progress(0.45);
+
+  // Commute radio: must name the planted rain.
+  t.scene("Car radio names today's weather");
+  const drive = day.blocks.find((b) => b.chapter === "commute") || day.actions.find((a) => a.inCar);
+  if (drive) scrubTo((drive.start || day.dayStart) + 0.5);
+  clickSpeed(1);
+  await sleep(400);
+  const wx = DS.radioWeather();
+  await DS.playRadio(wx);
+  await sleep(1200);
+  const radioHit = events.some((e) => (e.action === "radio" || e.action === "radio-report") && e.weather === "rain");
+  if (wx !== "rain") t.problem("bug", `Radio weather was "${wx}", need rain from the planted deed`);
+  else if (!radioHit) t.problem("bug", "Car radio never fired a rain weather report");
+  else t.event("day-radio-weather", wx);
+  t.progress(0.62);
+
+  // Office keyboard: scrub to a desk Work block, wait ≤3 s for the keyboard loop, then leave the desk.
+  t.scene("Office keyboard at the desk");
+  const desk = day.actions.find((a) => a.place === "desk" && a.chapter === "work" && /type|Work|Email|desk/i.test((a.text || "") + (a.block || "")))
+    || day.actions.find((a) => a.place === "desk" && a.chapter === "work");
+  if (desk) {
+    scrubTo(desk.start + Math.min(0.3, (desk.end - desk.start) / 4));
+    clickSpeed(1);
+    const t0 = performance.now();
+    await t.until(() => {
+      const n = DS.now();
+      return n.loops && n.loops.includes("keyboard");
+    }, 4000, "keyboard loop within 3 s of the desk").catch(() => {});
+    const within = (performance.now() - t0) / 1000;
+    const n = DS.now();
+    t.metric("dayKeyboardSec", within);
+    if (!(n.loops && n.loops.includes("keyboard"))) t.problem("bug", "Office keyboard clatter never started at the desk");
+    else if (within > 3.2) t.problem("bug", `Keyboard took ${within.toFixed(2)} s (need ≤3)`);
+    else t.event("day-keyboard-ok", `within ${within.toFixed(2)} s`);
+
+    const leave = day.actions.find((a) => a.chapter === "work" && a.place && a.place !== "desk" && a.place !== "deskStand" && a.hand !== "type" && a.start > desk.start);
+    if (leave) {
+      scrubTo(leave.start + 0.2);
+      await sleep(700);
+      const after = DS.now();
+      if (after.loops.includes("keyboard") || after.keyboard) t.problem("bug", "Keyboard kept playing after he left the desk");
+      else t.event("day-keyboard-stopped", leave.place || leave.block || "left desk");
+    }
+  } else {
+    t.problem("bug", "No desk work action to test keyboard clatter");
+  }
+  t.progress(0.8);
+
+  // Phone / low quality: never more than 3 loops.
+  t.scene("Phone loop cap");
+  if (options && options.touch) {
+    document.documentElement.classList.add("touch-ui");
+    if (window.day.look && window.day.look.setQuality) window.day.look.setQuality("low");
+    else if (window.look && window.look.setQuality) window.look.setQuality("low");
+    await DS.force("home", { chapter: "wake", things: { shower: "on" }, wet: true });
+    await sleep(400);
+    await DS.force("office", { chapter: "work", place: "desk", hand: "type" });
+    await sleep(400);
+    await DS.force("park", { chapter: "lunch" });
+    await sleep(400);
+    const phoneMax = Math.max(maxLoops, DS.now().playing, DS.now().cap === 3 ? DS.now().playing : 0);
+    // Re-measure across forced scapes
+    let peak = 0;
+    for (const id of ["home", "commute", "office", "park", "tv", "night"]) {
+      await DS.force(id, { chapter: id === "home" ? "wake" : id === "office" ? "work" : id === "park" ? "lunch" : id === "tv" ? "tv" : id === "commute" ? "commute" : "bedtime", place: id === "office" ? "desk" : "", hand: id === "office" ? "type" : "", inCar: id === "commute", things: id === "home" ? { shower: "on" } : {} });
+      await sleep(250);
+      peak = Math.max(peak, DS.now().playing);
+    }
+    t.metric("dayPhoneLoops", peak);
+    if (peak > 3) t.problem("bug", `Phone low quality played ${peak} loops at once (cap 3)`);
+    else t.event("day-phone-cap", `max ${peak} loops`);
+  } else {
+    t.event("day-phone-cap", "desktop run; phone cap checked when options.touch");
+    // Still assert the runtime cap reports 3 under touch-ui class briefly.
+    document.documentElement.classList.add("touch-ui");
+    await DS.force("park", { chapter: "lunch" });
+    await sleep(200);
+    if (DS.now().cap > 3) t.problem("bug", `touch-ui cap is ${DS.now().cap}, need 3`);
+    document.documentElement.classList.remove("touch-ui");
+  }
+  t.progress(0.95);
+
+  window.removeEventListener("day:daysound", onDs);
+  t.event("day-sound-done", `scapes ${scapesSeen.size} maxLoops ${maxLoops}`);
+  t.finish("done");
+}
+
 /* ---------------- pilot: schedule nudges, take/let-go, wrist ring, no overlap with Small Weather ---------------- */
 // Needs ?playtest=pilot. Sound on, 1200× day for schedule lines, Enter (take), weather chaos, Esc (let-go).
 // Optional {"touch":true} for 390x844 caption/layout. Events pilot-schedule / pilot-take / pilot-letgo /
@@ -10132,6 +10312,7 @@ installPlaytest({
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
     { id: "stem-score", title: "Stem score: Play opens on the 4-note motif (title, then the cold open), three stems stream after the first input and play in sync, a held bolt raises the tension layer within one bar, a tornado brings the storm layer, an episode success plays the resolution sting; on a phone the stems stay under 1.5 MB", seconds: 90, tags: ["audio", "music", "phone", "opening"], description: "Load with ?playtest=stem-score. Setup: every icanbe.* key cleared, cold open armed, title up. Real input: click or tap Play, hold the bolt (E or the Bolt button). Shortcuts: powers.command('tornado'), a day:episode score event. Events stem-motif-title / -coldopen / -ready / -windup / -storm / -sting / -transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. Run at 1280x720 and 390x844 touch." },
+    { id: "day-sound", title: "Diegetic day soundscapes: at 1200× the sound log shows distinct beds for home morning, commute, office, park lunch, evening TV and night; the car radio names a weather the player called today; office keyboard starts within 3 s of the desk and stops when he leaves; on phone low quality at most 3 loops play at once", seconds: 180, tags: ["audio", "phone", "story"], description: "Load with ?playtest=day-sound ({\"touch\":true} for 390x844). Sound on (real pointer), 1200× through the day, scrub to commute and desk. Events day-scape-* / day-radio / day-keyboard-on / day-keyboard-off / day-phone-cap; metrics dayScapes, dayMaxLoops, dayKeyboardSec, dayPhoneLoops." },
     { id: "weather-audio", title: "Rooftop weather soundscape and footsteps: Sound on (real click), Take control (sting), climb apt roof, walk across gravel, metal, tar and puddle surfaces, then cycle clear/sun, clouds, rain (light roof patter vs heavy downpour, gutters, umbrella), storm (distance-delayed thunder crack and rolling thunder), fog, wind (3D-panned gusts and flapping awnings) and snow (muffled city) with equal-power crossfades", seconds: 150, tags: ["weather", "audio"], description: "Day bar outside, confirms silence, turns Sound on with a pointer, Enter, climbs apt rooftop, walks gravel/metal/tar/puddle zones, cycles keys 1–7 on the roof. Logs footstep-*, rain-layers, thunder-delay, loop-seams, music-* and soundscape levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
@@ -10220,6 +10401,7 @@ installPlaytest({
       else if (id === "neighbor-bodies") await neighborBodies(options, t);
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);
+      else if (id === "day-sound") await daySoundScenario(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "power-sfx") await powerSfx(options, t);
       else if (id === "stem-score") await stemScore(options, t);

@@ -616,6 +616,92 @@ window.DAY_CONFIG = {
      leave the procedural weather noise in place. Sound stays off until the
      Sound button (browser autoplay). Wind reuses the clear bed.
      ------------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------------
+     DAY SOUND — diegetic loops for the autopilot day (js/daysound.js)
+     ------------------------------------------------------------------------
+     Six soundscapes switched by schedule chapter: home (wake/ready), commute,
+     office (work), park (lunch atmosphere), tv (evening), night (computer/
+     bedtime/sleep). Sources sit at named spots. Phone/low: only the current
+     scape's files load, at most 3 loops at once. Car radio: a 20 s jingle then
+     a short weather report that names a weather from day.memory.facts.
+     Files from Hawkes Gen audio.sfx / audio.voice under audio/daysound/; null
+     paths (or a 404) fall back to a short synth bed of the same id.
+     ------------------------------------------------------------------------ */
+  daysound: {
+    fade: 0.7,
+    mix: 0.55,
+    radioDelay: 4.2,
+    radioEvery: 160,
+    /* file: null until the Gen clip is in audio/daysound/ (a named missing file 404s). Recipes: sfx-day-*. */
+    jingle: null, // "audio/daysound/radio-jingle.mp3"
+    landmarks: {
+      fountain: [118, 26],
+      parkBench: [-2, 44],
+      pond: [8, 48],
+    },
+    reports: {
+      storm: { text: "Weather desk: storms called in over the district. Stay off the roofs.", file: null },
+      rain: { text: "Weather desk: rain over the west avenue today. Umbrellas out.", file: null },
+      fog: { text: "Weather desk: thick fog rolling through the plaza and avenue.", file: null },
+      wind: { text: "Weather desk: high winds on the avenue. Secure loose signs.", file: null },
+      sun: { text: "Weather desk: sun breaks cutting through this afternoon.", file: null },
+      bolt: { text: "Weather desk: lightning strikes reported near the shop and Tank.", file: null },
+      clear: { text: "Weather desk: quiet skies so far. We'll keep watching.", file: null },
+    },
+    scapes: {
+      home: {
+        label: "Apartment morning",
+        layers: [
+          { id: "fridge-hum", file: null, at: "fridge", vol: 0.35 },
+          { id: "kettle-coffee", file: null, at: "counter", vol: 0.4 },
+          { id: "shower", file: null, at: "shower", vol: 0.45, when: "shower" },
+          { id: "rain-window", file: null, at: "livingWindow", vol: 0.38, when: "rain" },
+        ],
+      },
+      commute: {
+        label: "Car cabin",
+        layers: [
+          /* Cabin stays on for the whole commute chapter so the scape is never silent between walks to the car. */
+          { id: "car-cabin", file: null, at: "parkHome", vol: 0.5 },
+          { id: "car-wipers", file: null, at: "parkHome", vol: 0.35, when: "rain" },
+        ],
+      },
+      office: {
+        label: "Office floor",
+        layers: [
+          { id: "hvac", file: null, at: "desk", vol: 0.28 },
+          { id: "keyboard", file: null, at: "desk", vol: 0.48, when: "desk" },
+          { id: "meeting", file: null, at: "meetSeat", vol: 0.32, when: "meeting" },
+          { id: "coffee-machine", file: null, at: "deskStand", vol: 0.3 },
+        ],
+      },
+      park: {
+        label: "Park lunch",
+        layers: [
+          { id: "fountain", file: null, at: "fountain", vol: 0.4 },
+          { id: "kids", file: null, at: "parkBench", vol: 0.34 },
+          { id: "ducks", file: null, at: "pond", vol: 0.32 },
+        ],
+      },
+      tv: {
+        label: "Evening TV",
+        layers: [
+          { id: "tv-muffled", file: null, at: "couch", vol: 0.42 },
+          { id: "fridge-hum", file: null, at: "fridge", vol: 0.22 },
+          { id: "rain-window", file: null, at: "livingWindow", vol: 0.3, when: "rain" },
+        ],
+      },
+      night: {
+        label: "Night quiet",
+        layers: [
+          { id: "clock-tick", file: null, at: "bed", vol: 0.28 },
+          { id: "distant-traffic", file: null, at: "livingWindow", vol: 0.3 },
+          { id: "far-train", file: null, at: "aptRoof", vol: 0.26 },
+        ],
+      },
+    },
+  },
+
   score: {
     fade: 2.8,
     /* The mix, in one place (js/score.js). master: everything the score plays; music: the beds; ambience:

@@ -1212,6 +1212,8 @@ export function startScore(dayApi) {
     equalPowerGains,
     /** js/stems.js: the music bus and context (null until Sound is on and unlocked), and the beds' level (0 = muted). */
     bus: () => (ctx && musicBus ? { ctx, bus: musicBus, unlocked, on: soundOn() } : null),
+    /** js/daysound.js: the ambience bus (rain/city and diegetic day loops), once Sound has unlocked the graph. */
+    ambienceBus: () => (ctx && ambBus ? { ctx, bus: ambBus, unlocked, on: soundOn() } : null),
     bedLevel: (k) => { bedGoal = Math.max(0, Math.min(1, Number(k))); live.bedLevel = bedGoal; return bedGoal; },
     usingSamples: () => live.samples,
     bedFor: (state, hour) => bedFor(state, hour == null ? simHour() : hour),

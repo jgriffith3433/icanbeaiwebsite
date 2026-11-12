@@ -1231,6 +1231,97 @@
    }
   },
   {
+   "id": "sfx-day-soundscapes",
+   "note": "Diegetic autopilot-day loops (js/daysound.js): apartment, car, office, park lunch, evening TV, night. Seamless 8 s beds, mono, ≤200 KB each under audio/daysound/.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Diegetic day soundscape loops for Small Weather's apartment, car, office, park and night",
+      "duration": 8,
+      "loop": true,
+      "crossfade": 1,
+      "format": "mp3_22050_32",
+      "variants": [
+       "quiet apartment refrigerator hum low steady buzz seamless loop no music",
+       "kitchen electric kettle boiling then coffee drip soft steam seamless loop no music",
+       "bathroom shower water spray on tile soft steam seamless loop no music",
+       "muffled television programme dialogue and ads through a living room wall soft distant seamless loop no music",
+       "rain tapping gently on a closed apartment window pane soft indoor perspective seamless loop no music",
+       "car cabin road rumble low engine hum from inside a sedan seamless loop no music",
+       "car cabin windshield wipers rhythmic soft rubber swipe in light rain seamless loop no music",
+       "office open-plan soft keyboard typing clatter mid distance seamless loop no music",
+       "office conference room murmured meeting voices soft distant seamless loop no music",
+       "office coffee machine brew gurgle and drip short ambient loop no music",
+       "office HVAC air duct hum steady soft seamless loop no music",
+       "city park kids playing distant cheerful voices and laughter seamless loop no music",
+       "plaza fountain water splashing soft mid distance seamless loop no music",
+       "park pond ducks soft quacks and water paddle seamless loop no music",
+       "quiet bedroom analog clock soft tick tock close seamless loop no music",
+       "distant city night traffic soft whoosh far away seamless loop no music",
+       "far train horn and rumble across a quiet night city soft distant seamless loop no music"
+      ]
+     }
+    }
+   ],
+   "files": {
+    "fridge": "audio/daysound/fridge-hum.mp3",
+    "kettle": "audio/daysound/kettle-coffee.mp3",
+    "shower": "audio/daysound/shower.mp3",
+    "tv": "audio/daysound/tv-muffled.mp3",
+    "rainWindow": "audio/daysound/rain-window.mp3",
+    "cabin": "audio/daysound/car-cabin.mp3",
+    "wipers": "audio/daysound/car-wipers.mp3",
+    "keyboard": "audio/daysound/keyboard.mp3",
+    "meeting": "audio/daysound/meeting.mp3",
+    "coffeeMachine": "audio/daysound/coffee-machine.mp3",
+    "hvac": "audio/daysound/hvac.mp3",
+    "kids": "audio/daysound/kids.mp3",
+    "fountain": "audio/daysound/fountain.mp3",
+    "ducks": "audio/daysound/ducks.mp3",
+    "clock": "audio/daysound/clock-tick.mp3",
+    "traffic": "audio/daysound/distant-traffic.mp3",
+    "train": "audio/daysound/far-train.mp3"
+   }
+  },
+  {
+   "id": "sfx-day-radio-jingle",
+   "note": "20 s car-radio station jingle bed under the weather report (js/daysound.js commute).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "short upbeat local radio station jingle sting with soft synth beds and a cheerful station ID bed under 20 seconds, instrumental only, no voice, no lyrics",
+      "duration": 20,
+      "loop": false,
+      "format": "mp3_22050_32"
+     }
+    }
+   ],
+   "files": {
+    "jingle": "audio/daysound/radio-jingle.mp3"
+   }
+  },
+  {
+   "id": "voice-day-radio-weather",
+   "note": "Car radio weather desk lines that name the weather the player called today (js/daysound.js). Calm mid adult announcer; one clip per weather.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Weather desk: rain over the west avenue today. Umbrellas out.",
+      "description": "Calm mid adult radio weather announcer, warm station voice, clear diction",
+      "direction": "calm radio weather read, slight smile",
+      "provider": "open",
+      "format": "mp3_22050_32"
+     }
+    }
+   ],
+   "files": {
+    "rain": "audio/daysound/radio-wx-rain.mp3"
+   }
+  },
+  {
    "id": "mat-brick",
    "note": "Red brick for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/brick-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and brick-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
    "steps": [
