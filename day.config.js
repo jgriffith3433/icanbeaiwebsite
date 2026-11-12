@@ -104,7 +104,16 @@ window.DAY_CONFIG = {
   dayStart: "7:30", // the day (and the timeline) begins here; the night before ends here
   seed: "date", // "date" = a different but repeatable day every date. Any other text = always the same day.
   start: { at: "bed", car: "parkHome" },
-  sky: { sunrise: "7:05", sunset: "18:25" }, // mid-October // where the person and the car are when the day begins
+  sky: {
+    sunrise: "7:05", sunset: "18:25",
+    // Painted equirect skies (Hawkes Gen image.panorama, recipes sky-*): js/sky.js crossfades them by the clock; storm comes in with the cover.
+    // yaw turns the picture so the night's painted moon sits to the right of the default eastward view.
+    yaw: 0.215,
+    panoramas: {
+      dawn: "textures/sky/sky-dawn.webp", noon: "textures/sky/sky-noon.webp", golden: "textures/sky/sky-golden.webp",
+      dusk: "textures/sky/sky-dusk.webp", night: "textures/sky/sky-night.webp", storm: "textures/sky/sky-storm.webp",
+    },
+  }, // mid-October // where the person and the car are when the day begins
 
   person: {
     name: "Small Weather", // shown in the side panel; he/him in every line below

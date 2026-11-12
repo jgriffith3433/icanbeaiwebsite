@@ -20,6 +20,7 @@ import "./weather.js"; // the day's forecast, and the weather he commands while 
 import "./score.js"; // weather music beds, sampled ambience, take-control sting (after weather)
 import "./stems.js"; // the stem score under control: one 4-note motif, three synced layers, stings (after score.js)
 import "./render-pipeline.js"; // the picture: ACES, a grade LUT per hour and weather, emissive bloom, SSAO2, cascaded shadows (after weather: it follows weather.now())
+import "./sky.js"; // the sky: painted panoramas by the clock, a cloud deck, Sun break god rays, sky reflections (after look, weather and the pipeline)
 import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyline curtains, window runnels, drips, lens drops, height fog (after weather)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
 import "./windfog.js"; // wind and fog you can see: a shader bend, ribbons, leaves, flags, cloth, umbrellas, ground-fog slices (after powers, weather, crowd)

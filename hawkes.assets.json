@@ -7062,6 +7062,120 @@
    "files": {
     "audio": "audio/pilot/pilot-chapter-5.mp3"
    }
+  },
+  {
+   "id": "sky-dawn",
+   "note": "Sky panorama 'dawn' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_f759c8039a5a.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, clear dawn: pale peach and rose glow low on the eastern horizon fading to soft teal then clear light blue overhead, a few thin pink streak clouds, calm and open, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1101
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-dawn.webp"
+   }
+  },
+  {
+   "id": "sky-noon",
+   "note": "Sky panorama 'noon' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_d02e73c29d0e.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, bright clear noon: saturated blue sky, big soft white cumulus clouds scattered all around, high sun, haze at the horizon, readable and bright, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1102
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-noon.webp"
+   }
+  },
+  {
+   "id": "sky-golden",
+   "note": "Sky panorama 'golden' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_05b83316878d.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, golden hour: low warm sun glowing orange gold in the west, long amber lit clouds, blue sky turning to peach near the horizon, rays of warm light, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1103
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-golden.webp"
+   }
+  },
+  {
+   "id": "sky-dusk",
+   "note": "Sky panorama 'dusk' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_627f3b36350e.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, dusk: deep navy and violet overhead, amber and electric blue band at the horizon, dramatic dark clouds edged with magenta and orange light, cinematic, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1104
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-dusk.webp"
+   }
+  },
+  {
+   "id": "sky-night",
+   "note": "Sky panorama 'night' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_047d360d1234.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, starry night: deep navy black sky full of crisp stars and a faint milky way band, a bright full moon with soft glow on the right side, a few wispy dark clouds, faint blue glow at the horizon, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1105
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-night.webp"
+   }
+  },
+  {
+   "id": "sky-storm",
+   "note": "Sky panorama 'storm' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_2ba334579597.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, storm shelf cloud: a huge dark arcus shelf cloud rolling across the whole sky, slate grey and teal green underside, heavy rain curtains in the distance, a thin bright gap of pale light low at the horizon, ominous, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1106
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-storm.webp"
+   }
   }
  ]
 }

@@ -441,6 +441,30 @@ export function installLook(world) {
           uniform vec3 horizonColor;
           uniform vec3 skyTint;
           uniform vec4 weather;
+          uniform sampler2D pano0;
+          uniform sampler2D pano1;
+          uniform sampler2D pano2;
+          uniform sampler2D pano3;
+          uniform sampler2D pano4;
+          uniform sampler2D pano5;
+          uniform vec3 panoA;   // weights of dawn, noon, golden
+          uniform vec3 panoB;   // weights of dusk, night, storm
+          uniform vec2 panoOn;  // x: painted skies loaded (0..1), y: yaw of the picture (turns)
+
+          // The painted skies are equirect: one sample per lit panorama, no mipmaps (the atan wrap can't show a seam line).
+          vec3 panoSky(vec3 dir, float lift) {
+            float u = fract(atan(dir.x, dir.z) / 6.2831853 + 0.5 + panoOn.y);
+            float v = clamp(0.5 + asin(clamp(dir.y, -1.0, 1.0)) / 3.14159265 + lift, 0.0, 1.0);
+            vec2 uv = vec2(u, v);
+            vec3 c = vec3(0.0);
+            if (panoA.x > 0.002) c += texture2D(pano0, uv).rgb * panoA.x;
+            if (panoA.y > 0.002) c += texture2D(pano1, uv).rgb * panoA.y;
+            if (panoA.z > 0.002) c += texture2D(pano2, uv).rgb * panoA.z;
+            if (panoB.x > 0.002) c += texture2D(pano3, uv).rgb * panoB.x;
+            if (panoB.y > 0.002) c += texture2D(pano4, uv).rgb * panoB.y;
+            if (panoB.z > 0.002) c += texture2D(pano5, uv).rgb * panoB.z;
+            return c;
+          }
 
           float hash2(vec2 p) {
             vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -488,7 +512,14 @@ export function installLook(world) {
 
             sky = mix(sky, skyTint * 0.88, cover * 0.65);
 
-            if (up > 0.01) {
+            float painted = panoOn.x;
+            if (painted > 0.001) {
+              // the painted sky, with the same horizon lift as the procedural one so the two cross-fade without a jump
+              vec3 pc = panoSky(dir, 0.0);
+              sky = mix(sky, pc, painted);
+            }
+
+            if (up > 0.01 && painted < 0.999) {
               vec2 cloudUv = dir.xz / (up + 0.38) * 1.6 + vec2(t * 0.018, t * 0.008);
               float n = fbm2(cloudUv);
               float thresh = mix(0.58, 0.25, cover);
@@ -499,10 +530,10 @@ export function installLook(world) {
               vec3 cCol = mix(cLight, cStorm, cover * 0.85);
               float rim = smoothstep(0.48, 0.72, n) * (storm * 0.35 + flash * 0.75);
               cCol += vec3(0.35, 0.68, 1.0) * rim;
-              sky = mix(sky, cCol, cMask * (0.35 + cover * 0.55));
+              sky = mix(sky, cCol, cMask * (0.35 + cover * 0.55) * (1.0 - painted));
             }
 
-            if (weights.z > 0.25 && up > 0.15 && cover < 0.75) {
+            if (weights.z > 0.25 && up > 0.15 && cover < 0.75) { // twinkle sits on the painted stars too
               vec2 starCell = floor(dir.xz / (up + 0.25) * 90.0);
               float s = hash2(starCell);
               if (s > 0.9965) {
@@ -511,13 +542,17 @@ export function installLook(world) {
               }
             }
 
-            float horBlend = smoothstep(-0.04, 0.22, h);
+            // the horizon: the sky meets the fog's colour over a band of sky, never a line (a painted sky is blended lower, so its glow stays)
+            float horBlend = smoothstep(-0.04, mix(0.22, 0.12, painted), h);
             vec3 finalCol = mix(horizonColor, sky, horBlend);
+            // a lightning flash lights the whole dome a little
+            finalCol += vec3(0.30, 0.42, 0.62) * flash * (0.25 + 0.5 * cover) * smoothstep(0.0, 0.5, h + 0.1);
             gl_FragColor = vec4(finalCol, 1.0);
           }`,
       }, {
         attributes: ["position"],
-        uniforms: ["worldViewProjection", "weights", "horizonColor", "skyTint", "weather"],
+        uniforms: ["worldViewProjection", "weights", "horizonColor", "skyTint", "weather", "panoA", "panoB", "panoOn"],
+        samplers: ["pano0", "pano1", "pano2", "pano3", "pano4", "pano5"],
       });
       skyMat.backFaceCulling = false;
       skyMat.disableDepthWrite = false;
@@ -525,6 +560,9 @@ export function installLook(world) {
       skyMat.setVector3("horizonColor", new B.Vector3(0.5, 0.62, 0.74));
       skyMat.setVector3("skyTint", new B.Vector3(0.5, 0.62, 0.74));
       skyMat.setVector4("weather", new B.Vector4(0, 0, 0, 0));
+      skyMat.setVector3("panoA", new B.Vector3(0, 0, 0));
+      skyMat.setVector3("panoB", new B.Vector3(0, 0, 0));
+      skyMat.setVector2("panoOn", new B.Vector2(0, 0)); // js/sky.js loads the painted skies, fills the samplers and turns this on
       // Big enough that the farthest skyline towers (about 400 m out) stand in front of it, inside camera.maxZ (600).
       dome = B.MeshBuilder.CreateSphere("skyDome", { diameter: 1100, segments: 24 }, scene);
       dome.material = skyMat;
@@ -786,6 +824,9 @@ export function installLook(world) {
   scene.metadata = scene.metadata || {};
   scene.metadata.dayLook = api;
   if (typeof document !== "undefined") api.surfaces = installSurfaces(api, scene); // Gen PBR sets, once the page is up
+  api.skyDome = dome; // js/sky.js: the painted panoramas, cloud deck, god rays and the sky's reflections hang off these
+  api.skyMat = skyMat;
+  api.override = () => override;
   world.look = api;
   if (window.day) window.day.look = api;
   return api;
