@@ -1288,6 +1288,7 @@ export function startWeather(world, dayApi) {
         storm: L.lightning,
         wind: L.wind,
         flash,
+        sun: sunK, // js/sky.js: the Sun break's gap in the cloud deck and its god rays
       });
     } else if (pipeline && pipeline.imageProcessing) {
       const safeExp = Math.abs(targetExp - 1.0) < 1e-4 ? 0.9999 : targetExp;

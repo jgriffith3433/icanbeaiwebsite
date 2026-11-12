@@ -2682,6 +2682,125 @@ async function renderGrade(options, t) {
   t.progress(1);
 }
 
+/* ---------------- sky-cast: five painted skies by the clock, the storm shelf, Sun break's god rays, each strike lighting the deck ---------------- */
+// Setup shortcuts (named): the day bar to each hour (scrubTo), control.place onto the apt roof, a full Charge, and on the phone
+// control.touch + low quality. Everything else is real input: Take control (Enter / a tap), a camera drag up at the sky, E or the
+// Lightning slot, X or the Sun break slot. It reads day.sky.info() (the weights, what loaded, the gap, the god-ray post, the deck's
+// lit frames) and counts frames itself.
+async function skyCast(options, t) {
+  const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  t.scene("Apt roof, looking up");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.sky && window.day.control && window.day.weather && window.day.look, 8000, "the sky (js/sky.js)");
+  const S = window.day.sky, C = window.day.control, W = window.day.weather, P = window.powers || window.day.powers;
+  const refill = () => { if (P && P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  window.day.title && window.day.title.quiet && window.day.title.quiet();
+  if (touch) { try { window.day.look.quality("low"); } catch (e) { /* */ } if (C.touch) C.touch(true); }
+  scrubTo(12 * 60);
+  await sleep(500);
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  C.place(-21, 0.5, 1.5708, { from: 14, alpha: 4.1, beta: 1.15, radius: 11 });
+  await sleep(700);
+  // look up at the sky: drag the camera (one finger on the right half on a phone)
+  const world = window.day.world();
+  const canvas = world.engine.getRenderingCanvas();
+  const rect = canvas.getBoundingClientRect();
+  const cam = world.scene.activeCamera;
+  const pitch = () => (cam.getForwardRay ? cam.getForwardRay(1).direction.y : 0);
+  async function drag(dy) {
+    const x = rect.left + rect.width * (touch ? 0.78 : 0.5), y0 = rect.top + rect.height * 0.5, id = touch ? 31 : 1;
+    const mk = (type, y) => new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, pointerId: id, pointerType: touch ? "touch" : "mouse", isPrimary: true });
+    canvas.dispatchEvent(mk("pointerdown", y0));
+    for (let i = 1; i <= 8; i++) { canvas.dispatchEvent(mk("pointermove", y0 + (dy * i) / 8)); await sleep(30); }
+    canvas.dispatchEvent(mk("pointerup", y0 + dy));
+    await sleep(250);
+  }
+  const p0 = pitch();
+  await drag(-170);
+  if (pitch() < p0 - 0.02) await drag(340);
+  t.event("camera-pitch", `forward y ${p0.toFixed(2)} -> ${pitch().toFixed(2)}`);
+  const i0 = S.info();
+  t.event("sky-start", `${i0.quality}: ${i0.files.length} painted skies listed, ${i0.loaded.length} loaded, deck ${i0.deck.mode} (${i0.deck.layers} layers), god rays ${i0.godRays.supported ? "supported" : "unsupported"}, reflections ${i0.ibl.on ? "on" : "off"}`);
+  if (!i0.enabled) t.problem("bug", "js/sky.js has no dome to dress (look.skyDome)");
+  if (i0.files.length < 6) t.problem("bug", `Only ${i0.files.length} of the 6 painted skies are listed in day.config.js sky.panoramas`);
+  if (!i0.ibl.on) t.problem("bug", "The sky isn't the scene's environment texture (no reflections of it)");
+  if (touch && i0.deck.mode !== "planes") t.problem("bug", `The phone's cloud deck is ${i0.deck.mode}, expected 2 planes`);
+  if (touch && i0.deck.layers !== 2) t.problem("bug", `The phone draws ${i0.deck.layers} cloud layers, expected 2`);
+  t.progress(0.1);
+
+  // five times of day, five painted skies
+  const tops = [];
+  for (const [label, minutes] of [["06:30", 6 * 60 + 30], ["12:00", 12 * 60], ["17:25", 17 * 60 + 25], ["19:00", 19 * 60], ["23:00", 23 * 60]]) {
+    t.scene("Sky at " + label);
+    scrubTo(minutes);
+    await t.until(() => { const i = S.info(); return i.loaded.length && i.painted > 0.9; }, 9000, "the painted sky to fade in").catch(() => {});
+    await sleep(1600);
+    const i = S.info();
+    const top = Object.keys(i.weights).sort((a, b) => i.weights[b] - i.weights[a])[0];
+    tops.push(top);
+    t.event("sky-" + label.replace(":", ""), `${label}: ${top} (${i.weights[top].toFixed(2)}), painted ${i.painted}, loaded ${i.loaded.join("/")}`);
+    if (i.painted < 0.9) t.problem("bug", `${label}: the painted sky isn't showing (painted ${i.painted}, loaded ${i.loaded.join("/") || "none"})`);
+    t.progress(0.1 + 0.1 * tops.length);
+  }
+  if (new Set(tops).size < 5) t.problem("bug", `The five hours show only ${new Set(tops).size} distinct skies: ${tops.join(", ")}`);
+  t.event("sky-distinct", `${new Set(tops).size} distinct painted skies: ${tops.join(", ")}`);
+
+  // Storm: the shelf cloud, a darker, thicker deck, each strike lights the deck from inside
+  t.scene("Dusk, a Storm");
+  scrubTo(19 * 60);
+  await sleep(1200);
+  refill();
+  const strikes0 = S.info().deck.strikes;
+  if (touch) await tapEl($("ability-bolt")); else await tapKey("e");
+  let seen = 0;
+  const frames = [];
+  const obs = world.scene.onAfterRenderObservable.add(() => frames.push(S.info().deck.flash));
+  await sleep(2600);
+  await t.until(() => S.info().weights.storm > 0.5, 6000, "the storm shelf cloud").catch(() => {});
+  world.scene.onAfterRenderObservable.remove(obs);
+  const iS = S.info();
+  const lit = (() => { let best = 0, run = 0; for (const v of frames) { if (v > 0.45) { run++; best = Math.max(best, run); } else run = 0; } return best; })();
+  seen = iS.deck.strikes - strikes0;
+  t.event("sky-storm", `storm weight ${iS.weights.storm.toFixed(2)}, ${seen} strike(s), deck lit ${lit} frame(s) in a row from inside, flash now ${iS.deck.flash}`);
+  if (seen < 1) t.problem("bug", "A Lightning cast didn't reach the cloud deck (no day:strike)");
+  if (lit < 3) t.problem("bug", `A strike lit the cloud deck for only ${lit} frame(s) (needs 3)`);
+  t.metric("sky.deckLitFrames", lit);
+  if (iS.weights.storm < 0.5) t.problem("bug", `The storm shelf cloud isn't showing (weight ${iS.weights.storm.toFixed(2)})`);
+  await sleep(1500);
+
+  // Sun break: a gap and god rays within 2 s
+  t.scene("Sun break");
+  scrubTo(17 * 60 + 25);
+  W.set("clear", 1, "api");
+  await sleep(1200);
+  refill();
+  const tCast = performance.now();
+  if (touch) await tapEl($("ability-sunbreak")); else await tapKey("x");
+  let gapAt = -1, raysAt = -1;
+  while (performance.now() - tCast < 4000) {
+    await sleep(80);
+    const i = S.info();
+    if (gapAt < 0 && i.gap > 0.5) gapAt = (performance.now() - tCast) / 1000;
+    if (raysAt < 0 && i.godRays.on) raysAt = (performance.now() - tCast) / 1000;
+    if (gapAt >= 0 && (touch || raysAt >= 0)) break;
+  }
+  const iG = S.info();
+  t.event("sky-sunbreak", `gap ${iG.gap} open in ${gapAt < 0 ? ">4" : gapAt.toFixed(1)} s; god rays ${touch ? "not built on low quality (post " + iG.godRays.made + " made)" : raysAt < 0 ? "never on" : "on in " + raysAt.toFixed(1) + " s"}`);
+  if (gapAt < 0 || gapAt > 2) t.problem("bug", `Sun break opened a gap in ${gapAt < 0 ? "more than 4" : gapAt.toFixed(1)} s (needs 2 s or less)`);
+  if (touch) { if (iG.godRays.made || iG.godRays.on) t.problem("bug", "The phone built the god-ray pass (low quality has none)"); }
+  else if (raysAt < 0 || raysAt > 2) t.problem("bug", `God rays ${raysAt < 0 ? "never showed" : "took " + raysAt.toFixed(1) + " s"} (needs 2 s or less)`);
+  t.metric("sky.godRaysSec", raysAt < 0 ? 4 : Math.round(raysAt * 10) / 10);
+  await sleep(2500); // hold it: the footage shows the shafts
+
+  // frame rate with the sky up
+  const fps = await fpsWindow(4000);
+  t.metric(touch ? "phone.fpsAvg" : "sky.fpsAvg", Math.round(fps.avg * 10) / 10);
+  t.event("sky-fps", `${touch ? "phone" : "desktop"} ${S.info().quality}: ${fps.avg.toFixed(0)} fps (min ${fps.min.toFixed(0)}) with the deck${touch ? " and no god-ray pass" : " and god rays"}`);
+  if (touch && fps.avg < 30) t.problem("bug", `The phone averages ${fps.avg.toFixed(1)} fps with the sky (needs 30)`);
+  t.progress(1);
+}
+
 /* ---------------- look: the city at noon, dusk and night, then the phone quality setting ---------------- */
 // Day bar to the sidewalk (setup), then real keys walk him in front of a block. Scrub holds the clock
 // (a scrub leaves the day paused) so the three times stay put for the shot. The quality button is a real click.
@@ -9494,6 +9613,7 @@ installPlaytest({
     { id: "camera-run", title: "Third-person camera: a two-minute walk, climb and cast run (the avenue, the stair, the apartment roof and its parapets, all five verbs and a Tornado) with the camera never inside a building or the ground, never turning over 180 deg/s, framing him and the cast's target together for 1 s or more; taking control blends in; by touch a right-half drag looks and it recentres behind him within 3 s", seconds: 170, tags: ["control", "feel", "phone", "camera"], description: "Load with ?playtest=camera-run ({\"touch\":true} for the phone run). Setup: the day bar beside the car, a full Charge. Real input: Enter, WASD with Shift up the stair and round the roof, mouse drags (one a full-width flick), E R V C X and a held V for the Tornado; by touch a tap on Take control, the stick, one-finger drags on the left and right halves, a tap on Bolt. Events control-taken / take-blend / on-the-roof / cast-framed-<power> / left-half-drag / right-half-drag / recentred / camera-stats; metrics cameraInsideFrames, cameraMaxYawDegPerSec, castFramed.<power>, recentreSeconds. Run at 1280x720 and 390x844 touch." },
     { id: "wet-materials", title: "Wet materials: Rain makes brick, asphalt and roofs darker and glossy within 3 s and they dry back within 60 s; on phone 512 maps", seconds: 90, tags: ["weather", "phone", "look"], description: "Day bar beside the car (setup), Enter / Take control tap, control.place on the apartment roof (setup), tap R / #ability-rain. Events surfaces-set / wet-on / wet-dry. Option {\"touch\":true} for 390x844 low quality." },
     { id: "wind-fog", title: "Wind and fog you can see: a Gust shows ribbons, 10+ swirling leaves and papers, bending trees, flapping awnings and flags, a walker's umbrella flips; Fog rolls ground-fog slices into the street within 5 s and fades the skyline; on a phone, vertex shaders only, 2 slices, fps ≥ 30", seconds: 75, tags: ["powers", "phone", "feel"], description: "Takes control at lunch, stands on the plaza, taps Wind (V / #ability-wind) for a Gust, then Fog (C / #ability-fog). Events wind-gust / wind-ribbons / wind-leaves / wind-bend / wind-cloth / wind-umbrella / fog-cast / fog-roll / fog-skyline / fog-lights / fog-fps. Option {\"touch\":true} for 390x844 low quality by touch." },
+    { id: "sky-cast", title: "The sky: five times of day show five painted skies, a Storm brings the shelf cloud and each Lightning strike lights the cloud deck from inside for 3+ frames, Sun break opens a gap with god rays inside 2 s; on phone low quality has the panorama and 2 cloud planes, no god-ray pass, 30 fps", seconds: 70, tags: ["weather", "powers", "phone", "feel"], description: "Day bar to each hour (setup), Enter / Take control tap, control.place on the apartment roof (setup), drag the camera up at the sky, E / #ability-bolt, X / #ability-sunbreak. Events sky-start / sky-0630 / sky-1200 / sky-1725 / sky-1900 / sky-2300 / sky-distinct / sky-storm / sky-sunbreak / sky-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "rain-cast", title: "Heavy rain: a Rain cast shows velocity-stretched streaks, splashes on the roof and his shoulders, ripples in puddles, 5+ lens drops sliding when the camera looks up, and distant curtains in a plaza storm; on phone at most 4000 streaks, no lens drops, fps ≥ 30", seconds: 60, tags: ["powers", "weather", "phone", "feel"], description: "Day bar beside the car (setup), Sound on, Enter / Take control tap, control.place on the apartment roof (setup), drag the camera level, tap R / #ability-rain. Then weather.set storm and control.place on the plaza (setup) for the curtains. Events rain-cast / rain-streaks / rain-splashes / rain-ripples / rain-lens / rain-curtains / rain-fog / rain-phone / rain-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
@@ -9557,6 +9677,7 @@ installPlaytest({
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "render-grade") await renderGrade(options, t);
+      else if (id === "sky-cast") await skyCast(options, t);
       else if (id === "photos") await photos(options, t);
       else if (id === "fill-out") await fillOut(options, t);
       else if (id === "city-audit") await cityAudit(options, t);
