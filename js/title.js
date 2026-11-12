@@ -69,7 +69,8 @@ export function startTitle() {
 .title-screen button.play:hover{background:#f6d39b;transform:translateY(-1px)}
 .title-screen .row button{flex:0 1 auto}
 .title-screen button[aria-pressed="false"]{color:rgba(246,241,232,.6)}
-.title-screen .hint{font-size:.78rem;color:rgba(246,241,232,.55);min-height:1.1em}
+.title-screen .hint{font-size:.88rem;font-weight:600;letter-spacing:.04em;color:#f6f1e8;min-height:1.1em;padding:6px 14px;border-radius:999px;background:rgba(10,13,22,.62);text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .hint:empty{display:none}
 .title-screen .tset{width:min(92vw,360px);margin:0;padding:10px;border-radius:16px;background:rgba(10,13,22,.82);border:1px solid rgba(246,241,232,.22);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .title-screen .tset[hidden]{display:none}
 .title-screen .tset .settings-pop{position:static;margin:0;padding:0;align-items:stretch}
