@@ -128,6 +128,35 @@ export function installSlice(day, world) {
     sfx("lift");
     emit("pigeons", { why });
   };
+  /** Bring pigeons back to a perch (bandstand rail, or fly them onto the apt roof after a Sun-break clearing). */
+  const land = (why) => {
+    const APT = { x: -24, y: 12.35, z: 0.5 };
+    let n = 0;
+    pigeons.forEach((p, i) => {
+      if (why === "aftermath") {
+        const a = (i / pigeons.length) * Math.PI * 2;
+        p.fromX = p.root.position.x;
+        p.fromY = Math.max(p.root.position.y, 3);
+        p.fromZ = p.root.position.z;
+        p.hx = APT.x + Math.cos(a) * 2.4;
+        p.hz = APT.z + Math.sin(a) * 2.4;
+        p.homeY = APT.y;
+        p.fly = 0;
+        p.landHome = true;
+        n++;
+      } else if (p.fly >= 0) {
+        p.root.position.set(p.hx, p.homeY != null ? p.homeY : 3.0, p.hz);
+        p.fly = -1;
+        n++;
+      }
+    });
+    if (n) {
+      st.landed = (st.landed || 0) + n;
+      sfx("blip");
+      emit("pigeons-land", { why, n });
+    }
+    return n;
+  };
 
   const me = () => (day.control && day.control.mode() === "control" ? day.control.state() : null);
   let t = 0;
@@ -151,13 +180,29 @@ export function installSlice(day, world) {
     if (t > nextRipple) { nextRipple = t + 6; emit("ripple", {}); }
     // pigeons
     pigeons.forEach((p) => {
+      const homeY = p.homeY != null ? p.homeY : 3.0;
       if (p.fly >= 0) {
         p.fly += dt;
-        p.root.position.x += p.vx * dt * 6;
-        p.root.position.z += p.vz * dt * 6;
-        p.root.position.y += (p.fly < 1.2 ? 4 : -0.2) * dt;
-        if (p.fly > 14) { p.root.position.set(p.hx, 3.0, p.hz); p.fly = -1; }
-      } else p.root.position.y = 3.0 + Math.sin(t * 2 + p.a) * 0.01 + (Math.sin(t * 0.7 + p.a * 3) > 0.96 ? 0.03 : 0);
+        if (p.landHome) {
+          // arc toward the roof perch (Sun-break aftermath)
+          const u = Math.min(1, p.fly / 3.2);
+          const ease = u * u * (3 - 2 * u);
+          const loft = Math.sin(u * Math.PI) * 4.5;
+          p.root.position.x = p.fromX + (p.hx - p.fromX) * ease;
+          p.root.position.z = p.fromZ + (p.hz - p.fromZ) * ease;
+          p.root.position.y = p.fromY + (homeY - p.fromY) * ease + loft;
+          if (u >= 1) {
+            p.root.position.set(p.hx, homeY, p.hz);
+            p.fly = -1;
+            p.landHome = false;
+          }
+        } else {
+          p.root.position.x += p.vx * dt * 6;
+          p.root.position.z += p.vz * dt * 6;
+          p.root.position.y += (p.fly < 1.2 ? 4 : -0.2) * dt;
+          if (p.fly > 14) { p.root.position.set(p.hx, homeY, p.hz); p.fly = -1; }
+        }
+      } else p.root.position.y = homeY + Math.sin(t * 2 + p.a) * 0.01 + (Math.sin(t * 0.7 + p.a * 3) > 0.96 ? 0.03 : 0);
     });
     const s = me();
     if (s) {
@@ -208,8 +253,9 @@ export function installSlice(day, world) {
   });
 
   const api = {
-    now: () => ({ ...st, pigeons: pigeons.filter((p) => p.fly < 0).length }),
+    now: () => ({ ...st, pigeons: pigeons.filter((p) => p.fly < 0).length, landed: st.landed || 0 }),
     scatter,
+    land,
     setLawn,
     setTomatoes,
   };

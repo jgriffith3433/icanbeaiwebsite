@@ -5226,6 +5226,129 @@ async function rainCast(options, t) {
   t.progress(1);
 }
 
+/* ---------------- sun-aftermath: Rain then Sun break → steam, rainbow at 42°, drips, umbrellas fold, pigeons land ---------------- */
+// Setup: day bar to lunch (sidewalks full), control.place on the avenue near the shop. Real input: Take control,
+// Rain (R / #ability-rain), wait for umbrellas, Sun break (X / #ability-sunbreak). Reads day.aftermath.info(),
+// rain.afterLeft / drips, crowd.umbrellasClosed, slice pigeons. Option {"touch":true} for 390x844 low quality + fps.
+async function sunAftermath(options, t) {
+  const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  t.scene("Avenue after rain");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.aftermath && window.day.control && window.day.weather && window.day.rain, 8000, "aftermath (js/aftermath.js)");
+  const A = window.day.aftermath;
+  const C = window.day.control;
+  const W = window.day.weather;
+  const R = window.day.rain;
+  const P = window.powers || window.day.powers;
+  const crowd = window.day.crowd;
+  window.day.title && window.day.title.quiet && window.day.title.quiet();
+  if (touch) { try { window.day.look.quality("low"); } catch (e) { /* */ } if (C.touch) C.touch(true); }
+  // Mid-morning: Dex is on the shop stoop (stops at 7–11.4), sidewalks alive
+  scrubTo(9.2 * 60);
+  clickSpeed(1);
+  await sleep(600);
+  const sound = $("sound");
+  if (sound && !/on/i.test(sound.textContent || "")) { sound.click(); await sleep(120); }
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  // Shop stoop: Dex's ask spot, within the 28 m neighbor range
+  if (C.place) C.place(46, 9.8, Math.PI / 2, { from: 12, alpha: 4.0, beta: 1.05, radius: 10 });
+  await sleep(500);
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  t.event("aftermath-ready", `quality ${window.day.look.quality()}, touch ${touch}, clock ${window.day.now().minutes}`);
+  t.progress(0.1);
+
+  // Rain first so the street is wet and umbrellas are up
+  if (touch) await tapEl($("ability-rain")); else await tapKey("r");
+  await t.until(() => (W.now().rain || 0) > 0.35, 6000, "rain on the street");
+  // Mark wet on the aftermath clock in case a frame hasn't yet (setup aid; rain was cast by real input)
+  if (A.markWet) A.markWet();
+  let umbPeak = 0;
+  const tRain = performance.now();
+  while (performance.now() - tRain < 3500) {
+    await sleep(250);
+    if (crowd) umbPeak = Math.max(umbPeak, crowd.info().umbrellas || 0);
+    if (A.markWet) A.markWet();
+  }
+  t.event("aftermath-rain", `umbrellas ${umbPeak}, roofWet ${(W.now().roofWet || 0).toFixed(2)}, lastWet ${A.info().lastWetMin}`);
+  if (umbPeak < 3) t.problem("warning", `Only ${umbPeak} umbrellas up before the clear (want 3+)`);
+  t.progress(0.25);
+
+  // Sun break within the wet window
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await sleep(200);
+  const castAt = performance.now();
+  if (touch) await tapEl($("ability-sunbreak")); else await tapKey("x");
+  await t.until(() => A.active && A.active(), 4000, "aftermath starts").catch(() => {});
+  let steamAt = -1, rainbowAt = -1;
+  let closedAt = -1, birdsAt = -1, dripMax = 0, dripLiveAt20 = 0, neighborAt = -1;
+  // First 15 s: steam, rainbow, umbrellas, birds; keep sampling drips through 20 s
+  while (performance.now() - castAt < 21000) {
+    await sleep(200);
+    const elapsed = (performance.now() - castAt) / 1000;
+    const i = A.info();
+    const ri = R.info();
+    const ci = crowd ? crowd.info() : {};
+    dripMax = Math.max(dripMax, ri.drips || 0);
+    if (steamAt < 0 && ((i.steam || 0) > 0.15 || (i.steamLive || 0) > 2 || (W.now().steam || 0) > 0.15)) steamAt = elapsed;
+    if (rainbowAt < 0 && (i.rainbowOn || (i.rainbow || 0) > 0.08)) rainbowAt = elapsed;
+    const closedNow = Math.max(i.umbrellasClosed || 0, ci.umbrellasClosed || 0, umbPeak - (ci.umbrellas || 0));
+    if (closedAt < 0 && closedNow >= 3) closedAt = elapsed;
+    const birdsNow = Math.max(i.birdsLanded || 0, (window.day.slice && window.day.slice.now && window.day.slice.now().landed) || 0);
+    if (birdsAt < 0 && birdsNow >= 1) birdsAt = elapsed;
+    if (neighborAt < 0 && (i.neighborSaid || false)) neighborAt = elapsed;
+    if (elapsed >= 20 && dripLiveAt20 === 0) dripLiveAt20 = Math.max(ri.drips || 0, (ri.afterLeft || 0) > 0 ? 1 : 0);
+  }
+  const i1 = A.info();
+  const umbsNow = crowd ? crowd.info().umbrellas : 0;
+  const closed = Math.max(i1.umbrellasClosed || 0, (crowd && crowd.info().umbrellasClosed) || 0, umbPeak - umbsNow);
+  const birds = Math.max(i1.birdsLanded || 0, (window.day.slice && window.day.slice.now && window.day.slice.now().landed) || 0);
+
+  t.metric("aftermathSteamSec", steamAt < 0 ? 99 : Math.round(steamAt * 100) / 100);
+  t.metric("aftermathRainbowSec", rainbowAt < 0 ? 99 : Math.round(rainbowAt * 100) / 100);
+  t.metric("aftermathAngleDeg", i1.angleDeg || 42);
+  t.metric("aftermathDrips", dripMax);
+  t.metric("aftermathDripLive20", dripLiveAt20);
+  t.metric("aftermathUmbrellasClosed", closed);
+  t.metric("aftermathBirdsLanded", birds);
+  t.metric("aftermathUmbrellaSec", closedAt < 0 ? 99 : Math.round(closedAt * 100) / 100);
+  t.metric("aftermathBirdSec", birdsAt < 0 ? 99 : Math.round(birdsAt * 100) / 100);
+
+  if (steamAt < 0 || steamAt > 3) t.problem("bug", `Steam after Sun break took ${steamAt < 0 ? ">3" : steamAt.toFixed(2)} s (want within 3 s)`);
+  else t.event("aftermath-steam", `steam in ${steamAt.toFixed(2)} s (live ${i1.steamLive}, weather ${(W.now().steam || 0).toFixed(2)})`);
+  if (rainbowAt < 0 || rainbowAt > 3) t.problem("bug", `Rainbow after Sun break took ${rainbowAt < 0 ? ">3" : rainbowAt.toFixed(2)} s (want within 3 s)`);
+  else t.event("aftermath-rainbow", `rainbow in ${rainbowAt.toFixed(2)} s at ${i1.angleDeg}° (alpha ${(i1.rainbow || 0).toFixed(2)})`);
+  t.progress(0.45);
+
+  if (dripMax < 1 || dripLiveAt20 < 1) t.problem("bug", `Gutters didn't keep dripping (peak live ${dripMax}, still at 20 s: ${dripLiveAt20}; afterLeft ${R.info().afterLeft})`);
+  else t.event("aftermath-drips", `live drips peak ${dripMax}, still dripping at 20 s`);
+  t.progress(0.6);
+
+  if (closed < 3 || (closedAt >= 0 && closedAt > 15) || closedAt < 0) {
+    t.problem("bug", `Umbrellas: closed ${closed} (peak ${umbPeak} → ${umbsNow}) at ${closedAt < 0 ? ">15" : closedAt.toFixed(1)} s (want ≥3 within 15 s)`);
+  } else t.event("aftermath-umbrellas", `${closed} walkers closed their umbrellas in ${closedAt.toFixed(1)} s`);
+  if (birds < 1 || (birdsAt >= 0 && birdsAt > 15) || birdsAt < 0) {
+    t.problem("bug", `Pigeons: landed ${birds} at ${birdsAt < 0 ? ">15" : birdsAt.toFixed(1)} s (want ≥1 within 15 s)`);
+  } else t.event("aftermath-birds", `${birds} pigeons landed on a roof in ${birdsAt.toFixed(1)} s`);
+  if (i1.neighborSaid || neighborAt >= 0) t.event("aftermath-dex", `Dex said his dry-parcels thanks at ${(neighborAt < 0 ? 0 : neighborAt).toFixed(1)} s`);
+  else t.problem("warning", "Dex didn't voice his dry-parcels thanks (is he within 28 m on the stoop?)");
+  t.progress(0.8);
+
+  if (touch) {
+    const fp = await fpsWindow(4500);
+    t.metric("aftermathPhoneFpsAvg", Math.round(fp.avg * 10) / 10);
+    const mid = A.info();
+    if (!(mid.rainbowOn || mid.rainbow > 0.05) && mid.rainbowLeft <= 0) t.problem("warning", "Rainbow already faded on the phone sample");
+    if ((mid.budgets && mid.budgets.steam > 50)) t.problem("bug", `Phone steam budget ${mid.budgets.steam} (want half of desktop)`);
+    if (fp.avg < 30) t.problem("bug", `Phone aftermath fps averaged ${fp.avg.toFixed(1)} (want >= 30)`);
+    else t.event("aftermath-fps", `${fp.avg.toFixed(1)} fps avg at low quality; steam budget ${mid.budgets && mid.budgets.steam}, drips ${mid.budgets && mid.budgets.drips}, rainbow on`);
+  } else {
+    t.event("aftermath-done", `steam ${steamAt.toFixed(2)} s, rainbow ${rainbowAt.toFixed(2)} s, drips ${dripMax}, closed ${closed}, birds ${birds}`);
+  }
+  t.progress(1);
+}
+
 /* ---------------- lightning-bolt: the forked bolt, its flash, afterimage, scorch and crowd flinch ---------------- */
 // Real input: Take control (Enter, or a tap on the button on a phone), walk to the avenue, then tap/press Lightning
 // (touch: pointer events on #ability-bolt). Per frame it records the cast frame time, the forks and re-strikes (times
@@ -10321,6 +10444,7 @@ installPlaytest({
     { id: "wind-fog", title: "Wind and fog you can see: a Gust shows ribbons, 10+ swirling leaves and papers, bending trees, flapping awnings and flags, a walker's umbrella flips; Fog rolls ground-fog slices into the street within 5 s and fades the skyline; on a phone, vertex shaders only, 2 slices, fps ≥ 30", seconds: 75, tags: ["powers", "phone", "feel"], description: "Takes control at lunch, stands on the plaza, taps Wind (V / #ability-wind) for a Gust, then Fog (C / #ability-fog). Events wind-gust / wind-ribbons / wind-leaves / wind-bend / wind-cloth / wind-umbrella / fog-cast / fog-roll / fog-skyline / fog-lights / fog-fps. Option {\"touch\":true} for 390x844 low quality by touch." },
     { id: "sky-cast", title: "The sky: five times of day show five painted skies, a Storm brings the shelf cloud and each Lightning strike lights the cloud deck from inside for 3+ frames, Sun break opens a gap with god rays inside 2 s; on phone low quality has the panorama and 2 cloud planes, no god-ray pass, 30 fps", seconds: 70, tags: ["weather", "powers", "phone", "feel"], description: "Day bar to each hour (setup), Enter / Take control tap, control.place on the apartment roof (setup), drag the camera up at the sky, E / #ability-bolt, X / #ability-sunbreak. Events sky-start / sky-0630 / sky-1200 / sky-1725 / sky-1900 / sky-2300 / sky-distinct / sky-storm / sky-sunbreak / sky-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "rain-cast", title: "Heavy rain: a Rain cast shows velocity-stretched streaks, splashes on the roof and his shoulders, ripples in puddles, 5+ lens drops sliding when the camera looks up, and distant curtains in a plaza storm; on phone at most 4000 streaks, no lens drops, fps ≥ 30", seconds: 60, tags: ["powers", "weather", "phone", "feel"], description: "Day bar beside the car (setup), Sound on, Enter / Take control tap, control.place on the apartment roof (setup), drag the camera level, tap R / #ability-rain. Then weather.set storm and control.place on the plaza (setup) for the curtains. Events rain-cast / rain-streaks / rain-splashes / rain-ripples / rain-lens / rain-curtains / rain-fog / rain-phone / rain-fps. Option {\"touch\":true} for 390x844 low quality." },
+    { id: "sun-aftermath", title: "Sun break after rain: steam off wet roofs and a rainbow at 42° within 3 s, gutters drip for 20+ s, at least 3 walkers close umbrellas and pigeons land on a roof; on phone half steam/drips, rainbow on, fps ≥ 30", seconds: 70, tags: ["powers", "weather", "phone", "feel", "crowd"], description: "Day bar to lunch (setup), Sound on, Enter / Take control tap, control.place by the shop (setup), tap R then X (or #ability-rain / #ability-sunbreak). Events aftermath-rain / -steam / -rainbow / -drips / -umbrellas / -birds / -fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
@@ -10411,6 +10535,7 @@ installPlaytest({
       else if (id === "wind-fog") await windFog(options, t);
       else if (id === "tornado-plaza") await tornadoPlaza(options, t);
       else if (id === "rain-cast") await rainCast(options, t);
+      else if (id === "sun-aftermath") await sunAftermath(options, t);
       else if (id === "wet-materials") await wetMaterials(options, t);
       else if (id === "lightning-bolt") await lightningBolt(options, t);
       else if (id === "camera-run") await cameraRun(options, t);

@@ -162,6 +162,7 @@ export function createWeather(opt) {
   let puddleLevel = 0; // 0..1 smooth puddle growth and drying
   let steam = 0; // 0..1 short steam wisp off wet roofs as sun/clear dries them
   let steamLeft = 0;
+  let steamHold = 0; // aftermath can hold steam for ~20 s (js/aftermath.js boostSteam)
   let wasRainWet = false;
   let snowCover = 0; // 0..1 snow layer accumulation on upward faces, melts afterwards
 
@@ -182,6 +183,7 @@ export function createWeather(opt) {
     const sunny = target === "clear" || sun > 0.05;
     if (snap) {
       steamLeft = 0;
+      steamHold = 0;
       steam = 0;
       roofWet = L.wet;
       puddleLevel = L.rain > 0.15 ? L.wet : 0;
@@ -204,9 +206,11 @@ export function createWeather(opt) {
         steamLeft = Math.max(steamLeft, 2.5);
         wasRainWet = false;
       }
+      if (steamHold > 0) steamHold = Math.max(0, steamHold - dtPos);
       if (steamLeft > 0) steamLeft = Math.max(0, steamLeft - dtPos);
-      const dryingRoof = sunny && !raining && (roofWet > 0.06 || steamLeft > 0.15);
-      const steamGoal = dryingRoof ? Math.min(1, Math.max(roofWet * 1.35, steamLeft * 0.45)) : 0;
+      const dryingRoof = sunny && !raining && (roofWet > 0.06 || steamLeft > 0.15 || steamHold > 0.1);
+      const holdK = steamHold > 0 ? Math.min(1, 0.55 + steamHold / 20) : 0;
+      const steamGoal = dryingRoof ? Math.min(1, Math.max(roofWet * 1.35, steamLeft * 0.45, holdK)) : 0;
       const steamTau = steamGoal > steam ? 0.24 : 0.55;
       steam += (steamGoal - steam) * (1 - Math.exp(-dtPos / steamTau));
       if (steam < 0.005) steam = 0;
@@ -325,7 +329,14 @@ export function createWeather(opt) {
     return true;
   }
 
-  return { set, sunbreak, step, follow, now, look, blendSec, holdSec };
+  /** Hold the drying steam wisp for `sec` real seconds (Sun-break aftermath). */
+  function boostSteam(sec) {
+    const s = Math.max(0, sec == null ? 20 : sec);
+    steamHold = Math.max(steamHold, s);
+    steamLeft = Math.max(steamLeft, Math.min(4, s * 0.2));
+  }
+
+  return { set, sunbreak, boostSteam, step, follow, now, look, blendSec, holdSec };
 }
 
 /* ---------------- the page: sky, particles, wet roads, wind, sound, the wheel ---------------- */
@@ -1609,6 +1620,7 @@ export function startWeather(world, dayApi) {
     now: apiNow,
     set: (state, intensity, via) => weather.set(state, intensity, via),
     sunbreak: () => weather.sunbreak(),
+    boostSteam: (sec) => weather.boostSteam(sec),
     triggerFlash: (dist, pan) => scheduleFlash(dist, pan),
     thunderDelay,
     forecast: (dateKey, minutes) => forecastAt(dateKey, minutes, cfg.forecast),

@@ -467,6 +467,26 @@ window.DAY_CONFIG = {
     river: [0, 1],
   },
 
+  /* ------------------------------------------------------------------------
+     SUN-BREAK AFTERMATH (js/aftermath.js, js/aftermath-core.js)
+     When Sun break follows rain or a storm within `rainWindowMin` game minutes:
+     steam off roofs / asphalt / car bonnets (`steamSec`), a rainbow opposite the
+     sun at 42° (`rainbowSec`, fades with cloud cover), gutters and awnings drip
+     (`dripSec`, via js/rain.js afterDrip), puddle sparkles, pigeons land on a
+     roof, walkers close umbrellas and a few shop doors open. Phone: half steam
+     and drips; the rainbow always shows. day:crowd action "aftermath" lets Dex
+     say his dry-parcels thanks when he's near.
+     ------------------------------------------------------------------------ */
+  aftermath: {
+    rainWindowMin: 2,
+    steamSec: 20,
+    dripSec: 30,
+    rainbowSec: 28,
+    sparkleSec: 22,
+    birdSec: 15,
+    shopOut: 3,
+  },
+
   weather: {
     blend: 3.4,
     // How long a power's weather lasts and how fast it eases out: ABILITY_HOLD_SEC / ABILITY_FADE_SEC at the top of js/weather.js.

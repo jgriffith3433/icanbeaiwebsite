@@ -656,12 +656,51 @@ export function installCrowd(world) {
 
   /* A bolt cracks (js/lightning.js): everyone within its radius stops and flinches for a moment, the near ones longest. */
   let flinching = 0;
+  let umbrellasClosed = 0;
+  let shopsOut = 0;
+  let prevUmbs = 0;
+  let aftermathClose = 0; // frames to force-count umbrella closings after a Sun-break clearing
   if (typeof window !== "undefined" && window.addEventListener) {
     window.addEventListener("day:crowd", (e) => {
       const d = (e && e.detail) || {};
       if (d.action === "scatter" && d.x != null && d.z != null) {
         scare(d.x, d.z, d.r || 22, 4);
         info.screams = (info.screams || 0) + 1;
+        return;
+      }
+      if (d.action === "aftermath") {
+        // Sun break after rain: fold open umbrellas (count only after they close), a few shop doors open
+        aftermathClose = 5.5; // long enough for the rain blend to drop
+        umbrellasClosed = 0;
+        let open = 0;
+        for (let i = 0; i < MAXP; i++) {
+          const p = people[i];
+          if (!p || !p.active) continue;
+          if (p.hasUmb && (p.umb === "open" || p.umb === "flipped")) {
+            open++;
+            p.umbForceClose = true; // fold even if a light wind would keep every 3rd open
+          }
+        }
+        prevUmbs = open;
+        // shop owners step out near the camera / hero
+        const want = Math.max(1, Math.min(4, d.shops || 3));
+        let out = 0;
+        const cam = world.camera && world.camera.position;
+        const free = people.filter((p) => !p.active);
+        const sites = doorSites.slice().sort((a, b) => {
+          if (!cam) return 0;
+          return Math.hypot(a.x - cam.x, a.z - cam.z) - Math.hypot(b.x - cam.x, b.z - cam.z);
+        });
+        for (let n = 0; n < want && free.length && sites.length; n++) {
+          const site = sites[n % sites.length];
+          const p = free.pop();
+          spawnWalker(p, site, false);
+          out++;
+        }
+        shopsOut = Math.max(shopsOut, out);
+        try {
+          window.dispatchEvent(new CustomEvent("day:crowd", { detail: { action: "shops-out", count: shopsOut } }));
+        } catch (err) { /* */ }
         return;
       }
       if (d.action !== "flinch") return;
@@ -969,10 +1008,14 @@ export function installCrowd(world) {
       else if (rKind === "sun" && rk > 0.3) { put(mHand, i, p.x, y + 1.95 * h + cheer, p.z, p.yaw, p.scale * 2.2, 1); cheering++; }
       else hide(mHand, i);
       /* Umbrellas: up in the rain; a strong gust (js/windfog.js) snatches the ones carried open, then turns each inside out
-         once the wind passes its own threshold (0.5-0.9), and it stays flipped until the wind is nearly gone. */
+         once the wind passes its own threshold (0.5-0.9), and it stays flipped until the wind is nearly gone.
+         Sun-break aftermath (p.umbForceClose) folds them as the street clears. */
       const wkNow = windK;
       let ustate = "closed";
-      if (p.hasUmb && (wxK.raining || (i % 3) === 0)) {
+      if (p.umbForceClose) {
+        ustate = "closed";
+        if (p.umb === "open" || p.umb === "flipped") { /* counted below via prevUmbs drop */ }
+      } else if (p.hasUmb && (wxK.raining || (i % 3) === 0)) {
         if (p.umb === "flipped") ustate = wkNow > 0.28 ? "flipped" : (wxK.raining ? "open" : "closed");
         else if (wkNow >= p.umbT) ustate = "flipped";
         else ustate = wxK.raining || wkNow >= 0.3 ? "open" : "closed";
@@ -1038,6 +1081,18 @@ export function installCrowd(world) {
     umbMesh.setEnabled(wxK.raining || windK >= 0.3);
     umbFlipMesh.setEnabled(flipped > 0);
     if (flippedNow > 0 && typeof window !== "undefined" && window.dispatchEvent) window.dispatchEvent(new CustomEvent("day:wind", { detail: { action: "umbrella-flip", count: flippedNow, flipped } }));
+    // Sun-break aftermath: count only open → closed (peak at start minus live open now)
+    if (aftermathClose > 0) {
+      aftermathClose = Math.max(0, aftermathClose - dt);
+      const closedNow = Math.max(0, prevUmbs - umbs);
+      if (closedNow > umbrellasClosed) {
+        umbrellasClosed = closedNow;
+        try { window.dispatchEvent(new CustomEvent("day:crowd", { detail: { action: "umbrellas-closed", count: umbrellasClosed } })); } catch (e) { /* */ }
+      }
+      if (aftermathClose <= 0) {
+        for (let i = 0; i < MAXP; i++) if (people[i]) people[i].umbForceClose = false;
+      }
+    }
     handMesh.setEnabled(rKind === "gale" || rKind === "sun");
     wiperMesh.setEnabled(wxK.raining);
     lampMatF.emissiveColor.set(lampK * 0.9, lampK * 0.85, lampK * 0.7);
@@ -1052,6 +1107,7 @@ export function installCrowd(world) {
       people: active, cars: nCars, targetPeople: targetP, targetCars: targetC, walking, waiting, crossing, entering, leaving,
       moving: sampleMoved, stopped, near: { people: nearP, cars: nearC }, phase: phaseAt(phases, hourNow), scale: Math.round(budgetScale() * 100) / 100,
       reaction: rKind, flinching, reacting, lookingUp, hats, cheering, running: rKind === "rain" ? reacting : 0,
+      umbrellasClosed, shopsOut,
       quality, umbrellas: umbs, flipped, flips: flipEvents, wipers: wxK.raining ? nCars : 0, carSpeed: nCars ? sumV / nCars : 0, hour: Math.round(hourNow * 100) / 100,
       flares: flareCount, lights: !!wxK.lights,
     });
