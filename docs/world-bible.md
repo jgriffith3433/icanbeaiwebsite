@@ -167,7 +167,7 @@ Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather end
 - Moment: Take control / Let go; cold-open bolt; Birdie's rain; the light show.
 - Personality: dry, patient, understated.
 - Voice: DoD Eric `cjVigY5qzO86Huf0OWal`.
-- Animations: idle, walk, run, jump, fall, float, cast, throw, sit, type, phone, lie, side, recline (`models/small-weather.glb`).
+- Animations: idle, walk, talk (idle stance with a small hand gesture while his voiced line plays; the caption and wrist ring pulse with it), run, jump, fall, float, cast, throw, sit, type, phone, lie, side, recline (`models/small-weather.glb`).
 
 ### Pilot
 - Want: keep Small Weather on schedule and safe; hand the sky back by five.
