@@ -32,6 +32,11 @@ function copyStatic() {
       fs.mkdirSync(folDir, { recursive: true });
       const fol = fs.existsSync('audio/foley') ? fs.readdirSync('audio/foley').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/foley/' + n) : [];
       fs.writeFileSync(path.join(folDir, 'index.json'), JSON.stringify({ files: fol }) + '\n');
+      // Layered power casts (crack/body/rumble, whoosh, gale, tornado, sun shimmer)
+      const powDir = path.join(outDir, 'audio', 'sfx', 'power');
+      fs.mkdirSync(powDir, { recursive: true });
+      const pow = fs.existsSync('audio/sfx/power') ? fs.readdirSync('audio/sfx/power').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/sfx/power/' + n) : [];
+      fs.writeFileSync(path.join(powDir, 'index.json'), JSON.stringify({ files: pow }) + '\n');
     },
   };
 }
