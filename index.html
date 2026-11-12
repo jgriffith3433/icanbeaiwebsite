@@ -48,6 +48,7 @@
         try { forced = new URLSearchParams(location.search).get("view") === "public"; } catch (e) {}
         if (!local) root.classList.add("public", "preview-public");
         else if (forced) root.classList.add("preview-public", "view-forced");
+        try { if (new URLSearchParams(location.search).get("report") === "1") root.classList.add("show-report"); } catch (e) {}
       })();
     </script>
     <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
