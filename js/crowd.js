@@ -635,7 +635,9 @@ export function installCrowd(world) {
     const fog = wx.state === "fog" || (wx.fog || 0) > 0.05;
     const sky = (look && look.info && look.info().sky) || { night: 0, dusk: 0 };
     let kind = "";
-    if (wx.manual) {
+    if (celebrateLeft > 0) kind = "sun";
+    else if (hushLeft > 0) kind = "rain";
+    else if (wx.manual) {
       if (wx.state === "storm") kind = "lookup";
       else if (wx.state === "rain") kind = "rain";
       else if (wx.state === "wind") kind = "gale";
@@ -660,12 +662,48 @@ export function installCrowd(world) {
   let shopsOut = 0;
   let prevUmbs = 0;
   let aftermathClose = 0; // frames to force-count umbrella closings after a Sun-break clearing
+  let celebrateLeft = 0; // ending A: hop and cheer in the rain for a few seconds
+  let hushLeft = 0; // ending C: silent under umbrellas
   if (typeof window !== "undefined" && window.addEventListener) {
     window.addEventListener("day:crowd", (e) => {
       const d = (e && e.detail) || {};
       if (d.action === "scatter" && d.x != null && d.z != null) {
         scare(d.x, d.z, d.r || 22, 4);
         info.screams = (info.screams || 0) + 1;
+        return;
+      }
+      if (d.action === "celebrate") {
+        // Fair Weather ending: dance in the rain on the plaza (cheer hops even while raining)
+        celebrateLeft = Math.max(4, d.secs || 12);
+        hushLeft = 0;
+        startReaction("sun");
+        for (let i = 0; i < MAXP; i++) {
+          const p = people[i];
+          if (!p || !p.active) continue;
+          p.leaving = false;
+          p.umbForceClose = true;
+          p.rdelay = rng() * 0.25;
+        }
+        return;
+      }
+      if (d.action === "hush") {
+        // Overcast ending: crowd under umbrellas, no cheer — rain reaction, stay put
+        hushLeft = Math.max(4, d.secs || 14);
+        celebrateLeft = 0;
+        for (let i = 0; i < MAXP; i++) {
+          const p = people[i];
+          if (!p || !p.active) continue;
+          p.leaving = false;
+          p.umbForceClose = false;
+          p.hasUmb = true;
+          p.umb = "open";
+          p.rdelay = rng() * 0.2;
+        }
+        startReaction("rain");
+        for (let i = 0; i < MAXP; i++) {
+          const p = people[i];
+          if (p && p.active) p.leaving = false;
+        }
         return;
       }
       if (d.action === "aftermath") {
@@ -859,6 +897,8 @@ export function installCrowd(world) {
 
     const minutes = dayNow.minutes;
     hourNow = ((minutes % 1440) + 1440) % 1440 / 60;
+    if (celebrateLeft > 0) celebrateLeft = Math.max(0, celebrateLeft - dt);
+    if (hushLeft > 0) hushLeft = Math.max(0, hushLeft - dt);
     const d = densityAt(curve, hourNow);
     const w = weatherK();
     const sc = budgetScale();

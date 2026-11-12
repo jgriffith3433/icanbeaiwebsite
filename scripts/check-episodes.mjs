@@ -177,6 +177,18 @@ ok(pickEnding(mk([true, true, true]), 3, E.endings.rules) === "C", "all three sc
 ok(pickEnding({ parts: { 3: { scarred: false } } }, 3, E.endings.rules) === "B", "an unplayed part keeps it from Fair Weather");
 ["A", "B", "C"].forEach((k) => ok(E.endings[k] && E.endings[k].name && E.endings[k].scene && E.endings[k].last.length === 2, `ending ${k} has a name, scene and last line`));
 ok(E.endings.A.last[1] === "Clear skies. He did that, and then stopped." && E.endings.B.last[1] === "It worked. It cost." && E.endings.C.last[0] === "He", "endings keep the sheet's last lines");
+const scenes = E.endings.scenes || {};
+["A", "B", "C"].forEach((k) => {
+  const s = scenes[k];
+  ok(s && s.secs > 0 && s.secs <= 40, `ending scene ${k} is at most 40 s`);
+  ok(s && Array.isArray(s.shots) && s.shots.length >= 1, `ending scene ${k} has a camera path`);
+  ok(s && Array.isArray(s.lines) && s.lines.length >= 2, `ending scene ${k} has at least 2 voiced lines`);
+  ok(s && (s.sting === "resolution" || s.sting === "failure"), `ending scene ${k} uses the score's resolution or failure sting`);
+  (s.lines || []).forEach((L) => {
+    ok((L.caption || L.text || "").length <= 40, `ending ${k} caption too long for one phone line`);
+    ok(L.who !== "He" || !/\b(he|him|his)\b/i.test(L.text), `ending ${k}: "${L.text}" is narration, not spoken`);
+  });
+});
 const fa = cityFared({ parts: { 1: { goals: ["rain-park", "stalls"], kicks: ["flood"] }, 2: { goals: ["turn"], kicks: [] }, 3: { goals: ["charge", "fill"], kicks: [] } } }, E.endings.fared);
 ok(fa.map((f) => f.state).join(",") === "scar,ok,ok,ok" && fa.length === 4 && fa.every((f) => f.text && !/: (ok|scar|open)$/.test(f.text)), `the city fared: ${fa.map((f) => f.state)}`);
 ok(cityFared({ parts: {} }, E.endings.fared).every((f) => f.state === "open"), "nothing played, every need open");

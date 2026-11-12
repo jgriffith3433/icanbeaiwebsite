@@ -100,6 +100,11 @@ export function dialogueLines(config) {
   Object.keys(cold).forEach((k) => add(cold[k][0], cold[k][1], `coldopen:${k}`));
   // The chapter openers' lines (day.config.js `chapters`): his in Eric's voice; Pilot's are `pilot.lines`, not here.
   (C.arc || []).forEach((ch) => ((ch.opener && ch.opener.lines) || []).forEach((L) => { if (L.who !== "Pilot") add(L.who, L.text, `chapter:${ch.id}`); }));
+  // Part 3 ending scenes (episodes.endings.scenes): Birdie / Dex / He; Pilot's are `pilot.lines`.
+  const scenes = (C.episodes && C.episodes.endings && C.episodes.endings.scenes) || {};
+  Object.keys(scenes).forEach((id) => ((scenes[id] && scenes[id].lines) || []).forEach((L) => {
+    if (L.who && L.who !== "Pilot") add(L.who, L.text, `ending:${id}`);
+  }));
   return out;
 }
 

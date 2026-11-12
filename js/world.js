@@ -1685,6 +1685,19 @@
         return false;
       }
       const two = (v, d) => (Array.isArray(v) ? v : [v == null ? d : v, v == null ? d : v]);
+      // A mid-scene cut (ending scenes): retarget without replacing the restore pose.
+      if (spec.cut && cine) {
+        cine.t = 0;
+        cine.secs = spec.secs || cine.secs || 6;
+        cine.tx = two(spec.tx, cine.tx[1]);
+        cine.ty = two(spec.ty, cine.ty[1]);
+        cine.tz = two(spec.tz, cine.tz[1]);
+        cine.alpha = two(spec.alpha, cine.alpha[1]);
+        cine.beta = two(spec.beta, cine.beta[1]);
+        cine.radius = two(spec.radius, cine.radius[1]);
+        cine.fov = spec.fov || 0;
+        return true;
+      }
       cine = {
         t: 0, secs: spec.secs || 6, frames: 0, inside: 0, minClear: 99,
         tx: two(spec.tx), ty: two(spec.ty), tz: two(spec.tz),
