@@ -216,14 +216,14 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 ### West Avenue Home Block
 - **Interactions:** Take control / Let go; walk, run, jump, float; call Rain for Birdie; climb apt stair; knock props with Gust; look through cutaway rooms; **Build:** carry watering can to pots; knock/enter apt (fridge hum, radio); sit on stoop.
 - **On their own:** his autopilot morning; Birdie's pot watering path; crowd thin→commute; lamps by sky; day-end moment when the clock rolls.
-- **Ambient:** birds, city hum, footsteps, alarm/coffee diegetic day sounds, title/score beds under the page.
+- **Ambient:** birds, city hum, footsteps; **diegetic day soundscapes** (`js/daysound.js`): fridge hum, kettle/coffee, shower, rain on the window; evening TV muffled programme; night clock tick, distant traffic and a far train; title/score beds under the page.
 - **Over time:** model-constant look; windows follow occupant schedules (dusk on, bedtime off) and Small Weather's apt lights; lamps and neon by dusk/night; opening once per new player.
-- **Short:** no fridge/radio loop; few porch interactions after Birdie goes in.
+- **Short:** few porch interactions after Birdie goes in.
 
 ### The Park
 - **Interactions:** Rain (and over-hold overflow), sit near Birdie for ask/thanks, bolt scorch grass, explore pond/bandstand; **Build:** sit on bench/bandstand (camera + ambient); pigeon scatter without spending Pressure (walk-up or Gust).
 - **On their own:** Birdie noon bench; park lamps; lawn state after Part 1 (*should* persist — Build queue 1); crowd on edges.
-- **Ambient:** softer bed under trees; rain on leaves when wet; bandstand quiet creak (Build).
+- **Ambient:** softer bed under trees; rain on leaves when wet; bandstand quiet creak (Build); **lunch soundscape** kids, fountain and ducks while his schedule is on the lunch chapter (`daysound` park).
 - **Over time:** straw→damp→scar brown patch across the arc day.
 - **Short:** need always-on state + 2–3 microevents so a non-episode walk still breathes.
 
@@ -244,7 +244,7 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 ### Office Lot and Annex East
 - **Interactions:** Gale hold on turbines; Ines bolt ask; start Hurricane drive; desk is autopilot until Take control.
 - **On their own:** lights/lifts with power (*should* be visible — Build); Ines telescope; evening commute crowd.
-- **Ambient:** HVAC, keyboard (day), roof wind, Board distant from Tank.
+- **Ambient:** HVAC and coffee machine as room tone; **keyboard clatter only while he is at the desk** (stops when he leaves); murmured meeting when he is in the meeting room; roof wind; Board distant from Tank.
 - **Over time:** still blades → spinning → overspeed scar.
 - **Short:** coworkers as bodies; turbines permanent.
 
@@ -271,7 +271,7 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 ### Main Avenue Commute
 - **Interactions:** weather abilities; Gust/Tornado debris; Hurricane four closures (help vs hurt powers); crosswalk timing; brake-test by standing in lane carefully.
 - **On their own:** crowd curve, signals, weather forecast (off by default) vs ability weather, sirens at night.
-- **Ambient:** score + ambience beds, cars, birds, siren.
+- **Ambient:** score + ambience beds, cars, birds, siren; **commute cabin** rumble and wipers in rain; **car radio** plays a short station jingle then a weather-desk line that names a weather the player called today (from `day.memory.facts`).
 - **Over time:** rush hours; episode debris; flood patches.
 - **Short:** junction turns; kerb micro-events every ~8 s of walk east.
 

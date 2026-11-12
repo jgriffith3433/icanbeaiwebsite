@@ -19,6 +19,7 @@ import "./control.js"; // the player can take control of him
 import "./weather.js"; // the day's forecast, and the weather he commands while he's the player's
 import "./score.js"; // weather music beds, sampled ambience, take-control sting (after weather)
 import "./stems.js"; // the stem score under control: one 4-note motif, three synced layers, stings (after score.js)
+import "./daysound.js"; // autopilot diegetic soundscapes by schedule block (after score: uses ambience bus)
 import "./render-pipeline.js"; // the picture: ACES, a grade LUT per hour and weather, emissive bloom, SSAO2, cascaded shadows (after weather: it follows weather.now())
 import "./sky.js"; // the sky: painted panoramas by the clock, a cloud deck, Sun break god rays, sky reflections (after look, weather and the pipeline)
 import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyline curtains, window runnels, drips, lens drops, height fog (after weather)
