@@ -449,6 +449,27 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
 .ep-ending .lastline{font-size:1.05rem;color:#f6f1e8;margin:10px 0 4px}
 .ep-ending .lastline i{display:block;font-style:normal;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#7ec8ff}
 .ep-ending .tally{font-size:.85rem;color:#9fd4ff;margin:0 0 6px}
+.ep-credits,.ep-post{position:fixed;inset:0;z-index:24;display:flex;align-items:flex-end;justify-content:center;pointer-events:none;padding:max(18px,env(safe-area-inset-top)) 18px max(28px,calc(env(safe-area-inset-bottom) + 18px))}
+.ep-credits[hidden],.ep-post[hidden]{display:none}
+.ep-credits{background:linear-gradient(180deg,rgba(4,6,12,.15) 0%,rgba(4,6,12,.55) 42%,rgba(4,6,12,.82) 100%);pointer-events:auto}
+.ep-credits .roll{width:min(420px,100%);text-align:center;color:#f6f1e8;font:500 1rem/1.45 Outfit,system-ui,sans-serif;transform:translateY(40vh);animation:epCreditsUp var(--ep-credits-secs,26s) linear forwards}
+.ep-credits .roll .kicker{margin:0 0 4px;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:#9fd4ff}
+.ep-credits .roll h2{margin:0 0 18px;font:700 clamp(1.35rem,5vw,1.8rem)/1.15 Fraunces,Georgia,serif}
+.ep-credits .cast{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.ep-credits .cast li{margin:0}
+.ep-credits .cast b{display:block;font-size:max(14px,.95rem);font-weight:700;color:#f6f1e8}
+.ep-credits .cast span{display:block;font-size:max(14px,.82rem);color:rgba(246,241,232,.7);margin-top:2px}
+.ep-credits .skip,.ep-post .skip{pointer-events:auto;appearance:none;border:1px solid rgba(246,241,232,.28);background:rgba(14,16,22,.72);color:#f6f1e8;border-radius:12px;padding:12px 18px;min-height:44px;min-width:44px;font:600 .9rem Outfit,system-ui,sans-serif;cursor:pointer;position:absolute;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom) + 14px));transform:translateX(-50%)}
+@keyframes epCreditsUp{from{transform:translateY(42vh)}to{transform:translateY(-110%)}}
+.ep-post{align-items:center;background:rgba(6,8,14,.62);pointer-events:auto}
+.ep-post .card{width:min(420px,100%);background:rgba(14,16,22,.92);border:1px solid rgba(246,241,232,.18);border-radius:18px;padding:20px 20px 16px;color:#f6f1e8;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.ep-post .kicker{margin:0 0 4px;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:#9fd4ff}
+.ep-post h2{margin:0 0 8px;font:700 max(16px,1.15rem)/1.25 Fraunces,Georgia,serif}
+.ep-post p{margin:0 0 14px;font-size:max(14px,.95rem);color:rgba(246,241,232,.82);line-height:1.4}
+.ep-post .skip{position:static;transform:none;background:#f0c27a;color:#1a1c22;border-color:transparent}
+@media (max-width:700px){
+  .ep-credits .cast b,.ep-credits .cast span,.ep-post h2,.ep-post p{font-size:max(14px,1rem)}
+}
 .ep-menu .ep-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 .ep-menu .ep-row{display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:100%;gap:2px}
 .ep-menu .ep-row small{font-weight:500;color:rgba(246,241,232,.55)}
@@ -492,6 +513,19 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   closeEl.hidden = true;
   closeEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><p class="kicker"></p><h2></h2><p class="scene"></p><ul class="fared"></ul><ul class="neighbors"></ul><p class="lastline"></p><p class="tally"></p><div class="actions"><button type="button" class="primary again"></button></div></div>`;
 
+  /* Credits flyover (Night Show payoff): cast scroll over a crane-out shot, then tomorrow's sky request. */
+  const creditsEl = document.createElement("div");
+  creditsEl.id = "credits-roll";
+  creditsEl.className = "ep-credits";
+  creditsEl.hidden = true;
+  creditsEl.innerHTML = `<div class="roll" aria-live="polite"><p class="kicker"></p><h2></h2><ul class="cast"></ul></div><button type="button" class="skip">Skip</button>`;
+
+  const postEl = document.createElement("div");
+  postEl.id = "post-credits";
+  postEl.className = "ep-post";
+  postEl.hidden = true;
+  postEl.innerHTML = `<div class="card" role="dialog" aria-modal="true"><p class="kicker"></p><h2></h2><p class="ask"></p><button type="button" class="skip">Continue</button></div>`;
+
   const menu = document.createElement("div");
   menu.id = "episode-menu";
   menu.className = "ep-menu";
@@ -511,7 +545,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   say.setAttribute("aria-live", "polite");
 
   (document.getElementById("hud-left") || document.body).append(menuBtn);
-  document.body.append(hud, offer, scoreEl, endEl, closeEl, menu, toast, say);
+  document.body.append(hud, offer, scoreEl, endEl, closeEl, creditsEl, postEl, menu, toast, say);
 
   const hudTitle = hud.querySelector("h3");
   const hudTag = hud.querySelector(".tag");
@@ -1557,6 +1591,203 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   let stageHold = false; // keep the stage up after the show for the score and closing cards
   let pendingClosing = null;
   let closeAuto = 0;
+  let creditsOn = null; // { t0, secs, cfg, card, timer }
+  let postOn = null; // { t0, secs, ask, timer }
+  let lastFinale = null; // last night finale cfg (for credits after endQuiet)
+  function clearRoofStands() {
+    const N = day.neighbors;
+    if (!N || !N.stand) return;
+    ["birdie", "dex", "quill"].forEach((id) => { try { N.stand(id, null, null); } catch (e) { /* */ } });
+  }
+  function placeRoofs(F) {
+    const N = day.neighbors;
+    if (!N || !N.stand || !F || !F.roofs) return [];
+    const placed = [];
+    F.roofs.forEach((r) => {
+      if (N.stand(r.id, r.x, r.z)) {
+        if (N.gesture && r.gesture) N.gesture(r.id, r.gesture);
+        placed.push({ id: r.id, who: r.who, x: r.x, z: r.z });
+      }
+    });
+    return placed;
+  }
+  function speakFarewell(F) {
+    const text = (F && F.farewell && F.farewell.text) || (window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.farewell);
+    if (!text) return false;
+    const id = (F && F.farewell && F.farewell.id) || "pilot-finale-farewell";
+    const lines = (window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.lines) || [];
+    const line = lines.find((p) => p.id === id) || { id, group: "finale", text, file: "audio/pilot/pilot-finale-farewell.mp3" };
+    let ok = false;
+    try {
+      if (day.voice && day.voice.speakPilot) ok = !!day.voice.speakPilot(line, { via: "finale", queue: false, radio: window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.radio });
+    } catch (e) { /* */ }
+    mark("show-farewell", { id: "night", text, voiced: ok });
+    if (day.note) day.note(`Pilot: ${text}`);
+    return true;
+  }
+  let roofCut = null; // { until, id }
+  function speakRoof(r) {
+    if (!r || r.said) return;
+    r.said = true;
+    const who = r.who || r.id;
+    const text = r.text;
+    // sayKey → #episode-say + day:story (js/dialogue.js speaks in their voice)
+    sayKey("roof:" + r.id);
+    try {
+      if (day.neighbors && day.neighbors.gesture) day.neighbors.gesture(r.id, r.gesture || "thanks");
+    } catch (e) { /* */ }
+    // Brief cutaway so the roof watcher is seen from the plaza, not only heard
+    const cut = (lastFinale && lastFinale.roofCutSec) || 1.9;
+    if (r.shot && day.world && day.world()) {
+      try {
+        if (day.control && day.control.hold) day.control.hold(true);
+        document.documentElement.classList.add("cine-up");
+        day.world().cineShot(Object.assign({ secs: cut }, r.shot));
+        try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(cut + 0.4); } catch (e) { /* */ }
+        roofCut = { until: performance.now() + cut * 1000, id: r.id };
+        setTimeout(() => {
+          if (!roofCut || roofCut.id !== r.id) return;
+          roofCut = null;
+          try { if (day.world && day.world() && day.world().cineShot) day.world().cineShot(null); } catch (e) { /* */ }
+          try { if (day.control && day.control.hold) day.control.hold(false); } catch (e) { /* */ }
+          if (!creditsOn) document.documentElement.classList.remove("cine-up");
+        }, cut * 1000);
+      } catch (e) { /* */ }
+    }
+    mark("show-roof", { id: "night", who, neighbor: r.id, text, x: r.x, z: r.z, cutaway: !!r.shot });
+  }
+  function cityAnswers(grade, power) {
+    const k = grade === "perfect" ? 1 : 0.65;
+    try {
+      if (day.cityscape && day.cityscape.flicker) day.cityscape.flicker(0.55 + 0.55 * k);
+    } catch (e) { /* */ }
+    try {
+      const W = window.weather || day.weather;
+      if (W && W.triggerFlash && (power === "bolt" || grade === "perfect")) W.triggerFlash(18 + (1 - k) * 30, 0);
+    } catch (e) { /* */ }
+    try {
+      // Plaza crowd answers the light with him (cheer / look-up near the fountain)
+      window.dispatchEvent(new window.CustomEvent("day:crowd", { detail: { action: grade === "perfect" ? "celebrate" : "flinch", secs: 1.2 + k, x: 118, z: 26, r: 28 } }));
+    } catch (e) { /* */ }
+  }
+  function tomorrowAskLine(cfg) {
+    const post = cfg || {};
+    try {
+      const D = day.daily;
+      const today = day.memory && day.memory.today && day.memory.today().date;
+      if (D && D.forDate && today) {
+        const [yy, mm, dd] = String(today).split("-").map(Number);
+        const n = new Date(yy, mm - 1, dd + 1, 12);
+        const key = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+        const ask = D.forDate(key);
+        if (ask && ask.title) return { key, ask, line: `Tomorrow: ${ask.title}` };
+      }
+      if (D && D.today) {
+        const t = D.today();
+        if (t && t.title) return { key: null, ask: t, line: `Tomorrow: ${t.title}` };
+      }
+    } catch (e) { /* */ }
+    return { key: null, ask: null, line: post.fallback || "Tomorrow the sky will ask again." };
+  }
+  function endCredits(how) {
+    const c = creditsOn;
+    if (!c) return false;
+    creditsOn = null;
+    if (c.timer) clearTimeout(c.timer);
+    creditsEl.hidden = true;
+    try { if (day.world && day.world() && day.world().cineShot) day.world().cineShot(null); } catch (e) { /* */ }
+    try { if (day.control && day.control.hold) day.control.hold(false); } catch (e) { /* */ }
+    document.documentElement.classList.remove("cine-up");
+    try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* */ }
+    mark("credits", { id: "night", how: how || "end", secs: c.secs, cast: (c.cfg.cast || []).length });
+    showPostCredits();
+    return true;
+  }
+  function showCredits(card) {
+    const F = lastFinale;
+    const C = F && F.credits;
+    if (!C) { showClosing(card); return false; }
+    const secs = Math.max(12, Math.min(40, C.secs || 26));
+    creditsOn = { t0: performance.now(), secs, cfg: C, card, timer: null };
+    creditsEl.style.setProperty("--ep-credits-secs", secs + "s");
+    creditsEl.querySelector(".kicker").textContent = C.kicker || "I Can Be";
+    creditsEl.querySelector("h2").textContent = C.title || "The Night Show";
+    creditsEl.querySelector(".skip").textContent = C.skip || "Skip";
+    const ul = creditsEl.querySelector(".cast");
+    ul.innerHTML = "";
+    (C.cast || []).forEach((row) => {
+      const li = document.createElement("li");
+      const b = document.createElement("b");
+      b.textContent = row.role || row.name || "";
+      const sp = document.createElement("span");
+      sp.textContent = row.name && row.role ? row.name : "";
+      li.append(b);
+      if (sp.textContent) li.append(sp);
+      ul.appendChild(li);
+    });
+    const roll = creditsEl.querySelector(".roll");
+    roll.style.animation = "none";
+    void roll.offsetWidth;
+    roll.style.animation = "";
+    creditsEl.hidden = false;
+    document.documentElement.classList.add("cine-up");
+    try { if (day.control && day.control.hold) day.control.hold(true); } catch (e) { /* */ }
+    try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(secs + 1); } catch (e) { /* */ }
+    try {
+      if (day.world && day.world() && day.world().cineShot && C.shot) day.world().cineShot(Object.assign({ secs }, C.shot));
+    } catch (e) { /* */ }
+    try {
+      if (day.stems && day.stems.motif) day.stems.motif(C.motif || "credits");
+    } catch (e) { /* */ }
+    mark("credits-start", { id: "night", secs, cast: (C.cast || []).length });
+    creditsOn.timer = setTimeout(() => endCredits("end"), secs * 1000);
+    return true;
+  }
+  function endPost(how) {
+    const p = postOn;
+    if (!p) return false;
+    postOn = null;
+    if (p.timer) clearTimeout(p.timer);
+    postEl.hidden = true;
+    try { if (day.world && day.world() && day.world().cineShot) day.world().cineShot(null); } catch (e) { /* */ }
+    try { if (day.control && day.control.hold) day.control.hold(false); } catch (e) { /* */ }
+    document.documentElement.classList.remove("cine-up");
+    clearRoofStands();
+    stopStage();
+    mark("post-credits", { id: "night", how: how || "end", line: p.line, ask: p.ask && p.ask.id });
+    return true;
+  }
+  function showPostCredits() {
+    const P = (lastFinale && lastFinale.postCredits) || { secs: 7, fallback: "Tomorrow the sky will ask again.", kicker: "Tomorrow", skip: "Continue" };
+    const info = tomorrowAskLine(P);
+    const secs = Math.max(4, Math.min(14, P.secs || 7));
+    postOn = { t0: performance.now(), secs, ask: info.ask, line: info.line, timer: null };
+    postEl.querySelector(".kicker").textContent = P.kicker || "Tomorrow";
+    postEl.querySelector("h2").textContent = info.ask && info.ask.name ? info.ask.name : "The sky";
+    postEl.querySelector(".ask").textContent = info.line;
+    postEl.querySelector(".skip").textContent = P.skip || "Continue";
+    postEl.hidden = false;
+    // Land the crane on tomorrow's asker when we know where they stand
+    try {
+      const ask = info.ask;
+      const place = ask && (ask.stand || ask.place);
+      const x = place && (place.x != null ? place.x : place[0]);
+      const z = place && (place.z != null ? place.z : place[1]);
+      if (x != null && z != null && day.world && day.world() && day.world().cineShot) {
+        if (day.control && day.control.hold) day.control.hold(true);
+        document.documentElement.classList.add("cine-up");
+        day.world().cineShot({ secs, tx: x, ty: 3.2, tz: z, alpha: -1.6, beta: 1.05, radius: 16 });
+      }
+    } catch (e) { /* */ }
+    mark("post-credits-show", { id: "night", line: info.line, ask: info.ask && info.ask.id });
+    try {
+      if (info.ask && info.ask.ask && day.voice && day.voice.speakAs) {
+        const place = info.ask.stand || info.ask.place || {};
+        day.voice.speakAs(info.ask.name || info.ask.who || "Birdie", info.ask.ask, { x: place.x, z: place.z, via: "finale-tomorrow", queue: false });
+      }
+    } catch (e) { /* */ }
+    postOn.timer = setTimeout(() => endPost("end"), secs * 1000);
+  }
   function stopStage() {
     if (stage) stage.stop();
     stage = null;
@@ -1564,13 +1795,17 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   }
   function startShow(ep) {
     const F = ep.finale;
+    lastFinale = F;
     active.show = {
       started: false, t: 0, over: false, endAt: 0, hits: 0, perfect: 0, off: 0, chain: 0, best: 0, act: -1, judge: "", judgeKind: "",
+      farewell: false, roofsSaid: 0,
       used: new Set(), cues: F.cues.map((c) => Object.assign({ state: "wait", grade: null, dt: null }, c)),
+      roofs: (F.roofs || []).map((r) => Object.assign({ said: false }, r)),
     };
+    const placed = placeRoofs(F);
     stage = createFinale(world, B, F);
     if (stage) stage.start(F.spectators);
-    mark("show-stage", { id: ep.id, spectators: F.spectators, cues: F.cues.length });
+    mark("show-stage", { id: ep.id, spectators: F.spectators, cues: F.cues.length, roofs: placed.map((p) => p.id).join(",") });
   }
   const inPlaza = () => {
     const pos = playerPos();
@@ -1606,6 +1841,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     S.judge = `${F.lines[m.grade]}${m.dt >= 0 ? " +" : " "}${m.dt.toFixed(2)} s · ×${S.chain}`;
     S.judgeKind = m.grade;
     if (stage) stage.cue(power, m.grade);
+    cityAnswers(m.grade, power);
     mark("show-cue", { id: A.ep.id, cue: m.index, power, grade: m.grade, dt: +m.dt.toFixed(2), chain: S.chain, hits: S.hits });
     A.goals.forEach((g) => {
       if (g.kind === "show-hits") { g.progress = S.hits; if (S.hits >= (g.count | 0)) completeGoal(g, "show"); }
@@ -1622,13 +1858,20 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
         S.started = true;
         const a = abil();
         if (a && a.reset) a.reset(100);
+        if (!S.farewell) { S.farewell = true; speakFarewell(F); }
         sayKey("gather");
-        mark("show-begin", { id: A.ep.id, gathered: stage ? stage.info().gathered : 0 });
+        mark("show-begin", { id: A.ep.id, gathered: stage ? stage.info().gathered : 0, farewell: S.farewell, roofs: (S.roofs || []).length });
         paintHud();
       }
       return;
     }
     S.t += dt;
+    (S.roofs || []).forEach((r) => {
+      if (!r.said && S.t >= r.at) {
+        speakRoof(r);
+        S.roofsSaid = (S.roofsSaid || 0) + 1;
+      }
+    });
     F.acts.forEach((a, i) => {
       if (i > S.act && S.t >= a.at) {
         S.act = i;
@@ -1653,7 +1896,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       const k = S.hits / S.cues.length;
       if (stage) stage.grand(k);
       if (day.note) day.note(F.lines.done);
-      mark("show-over", { id: A.ep.id, hits: S.hits, perfect: S.perfect, best: S.best, off: S.off, of: S.cues.length });
+      mark("show-over", { id: A.ep.id, hits: S.hits, perfect: S.perfect, best: S.best, off: S.off, of: S.cues.length, roofs: S.roofsSaid || 0 });
     }
     if (S.over && S.t >= S.endAt) {
       stageHold = true;
@@ -1986,7 +2229,8 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     } else if (pendingClosing) {
       const c = pendingClosing;
       pendingClosing = null;
-      showClosing(c);
+      if (lastFinale && lastFinale.credits) showCredits(c);
+      else showClosing(c);
     } else if (!active) stopStage();
   }
   /* The closing card: how the day's stories ended (from the arc the three parts left), the neighbors in the crowd, his last line. */
@@ -2035,8 +2279,16 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   }
   closeEl.querySelector(".again").addEventListener("click", () => {
     closeEl.hidden = true;
+    clearRoofStands();
     stopStage();
   });
+  creditsEl.querySelector(".skip").addEventListener("click", () => endCredits("skip"));
+  postEl.querySelector(".skip").addEventListener("click", () => endPost("skip"));
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" && e.key !== "Enter") return;
+    if (!creditsEl.hidden) { e.preventDefault(); endCredits("key"); }
+    else if (!postEl.hidden) { e.preventDefault(); endPost("key"); }
+  }, true);
 
   function hideMenu() {
     menu.hidden = true;
@@ -2452,10 +2704,40 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       if (!active || !active.show) return null;
       const S = active.show;
       const nx = S.cues.find((c) => c.state === "wait");
-      return { started: S.started, t: S.t, over: S.over, hits: S.hits, perfect: S.perfect, off: S.off, chain: S.chain, best: S.best, used: [...S.used], next: nx ? { power: nx.power, at: nx.at, in: nx.at - S.t } : null, cues: S.cues.map((c) => ({ at: c.at, power: c.power, state: c.state, grade: c.grade })), judge: S.judge, stage: stage ? stage.info() : null };
+      return {
+        started: S.started, t: S.t, over: S.over, hits: S.hits, perfect: S.perfect, off: S.off, chain: S.chain, best: S.best, used: [...S.used],
+        farewell: !!S.farewell, roofsSaid: S.roofsSaid || 0,
+        roofs: (S.roofs || []).map((r) => ({ id: r.id, who: r.who, x: r.x, z: r.z, at: r.at, said: !!r.said, text: r.text })),
+        next: nx ? { power: nx.power, at: nx.at, in: nx.at - S.t } : null,
+        cues: S.cues.map((c) => ({ at: c.at, power: c.power, state: c.state, grade: c.grade })),
+        judge: S.judge, stage: stage ? stage.info() : null,
+      };
     },
     stage: () => (stage ? stage.info() : null),
     closing: () => ({ shown: !closeEl.hidden, rank: closeEl.dataset.rank || null, ending: closeEl.dataset.ending || null, pending: !!pendingClosing, fared: [...closeEl.querySelectorAll(".fared li")].map((li) => li.dataset.need + ":" + li.className), neighbors: [...closeEl.querySelectorAll(".neighbors li")].map((li) => li.dataset.neighbor) }),
+    credits: () => ({
+      shown: !creditsEl.hidden,
+      pending: !!creditsOn,
+      secs: creditsOn ? creditsOn.secs : ((lastFinale && lastFinale.credits && lastFinale.credits.secs) || 0),
+      cast: [...creditsEl.querySelectorAll(".cast b")].map((b) => b.textContent),
+      fontPx: (() => { const b = creditsEl.querySelector(".cast b"); return b ? parseFloat(getComputedStyle(b).fontSize) || 0 : 0; })(),
+    }),
+    postCredits: () => ({
+      shown: !postEl.hidden,
+      pending: !!postOn,
+      line: (postEl.querySelector(".ask") || {}).textContent || (postOn && postOn.line) || "",
+      ask: postOn && postOn.ask ? postOn.ask.id : null,
+      fontPx: (() => { const p = postEl.querySelector(".ask"); return p ? parseFloat(getComputedStyle(p).fontSize) || 0 : 0; })(),
+    }),
+    roofs: () => {
+      const people = (day.neighbors && day.neighbors.now && day.neighbors.now().people) || [];
+      const want = (lastFinale && lastFinale.roofs) || [];
+      return want.map((r) => {
+        const p = people.find((q) => q.id === r.id);
+        const near = p ? Math.hypot(p.x - r.x, p.z - r.z) < 3.5 : false;
+        return { id: r.id, who: r.who, wantX: r.x, wantZ: r.z, x: p ? p.x : null, z: p ? p.z : null, text: r.text, onRoof: near };
+      });
+    },
     offer: () => (offerEp ? { id: offerEp.id, title: offerEp.title } : null),
     best: () => loadBest(storageKey),
     lock: (id) => episodeLock(list, loadBest(storageKey), id),
