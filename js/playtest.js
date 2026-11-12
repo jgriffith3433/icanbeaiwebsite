@@ -2574,6 +2574,142 @@ async function model(options, t) {
   t.progress(1);
 }
 
+/* ---------------- clip-poses: every clip he plays, at mid-clip, never twisted; cross-fades without a pop ---------------- */
+// Acceptance: idle at two different times is upright (spine and neck within a few degrees, pelvis and shoulders square,
+// hands apart); walk, run, jump, fall/float, cast and throw each hold a screenshot with no twisted limbs; switching idle
+// <-> walk <-> run shows no snap (the pose never jumps more than a stride's worth between two frames); the phone
+// (touch, 390x844, low quality) animates the same. The probe is skin.pose() (js/small-weather.js), read on real frames.
+async function clipPoses(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Clip poses (phone)" : "Clip poses");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model === "small-weather", 45000, "his model to load").catch(() => {});
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok").catch(() => {});
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const WX = window.day.weather;
+  if (!C || !skinNow() || !skinNow().pose) {
+    t.problem("blocker", "Small Weather's model isn't on for clip-poses");
+    return;
+  }
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    try { C.touch(true); } catch (e) { /* */ }
+  }
+  const day = window.day.today();
+  const outside = carSideMoment(day) || quietMoment(day);
+  scrubTo(outside.start + 0.2);
+  clickSpeed(1);
+  if (WX && WX.set) WX.set("rain", 0.2, "key"); // not clear: the idle must stay the plain idle (no look-up)
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  if (touch) {
+    const btn = document.getElementById("control-btn") || document.querySelector("#take-control,.take-control");
+    if (btn) {
+      await tapEl(btn);
+      btn.click();
+    } else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 5000, "Take control");
+  const sk = () => skinNow();
+  const bad = (what, m, lim) => {
+    const v = m[what.k];
+    if (Math.abs(v) > lim) t.problem("bug", `quality.animation: ${what.label} ${v.toFixed(0)} deg (limit ${lim}) while ${sk().clip()}`);
+  };
+  const holdAndCheck = async (label, clip, lims, ms) => {
+    t.scene(label);
+    await sleep(ms);
+    const m = sk().pose();
+    if (!m) return null;
+    t.event(`pose-${label.toLowerCase().replace(/\s+/g, "-")}`, `${sk().clip()}: lean ${m.lean.toFixed(0)}, neck ${m.neck.toFixed(0)}, hips yaw ${m.hipYaw.toFixed(0)}, shoulders yaw ${m.shoulderYaw.toFixed(0)}, knees ${m.kneeL.toFixed(0)}/${m.kneeR.toFixed(0)}, hands ${m.handsApart.toFixed(2)} m apart`);
+    if (clip && sk().clip() !== clip) t.problem("bug", `${label}: his model played ${sk().clip()}, not ${clip}`);
+    for (const [k, [label2, lim]] of Object.entries(lims)) bad({ k, label: label2 }, m, lim);
+    if (m.handsApart < 0.12) t.problem("bug", `quality.animation: ${label}: a hand is through the body (${m.handsApart.toFixed(2)} m apart)`);
+    return m;
+  };
+  const IDLE = { lean: ["spine lean", 8], neck: ["neck lean", 10], sideLean: ["sideways lean", 6], hipYaw: ["pelvis yaw", 8], shoulderYaw: ["shoulder yaw", 8], kneeL: ["left knee bend", 16], kneeR: ["right knee bend", 16] };
+  const MOVE = { lean: ["spine lean", 40], neck: ["neck lean", 45], sideLean: ["sideways lean", 12], hipYaw: ["pelvis yaw", 30], shoulderYaw: ["shoulder yaw", 45] };
+  t.progress(0.1);
+  // idle at two different times (a breath and a weight shift apart)
+  await holdAndCheck("Idle early", "idle", IDLE, 1500);
+  await holdAndCheck("Idle later", "idle", IDLE, 4000);
+  t.progress(0.25);
+
+  // switching idle -> walk -> run -> idle: the pose never jumps between two frames beyond what a stride moves
+  const jumps = { worst: 0, at: "" };
+  let prev = null;
+  const poseObs = window.setInterval(() => {
+    const m = sk() && sk().pose();
+    if (!m) return;
+    if (prev) {
+      const d = Math.max(Math.abs(m.lean - prev.lean), Math.abs(m.neck - prev.neck), Math.abs(m.hipYaw - prev.hipYaw), Math.abs(m.shoulderYaw - prev.shoulderYaw));
+      if (d > jumps.worst) jumps.worst = d;
+    }
+    prev = m;
+  }, 33);
+  t.scene("Walk");
+  keyDown("w");
+  await sleep(1400);
+  await holdAndCheck("Walk mid", "walk", MOVE, 600);
+  t.scene("Run");
+  keyDown("Shift", { shiftKey: true });
+  keyDown("w", { shiftKey: true });
+  await sleep(900);
+  await holdAndCheck("Run mid", "run", MOVE, 500);
+  keyUp("Shift");
+  await sleep(700);
+  keyUp("w");
+  await sleep(1200);
+  await holdAndCheck("Idle after run", "idle", IDLE, 600);
+  t.progress(0.5);
+
+  // jump (Space) and float (Space held while falling)
+  t.scene("Jump");
+  keyDown(" ");
+  await sleep(180);
+  await holdAndCheck("Jump mid", null, MOVE, 60);
+  await sleep(400);
+  t.scene("Float");
+  await holdAndCheck("Float mid", null, MOVE, 400);
+  keyUp(" ");
+  await sleep(1500);
+  t.progress(0.65);
+
+  // the casts: Lightning (E) wind-up, then Rain (R)
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  t.scene("Cast Lightning");
+  keyDown("e");
+  await sleep(420);
+  await holdAndCheck("Cast mid", null, MOVE, 100);
+  await sleep(500);
+  keyUp("e");
+  await sleep(1400);
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  t.scene("Cast Rain");
+  pressKey("r");
+  await sleep(380);
+  await holdAndCheck("Rain cast mid", null, MOVE, 100);
+  await sleep(1600);
+  window.clearInterval(poseObs);
+  t.metric("quality.clipPopDeg", Math.round(jumps.worst * 10) / 10);
+  t.event("clip-switching", `worst pose change between two 33 ms samples across idle -> walk -> run -> idle: ${jumps.worst.toFixed(1)} deg`);
+  if (jumps.worst > 22) t.problem("bug", `quality.animation: the pose snapped ${jumps.worst.toFixed(0)} deg between two frames switching clips`);
+  t.progress(0.85);
+
+  // his day's own clips: the world tilts and seats him, the clip is the limbs
+  t.scene("His day");
+  C.letGo && C.letGo();
+  const seen = await clipsDuring(async () => {
+    for (const hour of [7.2, 9.6, 12.4, 19.5, 22.6]) {
+      scrubTo(hour * 60);
+      await sleep(touch ? 1300 : 1100);
+      const m = sk() && sk().pose();
+      if (m && /^(sit|type|window)$/.test(sk().clip())) t.event("day-pose", `${sk().clip()}: neck ${m.neck.toFixed(0)}, hands ${m.handsApart.toFixed(2)} m apart`);
+    }
+  });
+  t.event("day-clips", `his day played ${seen.join(" → ")}`);
+  t.metric("clips.dayDistinct", seen.length);
+  t.progress(1);
+}
+
 /* ---------------- hero-move: AAA foot plant, distinct cast wind-ups, clear-sky look-up, phone IK/fps ---------------- */
 // Acceptance: foot slide < 5 cm/step and float < 3 cm on apt stairs/ramp; Lightning windbolt ≠ Rain windrain;
 // idle 20 s under clear sky plays lookup; on phone low quality IK+clips and fps ≥ 30.
@@ -11392,6 +11528,7 @@ installPlaytest({
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
+    { id: "clip-poses", title: "Clip poses: idle at two times, walk, run, jump, float, Lightning and Rain casts and his day's clips each read upright and untwisted at mid-clip; switching clips never snaps the pose; the phone (390x844) the same", seconds: 70, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=clip-poses ({\"touch\":true} for 390x844). Takes control outside, stands (idle early, idle later), W, Shift+W, back to idle, Space jump and hold to float, E then R casts, then his day (sit, type, window). Each scene is a screenshot at mid-clip; skin.pose() reads spine/neck lean, pelvis/shoulder yaw, knees and hand gap on the frame and files quality.animation problems; metric quality.clipPopDeg is the worst pose change between two 33 ms samples." },
     { id: "hero-move", title: "Hero move: feet plant on the apt stairs and ramp (slide under 5 cm, float under 3 cm), Lightning and Rain show distinct wind-up clips, idle under a clear sky looks up; on phone IK and clips run on low quality at ≥30 fps", seconds: 150, tags: ["model", "control", "feel", "phone", "quality"], description: "Load with ?playtest=hero-move ({\"touch\":true} for 390x844). Setup: day bar outside, clear sky, full Charge, control.place at the apt ramp. Real WASD up the ramp and across the roof, E then R for wind-ups, stand still 20 s for look-up. Events foot-plant / windups-distinct / lookup-ok / phone-fps-ok; metrics quality.footSlideM, quality.footFloatM, phone.fpsAvg." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
     { id: "storm-ride", title: "Storm-riding: hold Space in the air to glide with wind trails; a Gust updraft lifts him from the street to rooftop height; glide apt roof to shop roof without touching the ground", seconds: 240, tags: ["control", "powers"], description: "Day bar beside the car. Storm weather (4), real keys for glide, G for updraft, climb apt then glide to shop." },
@@ -11479,6 +11616,7 @@ installPlaytest({
       else if (id === "storm-ride") await stormRide(options, t);
       else if (id === "model") await model(options, t);
       else if (id === "hero-move") await heroMove(options, t);
+      else if (id === "clip-poses") await clipPoses(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "render-grade") await renderGrade(options, t);
