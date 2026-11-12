@@ -790,6 +790,25 @@ export function installLook(world) {
   applyQuality(quality);
   /* Quality scale for weaker devices: when nobody chose a level, a page that runs slowly for a few seconds drops
      itself to low once (never saved, never back up, so the picture can't flicker between the two). */
+  /* Boot probe: before the title shows (the loading card is still up), time ~30 frames once the first 8 (shader compiles) are past.
+     A page under 20 fps there drops itself to low at once, so the title opens on a picture that holds 30 fps. A playtest bot is
+     only moved when it is truly stuck (over 80 ms a frame), since its picture must not change otherwise. */
+  const bootProbe = { frames: 0, avgMs: 0, dropped: false, done: false };
+  {
+    let ms = 0, n = 0, skip = 0;
+    const probe = scene.onAfterRenderObservable.add(() => {
+      if (qualityPick.how !== "auto" || quality === "low") { bootProbe.done = true; scene.onAfterRenderObservable.remove(probe); return; }
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (++skip <= 8) return;
+      ms += Math.min(engine.getDeltaTime(), 250);
+      n++;
+      if (n < 30) return;
+      const bot = typeof navigator !== "undefined" && navigator.webdriver;
+      bootProbe.frames = n; bootProbe.avgMs = ms / n; bootProbe.done = true;
+      if (bootProbe.avgMs > (bot ? 80 : 50)) { bootProbe.dropped = true; applyQuality("low", "auto"); console.info(`[look] boot probe: ${bootProbe.avgMs.toFixed(0)} ms a frame, low quality before the title`); }
+      scene.onAfterRenderObservable.remove(probe);
+    });
+  }
   {
     let ms = 0, n = 0, warm = 0;
     const watch = scene.onAfterRenderObservable.add(() => {
@@ -823,6 +842,7 @@ export function installLook(world) {
       return {
         quality,
         qualityHow: qualityPick.how,
+        bootProbe,
         auto: autoQuality(),
         source,
         pbr: surfaces.length,
