@@ -537,7 +537,7 @@ window.DAY_CONFIG = {
        the repo (a 404 is a console error); null plays the same stems synthesized from the motif. */
     stems: {
       bpm: 120, motif: ["A3", "C4", "E4", "D4"],
-      files: { calm: null, tension: null, storm: null, resolution: null, failure: null },
+      files: { calm: "audio/music/stem-calm.mp3", tension: "audio/music/stem-tension.mp3", storm: null, resolution: "audio/music/sting-resolution.mp3", failure: "audio/music/sting-failure.mp3" },
       hold: { storm: 8, rescue: 11 },
     },
     music: {
