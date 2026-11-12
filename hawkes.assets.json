@@ -1115,38 +1115,6 @@
    }
   },
   {
-   "id": "city-asphalt",
-   "note": "Wet asphalt for the avenues (js/look.js). Dark navy, rain-wet, stylized like Dose Of Destruction. texture.maps makes the normal and roughness from the albedo.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark wet asphalt, nearly black with deep navy, rain-wet sheen, faint electric-blue reflections in the damp, fine grain and a few soft cracks, even all over, no focal point. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, not a photograph. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    {
-     "tool": "texture.maps",
-     "inputs": {
-      "image": "$prev"
-     },
-     "params": {
-      "strength": 1.6
-     },
-     "save": "maps"
-    }
-   ],
-   "files": {
-    "take": "textures/city/asphalt-take.png",
-    "maps.albedo": "textures/city/asphalt-albedo.png",
-    "maps.normal": "textures/city/asphalt-normal.png",
-    "maps.roughness": "textures/city/asphalt-roughness.png"
-   }
-  },
-  {
    "id": "city-concrete",
    "note": "Wet concrete for sidewalks, the driveway and the ramps.",
    "steps": [
@@ -1176,102 +1144,6 @@
     "maps.albedo": "textures/city/concrete-albedo.png",
     "maps.normal": "textures/city/concrete-normal.png",
     "maps.roughness": "textures/city/concrete-roughness.png"
-   }
-  },
-  {
-   "id": "city-brick",
-   "note": "Dark wet brick for the shorter blocks.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark brick wall in running bond, bricks a deep navy-brown, mortar a cooler grey, surfaces rain-wet. Even all over, no single featured brick. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    {
-     "tool": "texture.maps",
-     "inputs": {
-      "image": "$prev"
-     },
-     "params": {
-      "strength": 1.6
-     },
-     "save": "maps"
-    }
-   ],
-   "files": {
-    "take": "textures/city/brick-take.png",
-    "maps.albedo": "textures/city/brick-albedo.png",
-    "maps.normal": "textures/city/brick-normal.png",
-    "maps.roughness": "textures/city/brick-roughness.png"
-   }
-  },
-  {
-   "id": "city-glass",
-   "note": "Dark glass curtain wall for the tall blocks.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark glass curtain wall, navy-black reflective panes divided by thin darker mullions, a faint electric-blue reflection, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark, no people.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    {
-     "tool": "texture.maps",
-     "inputs": {
-      "image": "$prev"
-     },
-     "params": {
-      "strength": 1.2
-     },
-     "save": "maps"
-    }
-   ],
-   "files": {
-    "take": "textures/city/glass-take.png",
-    "maps.albedo": "textures/city/glass-albedo.png",
-    "maps.normal": "textures/city/glass-normal.png",
-    "maps.roughness": "textures/city/glass-roughness.png"
-   }
-  },
-  {
-   "id": "city-roof",
-   "note": "Wet tar rooftops.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Flat rooftop, dark wet tar, navy-black, soft seams and a few shallow puddles reflecting a dull blue, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    {
-     "tool": "texture.maps",
-     "inputs": {
-      "image": "$prev"
-     },
-     "params": {
-      "strength": 1.6
-     },
-     "save": "maps"
-    }
-   ],
-   "files": {
-    "take": "textures/city/roof-take.png",
-    "maps.albedo": "textures/city/roof-albedo.png",
-    "maps.normal": "textures/city/roof-normal.png",
-    "maps.roughness": "textures/city/roof-roughness.png"
    }
   },
   {
@@ -5586,7 +5458,6 @@
    "pickAt": 0,
    "pick": "a seamless, even red brick tile with clear relief, no focal point, no visible seam or repeated blotch",
    "files": {
-    "take": "textures/city/brick-take.webp",
     "maps.albedo": "textures/city/brick-albedo.webp",
     "maps.normal": "textures/city/brick-normal.webp",
     "maps.roughness": "textures/city/brick-roughness.webp"
@@ -5621,7 +5492,6 @@
    "pickAt": 0,
    "pick": "a seamless, even painted stucco tile with clear relief, no focal point, no visible seam or repeated blotch",
    "files": {
-    "take": "textures/city/stucco-take.webp",
     "maps.albedo": "textures/city/stucco-albedo.webp",
     "maps.normal": "textures/city/stucco-normal.webp",
     "maps.roughness": "textures/city/stucco-roughness.webp"
@@ -5656,7 +5526,6 @@
    "pickAt": 0,
    "pick": "a seamless, even board-formed concrete tile with clear relief, no focal point, no visible seam or repeated blotch",
    "files": {
-    "take": "textures/city/concrete-take.webp",
     "maps.albedo": "textures/city/concrete-albedo.webp",
     "maps.normal": "textures/city/concrete-normal.webp",
     "maps.roughness": "textures/city/concrete-roughness.webp"
@@ -5691,7 +5560,6 @@
    "pickAt": 0,
    "pick": "a seamless, even glass curtain wall tile with clear relief, no focal point, no visible seam or repeated blotch",
    "files": {
-    "take": "textures/city/glass-take.webp",
     "maps.albedo": "textures/city/glass-albedo.webp",
     "maps.normal": "textures/city/glass-normal.webp",
     "maps.roughness": "textures/city/glass-roughness.webp"
@@ -5726,7 +5594,6 @@
    "pickAt": 0,
    "pick": "a seamless, even wet asphalt tile with clear relief, no focal point, no visible seam or repeated blotch",
    "files": {
-    "take": "textures/city/asphalt-take.webp",
     "maps.albedo": "textures/city/asphalt-albedo.webp",
     "maps.normal": "textures/city/asphalt-normal.webp",
     "maps.roughness": "textures/city/asphalt-roughness.webp"
@@ -5761,7 +5628,6 @@
    "pickAt": 0,
    "pick": "a seamless, even sidewalk pavers tile with clear relief, no focal point, no visible seam or repeated blotch",
    "files": {
-    "take": "textures/city/pavers-take.webp",
     "maps.albedo": "textures/city/pavers-albedo.webp",
     "maps.normal": "textures/city/pavers-normal.webp",
     "maps.roughness": "textures/city/pavers-roughness.webp"
@@ -5796,7 +5662,6 @@
    "pickAt": 0,
    "pick": "a seamless, even roof tar membrane tile with clear relief, no focal point, no visible seam or repeated blotch",
    "files": {
-    "take": "textures/city/tar-take.webp",
     "maps.albedo": "textures/city/tar-albedo.webp",
     "maps.normal": "textures/city/tar-normal.webp",
     "maps.roughness": "textures/city/tar-roughness.webp"
@@ -5831,7 +5696,6 @@
    "pickAt": 0,
    "pick": "a seamless, even gravel ballast tile with clear relief, no focal point, no visible seam or repeated blotch",
    "files": {
-    "take": "textures/city/gravel-take.webp",
     "maps.albedo": "textures/city/gravel-albedo.webp",
     "maps.normal": "textures/city/gravel-normal.webp",
     "maps.roughness": "textures/city/gravel-roughness.webp"
