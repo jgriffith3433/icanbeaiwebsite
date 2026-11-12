@@ -35,7 +35,14 @@ Groups the director plays with a caption and a quiet log line: `take`, `letgo`, 
 (thanks), `dayend`, `idle`. 2–4 variants each. Clips are dialogue table reads (`dlg-he-*.mp3`). Voices mute
 (`icanbe.voices`) is separate from Sound (music and effects).
 
+## Pilot (the day AI)
+Pilot is the calm, dry, faintly fond AI that keeps him on schedule (`day.config.js` `pilot`, director in
+`js/pilot.js`). Second person to the player ("You have the sky"), third/first for him as "he" only when needed.
+Same shortness and understatement as his lines; radio-filtered; caption labelled **Pilot**. Never talks over
+Small Weather: queued through `voice.speakPilot`. Groups: `schedule` (one nudge per spine block), `take`,
+`letgo` (names the deed from `day.memory.justDid()`), `worried` (chaos), `night`. Clips under `audio/pilot/`.
+
 ## Adding a line
-Put it in `barks.needs.<need>.lines` or `barks.weather.<state>`, or in `voice.spoken.<group>`, check it against the
-rules above, and run `npm test` (`scripts/check-barks.mjs`: at least 12 distinct lines across needs and weather, no
-duplicates, no "they", short, no exclamations). After changing spoken lines, run `node scripts/sync-dialogue.mjs`.
+Put it in `barks.needs.<need>.lines` or `barks.weather.<state>`, or in `voice.spoken.<group>`, or in
+`pilot.lines` / `pilot.schedule` / `pilot.take` / `pilot.letgo` / `pilot.worried` / `pilot.night`, check it against the
+rules above, and run `npm test` (`scripts/check-barks.mjs`, `scripts/check-pilot.mjs`). After changing spoken lines, run `node scripts/sync-dialogue.mjs`.

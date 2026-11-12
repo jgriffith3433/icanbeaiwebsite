@@ -145,6 +145,9 @@ Stargazer, violet coat, glasses, telescope; annex. Inside by day, out from 16:30
 ### The District Board *(candidate loudspeaker faction)*
 Utilities voice on the Storm Tank speaker. Plain official tone; does not name him. Reservoir advisories and Weather Warning. *Not settled as full canon* until J answers beat-sheet Q3; lines already play in Parts 1/3 dialogue data. *Build:* physical speaker staging (queue 3).
 
+### Pilot
+The calm, dry, faintly fond AI that runs Small Weather's day — the "AI" in I Can Be AI. Keeps him on schedule and safe; the player is the part of him that wants the sky. Speaks schedule nudges at each spine block, take-over and let-go lines (let-go names the deed just done), worried lines when the sky goes chaotic, and quiet night lines. Diegetic presence: a soft holographic ring on his left wrist that pulses with Pilot's voice; radio filter on the audio; one caption line labelled Pilot. Never talks over Small Weather (queued through `js/voice.js`). Data in `day.config.js` `pilot`; director in `js/pilot.js`. See **Characters → Pilot**.
+
 ### Crowd citizens and drivers
 Up to ~260 people / 64 cars on the day curve (commute, lunch, dinner, thin 2–5). Walk graph, cross on red for cars, enter/leave doors. React to ability weather: storm look-up then run; rain run / duck indoors; wind lean + hat; fog slow; sun break cheer. Named lunch/drive stranded: Odile, Pim, Gus, Hollis, Nell, Ravi, Marlo, Cass, Tamsin, Wren, Hale, Odette, Sorrel, Pike, Juno (challenge).
 
@@ -154,7 +157,49 @@ Up to ~260 people / 64 cars on the day curve (commute, lunch, dinner, thin 2–5
 - Birds remain daytime fair-weather sfx until pigeon meshes exist.
 
 ### How they react to the player
-Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather ending: nods — candidate until J settles Q4). Neighbors speak when he is near in their window and answer asks when he calls the right ability in range. Cars brake for him in lane. Episode stranded thank him with voice/bubble lines.
+Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather ending: nods — candidate until J settles Q4). Neighbors speak when he is near in their window and answer asks when he calls the right ability in range. Cars brake for him in lane. Episode stranded thank him with voice/bubble lines. Pilot comments on take-over, let-go and chaos, and nudges the schedule while the day runs itself.
+
+## Characters
+
+### Small Weather
+- Want: to keep a quiet developer day while the sky stays his to call when something needs weather.
+- Arc: lives on Pilot's schedule → player takes the sky → deeds reshape his day and the district → night rest under Pilot again.
+- Moment: Take control / Let go; cold-open bolt; Birdie's rain; the light show.
+- Personality: dry, patient, understated.
+- Voice: DoD Eric `cjVigY5qzO86Huf0OWal`.
+- Animations: idle, walk, run, jump, fall, float, cast, throw, sit, type, phone, lie, side, recline (`models/small-weather.glb`).
+
+### Pilot
+- Want: keep Small Weather on schedule and safe; hand the sky back by five.
+- Arc: runs the quiet day alone → yields the sky on take-over with a dry aside → names what the player did on let-go → worries when chaos spikes → holds the night while he sleeps.
+- Moment: every Take control and Let go (voiced Pilot line + wrist-ring pulse); schedule nudge at each spine block on a 1200× day.
+- Personality: calm, dry, fond.
+- Voice: Hawkes Gen designed voice (id in `day.config.js` `pilot.voiceId` after `audio.voice-save`).
+- Animations: idle (dim wrist-ring pulse), walk (ring follows the left wrist while he moves), talk (bright voice-synced pulse). No separate body — Pilot is the ring and the radio voice.
+
+### Birdie Alvarez
+- Want: rain for her tomatoes.
+- Arc: morning ask → rain thanks → evening tomato surprise.
+- Moment: Rain near her pots or park bench; lawn drinks.
+- Personality: warm, plain, grateful.
+- Voice: dialogue cast `birdie` (ElevenLabs id in `day.config.js` `dialogue.cast`).
+- Animations: idle, walk, talk (peoplekit; Gen model later).
+
+### Dex Moreno
+- Want: dry parcels and a clear lunch plaza.
+- Arc: sun-break ask → thanks → briefs the lunch rescue.
+- Moment: Sun break over the shop stoop or plaza.
+- Personality: brisk, practical, upbeat.
+- Voice: dialogue cast `dex`.
+- Animations: idle, walk, talk (peoplekit; Gen model later).
+
+### Ines Quill
+- Want: a clean sky reading for her lens and charts.
+- Arc: bolt ask → thanks → night surprise; names the lunch cell.
+- Moment: Lightning near the annex (not at her); dusk telescope.
+- Personality: precise, quiet, curious.
+- Voice: dialogue cast `ines`.
+- Animations: idle, walk, talk (peoplekit; Gen model later).
 
 ## What happens
 
@@ -249,6 +294,7 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 | 11 | Neighbor surprises | evening windows | Bubble + reward + Pressure; spoken when clips exist, else babble + bubble — never log-only | toast ≤1 line |
 | 12 | Day end recap | clock rolls next day | Dim score; sign-off voice; three in-world flashes tied to log events; one last spoken breath; Skip/Esc/timer | ≤1 line under flashes |
 | 13 | Crowd weather breath | any day under control | Manual weather → look-up, run, hats, cheer, umbrellas, wipers; hold then fade | none |
+| 14 | Pilot on the wrist | every day / take / let-go | Schedule nudge + radio chirp + wrist-ring pulse; take-over and let-go Pilot lines (let-go names the deed); worried on chaos; night hold | caption ≤1 line labelled Pilot |
 
 ### Beats that must not stay text-only (hard fails until fixed)
 - Opening lines → voice (Eric) or cut.

@@ -5092,6 +5092,172 @@ async function voiceDirector(options, t) {
   t.progress(1);
 }
 
+/* ---------------- pilot: schedule nudges, take/let-go, wrist ring, no overlap with Small Weather ---------------- */
+// Needs ?playtest=pilot. Sound on, 1200× day for schedule lines, Enter (take), weather chaos, Esc (let-go).
+// Optional {"touch":true} for 390x844 caption/layout. Events pilot-schedule / pilot-take / pilot-letgo /
+// pilot-ring / pilot-no-overlap / pilot-caption-phone; metrics pilotDistinct, pilotOverlaps.
+async function pilotScenario(options, t) {
+  t.scene("Pilot");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const P = window.pilot || (window.day && window.day.pilot);
+  const V = window.voice || (window.day && window.day.voice);
+  const C = window.day.control;
+  if (!P) { t.problem("bug", "There's no Pilot director (js/pilot.js)"); return; }
+  if (!V || !V.speakPilot) { t.problem("bug", "voice.speakPilot missing — Pilot can't queue through voice.js"); return; }
+  if (!C) { t.problem("bug", "There's no Take control"); return; }
+  if (options && options.touch && C.touch) C.touch(true);
+
+  const cfgP = (window.DAY_CONFIG && window.DAY_CONFIG.pilot) || {};
+  const sch = cfgP.schedule || {};
+  if (Object.keys(sch).length < 12) t.problem("bug", `pilot.schedule has ${Object.keys(sch).length} blocks, need 12+`);
+  if (!Array.isArray(cfgP.lines) || cfgP.lines.length < 40) t.problem("bug", `pilot.lines has ${(cfgP.lines || []).length}, need 40+`);
+  t.event("pilot-config", `${(cfgP.lines || []).length} lines, ${Object.keys(sch).length} schedule blocks`);
+
+  const plays = [];
+  const voicePlays = [];
+  const onPilot = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "play") plays.push(d);
+    if (d.action === "overlap") plays.push({ overlap: true, ...d });
+  };
+  const onVoice = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "play") voicePlays.push(d);
+  };
+  window.addEventListener("day:pilot", onPilot);
+  window.addEventListener("day:voice", onVoice);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: "mouse" }));
+    sound.click();
+    await sleep(250);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+  }
+  if (V.voices && !V.voices()) V.voices(true);
+  t.progress(0.08);
+
+  t.scene("Schedule at 1200×");
+  const day = window.day.today();
+  scrubTo(day.dayStart + 0.2);
+  clickSpeed(1200);
+  const schedulePlays = [];
+  const untilBlocks = Math.min(day.blocks.length, 28);
+  await t.until(() => {
+    const n = plays.filter((p) => p.group === "schedule" || (p.via === "schedule"));
+    if (n.length > schedulePlays.length) {
+      const fresh = n.slice(schedulePlays.length);
+      fresh.forEach((p) => {
+        schedulePlays.push(p);
+        t.event("pilot-schedule", `${p.block || "?"}: "${p.text}"`);
+      });
+    }
+    const fr = window.day.now().frame;
+    const minutes = window.day.now().minutes;
+    return schedulePlays.length >= 12 || (fr && minutes > day.dayStart + 10 * 60);
+  }, 90000, "12 Pilot schedule lines").catch(() => {});
+  clickSpeed(1);
+  const distinct = new Set(schedulePlays.map((p) => p.id || p.text));
+  t.metric("pilotDistinct", distinct.size);
+  if (distinct.size < 12) t.problem("bug", `Pilot only spoke ${distinct.size} distinct schedule lines (need 12+)`);
+  else t.event("pilot-schedule-count", `${distinct.size} distinct schedule lines`);
+  t.progress(0.35);
+
+  t.scene("Take control");
+  const out = day.actions.find((a) => /steps out/.test(a.text || "")) || quietMoment(day);
+  scrubTo(out.start + Math.min(0.4, (out.end - out.start) / 2));
+  await sleep(300);
+  const beforeTake = plays.length;
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  await t.until(() => plays.length > beforeTake && plays.some((p) => p.group === "take" || p.via === "take" || (p.via || "").includes("control") && /sky|move|schedule/i.test(p.text || "")), 8000, "Pilot take line").catch(() => {});
+  const take = [...plays].reverse().find((p) => p.group === "take" || /sky|Your move|hold the schedule/i.test(p.text || ""));
+  if (!take) t.problem("bug", "Taking control didn't play a Pilot take line");
+  else t.event("pilot-take", `"${take.text}"`);
+
+  await t.until(() => P.now().talking || P.now().pulse > 0.5, 4000, "wrist ring pulse").catch(() => {});
+  const ringOn = P.now().ring && (P.now().talking || P.now().pulse > 0.4);
+  if (!ringOn) t.problem("bug", "Wrist ring did not pulse while Pilot spoke");
+  else t.event("pilot-ring", `ring=${P.now().ring} pulse=${P.now().pulse}`);
+  t.progress(0.55);
+
+  t.scene("Chaos then let go");
+  const Pow = window.powers || (window.day && window.day.powers);
+  if (Pow) {
+    await t.until(() => Pow.now().pressure + 0.05 >= 40, 15000, "Charge for chaos").catch(() => {});
+    pressKey("v"); // start wind; hold for tornado if possible
+    await sleep(100);
+    // Force a tornado command so worried fires even if hold depth is awkward in bots
+    if (Pow.command) Pow.command("tornado", "playtest");
+    await sleep(600);
+  }
+  // Seed a deed so let-go names it (session clears on take; note after take)
+  if (window.day.memory && window.day.memory.note) {
+    try { window.day.memory.note("birdieRain", "park", "rain"); } catch (e) { /* */ }
+  }
+  const beforeGo = plays.length;
+  pressKey("Escape");
+  await t.until(() => C.mode() === "schedule" || C.mode() === "returning", 6000, "Let go").catch(() => {});
+  await t.until(() => plays.length > beforeGo, 10000, "Pilot let-go line").catch(() => {});
+  const letgo = [...plays].reverse().find((p) => p.group === "letgo" || p.deed || /Tomatoes|schedule|Storm|Rain|Fog|Sun|Bins|neighbour|park/i.test(p.text || ""));
+  if (!letgo) t.problem("bug", "Letting go didn't play a Pilot let-go line");
+  else {
+    t.event("pilot-letgo", `"${letgo.text}" deed=${letgo.deed || "?"}`);
+    if (!/tomato|desk|ask|park|roof|storm|bin|fog|sun|rain|rescue|neighbour|schedule|catch/i.test(letgo.text || "")) {
+      t.problem("bug", `Pilot let-go line didn't name a deed: "${letgo.text}"`);
+    }
+  }
+  t.progress(0.75);
+
+  // Overlap: Pilot and Small Weather must never both be "playing" as overlapping voice events
+  let overlapBad = 0;
+  let heAt = null;
+  let pilotAt = null;
+  voicePlays.forEach((p) => {
+    const who = p.who || (String(p.group || "").startsWith("pilot") ? "Pilot" : "He");
+    const at = p.at || 0;
+    if (who === "Pilot" || String(p.group || "").startsWith("pilot")) {
+      if (heAt != null && Math.abs(at - heAt) < 0.05) overlapBad += 1;
+      pilotAt = at;
+    } else {
+      if (pilotAt != null && Math.abs(at - pilotAt) < 0.05) overlapBad += 1;
+      heAt = at;
+    }
+  });
+  const reported = plays.filter((p) => p.overlap).length;
+  t.metric("pilotOverlaps", overlapBad + reported);
+  if (overlapBad + reported > 0) t.problem("bug", `Pilot overlapped Small Weather (${overlapBad + reported} times)`);
+  else t.event("pilot-no-overlap", "0 overlapping voice events");
+
+  const cap = $("voice-caption");
+  if (cap && !cap.hidden) {
+    const text = (cap.textContent || "").replace(/\s+/g, " ").trim();
+    const lines = text.split("\n").filter(Boolean);
+    if (options && options.touch) {
+      if (lines.length > 1 && text.length > 80) t.problem("bug", "Pilot caption is more than one line on phone");
+      else t.event("pilot-caption-phone", `"${text.slice(0, 80)}" at ${innerWidth}x${innerHeight}`);
+      checkHud(t, "pilot: phone");
+    }
+  } else if (options && options.touch) {
+    // Force a Pilot line to check layout
+    P.say("take", { via: "playtest" });
+    await sleep(400);
+    if (cap && !cap.hidden) {
+      t.event("pilot-caption-phone", `"${(cap.textContent || "").trim().slice(0, 80)}"`);
+      checkHud(t, "pilot: phone");
+    } else t.problem("bug", "No Pilot caption on phone");
+  }
+
+  checkHud(t, "pilot");
+  window.removeEventListener("day:pilot", onPilot);
+  window.removeEventListener("day:voice", onVoice);
+  t.metric("pilotPlays", plays.length);
+  t.event("pilot-summary", `${plays.length} Pilot plays, ${distinct.size} schedule distinct, overlaps=${overlapBad + reported}`);
+  t.progress(1);
+}
+
 /* ---------------- storm-ride: glide on the wind, ride an updraft to a roof, cross rooftop to rooftop ---------------- */
 // Real input: Enter, WASD, Space held, G for a gust updraft, 4 for storm weather. Setup: day bar beside the car.
 async function stormRide(options, t) {
@@ -9143,6 +9309,7 @@ installPlaytest({
     { id: "spoken-dialogue", title: "Spoken dialogue: every dialogue line has its own clip in the build, sampled clips load and decode, and with Sound on Part 1's opening lines play as voice (day:dialogue say), not babble", seconds: 60, tags: ["voice", "story", "audio"], description: "Load with ?playtest=spoken-dialogue. Sound on (real pointer), Enter, Part 1 started by its API (setup). Events dialogue-index / dialogue-decode / sound-on / dialogue-say / dialogue-played." },
     { id: "voice", title: "Small Weather's DoD voice: episode open on Enter, a reaction for each weather state, power barks not every time, episode close on Esc", seconds: 100, tags: ["voice"], description: "Sound on (real pointer), Enter, keys 1–7 with cooldown gaps, bolts for chance/cooldown skips, Esc. Events voice-play / voice-weather-* / voice-power." },
     { id: "voice-director", title: "Voice director: take control and first power uses speak with a caption clear of the ability bar; lines never overlap; Voices mute leaves music/effects alone; day end speaks", seconds: 90, tags: ["voice", "audio"], description: "Load with ?playtest=voice-director. Sound on (real pointer), Enter, E then R, Voices off in Settings, day-end recap (setup). Optional {\"touch\":true}. Events voice-take / voice-power-first / voice-caption / voice-no-overlap / voices-mute / voice-dayend. Run at desktop and 390x844." },
+    { id: "pilot", title: "Pilot: on a 1200× day at least 12 distinct schedule lines; every take-over and let-go plays a Pilot voice event (let-go names the deed); wrist ring pulses while Pilot speaks; never overlaps Small Weather; on phone the Pilot caption is one line and clear of touch controls", seconds: 180, tags: ["voice", "characters", "phone", "story"], description: "Load with ?playtest=pilot. Sound on, 1200× through morning blocks, Enter, cast weather chaos, Esc. Optional {\"touch\":true} for 390x844. Events pilot-schedule / pilot-take / pilot-letgo / pilot-ring / pilot-no-overlap / pilot-caption-phone; metrics pilotDistinct, pilotOverlaps." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
     { id: "story-ending", title: "Part 3 (the reservoir) after Part 2, and the ending card: three Part 3 runs reach three different endings (Fair Weather, Heavy Weather, Overcast) and the card says how the park, turbines, market and reservoir fared", seconds: 840, tags: ["episodes", "story"], description: "Day bar to a moment outdoors and to 22:30 (setup), Enter, each part started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza, the annex and the Storm Tank, R, X, V and E. Events part3-offered / ending-say / ending-gauge / ending-kick / ending-card / ending-reached / ending-fared / three-endings." },
@@ -9223,6 +9390,7 @@ installPlaytest({
       else if (id === "camera-run") await cameraRun(options, t);
       else if (id === "voice") await voice(options, t);
       else if (id === "voice-director") await voiceDirector(options, t);
+      else if (id === "pilot") await pilotScenario(options, t);
       else if (id === "spoken-dialogue") await spokenDialogue(options, t);
       else if (id === "foley") await foley(options, t);
       else if (id === "episodes") await episodes(options, t);
