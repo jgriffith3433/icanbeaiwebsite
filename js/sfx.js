@@ -431,6 +431,22 @@
       noise({ type: "lowpass", freq: 400, to: 1200, q: 1, dur: 0.25, vol: 0.08 * g, attack: 0.01, pan });
       tone({ freq: 180, to: 90, dur: 0.2, vol: 0.05 * g, pan });
     },
+    /* Soft steam hiss off wet roofs after a Sun-break clear (js/aftermath.js). */
+    steamHiss(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("steam");
+      synthTag("city");
+      noise({ type: "highpass", freq: 900, to: 1400, q: 0.6, dur: 0.7, vol: 0.045 * g, attack: 0.12, pan });
+      noise({ type: "bandpass", freq: 500, to: 300, q: 0.7, dur: 0.9, vol: 0.03 * g, attack: 0.2, pan });
+    },
+    /* One gutter drip tick during the after-drip window. */
+    dripTick(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("drip");
+      synthTag("city");
+      tone({ freq: 880 + Math.random() * 400, to: 220, dur: 0.07, vol: 0.035 * g, wave: "sine", pan });
+      noise({ type: "bandpass", freq: 1600, to: 600, q: 1.2, dur: 0.05, vol: 0.025 * g, attack: 0.001, pan });
+    },
     thud() { note("fail"); if (sample("ui-fail")) return; synthTag("ui"); tone({ freq: 120, to: 55, dur: 0.45, vol: 0.18 }); tone({ freq: 127, to: 58, dur: 0.45, vol: 0.08, wave: "sawtooth", band: 300 }); },
     blip() { note("blip"); if (sample("ui-toast")) return; synthTag("ui"); tone({ freq: 1250, to: 1600, dur: 0.12, vol: 0.06, wave: "triangle" }); },
     rumble() { note("rumble"); noise({ type: "lowpass", freq: 120, dur: 0.9, vol: 0.25, attack: 0.05 }); },
@@ -785,11 +801,35 @@
       else if (d.kind === "wind") S.clap(0, 0.8);
       return;
     }
+    if (d.action === "aftermath") {
+      S.cheer(0, 0.85);
+      S.bird(0, 1.1);
+      S.steamHiss(0, 1);
+      // a few umbrella folds as the street clears
+      setTimeout(() => S.umbSnap(-0.3, 0.7), 180);
+      setTimeout(() => S.umbSnap(0.25, 0.65), 420);
+      setTimeout(() => S.umbSnap(0.05, 0.55), 780);
+      return;
+    }
+    if (d.action === "umbrellas-closed" && (d.count | 0) > 0) {
+      if (performance.now() - lastUmb > 400) { lastUmb = performance.now(); S.umbSnap(0, 0.6); }
+      return;
+    }
     if (d.action === "flinch") { S.gasp(0, 0.7); return; }
     if (d.action === "scatter" || d.action === "scream") {
       const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
       S.scream(at.pan, at.gain);
     }
+  });
+  window.addEventListener("day:aftermath", (e) => {
+    const d = e.detail || {};
+    if (d.action === "start") {
+      S.cheer(0, 0.7);
+      S.bird(-0.2, 1);
+      S.steamHiss(0.1, 0.9);
+      // gutter ticks for the first few seconds of after-drip
+      for (let i = 0; i < 6; i++) setTimeout(() => S.dripTick((i % 3) * 0.3 - 0.3, 0.7), 300 + i * 480);
+    } else if (d.action === "bird-land") S.bird(0.3, 0.7);
   });
   window.addEventListener("day:story", (e) => {
     const d = e.detail || {};

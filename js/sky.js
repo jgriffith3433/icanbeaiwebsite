@@ -138,6 +138,7 @@ export function installSky(world) {
         weights: Object.assign({}, st.weights),
         painted: Number(st.painted.toFixed(3)),
         gap: Number(st.gap.toFixed(3)),
+        hole: { x: Number(st.hole.x.toFixed(3)), y: Number(st.hole.y.toFixed(3)), z: Number(st.hole.z.toFixed(3)) },
         godRays: { on: st.god.active, made: st.god.made, supported: !!st.god.supported },
         deck: {
           layers: st.layers ? st.layers.filter((m) => m.isEnabled()).length : 0,
