@@ -43,6 +43,7 @@ import "./dialogue.js"; // the story's and neighbors' lines, spoken in each spea
 import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
 import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
+import "./titlesound.js"; // night-city ambience under the title, a click on its buttons, a whoosh on the first Gust (before title.js)
 import "./daily.js"; // today's request: one neighbour asks for one bit of weather, by the real date (before title.js shows it)
 import "./transition.js"; // storm-cloud wipe, prop fade-in, frame timing around every scene change (before title handoff)
 import "./title.js"; // the title screen: the skyline, Play and Episodes (opens first)
