@@ -32,6 +32,11 @@ function copyStatic() {
       fs.mkdirSync(folDir, { recursive: true });
       const fol = fs.existsSync('audio/foley') ? fs.readdirSync('audio/foley').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/foley/' + n) : [];
       fs.writeFileSync(path.join(folDir, 'index.json'), JSON.stringify({ files: fol }) + '\n');
+      // js/ui-art.js loads only the painted webp this lists (textures/ui/*.webp), so missing art never 404s
+      const uiDir = path.join(outDir, 'textures', 'ui');
+      fs.mkdirSync(uiDir, { recursive: true });
+      const uiFiles = fs.existsSync('textures/ui') ? fs.readdirSync('textures/ui').filter((n) => /\.webp$/.test(n)).sort().map((n) => 'textures/ui/' + n) : [];
+      fs.writeFileSync(path.join(uiDir, 'index.json'), JSON.stringify({ files: uiFiles }) + '\n');
       // Layered power casts (crack/body/rumble, whoosh, gale, tornado, sun shimmer)
       const powDir = path.join(outDir, 'audio', 'sfx', 'power');
       fs.mkdirSync(powDir, { recursive: true });
