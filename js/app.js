@@ -36,6 +36,7 @@ import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beat
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
 import "./street.js"; // the street teaches: Rain, Sun, Fog and Wind each arrive on a neighbor's voiced ask (starts on the cold open)
 import "./coldopen.js"; // a new player's first Play: the roof at dusk, one prompt, the first bolt (before title.js calls it)
+import "./heroprompt.js"; // one in-world prompt over him until the first cast: "Hold V to call wind"
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
 import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build

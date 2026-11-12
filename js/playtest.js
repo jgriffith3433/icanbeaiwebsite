@@ -5525,6 +5525,19 @@ async function windFog(options, t) {
   t.event("control-taken", touch ? "by touch, low quality" : "Enter");
   if (C.place) C.place(112, 24, -Math.PI / 2); // setup: on the plaza, a flag pole and the avenue's trees in view
   await sleep(800);
+  /* clarity: one prompt floats over him ("Hold V to call wind"), no debug dot or error badge on the page */
+  const hp = window.day.heroprompt;
+  await t.until(() => hp && hp.now().shown, 5000, "the prompt over him").catch(() => {});
+  const pe = $("hero-prompt");
+  const pr = boxOf(pe);
+  if (!pr) t.problem("bug", "No in-world prompt over Small Weather after taking control");
+  else {
+    t.event("hero-prompt", `"${pe.textContent}" at ${Math.round(pr.left)},${Math.round(pr.top)} (${Math.round(pr.width)}x${Math.round(pr.height)})`);
+    if (pr.left < 0 || pr.right > innerWidth || pr.top < 0) t.problem("bug", "The prompt over him runs off the screen");
+  }
+  const dbg = document.querySelector("[data-hawkes-report]");
+  if (dbg && getComputedStyle(dbg).display !== "none") t.problem("bug", "The report-a-bug dot is visible on the player page");
+  else t.event("no-debug-ui", "no bug dot or error badge on screen");
   const quality = window.day.look.quality();
   t.metric("quality", quality === "low" ? 0 : 1);
   if (P.abilities && P.abilities.reset) P.abilities.reset(100);
