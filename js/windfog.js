@@ -842,6 +842,18 @@ export function createWindFog(B, scene, deps) {
     hold.push(cone);
   }
   buildFog();
+  // The fog's meshes are hidden until Fog is cast, so their shaders (opacity texture, vertex alpha, thin instances)
+  // used to compile on the first fogged frame: a multi-second stall on a throttled phone (the wind-fog phone run's
+  // fps p5 of 4). Compile them in the background once the page has settled instead.
+  setTimeout(() => {
+    const warm = (m, inst) => {
+      try { if (m && m.material && m.material.forceCompilationAsync) m.material.forceCompilationAsync(m, inst ? { useInstances: true } : undefined).catch(() => {}); } catch (err) { /* headless */ }
+    };
+    FOG.slices.forEach((s) => warm(s.mesh));
+    FOG.veils.forEach((v) => warm(v.mesh));
+    warm(FOG.shaft, true);
+    warm(FOG.cone, true);
+  }, 4000);
 
   let lastShaftAt = -9;
   const fogCol = new B.Color3();
