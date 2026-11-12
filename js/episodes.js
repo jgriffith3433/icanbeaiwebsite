@@ -1943,33 +1943,42 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       hideOffer();
       hideMenu();
       if (active) endQuiet();
+      const openChapter = () => {
+        chapterSeen(n);
+        const played = day.moments.chapter(n, {
+          onEnd: (how, d) => {
+            // let-go or another moment replacing it means he didn't mean to start the episode
+            if (d && (d.via === "let-go" || d.via === "replaced")) return;
+            startNow(ep, via, Object.assign({}, opts, { noOpener: true }));
+          },
+        });
+        if (played) { mark("chapter", { chapter: n, id: ep.id }); return true; }
+        return startNow(ep, via, opts);
+      };
+      const T = day.transition;
+      // Clock jump under the storm wipe so the chapter opener never hard-cuts the hour in the open.
+      if (T && T.wipe && ep.clock && day.jump) {
+        T.wipe(() => { day.jump(ep.clock); }, { kind: "chapter", id: "ch-" + n }).then(openChapter);
+        return true;
+      }
       if (ep.clock && day.jump) day.jump(ep.clock);
-      chapterSeen(n);
-      const played = day.moments.chapter(n, {
-        onEnd: (how, d) => {
-          // let-go or another moment replacing it means he didn't mean to start the episode
-          if (d && (d.via === "let-go" || d.via === "replaced")) return;
-          startNow(ep, via, Object.assign({}, opts, { noOpener: true }));
-        },
-      });
-      if (played) { mark("chapter", { chapter: n, id: ep.id }); return true; }
+      return openChapter();
     }
     return startNow(ep, via, opts);
   }
-  function startNow(ep, via, opts) {
-    if (!ep) return false;
-    if (opts && opts.challenge && !ep.tutorial) ep = challengeEp(ep, cfg.challenge);
-    hideOffer();
-    hideMenu();
-    if (active) endQuiet();
-    const C = day.control;
-    if (C && C.mode && C.mode() === "schedule") {
-      if (day.jump && ep.clock) day.jump(ep.clock);
-      // Wait a beat for the frame, then take control if needed.
-      setTimeout(() => {
-        if (C.mode() === "schedule") C.take();
-      }, 80);
-    }
+  /** Fade newly spawned episode meshes in over 0.3 s so they never pop within 30 m. */
+  function fadeNewProps() {
+    const T = day.transition;
+    if (!T || !T.fadeIn) return;
+    const nodes = [];
+    story.stalls.forEach((s) => s.node && nodes.push(s.node));
+    story.turbines.forEach((t) => t.root && nodes.push(t.root));
+    if (story.gauge && story.gauge.root) nodes.push(story.gauge.root);
+    props.rods.forEach((r) => { if (r.mesh) nodes.push(r.mesh); if (r.ball) nodes.push(r.ball); });
+    props.debris.forEach((m) => m && nodes.push(m));
+    if (nodes.length) T.fadeIn(nodes);
+  }
+  function armEpisode(ep, via, opts) {
     active = {
       ep,
       goals: goalState(ep),
@@ -2012,6 +2021,8 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (ep.turbines) spawnTurbines(ep.turbines);
     if (ep.id === "still-blades" && world.officePower) world.officePower(0.15); // "the lights are low": the moment brings them back
     if (ep.gauge) spawnGauge(ep.gauge);
+    // Fade after the wipe lifts (caller), or now if there was no wipe.
+    if (!(opts && opts.wiped)) fadeNewProps();
     stopStage();
     pendingClosing = null;
     closeAuto = 0;
@@ -2026,7 +2037,31 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     }
     if (ep.lines && ep.lines.start && day.note) day.note(ep.lines.start);
     paintHud();
-    mark("start", { id: ep.id, via: via || "play", title: ep.title, challenge: !!ep.challengeOn, timer: ep.timer || 0 });
+    mark("start", { id: ep.id, via: via || "play", title: ep.title, challenge: !!ep.challengeOn, timer: ep.timer || 0, wipe: !!(opts && opts.wiped) });
+  }
+  function startNow(ep, via, opts) {
+    if (!ep) return false;
+    if (opts && opts.challenge && !ep.tutorial) ep = challengeEp(ep, cfg.challenge);
+    hideOffer();
+    hideMenu();
+    if (active) endQuiet();
+    const C = day.control;
+    const T = day.transition;
+    const wantWipe = !(opts && opts.noWipe) && T && T.wipe;
+    if (wantWipe) {
+      // Storm-cloud wipe hides the clock jump, prop swap, take-control blend and shader warm-up.
+      T.wipe(() => {
+        if (day.jump && ep.clock) day.jump(ep.clock);
+        armEpisode(ep, via, Object.assign({}, opts, { wiped: true }));
+        if (C && C.mode && C.mode() === "schedule") C.take();
+      }, { kind: "episode", id: ep.id }).then(() => { fadeNewProps(); });
+      return true;
+    }
+    if (C && C.mode && C.mode() === "schedule") {
+      if (day.jump && ep.clock) day.jump(ep.clock);
+      setTimeout(() => { if (C.mode() === "schedule") C.take(); }, 80);
+    }
+    armEpisode(ep, via, opts);
     return true;
   }
   function endQuiet() {
@@ -2210,8 +2245,14 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     scoreNextLine.textContent = lock ? `Next episode is locked. Finish ${lock} first.` : "";
     scoreEl.dataset.next = nxt && !lock && !scoreNext.hidden ? nxt.id : "";
   }
-  /* Jump the clock to an episode's chapter, take control and start it (the menu, Replay and Next all go this way). */
+  /* Jump the clock to an episode's chapter, take control and start it (the menu, Replay and Next all go this way).
+     With js/transition.js the clock jump and prop swap run under the storm wipe — never in the open. */
   function launch(ep, opts) {
+    const T = day.transition;
+    if (T && T.wipe) {
+      start(ep, "menu", opts);
+      return;
+    }
     if (day.jump && ep.clock) day.jump(ep.clock);
     const C = day.control;
     setTimeout(() => {

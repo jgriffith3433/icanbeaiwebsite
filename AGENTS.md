@@ -31,7 +31,15 @@ levels get redone over time. The page is the day playing on its own until someon
   walks back by the day's own routes (`DayEngine.route`, through the doors) to where his day says he should be by
   now, then the day has him again. Where he can't walk to (the day has him driving, or in the other building) he
   catches up with it in a quick fade. He can't be taken while he's driving. The log gets a line for each of these
-  (`day.note()`), and the panel says `control.lines.steering` while he's the player's.
+  (`day.note()`), and the panel says `control.lines.steering` while he's the player's. Take and let-go each play a
+  whoosh with the camera blend (`js/score.js`).
+- **Seamless scene changes** (`js/transition.js`, numbers in `day.config.js` `transition`; imported before `title.js`):
+  the loading card fades 0.9 s into the title crane (theme arms under the handoff when Sound is on); every episode
+  start (menu, Replay, Next, API) runs a 1.2 s storm-cloud wipe that covers the clock jump, prop spawn and shader
+  warm-up (`forceCompilationAsync` / `whenReadyAsync`); episode props fade in 0.3 s; day-bar scrubs crossfade grade
+  and exposure (~0.7 s) instead of stepping; crowd LOD on low keeps hair/bags to 32 m so nothing pops inside 30 m.
+  `day.transition`: `wipe(work)`, `fadeIn(meshes)`, `warm()`, `active()`, `stats()`, `now()`; events `day:transition`.
+  Playtest: `episode-jump` (`{"touch":true}` for phone; metrics `jumpWorstMs`, desktop ≤100 ms, phone ≤150 ms).
 - **His look:** a rigged 3D model made in Hawkes Gen from his Dose Of Destruction art (below, "His 3D model"): black
   messy hair, glasses, the navy tech jacket with glowing blue seams, cargo pants, glowing boots; lightning coils his
   arms while he's the player's. It's the same him all day (no pyjamas or towel colours: `person.outfits` only colours

@@ -207,6 +207,11 @@ Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather end
 
 ## What happens
 
+### Seamless scene changes (*In*, `js/transition.js`)
+- **Player feel:** the day never cuts to black between moments. Loading fades (0.9 s) into the title crane; episode menu / Replay / Next starts roll a **1.2 s storm-cloud wipe** (navy cloud front, not a black frame) that hides the clock jump, prop spawn and shader warm-up; take control and let go pair the camera blend with a whoosh; day-bar scrubs crossfade grade and exposure (~0.7 s) instead of stepping; episode props fade in over 0.3 s so nothing pops within 30 m.
+- **Heard / seen:** wipe is weather-diegetic (the same storm navy as the rest of the sky); `day:transition` events; playtest `episode-jump` (desktop + `{"touch":true}` phone).
+- **Canon:** scene changes are continuous like God of War (2018) — one world, no load cuts.
+
 ### Density walks (acceptance beads; ≤8 s / ≤30 m between)
 A later playtest walks these under control at walk speed and fails if quiet > 10 s (`quality.maxQuietSeconds`). Each bead is something new to see, hear or do. Spacing is a table in metres on every avenue segment (auto-checked from placed beads), not only the three hand walks.
 
