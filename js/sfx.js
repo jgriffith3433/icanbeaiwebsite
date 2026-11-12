@@ -155,13 +155,16 @@
     const f = a.c.createBiquadFilter();
     f.type = o.type || "lowpass";
     f.Q.value = o.q || 0.8;
-    f.frequency.setValueAtTime(o.freq, t);
-    if (o.to) f.frequency.exponentialRampToValueAtTime(o.to, t + o.dur);
+    // Every synthesized hit varies a little (pitch ~+-6%, level ~+-8%) so repeats never sound identical.
+    const pj = 0.94 + Math.random() * 0.12;
+    f.frequency.setValueAtTime(o.freq * pj, t);
+    if (o.to) f.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
     const g = a.c.createGain();
-    const vol = Math.max(0.0002, o.vol);
+    const vol = Math.max(0.0002, o.vol) * (0.92 + Math.random() * 0.16);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + (o.attack || 0.008));
+    g.gain.exponentialRampToValueAtTime(vol, t + Math.max(0.006, o.attack || 0.008));
     g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+    g.gain.setValueAtTime(0, t + o.dur + 0.002); // true zero before the source stops: no click
     src.connect(f);
     f.connect(g);
     const bus = o.bus || "sfx";
@@ -176,12 +179,14 @@
     const t = a.c.currentTime + (o.delay || 0);
     const osc = a.c.createOscillator();
     osc.type = o.wave || "sine";
-    osc.frequency.setValueAtTime(o.freq, t);
-    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + o.dur);
+    const pj = 0.97 + Math.random() * 0.06; // +-3% pitch: musical notes stay in tune, repeats still differ
+    osc.frequency.setValueAtTime(o.freq * pj, t);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
     const g = a.c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol), t + (o.attack || 0.01));
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol) * (0.94 + Math.random() * 0.12), t + Math.max(0.008, o.attack || 0.01));
     g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+    g.gain.setValueAtTime(0, t + o.dur + 0.002);
     let node = osc;
     if (o.band) {
       const f = a.c.createBiquadFilter();
