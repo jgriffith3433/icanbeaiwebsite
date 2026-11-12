@@ -345,9 +345,10 @@ export function startMoments() {
     try { c.spec.onEnd && c.spec.onEnd(how, d); } catch (e) { console.error("[moments]", e); }
     return true;
   }
-  /** Play a turning-point moment: spec { id, title, secs, sting, shot, lines: [{ who, text, at, caption }], speak, tick, onStart, onEnd }. */
+  /** Play a turning-point moment: spec { id, title, secs, sting, shot, lines: [{ who, text, at, caption }], speak, tick, onStart, onEnd }.
+      `force: true` plays even when turning moments are off (Part 3 ending scenes). */
   function play(spec) {
-    if (!spec || !turnOn || !day.world) return false;
+    if (!spec || (!turnOn && !spec.force) || !day.world) return false;
     if (cur) endTurn("skip", "replaced");
     const w = day.world();
     if (lineUp) endLine("skip", "moment");
@@ -435,6 +436,142 @@ export function startMoments() {
     if (cur && (a === "let-go" || a === "letgo")) endTurn("skip", "let-go");
   });
 
+  /* ---------- 5. Part 3 ending scenes (config episodes.endings.scenes): always on, ≤40 s, no text card ---------- */
+  const MAX_ENDING = 40;
+  const stamp = document.createElement("div");
+  stamp.id = "ending-stamp";
+  stamp.className = "mo-stamp";
+  stamp.hidden = true;
+  stamp.innerHTML = `<b class="rank"></b><span class="name"></span>`;
+  document.body.appendChild(stamp);
+  const stampRank = stamp.querySelector(".rank");
+  const stampName = stamp.querySelector(".name");
+  style.textContent += `
+.mo-stamp{display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:radial-gradient(ellipse at 50% 42%,rgba(8,12,24,.35),rgba(4,6,12,.55));opacity:0;transition:opacity .45s ease}
+.mo-stamp.on{opacity:1}
+.mo-stamp[hidden]{display:none}
+.mo-stamp .rank{font:700 clamp(4.2rem,22vw,9rem)/1 Fraunces,Georgia,serif;color:#f6f1e8;text-shadow:0 4px 28px rgba(0,0,0,.75),0 0 40px rgba(126,200,255,.45);letter-spacing:.04em}
+.mo-stamp .name{margin-top:8px;font:600 .85rem/1 Outfit,system-ui,sans-serif;letter-spacing:.34em;text-transform:uppercase;color:#7ec8ff;text-shadow:0 2px 12px rgba(0,0,0,.7)}
+`;
+  function clearEndingStage() {
+    try {
+      const N = day.neighbors;
+      if (N && N.stand) ["birdie", "dex", "ines"].forEach((id) => N.stand(id, null, null));
+    } catch (e) { /* none */ }
+  }
+  function runEndingFx(fx, id) {
+    if (!fx) return;
+    try {
+      if (fx.weather && day.weather && day.weather.set) day.weather.set(fx.weather, fx.intensity != null ? fx.intensity : 0.6, "ending");
+      if (fx.lawn != null && day.slice && day.slice.setLawn) day.slice.setLawn(fx.lawn > 0 ? "damp" : "straw", fx.lawn, true);
+      if (fx.celebrate) window.dispatchEvent(new window.CustomEvent("day:crowd", { detail: { action: "celebrate", secs: fx.celebrate } }));
+      if (fx.umbrellas) window.dispatchEvent(new window.CustomEvent("day:crowd", { detail: { action: "hush", secs: fx.secs || 16 } }));
+      if (fx.flood && day.episodes && day.episodes.floodAvenue) day.episodes.floodAvenue();
+      if (fx.spin != null && day.episodes) {
+        if (!((day.episodes.story && day.episodes.story()) || {}).turbine && day.episodes.ensureTurbines) day.episodes.ensureTurbines();
+        if (day.episodes.spinTurbines) day.episodes.spinTurbines(fx.spin);
+      }
+      if (fx.lawnAnim != null && day.slice && day.slice.setLawn) {
+        // time-lapse bloom: ease straw → damp over a few seconds of the cut
+        const from = fx.lawnFrom != null ? fx.lawnFrom : 0;
+        const to = fx.lawnAnim;
+        const dur = Math.max(0.8, fx.lawnSecs || 4);
+        const t0 = performance.now();
+        const step = () => {
+          const k = Math.min(1, (performance.now() - t0) / (dur * 1000));
+          const e = k * k * (3 - 2 * k);
+          try { day.slice.setLawn("damp", from + (to - from) * e, true); } catch (err) { /* */ }
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    } catch (e) { console.error("[moments ending fx]", e); }
+  }
+  /** Play ending A/B/C in-engine. Always available (not gated by turning-moments). opts: { rank, name, onEnd }. */
+  function ending(which, opts) {
+    opts = opts || {};
+    const END = (window.DAY_CONFIG && window.DAY_CONFIG.episodes && window.DAY_CONFIG.episodes.endings) || {};
+    const scene = END.scenes && END.scenes[which];
+    const meta = END[which];
+    if (!scene || !day.world) return false;
+    const secs = Math.min(MAX_ENDING, scene.secs || 32);
+    const shots = (scene.shots || []).slice().sort((a, b) => (a.at || 0) - (b.at || 0));
+    const fxList = (scene.fx || []).slice().sort((a, b) => (a.at || 0) - (b.at || 0));
+    let shotI = 0;
+    let fxI = 0;
+    const pilotLines = (window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.lines) || [];
+    const N = day.neighbors;
+    (scene.places || []).forEach((p) => {
+      try {
+        if (N && N.stand) N.stand(p.id, p.x, p.z);
+        if (N && N.gesture && p.gesture) N.gesture(p.id, p.gesture);
+      } catch (e) { /* none */ }
+    });
+    const first = shots[0] || { tx: 118, ty: 4, tz: 26, alpha: -1.8, beta: 1.1, radius: 22 };
+    const ok = play({
+      id: "ending-" + which,
+      force: true, // endings always play, even when turning-moments are off for other playtests
+      title: (meta && meta.name) || which,
+      secs,
+      max: MAX_ENDING,
+      sting: null, // the score stem sting plays below; momentSting stays for turning points
+      shot: Object.assign({ secs }, first),
+      lines: (scene.lines || []).map((L) => ({
+        who: L.who,
+        label: ENGINE[L.who] || L.who,
+        text: L.text,
+        at: L.at,
+        caption: L.caption || L.text,
+        voiced: true,
+        id: L.id,
+      })),
+      speak: (who, text) => {
+        if (who === "Pilot") {
+          const line = pilotLines.find((p) => p.text === text);
+          try { if (line && day.voice && day.voice.speakPilot) day.voice.speakPilot(line, { via: "ending", queue: false, radio: window.DAY_CONFIG.pilot.radio }); } catch (e) { /* */ }
+        } else {
+          try { window.dispatchEvent(new window.CustomEvent("day:story", { detail: { action: "say", who, text, moment: true, ending: which, id: "ending-" + which } })); } catch (e) { /* */ }
+        }
+      },
+      onStart: () => {
+        try {
+          if (day.stems && day.stems.sting) day.stems.sting(scene.sting === "failure" ? "failure" : "resolution");
+        } catch (e) { /* */ }
+        try { window.dispatchEvent(new window.CustomEvent("day:episode", { detail: { action: "ending-scene", ending: which, name: meta && meta.name, secs, rank: opts.rank || null } })); } catch (e) { /* */ }
+      },
+      tick: (k, total) => {
+        const t = k * total;
+        while (shotI + 1 < shots.length && t >= (shots[shotI + 1].at || 0)) {
+          shotI++;
+          const s = shots[shotI];
+          const left = Math.max(1.2, total - t);
+          try { day.world() && day.world().cineShot(Object.assign({ secs: left, cut: true }, s)); } catch (e) { /* */ }
+        }
+        while (fxI < fxList.length && t >= (fxList[fxI].at || 0)) {
+          runEndingFx(fxList[fxI], which);
+          fxI++;
+        }
+      },
+      onEnd: (how, d) => {
+        clearEndingStage();
+        const rank = opts.rank || "C";
+        const name = (meta && meta.name) || which;
+        stampRank.textContent = rank;
+        stampName.textContent = name;
+        stamp.hidden = false;
+        stamp.classList.add("on");
+        try { window.dispatchEvent(new window.CustomEvent("day:episode", { detail: { action: "ending-stamp", ending: which, name, rank, how, seconds: d && d.seconds } })); } catch (e) { /* */ }
+        setTimeout(() => {
+          stamp.classList.remove("on");
+          setTimeout(() => { stamp.hidden = true; }, 500);
+        }, 2200);
+        try { opts.onEnd && opts.onEnd(how, Object.assign({}, d, { ending: which, rank, name })); } catch (e) { console.error("[moments]", e); }
+      },
+    });
+    if (!ok) clearEndingStage();
+    return ok;
+  }
+
   const api = {
     takeover,
     recap: (via) => recap(via || "api"),
@@ -442,6 +579,7 @@ export function startMoments() {
     pickDeeds: (key, n) => pickDeeds(key || day.now().key, n || D.speakDeeds || 2),
     play,
     chapter,
+    ending,
     chapters: () => chapters().map((c) => ({ n: c.n, id: c.id, title: c.title, line: c.line, episodes: c.episodes.slice(), secs: c.opener && c.opener.secs })),
     playing: () => !!cur,
     turning: (id) => (id ? TURN[id] || null : Object.assign({}, TURN)),
