@@ -345,6 +345,10 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     clips: SKIN_CLIPS.filter((c) => named(c)),
     clip: () => clip,
     motion: () => Object.assign({}, motion, ik.stats()),
+    /* What his body is doing right now, in his own frame (+z forward, +x his left): how far the spine and neck lean
+       from upright, the pelvis and shoulder lines' yaw, how far the knees bend, the hands' gap. The clip-poses playtest
+       reads this on a real frame to flag a twisted torso, a hanging head or an arm through the body. */
+    pose: () => bodyPose(B, wrap, nodeByShort),
     /* clip, ground speed (m/s), dt; mine: the player has him (the lightning shows) */
     play(c, speed, dt, mine) {
       const ctx = readCtx();
@@ -451,6 +455,34 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       try { rim.dispose(); } catch (e) { /* */ }
       try { fill.dispose(); } catch (e) { /* */ }
     },
+  };
+}
+
+function bodyPose(B, wrap, byShort) {
+  const inv = wrap.getWorldMatrix().clone().invert();
+  const at = (n) => (byShort[n] ? B.Vector3.TransformCoordinates(byShort[n].getAbsolutePosition(), inv) : null);
+  const P = {};
+  ["Hips", "Neck", "Head", "LeftArm", "RightArm", "LeftHand", "RightHand", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg", "LeftFoot", "RightFoot"].forEach((n) => (P[n] = at(n)));
+  if (Object.values(P).some((v) => !v)) return null;
+  const d = (a, b) => P[b].subtract(P[a]);
+  const deg = (r) => (r * 180) / Math.PI;
+  const bend = (a, b, c) => {
+    const u = d(a, b);
+    const v = d(b, c);
+    return deg(Math.acos(Math.max(-1, Math.min(1, B.Vector3.Dot(u, v) / (u.length() * v.length() || 1)))));
+  };
+  const sp = d("Hips", "Head");
+  const nk = d("Neck", "Head");
+  const yaw = (a, b) => deg(Math.atan2(d(a, b).z, d(a, b).x));
+  return {
+    lean: deg(Math.atan2(sp.z, sp.y)),
+    neck: deg(Math.atan2(nk.z, nk.y)),
+    sideLean: deg(Math.atan2(sp.x, sp.y)),
+    hipYaw: yaw("RightUpLeg", "LeftUpLeg"),
+    shoulderYaw: yaw("RightArm", "LeftArm"),
+    kneeL: bend("LeftUpLeg", "LeftLeg", "LeftFoot"),
+    kneeR: bend("RightUpLeg", "RightLeg", "RightFoot"),
+    handsApart: P.LeftHand.x - P.RightHand.x,
   };
 }
 
