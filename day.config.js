@@ -880,7 +880,7 @@ window.DAY_CONFIG = {
      Speaks through js/voice.js (never over Small Weather). Wrist ring on him.
      ------------------------------------------------------------------------ */
   pilot: {
-    voiceId: null, // set after audio.voice-save (Gen gv_...)
+    voiceId: "gv_c2c9cdffeae27b99", // Gen "I Can Be — Pilot" (audio.voice-save, candidate 1)
     volume: 0.8,
     captionSecs: 2.6,
     cooldown: 1.4,
