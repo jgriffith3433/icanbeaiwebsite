@@ -2395,21 +2395,23 @@ async function heroMove(options, t) {
     t.event("ik-ready", `clips ${skin().clips.join(" ")}; rim ${motion0().rimOn}`);
   }
   t.scene("Stairs and ramp");
+  // Render fps (same probe as render-grade / sky-cast): engine delta, not setInterval cadence
   const fpsSamples = [];
-  let lastFrame = performance.now();
-  const walkIv = setInterval(() => {
-    const now = performance.now();
-    const dt = now - lastFrame;
-    lastFrame = now;
-    if (dt > 0 && dt < 250) fpsSamples.push(1000 / dt);
-  }, 200);
-  // Real WASD up the ramp and along the roof
-  await goTo(s.x1 - 0.4, s.z, t, { sprint: true, close: 0.5, progress: 0.35, ms: 50000, stall: 8000 }).catch(() => {});
+  const scene = window.day.world && window.day.world().scene;
+  const eng = window.day.world && window.day.world().engine;
+  const fpsObs = scene && eng
+    ? scene.onAfterRenderObservable.add(() => {
+      const dt = eng.getDeltaTime();
+      if (dt > 0 && dt < 250) fpsSamples.push(dt);
+    })
+    : null;
+  // Real WASD up the ramp and along the roof (~60 s of planted steps; walk, not sprint)
+  await goTo(s.x1 - 0.4, s.z, t, { sprint: false, close: 0.5, progress: 0.35, ms: 55000, stall: 8000 }).catch(() => {});
   await goTo(-19.5, s.z + 1.5, t, { sprint: false, close: 0.8, progress: 0.5, ms: 25000, stall: 6000 }).catch(() => {});
   // Pace the roof edge and back (gravel / ramp feel)
-  await goTo(-22, 3.2, t, { close: 1, progress: 0.55, ms: 20000, stall: 5000 }).catch(() => {});
-  await goTo(-18, 5.5, t, { close: 1, progress: 0.6, ms: 20000, stall: 5000 }).catch(() => {});
-  clearInterval(walkIv);
+  await goTo(-22, 3.2, t, { sprint: false, close: 1, progress: 0.55, ms: 20000, stall: 5000 }).catch(() => {});
+  await goTo(-18, 5.5, t, { sprint: false, close: 1, progress: 0.6, ms: 20000, stall: 5000 }).catch(() => {});
+  if (fpsObs != null && scene) scene.onAfterRenderObservable.remove(fpsObs);
   const mWalk = motion0();
   const samples = mWalk ? mWalk.samples : 0;
   const slide = mWalk && samples > 0 ? mWalk.footSlideMax : 1;
@@ -2496,11 +2498,13 @@ async function heroMove(options, t) {
   t.progress(0.9);
 
   if (touch) {
-    const avg = fpsSamples.length ? fpsSamples.reduce((a, b) => a + b, 0) / fpsSamples.length : 0;
+    const avgDt = fpsSamples.length ? fpsSamples.reduce((a, b) => a + b, 0) / fpsSamples.length : 0;
+    const avg = avgDt > 0 ? 1000 / avgDt : 0;
     t.metric("phone.fpsAvg", Math.round(avg * 10) / 10);
-    t.event("phone-ik", `low quality, fps avg ${avg.toFixed(1)}, samples ${fpsSamples.length}`);
+    t.event("phone-ik", `low quality, fps avg ${avg.toFixed(1)}, frames ${fpsSamples.length}`);
     if (avg > 0 && avg < 30) t.problem("bug", `Phone fps avg ${avg.toFixed(1)} under 30`);
     else if (avg >= 30) t.event("phone-fps-ok", `fps ${avg.toFixed(1)} ≥ 30`);
+    else if (!fpsSamples.length) t.problem("bug", "Phone fps probe collected no frames");
     const q = window.day.look.quality();
     if (q !== "low") t.problem("bug", `Phone run should be low quality (got ${q})`);
     else t.event("phone-low", "IK and clips running on low quality");
