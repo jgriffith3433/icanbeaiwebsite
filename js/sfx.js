@@ -36,8 +36,29 @@
     const btn = document.getElementById && document.getElementById("sound");
     return !!(btn && btn.getAttribute("aria-pressed") === "true");
   }
+  function mixApi() {
+    return (day && day.mix) || window.mix || (day && day.audio) || null;
+  }
   function ctx() {
     if (!soundOn()) return null;
+    if (!audio) {
+      try {
+        const Mix = mixApi();
+        if (Mix && typeof Mix.ctx === "function") {
+          try { if (typeof Mix.unlock === "function") Mix.unlock(); } catch (e) { /* */ }
+          const c = Mix.ctx();
+          if (c) {
+            const bus = Mix.bus && Mix.bus("sfx");
+            const master = (bus && bus.bus) || (Mix.master && Mix.master()) || c.createGain();
+            const len = c.sampleRate * 2;
+            const white = c.createBuffer(1, len, c.sampleRate);
+            const d = white.getChannelData(0);
+            for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+            audio = { c, master, lim: true, white, mix: true, ui: Mix.bus && Mix.bus("ui") };
+          }
+        }
+      } catch (err) { /* fall through */ }
+    }
     if (!audio) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return null;
@@ -58,7 +79,7 @@
         const white = c.createBuffer(1, len, c.sampleRate);
         const d = white.getChannelData(0);
         for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-        audio = { c, master, lim, white };
+        audio = { c, master, lim, white, mix: false };
       } catch (err) {
         audio = null;
         return null;
@@ -71,7 +92,9 @@
     return audio.c.state === "closed" ? null : audio;
   }
 
-  /* Where a point in the world sits for the ear: pan by the camera's right vector, quieter with distance. */
+  /* Where a point in the world sits for the ear: pan by the camera's right vector, quieter with distance.
+     When js/mix.js is up, placeWorld() builds a real PannerNode (HRTF / occlusion); this helper stays for
+     the synth oneshots that only need a pan value. */
   function place(x, z) {
     const cam = scene.activeCamera;
     if (!cam || x == null || z == null) return { pan: 0, gain: 1 };
@@ -86,15 +109,42 @@
     } catch (err) { /* no camera matrix yet */ }
     return { pan: Math.max(-0.9, Math.min(0.9, pan)), gain: 1 / (1 + Math.max(0, dist - 8) / 18) };
   }
-  function out(a, pan) {
-    if (!pan || !a.c.createStereoPanner) return a.master;
+  function placeWorld(x, y, z, opts) {
+    const Mix = mixApi();
+    if (Mix && typeof Mix.place === "function") {
+      try { return Mix.place(x, y != null ? y : 1.2, z, opts || { bus: "sfx" }); } catch (e) { /* */ }
+    }
+    return null;
+  }
+  function out(a, pan, busName, world) {
+    // Prefer the mix spatial graph when a world position was attached.
+    const w = world || (a && a.__world);
+    if (w && w.input) return w.input;
+    const dest = (busName === "ui" && a.ui && a.ui.bus) ? a.ui.bus
+      : (busName === "sfx" && a.mix && a.master) ? a.master
+      : a.master;
+    if (pan == null || pan === false || !a.c.createStereoPanner) return dest;
     const p = a.c.createStereoPanner();
     p.pan.value = pan;
-    p.connect(a.master);
+    p.connect(dest);
     return p;
   }
+  /** Connect a synth oneshot into an HRTF/occlusion place when mix is up; else stereo pan. */
+  function outAt(a, x, z, busName) {
+    if (x != null && z != null) {
+      const w = placeWorld(x, 1.2, z, { bus: busName || "sfx" });
+      if (w && w.input) {
+        // Auto-stop the spatial slot after a couple of seconds (oneshots are short).
+        setTimeout(() => { try { w.stop(); } catch (e) { /* */ } }, 2800);
+        return w.input;
+      }
+      const at = place(x, z);
+      return out(a, at.pan, busName);
+    }
+    return out(a, 0, busName);
+  }
 
-  /** Filtered noise: a hit, a thump, a whoosh (sweep with `to`). */
+  /** Filtered noise: a hit, a thump, a whoosh (sweep with `to`). Pass x/z for HRTF+occlusion via mix. */
   function noise(o) {
     const a = ctx();
     if (!a) return;
@@ -114,11 +164,12 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
     src.connect(f);
     f.connect(g);
-    g.connect(out(a, o.pan));
+    const bus = o.bus || "sfx";
+    g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
     src.start(t, Math.random() * 1.5);
     src.stop(t + o.dur + 0.05);
   }
-  /** One oscillator note, optionally gliding. */
+  /** One oscillator note, optionally gliding. Pass x/z for HRTF+occlusion via mix. */
   function tone(o) {
     const a = ctx();
     if (!a) return;
@@ -141,7 +192,8 @@
       node = f;
     }
     node.connect(g);
-    g.connect(out(a, o.pan));
+    const bus = o.bus || "sfx";
+    g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
     osc.start(t);
     osc.stop(t + o.dur + 0.05);
   }
@@ -216,7 +268,8 @@
     const g = a.c.createGain();
     g.gain.value = Math.max(0.0002, vol);
     src.connect(g);
-    g.connect(out(a, o.pan));
+    const bus = o.bus || (String(kind).startsWith("ui-") ? "ui" : "sfx");
+    g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
     src.start(a.c.currentTime + (o.delay || 0));
     const tag = groupOf(kind) === "move" ? (kind === "jump" ? "jump" : "landing") : kind.split("-")[0] === "crowd" || kind === "umbrella-pop" ? "crowd" : kind.startsWith("car") || kind === "siren-far" ? "car" : kind === "bird" || kind === "pigeon" ? "bird" : "ui";
     bank.sources[tag] = "file";
@@ -318,7 +371,7 @@
     g.gain.exponentialRampToValueAtTime(vol, t + (o.attack || 0.008));
     if (o.dur) g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
     node.connect(g);
-    g.connect(out(a, o.pan));
+    g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, "sfx") : out(a, o.pan, "sfx"));
     src.start(t);
     if (o.dur) try { src.stop(t + o.dur + 0.05); } catch (err) { /* ok */ }
     power.plays.push({ kind: o.kind || "power", file: pick.url, t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
@@ -339,21 +392,22 @@
     return Math.max(280, 5200 - d * 12);
   }
   /** Instant crack at the flash (and a chest sub hit when the strike is close). */
-  function crackLayered(pan, gain, dist) {
+  function crackLayered(pan, gain, dist, at) {
     wantPower("crack");
     const g = gain == null ? 1 : gain;
     const d = dist == null ? 12 : dist;
-    const filed = powerSample("crack", { pan, gain: 0.95 * g, lp: distLp(d * 0.35) });
+    const xz = at && at.x != null ? { x: at.x, z: at.z } : null;
+    const filed = powerSample("crack", { pan, gain: 0.95 * g, lp: distLp(d * 0.35), x: xz && xz.x, z: xz && xz.z });
     if (!filed) {
       note("bolt-crack");
       synthTag("bolt");
-      noise({ type: "highpass", freq: 2600, dur: 0.16, vol: 0.5 * g, attack: 0.002, pan });
-      noise({ type: "bandpass", freq: 900, q: 0.7, dur: 0.35, vol: 0.25 * g, attack: 0.004, pan, delay: 0.01 });
+      noise({ type: "highpass", freq: 2600, dur: 0.16, vol: 0.5 * g, attack: 0.002, pan, ...(xz || {}) });
+      noise({ type: "bandpass", freq: 900, q: 0.7, dur: 0.35, vol: 0.25 * g, attack: 0.004, pan, delay: 0.01, ...(xz || {}) });
     } else note("bolt-crack");
     if (d < 30) {
       // Sub-bass hit in the chest on close strikes.
-      tone({ freq: 48, to: 28, dur: 0.55, vol: 0.32 * g, wave: "sine", attack: 0.004, pan });
-      tone({ freq: 70, to: 40, dur: 0.35, vol: 0.14 * g, wave: "triangle", attack: 0.004, pan });
+      tone({ freq: 48, to: 28, dur: 0.55, vol: 0.32 * g, wave: "sine", attack: 0.004, pan, ...(xz || {}) });
+      tone({ freq: 70, to: 40, dur: 0.35, vol: 0.14 * g, wave: "triangle", attack: 0.004, pan, ...(xz || {}) });
       note("bolt-sub");
     }
     return true;
@@ -645,8 +699,8 @@
       note("updraft");
       noise({ type: "bandpass", freq: 300, to: 1800, q: 1.3, dur: 0.9, vol: 0.08, attack: 0.2 });
     },
-    crack(pan, gain, dist) {
-      crackLayered(pan, gain, dist);
+    crack(pan, gain, dist, at) {
+      crackLayered(pan, gain, dist, at);
     },
     denied() {
       note("denied");
@@ -654,16 +708,18 @@
     },
     chimeUp() { note("goal"); fx("ui-goal", "ui", {}, () => notes([660, 990], 0.1, 0.09)); },
     /* neighbour body gestures (peoplekit ask / thanks / surprise) */
-    wave(pan, gain) {
+    wave(pan, gain, at) {
       const g = gain == null ? 1 : gain;
+      const xz = at && at.x != null ? { x: at.x, z: at.z } : {};
       note("gesture-ask");
-      noise({ type: "bandpass", freq: 900, to: 1600, q: 1.2, dur: 0.22, vol: 0.05 * g, attack: 0.01, pan });
-      tone({ freq: 520, to: 780, dur: 0.18, vol: 0.04 * g, wave: "triangle", pan });
+      noise({ type: "bandpass", freq: 900, to: 1600, q: 1.2, dur: 0.22, vol: 0.05 * g, attack: 0.01, pan, ...xz });
+      tone({ freq: 520, to: 780, dur: 0.18, vol: 0.04 * g, wave: "triangle", pan, ...xz });
     },
-    clap(pan, gain) {
+    clap(pan, gain, at) {
       const g = gain == null ? 1 : gain;
+      const xz = at && at.x != null ? { x: at.x, z: at.z } : {};
       note("gesture-thanks");
-      if (sample("crowd-laugh", { gain: 0.7 * g, pan })) return;
+      if (sample("crowd-laugh", { gain: 0.7 * g, pan, ...xz })) return;
       synthTag("crowd");
       noise({ type: "bandpass", freq: 1800, to: 900, q: 0.8, dur: 0.08, vol: 0.12 * g, attack: 0.001, pan });
       tone({ freq: 240, to: 120, dur: 0.12, vol: 0.06 * g, pan });
@@ -1044,7 +1100,7 @@
     const t = performance.now();
     if (t - lastPress < 60) return;
     lastPress = t;
-    if (!sample("ui-press", { gain: 0.8 })) { synthTag("ui"); tone({ freq: 1250, to: 1500, dur: 0.05, vol: 0.04, wave: "triangle" }); }
+    if (!sample("ui-press", { gain: 0.8, bus: "ui" })) { synthTag("ui"); tone({ freq: 1250, to: 1500, dur: 0.05, vol: 0.04, wave: "triangle", bus: "ui" }); }
     note("ui-press");
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
@@ -1075,7 +1131,7 @@
       let s = null;
       try { s = day.powers.now().strike; } catch (err) { s = null; }
       const at = s ? place(s.x, s.z) : { pan: 0, gain: 1 };
-      S.crack(at.pan, at.gain, s && s.dist);
+      S.crack(at.pan, at.gain, s && s.dist, s ? { x: s.x, z: s.z } : null);
       if (day.score && day.score.duckStrike) day.score.duckStrike(1.5);
     } else if (d.action === "tornado") wantPower("tornado-roar");
   });
@@ -1177,9 +1233,10 @@
     } else if (d.action === "gesture") {
       let at = { pan: 0, gain: 1 };
       if (d.x != null && d.z != null) at = place(d.x, d.z);
-      if (d.kind === "ask") S.wave(at.pan, at.gain);
-      else if (d.kind === "thanks") S.clap(at.pan, at.gain);
-      else if (d.kind === "surprise") S.gasp(at.pan, at.gain);
+      const where = d.x != null ? { x: d.x, z: d.z } : null;
+      if (d.kind === "ask") S.wave(at.pan, at.gain, where);
+      else if (d.kind === "thanks") S.clap(at.pan, at.gain, where);
+      else if (d.kind === "surprise") S.gasp(at.pan, at.gain, where);
     } else if (d.action === "umbrella") {
       if (performance.now() - lastUmb < 800) return;
       lastUmb = performance.now();

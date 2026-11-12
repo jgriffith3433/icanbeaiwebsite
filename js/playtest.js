@@ -4188,6 +4188,220 @@ async function weatherAudio(options, t) {
   t.progress(1);
 }
 
+/* ---------------- audio-mix: buses, six reverb zones, voice duck, occlusion, Settings sliders ---------------- */
+// Criteria: day.audio.info() zone changes across rooftop/street/plaza/apartment/car/office in one 1200× day;
+// voiced line ducks music ≥6 dB within 200 ms; a source behind a building is low-passed in the audio log;
+// [phone] Music/Effects/Voice sliders ≥44 px and persist after a reload of levels.
+async function audioMixScenario(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Phone mix" : "Mix");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const Mix = window.day && (window.day.audio || window.day.mix);
+  const C = window.day.control;
+  const V = window.day.voice;
+  if (!Mix || typeof Mix.info !== "function") {
+    t.problem("bug", "There's no day.audio / day.mix (js/mix.js)");
+    return;
+  }
+  if (touch && C && C.touch) C.touch(true);
+
+  const zonesSeen = new Set();
+  const onAudio = (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "zone" && d.zone) {
+      zonesSeen.add(d.zone);
+      t.event(`mix-zone-${d.zone}`, d.zone);
+    }
+    if (d.action === "log" && d.msg === "occlusion") t.event("mix-occlusion", `cutoff ${d.cutoffHz || ""} Hz`);
+    if (d.action === "log" && d.msg === "duck-on") t.event("mix-duck-event", `music ${d.musicDb} dB`);
+  };
+  window.addEventListener("day:audio", onAudio);
+
+  const sound = $("sound");
+  if (sound) {
+    const r = sound.getBoundingClientRect();
+    sound.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 9,
+      pointerType: touch ? "touch" : "mouse",
+    }));
+    sound.click();
+    await sleep(300);
+    t.event("sound-on", sound.getAttribute("aria-pressed") === "true" ? "Sound on" : "Sound still off");
+  }
+  try { if (Mix.unlock) Mix.unlock(); } catch (e) { /* */ }
+  t.progress(0.08);
+
+  const day = window.day.today();
+  const outside = (typeof carSideMoment === "function" && carSideMoment(day))
+    || day.actions.find((a) => /steps out/.test(a.text || ""))
+    || quietMoment(day);
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(400);
+
+  // Take control and visit street → rooftop → plaza → apartment → office (place shortcuts).
+  if (touch) {
+    const btn = document.querySelector(".control-btn") || $("control");
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      btn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 10, pointerType: "touch" }));
+      btn.click();
+    }
+  } else {
+    pressKey("Enter");
+  }
+  await t.until(() => C && C.mode() === "control", 5000, "Take control").catch(() => {});
+  t.progress(0.15);
+
+  const visit = async (name, x, z, opts) => {
+    if (C && C.place) C.place(x, z, 0, opts || {});
+    // Wait for feet/Y to settle, then tick the mix so zoneAt reads control.state().
+    await sleep(700);
+    try { if (Mix.tick) Mix.tick(0.05); } catch (e) { /* */ }
+    await sleep(200);
+    try { if (Mix.tick) Mix.tick(0.55); } catch (e) { /* */ }
+    const info = Mix.info();
+    const zname = info.zone;
+    zonesSeen.add(zname);
+    const st = C && C.state ? C.state() : {};
+    t.event(`mix-zone-${name}`, `reported ${zname} at ${x.toFixed(1)},${z.toFixed(1)} y=${(st.y || 0).toFixed(2)}`);
+    if (zname !== name) t.problem("bug", `Expected reverb zone ${name}, got ${zname}`);
+    return zname;
+  };
+
+  await visit("street", 0, 12.6);
+  t.progress(0.25);
+  await visit("rooftop", -19.5, 3.2, { from: 12 });
+  t.progress(0.35);
+  await visit("plaza", 118, 26);
+  t.progress(0.45);
+  await visit("apartment", -4.6, -2.15);
+  t.progress(0.55);
+  await visit("office", 134, 0);
+  t.progress(0.62);
+
+  // Car cabin: let go and scrub into a drive so inCar is true (Take control locked while driving).
+  pressKey("Escape");
+  await sleep(500);
+  const drive = day.blocks.find((b) => b.chapter === "commute")
+    || day.actions.find((a) => a.inCar);
+  if (drive) scrubTo((drive.start || day.dayStart) + 0.8);
+  clickSpeed(1);
+  await t.until(() => {
+    const fr = window.day.now().frame;
+    return !!(fr && fr.person && fr.person.inCar);
+  }, 8000, "in the car on the commute").catch(() => {});
+  await sleep(400);
+  try { if (Mix.tick) Mix.tick(0.05); } catch (e) { /* */ }
+  await sleep(200);
+  try { if (Mix.tick) Mix.tick(0.55); } catch (e) { /* */ }
+  const carZone = Mix.info().zone;
+  zonesSeen.add(carZone);
+  t.event("mix-zone-car", carZone);
+  if (carZone !== "car") t.problem("bug", `Expected reverb zone car, got ${carZone}`);
+  t.metric("mixZones", zonesSeen.size);
+  ["rooftop", "street", "plaza", "apartment", "car", "office"].forEach((z) => {
+    if (!zonesSeen.has(z)) t.problem("bug", `Reverb zone ${z} never reported by day.audio.info()`);
+  });
+  if (zonesSeen.size >= 6) t.event("mix-zones-all", [...zonesSeen].join(","));
+  t.progress(0.7);
+
+  // Voice duck: take control again, force a spoken line, read duck musicDb within 200 ms.
+  scrubTo(outside.start + 1);
+  if (touch) {
+    const btn = document.querySelector(".control-btn") || $("control");
+    if (btn) btn.click();
+  } else pressKey("Enter");
+  await t.until(() => C && C.mode() === "control", 4000, "Take control for duck").catch(() => {});
+  await sleep(200);
+  const before = Mix.info();
+  if (V && V.say) V.say("take", { force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "playtest-mix" });
+  else {
+    window.dispatchEvent(new CustomEvent("day:voice", { detail: { action: "play", id: "mix-probe", group: "take" } }));
+  }
+  await sleep(180);
+  const mid = Mix.info();
+  const duckDb = mid.duck && mid.duck.musicDb != null ? mid.duck.musicDb : 0;
+  t.metric("mixDuckMusicDb", duckDb);
+  t.event("mix-duck", `music ${duckDb} dB (was ${before.duck && before.duck.musicDb}) within 200 ms`);
+  if (!(duckDb <= -6)) t.problem("bug", `Voice didn't duck music by ≥6 dB within 200 ms (got ${duckDb})`);
+  // Recover after the line ends (emit end, or wait out the hold).
+  window.dispatchEvent(new CustomEvent("day:voice", { detail: { action: "end", id: "mix-probe" } }));
+  await sleep(700);
+  try { if (Mix.tick) Mix.tick(0.05); } catch (e) { /* */ }
+  const after = Mix.info();
+  const recoverDb = after.duck && after.duck.musicDb != null ? after.duck.musicDb : -99;
+  t.event("mix-duck-recover", `music ${recoverDb} dB after end`);
+  if (!(recoverDb > -2)) t.problem("bug", `Music didn't recover after voice (got ${recoverDb} dB)`);
+  t.progress(0.8);
+
+  // Occlusion: place a world source on the far side of a building box; read the audio log.
+  // Home block sits around x −7..11; put the listener west and the source east of it.
+  if (C && C.place) C.place(-30, 12.6, 0);
+  await sleep(200);
+  let occluded = false;
+  if (Mix.place) {
+    const src = Mix.place(30, 1.2, 12.6, { bus: "sfx" });
+    await sleep(120);
+    if (Mix.tick) Mix.tick(0.05);
+    const info = Mix.info();
+    const log = (info.log || []).concat(Mix.log ? Mix.log() : []);
+    occluded = !!(src && src.occluded) || log.some((row) => row && (row.msg === "occlusion" || (row.detail && row.detail.occluded)));
+    if (src && src.stop) src.stop();
+  }
+  if (occluded) t.event("mix-occlusion", "source behind a building low-passed");
+  else t.problem("bug", "Occlusion low-pass never logged for a source behind a building");
+  t.progress(0.88);
+
+  // Settings sliders: open Settings, measure Music/Effects/Voice, drag and persist.
+  t.scene("Settings mix sliders");
+  const gear = $("settings");
+  const pop = $("settings-pop");
+  if (gear) {
+    const r = gear.getBoundingClientRect();
+    gear.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 11,
+      pointerType: touch ? "touch" : "mouse",
+    }));
+    gear.click();
+    await sleep(200);
+  }
+  if (pop && pop.hidden) t.problem("bug", "Settings popover stayed closed");
+  const ids = ["mix-music", "mix-effects", "mix-voice"];
+  let minH = 99;
+  ids.forEach((id) => {
+    const el = $(id);
+    const row = el && el.closest(".mix-row");
+    if (!el || !row) {
+      t.problem("bug", `Missing mix slider #${id}`);
+      return;
+    }
+    const rr = row.getBoundingClientRect();
+    minH = Math.min(minH, rr.height);
+    if (rr.height < 44) t.problem("bug", `#${id} row is only ${rr.height.toFixed(0)} px tall (need ≥44)`);
+    // Drag the slider (real input) and persist.
+    el.value = "55";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  t.metric("mixSliderMinPx", minH === 99 ? 0 : Math.round(minH));
+  t.event("mix-sliders", `min row ${minH === 99 ? 0 : minH.toFixed(0)} px`);
+  await sleep(100);
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("icanbe.mix") || "null"); } catch (e) { saved = null; }
+  if (!saved || saved.music == null) t.problem("bug", "Mix levels didn't persist to icanbe.mix");
+  else {
+    // Re-read through the API as a "reload" of the saved values.
+    const again = Mix.levels();
+    if (Math.abs(again.music - 0.55) > 0.02) t.problem("bug", `Music level didn't stick (got ${again.music})`);
+    else t.event("mix-persist", `music ${again.music} effects ${again.effects} voice ${again.voice}`);
+  }
+  if (gear && pop && !pop.hidden) gear.click();
+  t.progress(1);
+  window.removeEventListener("day:audio", onAudio);
+  t.event("audio-mix-pass", `zones ${zonesSeen.size}, duck ${duckDb} dB`);
+}
+
 /* ---------------- atmosphere: rain intensity, pressure scores the music, mute is remembered, frame rate ---------------- */
 // Real input: Sound on with a pointer, Enter to take control, key 3 for rain (and weather.set for a light
 // shower: a named setup shortcut), the Pressure meter set low then high (abilities.reset: a named shortcut),
@@ -10436,6 +10650,7 @@ installPlaytest({
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
     { id: "stem-score", title: "Stem score: Play opens on the 4-note motif (title, then the cold open), three stems stream after the first input and play in sync, a held bolt raises the tension layer within one bar, a tornado brings the storm layer, an episode success plays the resolution sting; on a phone the stems stay under 1.5 MB", seconds: 90, tags: ["audio", "music", "phone", "opening"], description: "Load with ?playtest=stem-score. Setup: every icanbe.* key cleared, cold open armed, title up. Real input: click or tap Play, hold the bolt (E or the Bolt button). Shortcuts: powers.command('tornado'), a day:episode score event. Events stem-motif-title / -coldopen / -ready / -windup / -storm / -sting / -transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. Run at 1280x720 and 390x844 touch." },
     { id: "day-sound", title: "Diegetic day soundscapes: at 1200× the sound log shows distinct beds for home morning, commute, office, park lunch, evening TV and night; the car radio names a weather the player called today; office keyboard starts within 3 s of the desk and stops when he leaves; on phone low quality at most 3 loops play at once", seconds: 180, tags: ["audio", "phone", "story"], description: "Load with ?playtest=day-sound ({\"touch\":true} for 390x844). Sound on (real pointer), 1200× through the day, scrub to commute and desk. Events day-scape-* / day-radio / day-keyboard-on / day-keyboard-off / day-phone-cap; metrics dayScapes, dayMaxLoops, dayKeyboardSec, dayPhoneLoops." },
+    { id: "audio-mix", title: "Mastered mix: day.audio.info() reports six reverb zones (rooftop, street, plaza, apartment, car, office); a voiced line ducks music ≥6 dB within 200 ms; a source behind a building is low-passed in the audio log; on phone Settings Music/Effects/Voice sliders are ≥44 px and persist", seconds: 150, tags: ["audio", "phone", "feel"], description: "Load with ?playtest=audio-mix ({\"touch\":true} for 390x844). Sound on, visit each zone (place/scrub shortcuts), speak a line, place a world source behind a block, open Settings and drag the three sliders, reload levels from localStorage. Events mix-zone-* / mix-duck / mix-occlusion / mix-sliders / mix-persist; metrics mixDuckMusicDb, mixSliderMinPx." },
     { id: "weather-audio", title: "Rooftop weather soundscape and footsteps: Sound on (real click), Take control (sting), climb apt roof, walk across gravel, metal, tar and puddle surfaces, then cycle clear/sun, clouds, rain (light roof patter vs heavy downpour, gutters, umbrella), storm (distance-delayed thunder crack and rolling thunder), fog, wind (3D-panned gusts and flapping awnings) and snow (muffled city) with equal-power crossfades", seconds: 150, tags: ["weather", "audio"], description: "Day bar outside, confirms silence, turns Sound on with a pointer, Enter, climbs apt rooftop, walks gravel/metal/tar/puddle zones, cycles keys 1–7 on the roof. Logs footstep-*, rain-layers, thunder-delay, loop-seams, music-* and soundscape levels." },
     { id: "weather-life", title: "Rain: street umbrellas and car wipers; leave a storm, let go, autopilot log reacts; weather holds then drifts back to the forecast", seconds: 150, tags: ["weather"], description: "Day bar to a yard moment whose forecast isn't a storm (morning door or evening car). Enter, WASD to the avenue, key 3 then 4, Esc. If the forecast there is a storm anyway: Enter, 1, Esc, so the drift is visible. Events: street-rain, umbrellas-and-wipers, autopilot-react, weather-drift, forecast-back." },
     { id: "powers", title: "Take control on the avenue, hold E for a storm, tap E lightning, G a gust, hold V for a tornado; Charge refuses a call when empty; Sky studio off leaves 1–7 idle", seconds: 140, tags: ["powers"], description: "Day bar beside the car (setup), Sound on, Enter, WASD to the loose props. Five verbs on the bar; hold depths for Storm and Tornado." },
@@ -10526,6 +10741,7 @@ installPlaytest({
       else if (id === "crowd-reacts") await crowdReacts(options, t);
       else if (id === "atmosphere") await atmosphere(options, t);
       else if (id === "day-sound") await daySoundScenario(options, t);
+      else if (id === "audio-mix") await audioMixScenario(options, t);
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "power-sfx") await powerSfx(options, t);
       else if (id === "stem-score") await stemScore(options, t);
