@@ -7879,6 +7879,138 @@
    "files": {
     "sfx": "audio/sfx/power/sun-shimmer-1.mp3"
    }
+  },
+  {
+   "id": "ui-verbs-lit",
+   "note": "UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game HUD icon sheet, five weather ability icons in a horizontal row equally spaced, left to right: (1) jagged electric lightning bolt, (2) rain cloud with three heavy raindrops, (3) swirling wind gust ribbons, (4) soft fog bank wisps, (5) sun breaking through clouds with warm rays. Style: stylized painted cartoon UI icons, Dose Of Destruction look, clean bold silhouettes readable at 44 pixels, storm-navy and black with LIT glowing electric cyan-blue edge light and soft bloom, flat front orthographic, each icon centered in its cell, plain solid magenta background #ff00ff, no text, no letters, no watermark, no keycaps",
+      "width": 1280,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": { "image": "$prev" },
+     "save": "cut"
+    }
+   ],
+   "files": { "cut": "textures/ui/verb-sheet-lit.png" }
+  },
+  {
+   "id": "ui-verbs-unlit",
+   "note": "UI art kit: five unlit (dim) weather verb icons sheet. Same layout as ui-verbs-lit. Stand-ins: textures/ui/verb-*-unlit.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game HUD icon sheet, five weather ability icons in a horizontal row equally spaced, left to right: (1) jagged lightning bolt, (2) rain cloud with three raindrops, (3) swirling wind ribbons, (4) fog bank wisps, (5) sun behind clouds. Style: stylized painted cartoon UI icons, Dose Of Destruction look, clean bold silhouettes readable at 44 pixels, storm-navy and muted slate UNLIT state, dim desaturated blue-grey, no glow, flat front orthographic, each icon centered in its cell, plain solid magenta background #ff00ff, no text, no letters, no watermark",
+      "width": 1280,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": { "image": "$prev" },
+     "save": "cut"
+    }
+   ],
+   "files": { "cut": "textures/ui/verb-sheet-unlit.png" }
+  },
+  {
+   "id": "ui-panel-frame",
+   "note": "UI art kit: 9-slice panel frame (Persona-bold angular corners, storm-navy + cyan). Stand-in: textures/ui/panel-frame.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI 9-slice panel frame only, square frame with ornate sharp Persona-5-like angular corner pieces and a thin electric-blue neon edge on storm-navy metal, hollow center completely filled with solid magenta #ff00ff for cutout, bold AAA game menu frame, flat front orthographic, cinematic dark navy and black with cyan accents, no text, no icons inside, no watermark",
+      "width": 512,
+      "height": 512,
+      "count": 1
+     },
+     "save": "frame"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": { "image": "$prev" },
+     "save": "cut"
+    }
+   ],
+   "files": { "cut": "textures/ui/panel-frame.png" }
+  },
+  {
+   "id": "ui-ranks",
+   "note": "UI art kit: S/A/B/C rank stamps in one sheet. Stand-ins: textures/ui/rank-S.svg etc.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI rank stamp sheet, four stamps in a horizontal row: big letter S, letter A, letter B, letter C. Each is a bold painted wax-seal style stamp with sharp angular frame, storm-navy metal and electric blue glow, S brightest gold-cyan, A teal, B blue, C muted copper-red. Flat front orthographic, plain solid magenta background #ff00ff, stylized cartoon AAA game UI, readable at small size, no other text, no watermark",
+      "width": 1024,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": { "image": "$prev" },
+     "save": "cut"
+    }
+   ],
+   "files": { "cut": "textures/ui/rank-sheet.png" }
+  },
+  {
+   "id": "ui-busts",
+   "note": "UI art kit: portrait busts of Birdie (yellow raincoat, straw hat), Dex (orange jacket, white helmet), Ines (violet coat, glasses) in one sheet. Stand-ins: textures/ui/bust-*.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI portrait bust sheet, three character busts in a horizontal row on magenta #ff00ff: (1) Birdie Alvarez short gardener woman yellow raincoat straw hat warm skin, (2) Dex Moreno courier man orange jacket white helmet parcel strap, (3) Ines Quill tall woman violet coat round glasses dark hair. Stylized 3D cartoon Dose Of Destruction look, storm-navy rim light, front-facing busts from shoulders up, bold readable silhouettes, no text, no watermark",
+      "width": 1152,
+      "height": 384,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": { "image": "$prev" },
+     "save": "cut"
+    }
+   ],
+   "files": { "cut": "textures/ui/bust-sheet.png" }
+  },
+  {
+   "id": "ui-pilot",
+   "note": "UI art kit: Pilot glyph (holographic wrist-ring / AI mark). Stand-in: textures/ui/pilot.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI glyph icon, a holographic wrist ring and soft radio pulse mark for an AI called Pilot, electric cyan on storm-navy, circular badge, stylized painted cartoon, clean silhouette readable at 28 px, plain solid magenta background #ff00ff, no text, no letters, no watermark",
+      "width": 256,
+      "height": 256,
+      "count": 1
+     },
+     "save": "glyph"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": { "image": "$prev" },
+     "save": "cut"
+    }
+   ],
+   "files": { "cut": "textures/ui/pilot.png" }
   }
  ]
 }

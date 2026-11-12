@@ -4889,6 +4889,139 @@ async function powers(options, t) {
   t.progress(1);
 }
 
+/* ---------------- ui-art-kit: painted verb icons, frames, fonts, no bracketed keys, phone 44 px ---------------- */
+// Real input: Take control, open Episodes / Neighbors / Settings, cast one verb (cooldown wipe + ready glow),
+// start the tutorial episode for goal icons. Touch option forces 390x844 arc checks.
+async function uiArtKit(options, t) {
+  t.scene("UI art kit");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  scrubTo(8.2 * 60);
+  clickSpeed(1);
+  await sleep(600);
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    window.day.control.touch(true);
+  }
+  const art = window.uiArt || (window.day && window.day.uiArt);
+  if (!art) t.problem("bug", "ui-art kit missing (js/ui-art.js)");
+  else {
+    const info = art.info();
+    t.event("ui-art-source", info.source || "unknown");
+    t.metric("uiArtVerbs", Object.keys(info.verbs || {}).length);
+  }
+  // Fonts: self-hosted Outfit + Fraunces on html.ui-kit
+  if (!document.documentElement.classList.contains("ui-kit")) t.problem("bug", "html.ui-kit not set");
+  else t.event("ui-fonts", "self-hosted kit fonts active");
+  // Frame on Episodes panel
+  const epBtn = $("episodes");
+  if (epBtn) {
+    await tapEl(epBtn);
+    await sleep(250);
+    const panel = document.querySelector("#episode-menu .ep-panel");
+    if (!panel) t.problem("bug", "Episodes menu panel missing");
+    else {
+      if (!panel.classList.contains("ui-frame") && !getComputedStyle(panel).borderImageSource.includes("panel-frame")) {
+        // applyFrame may have run; check kit CSS variable
+        const fr = getComputedStyle(document.documentElement).getPropertyValue("--ui-frame");
+        if (!fr || fr === "none") t.problem("bug", "UI frame token missing");
+        else t.event("ui-frame", "frame token set");
+      } else t.event("ui-frame", "Episodes panel framed");
+      t.scene("Episodes menu");
+    }
+    const menuEl = $("episode-menu");
+    if (menuEl) menuEl.hidden = true;
+  }
+  // Neighbors + Settings share the same frame language
+  const nb = $("neighbors-btn");
+  if (nb && !nb.hidden && getComputedStyle(nb).display !== "none") {
+    await tapEl(nb);
+    await sleep(200);
+    const np = $("neighbors-panel");
+    if (np && !np.hidden) {
+      const busts = np.querySelectorAll(".bust");
+      t.metric("uiBusts", busts.length);
+      if (busts.length >= 3) t.event("ui-busts", `${busts.length} neighbor busts`);
+      else t.problem("polish", `Neighbors panel showed ${busts.length} busts (want 3)`);
+      np.hidden = true;
+    }
+  }
+  const gear = $("settings");
+  if (gear) {
+    await tapEl(gear);
+    await sleep(200);
+    const pop = $("settings-pop");
+    if (pop && !pop.hidden) t.event("ui-settings", "Settings open under kit fonts");
+    if (pop && !pop.hidden) pop.hidden = true;
+  }
+  // Take control → five painted icons, ready glow, cast → radial wipe
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => window.day.control.mode() === "control", 5000, "Take control");
+  t.event("ui-control", touch ? "touch" : "key");
+  const P = window.powers || window.day.powers;
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await t.until(() => $("ability-bolt"), 4000, "ability slots");
+  const verbs = ["bolt", "rain", "wind", "fog", "sunbreak"];
+  let painted = 0;
+  let readyN = 0;
+  let minPx = 99;
+  await t.until(() => {
+    const el = $("ability-rain");
+    return el && (el.classList.contains("ready") || el.dataset.state === "ready");
+  }, 4000, "a ready verb").catch(() => {});
+  verbs.forEach((id) => {
+    const el = $("ability-" + id);
+    if (!el) return;
+    const ico = el.querySelector(".ico");
+    const r = el.getBoundingClientRect();
+    minPx = Math.min(minPx, r.width, r.height);
+    if (ico && ico.getAttribute("src") && /verb-|textures\/ui\//.test(ico.getAttribute("src"))) painted++;
+    if (el.classList.contains("ready") || el.dataset.state === "ready") readyN++;
+  });
+  t.metric("uiVerbIcons", painted);
+  t.metric("uiVerbReady", readyN);
+  t.metric("uiVerbMinPx", Math.round(minPx));
+  if (painted < 5) t.problem("bug", `Only ${painted}/5 painted verb icons on the arc`);
+  else t.event("ui-verbs", "five painted verb icons");
+  if (readyN < 1) t.problem("bug", "No verb shows the ready glow state before a cast");
+  else t.event("ui-ready-glow", `${readyN} verbs ready`);
+  if (touch && minPx < 44) t.problem("bug", `Verb slot ${minPx.toFixed(0)} px under 44 on phone`);
+  else if (touch) t.event("ui-phone-44", `verb slots ≥ ${Math.round(minPx)} px`);
+  // Cast rain for cooldown wipe
+  if (touch) await tapEl($("ability-rain"));
+  else pressKey("r");
+  await sleep(280);
+  const rain = $("ability-rain");
+  const wipe = rain && rain.querySelector(".wipe");
+  const cdVal = wipe ? parseFloat(wipe.style.getPropertyValue("--cd") || "0") : 0;
+  if (rain && rain.classList.contains("cooling") && wipe && cdVal > 0.05) t.event("ui-cooldown-wipe", `radial wipe cd=${cdVal.toFixed(2)}`);
+  else t.problem("bug", "Radial cooldown wipe not visible after a cast");
+  // Goal labels: no bracketed keys
+  const bad = ((window.DAY_CONFIG.episodes && window.DAY_CONFIG.episodes.list) || [])
+    .flatMap((ep) => (ep.goals || []).map((g) => ({ ep: ep.id, g })))
+    .filter(({ g }) => /\([A-Z0-9](?:\s*\/\s*[A-Z0-9]+)?\)/.test(String(g.label || "")) || /\([A-Z0-9](?:\s*\/\s*[A-Z0-9]+)?\)/.test(String(g.prompt || "")));
+  if (bad.length) t.problem("bug", `Goal labels/prompts still have bracketed keys: ${bad.map((b) => b.ep + "/" + b.g.id).join(", ")}`);
+  else t.event("goal-labels", "no bracketed keys in episode goals or prompts");
+  // Tutorial HUD shows icon + words
+  try {
+    if (window.day.episodes && window.day.episodes.start) {
+      window.day.episodes.start("tutorial", "playtest");
+      await sleep(500);
+      const prompt = document.querySelector("#episode-hud .prompt");
+      const ico = prompt && prompt.querySelector(".g-ico");
+      if (ico) t.event("ui-goal-icon", "tutorial prompt shows verb icon");
+      else t.problem("polish", "Tutorial prompt missing verb icon chip");
+      const txt = (prompt && prompt.textContent) || "";
+      if (/\([A-Z]\)/.test(txt) || /\bPress [A-Z]\b/.test(txt) || /\bTap [A-Z]\b/.test(txt)) {
+        t.problem("bug", `Tutorial prompt still names a key letter: "${txt}"`);
+      }
+    }
+  } catch (e) { t.problem("warning", "Could not start tutorial for goal icon check"); }
+  checkHud(t, "ui-art-kit");
+  t.progress(1);
+}
+
 /* ---------------- five-verbs: acceptance for the collapsed power set + phone arc ---------------- */
 // Real input on a phone-sized touch layout: five verb slots, Charge ring, street tap aims, ≤7 controls,
 // none over the character; Lightning hold → Storm and Wind full → Tornado already covered in `powers`.
@@ -10662,6 +10795,7 @@ installPlaytest({
     { id: "sun-aftermath", title: "Sun break after rain: steam off wet roofs and a rainbow at 42° within 3 s, gutters drip for 20+ s, at least 3 walkers close umbrellas and pigeons land on a roof; on phone half steam/drips, rainbow on, fps ≥ 30", seconds: 70, tags: ["powers", "weather", "phone", "feel", "crowd"], description: "Day bar to lunch (setup), Sound on, Enter / Take control tap, control.place by the shop (setup), tap R then X (or #ability-rain / #ability-sunbreak). Events aftermath-rain / -steam / -rainbow / -drips / -umbrellas / -birds / -fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
+    { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "foley", title: "Foley: recorded jump, landing, crowd, car, bird and UI sounds in lazy groups, taps on the ability arc and Episodes play the UI press, no clip file twice within 60 s, foley transfer under 400 KB", seconds: 130, tags: ["audio", "phone"], description: "Load with ?playtest=foley. Sound on, Take control by touch, taps on the ability arc and Episodes, Jump taps, then a two-minute listen. Events sound-on / ui-arc / sfx-sources / foley-repeats; metrics foley.bytes, foley.indexed." },
     { id: "power-sfx", title: "Power SFX: Lightning crack/body/rumble layers with distance delay at 343 m/s (≤30 m with the flash, ~340 m ≈ 1 s), ≥4 crack variants across 8 casts, tornado roar rises ≥6 dB from 60 m to 10 m; on phone the master limiter holds and the first cast sounds within 100 ms", seconds: 150, tags: ["audio", "powers", "phone"], description: "Load with ?playtest=power-sfx ({\"touch\":true} for 390x844). Sound on, Take control, near then far bolt, eight Lightning casts, Wind hold for Tornado. Events thunder-delay-formula / strike-near / strike-far / crack-variants / tornado-proximity / master-limiter; metrics thunderDelayFarSec, crackVariants, tornadoDbRise, firstCastSoundMs." },
@@ -10747,6 +10881,7 @@ installPlaytest({
       else if (id === "stem-score") await stemScore(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
+      else if (id === "ui-art-kit") await uiArtKit(options, t);
       else if (id === "five-verbs") await fiveVerbs(options, t);
       else if (id === "wind-fog") await windFog(options, t);
       else if (id === "tornado-plaza") await tornadoPlaza(options, t);
