@@ -391,9 +391,9 @@ export function installCityscape(w) {
     m.maxSimultaneousLights = lights;
     return m;
   }
-  const facadeMats = facadeTex.map((t, i) => makeFacadeMat("facade-" + STYLES[i].id, t, 4));
-  const aptMat = makeFacadeMat("facade-apt", aptTex, 4);
-  const officeMat = makeFacadeMat("facade-office", officeTex, 4);
+  const facadeMats = facadeTex.map((t, i) => makeFacadeMat("facade-" + STYLES[i].id, t, 3));
+  const aptMat = makeFacadeMat("facade-apt", aptTex, 3);
+  const officeMat = makeFacadeMat("facade-office", officeTex, 3);
   const allWindowTex = facadeTex.concat([aptTex, officeTex]);
   const shopTex = shopTextures(4242);
   const shopMat = new B.StandardMaterial("shopfront", scene);
@@ -401,7 +401,7 @@ export function installCityscape(w) {
   shopMat.emissiveTexture = shopTex.emissive;
   shopMat.emissiveColor = new B.Color3(0, 0, 0);
   shopMat.specularColor = new B.Color3(0.08, 0.08, 0.1);
-  shopMat.maxSimultaneousLights = 4;
+  shopMat.maxSimultaneousLights = 3;
 
   const skyTex = facadeTextures(STYLES[2], 5150, null);
   allWindowTex.push(skyTex);
