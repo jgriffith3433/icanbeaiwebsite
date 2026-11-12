@@ -162,6 +162,7 @@ export function createWeather(opt) {
   let puddleLevel = 0; // 0..1 smooth puddle growth and drying
   let steam = 0; // 0..1 short steam wisp off wet roofs as sun/clear dries them
   let steamLeft = 0;
+  let steamHold = 0; // aftermath can hold steam for ~20 s (js/aftermath.js boostSteam)
   let wasRainWet = false;
   let snowCover = 0; // 0..1 snow layer accumulation on upward faces, melts afterwards
 
@@ -182,6 +183,7 @@ export function createWeather(opt) {
     const sunny = target === "clear" || sun > 0.05;
     if (snap) {
       steamLeft = 0;
+      steamHold = 0;
       steam = 0;
       roofWet = L.wet;
       puddleLevel = L.rain > 0.15 ? L.wet : 0;
@@ -204,9 +206,11 @@ export function createWeather(opt) {
         steamLeft = Math.max(steamLeft, 2.5);
         wasRainWet = false;
       }
+      if (steamHold > 0) steamHold = Math.max(0, steamHold - dtPos);
       if (steamLeft > 0) steamLeft = Math.max(0, steamLeft - dtPos);
-      const dryingRoof = sunny && !raining && (roofWet > 0.06 || steamLeft > 0.15);
-      const steamGoal = dryingRoof ? Math.min(1, Math.max(roofWet * 1.35, steamLeft * 0.45)) : 0;
+      const dryingRoof = sunny && !raining && (roofWet > 0.06 || steamLeft > 0.15 || steamHold > 0.1);
+      const holdK = steamHold > 0 ? Math.min(1, 0.55 + steamHold / 20) : 0;
+      const steamGoal = dryingRoof ? Math.min(1, Math.max(roofWet * 1.35, steamLeft * 0.45, holdK)) : 0;
       const steamTau = steamGoal > steam ? 0.24 : 0.55;
       steam += (steamGoal - steam) * (1 - Math.exp(-dtPos / steamTau));
       if (steam < 0.005) steam = 0;
@@ -280,7 +284,7 @@ export function createWeather(opt) {
     if (via !== "forecast") {
       manual = true;
       holdLeft = 0;
-      powerLeft = via === "power" ? holdSec : 0;
+      powerLeft = via === "power" ? holdSec * (state === "rain" ? 2.4 : 1) : 0; // a Rain cast stays long enough to soak the street
       if (opt.onSet) opt.onSet({ state, intensity: targetIntensity, via: via || "set" });
     }
     return true;
@@ -325,7 +329,14 @@ export function createWeather(opt) {
     return true;
   }
 
-  return { set, sunbreak, step, follow, now, look, blendSec, holdSec };
+  /** Hold the drying steam wisp for `sec` real seconds (Sun-break aftermath). */
+  function boostSteam(sec) {
+    const s = Math.max(0, sec == null ? 20 : sec);
+    steamHold = Math.max(steamHold, s);
+    steamLeft = Math.max(steamLeft, Math.min(4, s * 0.2));
+  }
+
+  return { set, sunbreak, boostSteam, step, follow, now, look, blendSec, holdSec };
 }
 
 /* ---------------- the page: sky, particles, wet roads, wind, sound, the wheel ---------------- */
@@ -360,6 +371,7 @@ export function startWeather(world, dayApi) {
     flashLight: 0,
     particles: "off",
     puddles: 0,
+    reflectProbe: false,
     ripples: 0,
     reflect: 0,
     awnings: 0,
@@ -456,6 +468,34 @@ export function startWeather(world, dayApi) {
   let pmat = null;
   let puddleTex = null;
   let rippleClock = 0;
+  /* Low-quality wet-street reflections: a small ReflectionProbe of neon/lamps instead of SSR. */
+  let streetProbe = null;
+  let streetProbeOn = false;
+  let streetProbeAcc = 1;
+  let streetProbeReady = false;
+  function fillStreetProbeList() {
+    if (!streetProbe) return;
+    streetProbe.renderList.length = 0;
+    scene.meshes.forEach((m) => {
+      if (!m || !m.name) return;
+      // cityscape names: city-brick-*, city-shops-*, city-skyline, facade-apt/office, cs-lamp*, sign-*, props-glow
+      if (/^(city-|facade-|cs-lamp|sign-|props-glow|city-beacon)/.test(m.name)) {
+        try { streetProbe.renderList.push(m); } catch (e) { /* */ }
+      }
+    });
+    streetProbeReady = streetProbe.renderList.length > 0;
+  }
+  try {
+    if (B.ReflectionProbe && roadIsPbr && roadMat) {
+      streetProbe = new B.ReflectionProbe("wetStreetProbe", 64, scene, true);
+      streetProbe.refreshRate = -1; // manual: only while wet on low
+      if (streetProbe.cubeTexture) {
+        streetProbe.cubeTexture.coordinatesMode = B.Texture.CUBIC_MODE;
+      }
+      // list fills late: facades and signs arrive after weather.js boots (cityscape imports after)
+      scene.onAfterRenderObservable.addOnce(() => fillStreetProbeList());
+    }
+  } catch (e) { streetProbe = null; }
   function paintPuddleRipple(phase, rippleAmt) {
     if (!puddleTex) return;
     try {
@@ -659,10 +699,14 @@ export function startWeather(world, dayApi) {
     rainPs.maxEmitBox.set(18, 2, 18);
     rainPs.minLifeTime = 0.45;
     rainPs.maxLifeTime = 0.75;
-    rainPs.minSize = 0.12;
-    rainPs.maxSize = 0.28;
-    rainPs.color1.set(0.75, 0.84, 0.95, 0.55);
-    rainPs.color2.set(0.85, 0.9, 1, 0.28);
+    rainPs.minSize = 0.1;
+    rainPs.maxSize = 0.22;
+    rainPs.minScaleX = 0.16; // thin, long streaks: stretched along the velocity, so they lean with the wind
+    rainPs.maxScaleX = 0.26;
+    rainPs.minScaleY = 2.6;
+    rainPs.maxScaleY = 4.2;
+    rainPs.color1.set(0.75, 0.84, 0.95, 0.6);
+    rainPs.color2.set(0.85, 0.9, 1, 0.3);
   }
   if (splashPs) {
     splashPs.minEmitBox.set(-14, 0, -14);
@@ -1121,7 +1165,9 @@ export function startWeather(world, dayApi) {
     const cap = (ps, n) => (ps && !ps.__dead && !indoors ? n * (ps.__gpu ? 1 : 0.34) * tierScale : 0);
     if (rainPs && !rainPs.__dead) {
       rainPs.emitter.set(x, yBase + 14, z);
-      rainPs.emitRate = cap(rainPs, look.rain * 4200);
+      // js/rain.js RAIN_BUDGET: at most 4000 streaks alive on a phone (rate x mean life 0.6 s), 9000 on a desktop
+      rainPs.emitRate = Math.min(cap(rainPs, look.rain * 6200), (low ? 4000 : 9000) / 0.6);
+      live.rainStreaks = Math.round(rainPs.emitRate * 0.6);
       rainPs.direction1.set(-0.35 - wx, -1, -0.15);
       rainPs.direction2.set(0.25 - wx * 0.7, -1, 0.2);
       rainPs.minEmitPower = 16 + look.wind * 6;
@@ -1282,6 +1328,7 @@ export function startWeather(world, dayApi) {
         storm: L.lightning,
         wind: L.wind,
         flash,
+        sun: sunK, // js/sky.js: the Sun break's gap in the cloud deck and its god rays
       });
     } else if (pipeline && pipeline.imageProcessing) {
       const safeExp = Math.abs(targetExp - 1.0) < 1e-4 ? 0.9999 : targetExp;
@@ -1319,6 +1366,38 @@ export function startWeather(world, dayApi) {
             roadMat.clearCoat.intensity = wetR * 0.62;
             roadMat.clearCoat.roughness = 0.12 + (1 - wetR) * 0.18;
           }
+          // phone / low: SSR is off — bind the wet-street ReflectionProbe so neon and lamps still mirror
+          if (low && streetProbe && streetProbe.cubeTexture) {
+            if (!streetProbeReady) fillStreetProbeList();
+            const wantProbe = wetR > 0.15;
+            if (wantProbe !== streetProbeOn) {
+              streetProbeOn = wantProbe;
+              roadMat.reflectionTexture = wantProbe ? streetProbe.cubeTexture : null;
+              // metallic workflow: environmentIntensity lifts the probe; reflectivityColor alone is ignored
+              if (roadMat.__dryMetallic == null && roadMat.metallic != null) roadMat.__dryMetallic = roadMat.metallic;
+              if (roadMat.metallic != null) roadMat.metallic = wantProbe ? Math.max(roadMat.__dryMetallic || 0, 0.35) : (roadMat.__dryMetallic != null ? roadMat.__dryMetallic : 0.08);
+              if (roadMat.environmentIntensity != null) {
+                if (roadMat.__dryEnv == null) roadMat.__dryEnv = roadMat.environmentIntensity;
+                roadMat.environmentIntensity = wantProbe ? Math.max(0.85, roadMat.__dryEnv) : roadMat.__dryEnv;
+              }
+              streetProbe.refreshRate = wantProbe ? 12 : -1;
+            }
+            if (wantProbe) {
+              streetProbeAcc += 0.3;
+              if (streetProbeAcc > 1.2) {
+                streetProbeAcc = 0;
+                const cam = scene.activeCamera;
+                if (cam) {
+                  const p = cam.globalPosition || cam.position;
+                  streetProbe.position.set(p.x, 0.4, p.z);
+                }
+              }
+            }
+          } else if (streetProbeOn) {
+            streetProbeOn = false;
+            roadMat.reflectionTexture = null;
+            if (streetProbe) streetProbe.refreshRate = -1;
+          }
         } else {
           dryDiffuse.scaleToRef(1 - wet * 0.52, scratch.diff);
           scratch.diff.b = Math.min(1, scratch.diff.b + wet * 0.04);
@@ -1329,6 +1408,7 @@ export function startWeather(world, dayApi) {
         }
       }
       live.gloss = g;
+      live.reflectProbe = streetProbeOn;
     }
     const cam = scene.activeCamera;
     const px = cam && cam.target ? cam.target.x : 0;
@@ -1524,6 +1604,7 @@ export function startWeather(world, dayApi) {
       puddles: live.puddles,
       ripples: live.ripples,
       reflect: live.reflect || 0,
+      reflectProbe: !!live.reflectProbe,
       awnings: live.awnings,
       treeSway: live.treeSway,
       awningSway: live.awningSway,
@@ -1531,6 +1612,7 @@ export function startWeather(world, dayApi) {
       snowMeshes: live.snowMeshes,
       tier: live.tier,
       activeParticles: live.activeParticles,
+      rainStreaks: live.rainStreaks || 0,
     });
   }
   const api = {
@@ -1538,6 +1620,7 @@ export function startWeather(world, dayApi) {
     now: apiNow,
     set: (state, intensity, via) => weather.set(state, intensity, via),
     sunbreak: () => weather.sunbreak(),
+    boostSteam: (sec) => weather.boostSteam(sec),
     triggerFlash: (dist, pan) => scheduleFlash(dist, pan),
     thunderDelay,
     forecast: (dateKey, minutes) => forecastAt(dateKey, minutes, cfg.forecast),

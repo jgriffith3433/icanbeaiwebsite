@@ -7,7 +7,7 @@ import { defineConfig } from 'vite';
 // (js/hawkes-release.js, a copy of a shared file; the analytics SDK comes from Gen), releases.json, the CNAME and models/
 // (Small Weather's GLB, loaded by URL from day.config.js control.model).
 // dist/ is the whole site: .github/workflows/pages.yml publishes it.
-const STATIC = ['whatsnew.html', 'privacy.html', 'releases.json', 'CNAME', 'css', 'models', 'audio', 'textures', 'js/hawkes-release.js', 'js/hawkes-perf.js'];
+const STATIC = ['whatsnew.html', 'privacy.html', 'releases.json', 'CNAME', 'css', 'models', 'audio', 'textures', 'fonts', 'images', 'js/hawkes-release.js', 'js/hawkes-perf.js'];
 
 function copyStatic() {
   let outDir = 'dist';
@@ -27,6 +27,16 @@ function copyStatic() {
       fs.mkdirSync(dlgDir, { recursive: true });
       const files = fs.existsSync('audio/dialogue') ? fs.readdirSync('audio/dialogue').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/dialogue/' + n) : [];
       fs.writeFileSync(path.join(dlgDir, 'index.json'), JSON.stringify({ files }) + '\n');
+      // js/sfx.js's foley bank plays only the clips this lists (audio/foley/<kind>-<n>.mp3)
+      const folDir = path.join(outDir, 'audio', 'foley');
+      fs.mkdirSync(folDir, { recursive: true });
+      const fol = fs.existsSync('audio/foley') ? fs.readdirSync('audio/foley').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/foley/' + n) : [];
+      fs.writeFileSync(path.join(folDir, 'index.json'), JSON.stringify({ files: fol }) + '\n');
+      // Layered power casts (crack/body/rumble, whoosh, gale, tornado, sun shimmer)
+      const powDir = path.join(outDir, 'audio', 'sfx', 'power');
+      fs.mkdirSync(powDir, { recursive: true });
+      const pow = fs.existsSync('audio/sfx/power') ? fs.readdirSync('audio/sfx/power').filter((n) => /\.mp3$/.test(n)).sort().map((n) => 'audio/sfx/power/' + n) : [];
+      fs.writeFileSync(path.join(powDir, 'index.json'), JSON.stringify({ files: pow }) + '\n');
     },
   };
 }

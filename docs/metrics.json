@@ -1,0 +1,25 @@
+{
+  "unit": "m",
+  "jumpHeight": 1.5,
+  "jumpDistance": 5.2,
+  "runSpeed": 5.6,
+  "walkSpeed": 2.4,
+  "corridorWidths": {
+    "min": 2.0,
+    "comfortable": 2.8,
+    "combat": 6.0
+  },
+  "feel": {
+    "coyoteMs": 120,
+    "jumpBufferMs": 120,
+    "hitStopMs": 60,
+    "shakeMs": 120,
+    "shakeAmplitude": 0.15
+  },
+  "motion": {
+    "walkStrideM": 0.86,
+    "runStrideM": 1.25,
+    "footSlideLimitM": 0.05,
+    "footFloatLimitM": 0.03
+  }
+}

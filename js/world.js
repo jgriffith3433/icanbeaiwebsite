@@ -138,7 +138,7 @@
     sun.autoCalcShadowZBounds = false;
     sun.shadowMinZ = 1;
     sun.shadowMaxZ = 90;
-    const shadows = new B.ShadowGenerator(1024, sun);
+    let shadows = new B.ShadowGenerator(1024, sun); // js/render-pipeline.js swaps it for a cascaded one (stage.setShadows)
     shadows.usePercentageCloserFiltering = true;
     shadows.filteringQuality = B.ShadowGenerator.QUALITY_LOW;
     shadows.bias = 0.0018;
@@ -1506,10 +1506,16 @@
        still places, tilts and seats him (its boxes hide). The figure's pose and gesture pick the clip. */
     let skin = null;
     const SEATED = ["sitChair", "sitCouch", "sitBed", "toilet", "sitCar"];
+    let skinHour = 12;
     function skinClip(pose, hand) {
       if (pose === "walk") return "walk";
       if (pose === "lie" || pose === "side" || pose === "recline") return pose;
-      if (SEATED.includes(pose)) return ["type", "wheel", "phone", "remote", "eat", "cook", "hold"].includes(hand) ? "type" : "sit";
+      if (SEATED.includes(pose)) {
+        if (["type", "wheel", "phone", "remote", "eat", "cook", "hold"].includes(hand)) return "type";
+        // Autopilot evenings: sit-at-the-window idle (js/small-weather.js `window` clip)
+        if (skinHour >= 18.5 && skinHour < 22.5) return "window";
+        return "sit";
+      }
       if (hand === "phone" || hand === "remote" || hand === "brush" || hand === "face" || hand === "drink") return "phone";
       if (hand === "stretch" || hand === "towel") return "cast";
       return "idle";
@@ -1643,9 +1649,18 @@
     /* js/title.js's skyline shot: null = the day's camera */
     let titleShot = null;
     const TITLE_SHOT = { x: 92, y: 16, z: 32, alpha: -1.15, beta: 1.22, radius: 98, spin: 0.018 };
+    /* A crane (opts.crane { secs, from, to }: x y z alpha beta radius each, eased) replaces the slow orbit, and opts.hero
+       { x, y, z, yaw } stands Small Weather on a roof while the title is up (the day's person is hidden by it; the pose is the
+       idle clip with a slow wind lean). titleParallax(x, y) in -1..1 leans the camera a little (mouse, device tilt). */
+    let titleParX = 0, titleParY = 0, titleParSX = 0, titleParSY = 0;
     function setTitleShot(on) {
       titleShot = on ? Object.assign({}, TITLE_SHOT, typeof on === "object" ? on : {}) : null;
+      if (titleShot) { titleShot.t0 = null; titleParX = titleParY = titleParSX = titleParSY = 0; }
       return !!titleShot;
+    }
+    function setTitleParallax(x, y) {
+      titleParX = Math.max(-1, Math.min(1, +x || 0));
+      titleParY = Math.max(-1, Math.min(1, +y || 0));
     }
     /* js/moments.js's cut-away camera for a turning-point moment: orbits a point in the city (target, alpha, beta, radius
        each go from a start to an end value over `secs`, eased), on top of the day's camera and the player's. It stays out
@@ -1670,6 +1685,19 @@
         return false;
       }
       const two = (v, d) => (Array.isArray(v) ? v : [v == null ? d : v, v == null ? d : v]);
+      // A mid-scene cut (ending scenes): retarget without replacing the restore pose.
+      if (spec.cut && cine) {
+        cine.t = 0;
+        cine.secs = spec.secs || cine.secs || 6;
+        cine.tx = two(spec.tx, cine.tx[1]);
+        cine.ty = two(spec.ty, cine.ty[1]);
+        cine.tz = two(spec.tz, cine.tz[1]);
+        cine.alpha = two(spec.alpha, cine.alpha[1]);
+        cine.beta = two(spec.beta, cine.beta[1]);
+        cine.radius = two(spec.radius, cine.radius[1]);
+        cine.fov = spec.fov || 0;
+        return true;
+      }
       cine = {
         t: 0, secs: spec.secs || 6, frames: 0, inside: 0, minClear: 99,
         tx: two(spec.tx), ty: two(spec.ty), tz: two(spec.tz),
@@ -1685,6 +1713,16 @@
         const q = solids[i];
         if (q.roll || q.yaw || q.pitch) continue;
         if (Math.abs(p.x - q.x) < q.w / 2 + 0.2 && Math.abs(p.y - q.y) < q.h / 2 + 0.2 && Math.abs(p.z - q.z) < q.d / 2 + 0.2) return true;
+      }
+      return false;
+    }
+    /* The camera-inside detector: the camera's point inside a building's box (an axis-aligned solid), or under the ground. */
+    function cameraInside(p) {
+      if (p.y < (surfaceAt ? surfaceAt(p.x, p.z) : 0) + 0.06 && p.y < 4) return true;
+      for (let i = 0; i < solids.length; i++) {
+        const q = solids[i];
+        if (q.roll || q.yaw || q.pitch) continue;
+        if (Math.abs(p.x - q.x) < q.w / 2 + 0.1 && Math.abs(p.y - q.y) < q.h / 2 + 0.1 && Math.abs(p.z - q.z) < q.d / 2 + 0.1) return true;
       }
       return false;
     }
@@ -1719,6 +1757,105 @@
       c.frames++;
       c.minClear = Math.min(c.minClear, pos.y - (surfaceAt ? surfaceAt(pos.x, pos.z) : 0));
       if (cineInside(pos)) c.inside++;
+      followChapterSign(tx, ty, tz, r, e);
+    }
+
+
+    /* js/moments.js's chapter openers: the chapter's title written in the world, never a card. A camera-facing sign
+       (billboard mode, front face only, vertex-order and scale all positive, so the words read the right way round)
+       hung at the cut-away camera's target: `kind` "cloud" = puffs of cloud that form the letters one by one, "billboard"
+       = a lit neon panel that flickers on. It scales to the screen (a 390 px-wide phone gets a narrower sign), so the
+       whole title is always in frame. `chapterSignK(k)` is how much of it has formed (0..1). */
+    let sign = null;
+    function setChapterSign(spec) {
+      if (sign) { sign.mesh.dispose(); sign.mat.dispose(); sign.tex.dispose(); sign = null; }
+      if (!spec || !spec.text) return false;
+      const W = 1024, H = 256;
+      const tex = new B.DynamicTexture("chapter-sign-tex", { width: W, height: H }, scene, true);
+      tex.hasAlpha = true;
+      const mat = new B.StandardMaterial("chapter-sign-mat", scene);
+      mat.disableLighting = true;
+      mat.emissiveTexture = tex;
+      mat.opacityTexture = tex;
+      mat.backFaceCulling = true;
+      mat.fogEnabled = false;
+      const w = spec.w || 16;
+      const mesh = B.MeshBuilder.CreatePlane("chapter-sign", { width: w, height: w / 4 }, scene);
+      mesh.material = mat;
+      mesh.billboardMode = B.Mesh.BILLBOARDMODE_ALL;
+      mesh.isPickable = false;
+      mesh.alphaIndex = 50;
+      mesh.isVisible = false; // placed on the first cut-away frame (followChapterSign)
+      const off = document.createElement("canvas");
+      off.width = W; off.height = H;
+      const o = off.getContext("2d");
+      const text = String(spec.text).toUpperCase();
+      let px = 200;
+      o.font = `800 ${px}px Outfit, system-ui, sans-serif`;
+      while (o.measureText(text).width > W * 0.9 && px > 40) { px -= 6; o.font = `800 ${px}px Outfit, system-ui, sans-serif`; }
+      o.textAlign = "center"; o.textBaseline = "middle"; o.fillStyle = "#fff";
+      o.fillText(text, W / 2, H / 2 + px * 0.04);
+      const puffs = [];
+      if (spec.kind !== "billboard") {
+        const d = o.getImageData(0, 0, W, H).data;
+        let seed = 7919;
+        const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+        for (let y = 4; y < H; y += 6) for (let x = 4; x < W; x += 6) if (d[(y * W + x) * 4 + 3] > 128) puffs.push({ x: x + (rnd() - 0.5) * 6, y: y + (rnd() - 0.5) * 6, r: 11 + rnd() * 11, o: rnd() });
+        puffs.sort((a, b) => a.o - b.o);
+      }
+      sign = { mesh, mat, tex, w, kind: spec.kind === "billboard" ? "billboard" : "cloud", k: 0, drawn: -1, text, px, puffs, off, W, H, formed: 0 };
+      paintChapterSign(0);
+      return true;
+    }
+    function paintChapterSign(k) {
+      const S = sign;
+      if (!S) return;
+      const step = S.kind === "cloud" ? Math.floor(S.puffs.length * Math.min(1, k)) : Math.round(Math.min(1, k) * 24);
+      const key = S.kind === "cloud" ? Math.floor(step / Math.max(1, S.puffs.length / 28)) : step;
+      if (key === S.drawn) return;
+      S.drawn = key;
+      const c = S.tex.getContext();
+      c.clearRect(0, 0, S.W, S.H);
+      if (S.kind === "cloud") {
+        const pass = (dy, rgb, a) => {
+          for (let i = 0; i < step; i++) {
+            const p = S.puffs[i];
+            const g = c.createRadialGradient(p.x, p.y + dy, 0, p.x, p.y + dy, p.r);
+            g.addColorStop(0, `rgba(${rgb},${a})`);
+            g.addColorStop(1, `rgba(${rgb},0)`);
+            c.fillStyle = g;
+            c.fillRect(p.x - p.r, p.y + dy - p.r, p.r * 2, p.r * 2);
+          }
+        };
+        pass(5, "150,168,200", 0.55); // the cloud's shaded underside
+        pass(0, "255,255,255", 0.95);
+      } else {
+        const lit = step >= 24 || (step > 3 && step % 3 !== 1); // it flickers on, then holds
+        c.fillStyle = "rgba(8,12,24,0.9)";
+        c.fillRect(8, 24, S.W - 16, S.H - 48);
+        c.lineWidth = 6;
+        c.strokeStyle = lit ? "rgba(126,200,255,1)" : "rgba(60,90,120,0.6)";
+        c.strokeRect(14, 30, S.W - 28, S.H - 60);
+        c.font = `800 ${Math.round(S.px * 0.86)}px Outfit, system-ui, sans-serif`;
+        c.textAlign = "center"; c.textBaseline = "middle";
+        c.shadowColor = lit ? "rgba(126,200,255,1)" : "rgba(0,0,0,0)";
+        c.shadowBlur = lit ? 28 : 0;
+        c.fillStyle = lit ? "#eaf7ff" : "rgba(80,100,130,0.7)";
+        c.fillText(S.text, S.W / 2, S.H / 2 + S.px * 0.03);
+        c.shadowBlur = 0;
+      }
+      S.tex.update();
+    }
+    function followChapterSign(tx, ty, tz, dist, e) {
+      const S = sign;
+      if (!S) return;
+      S.mesh.position.set(tx, ty, tz);
+      const aspect = engine.getAspectRatio ? engine.getAspectRatio(camera) : 1.6;
+      const visW = 2 * Math.max(4, dist) * Math.tan(camera.fov / 2) * aspect;
+      const fit = Math.min(1.1, (0.82 * visW) / S.w);
+      const grow = 0.94 + 0.06 * Math.min(1, e * 3);
+      S.mesh.scaling.set(fit * grow, fit * grow, 1);
+      S.mesh.isVisible = true;
     }
 
     /* How far a camera at target + dir * r can sit before a building is in the way: a ray from the target
@@ -1762,6 +1899,7 @@
       const things = fr.things || things0;
       const minutes = fr.minutes;
       const hour = (minutes % 1440) / 60;
+      skinHour = hour;
       const day = daylight(hour);
       const snap = !!opts.snap;
 
@@ -1902,7 +2040,9 @@
       /* quilt */
       /* opts.player: the player has him (js/control.js), which places and poses him; the day still runs the rest */
       const player = opts.player || null;
-      const pp = player ? Object.assign({}, fr.person, { x: player.x, z: player.z, pose: "stand", walking: player.speed > 0.2, inCar: false }) : fr.person;
+      const hero = !player && titleShot && titleShot.hero ? titleShot.hero : null;
+      const pp = player ? Object.assign({}, fr.person, { x: player.x, z: player.z, pose: "stand", walking: player.speed > 0.2, inCar: false })
+        : hero ? Object.assign({}, fr.person, { x: hero.x, z: hero.z, yaw: hero.yaw, pose: "stand", hand: "none", walking: false, inCar: false }) : fr.person;
       const inBed = spots.bed && Math.hypot(pp.x - spots.bed.x, pp.z - spots.bed.z) < 0.4 && ["lie", "side", "recline"].includes(pp.pose);
       if (quiltUp) {
         quiltUp.setEnabled(inBed && things.blanket !== "down");
@@ -2021,10 +2161,13 @@
         // standing or walking, his feet go on whatever is under him (a room's floor, the sidewalk, the road, the lawn);
         // the poses' heights assume a room's floor
         const gy = spec === POSE.stand || spec === POSE.walk ? feetGround(pp.x, pp.z) : null;
-        me.root.position.set(pp.x, gy == null ? spec.y : spec.y - FLOOR + gy, pp.z);
-        if (state.yaw == null || snap) state.yaw = pp.yaw;
+        me.root.position.set(pp.x, hero ? spec.y - FLOOR + hero.y : gy == null ? spec.y : spec.y - FLOOR + gy, pp.z);
+        if (state.yaw == null || snap || hero) state.yaw = pp.yaw;
         state.yaw = dampAngle(state.yaw, pp.yaw, dt, pp.walking ? 12 : 7);
         me.root.rotation.y = state.yaw;
+        // on the title's roof the wind leans him, a little and never still
+        me.root.rotation.x = hero ? 0.035 + 0.02 * Math.sin(t * 1.3) + 0.012 * Math.sin(t * 3.1) : 0;
+        me.root.rotation.z = hero ? 0.015 * Math.sin(t * 0.9 + 1) : 0;
       }
       if (!player) {
         const moved = state.lastX == null ? 0 : Math.hypot(pp.x - state.lastX, pp.z - state.lastZ);
@@ -2088,11 +2231,27 @@
       /* the title screen (js/title.js): a slow, high orbit over the district so the skyline sits behind the
          menu; the day's own camera snaps back to him when the title closes */
       if (titleShot) {
-        const a = titleShot.alpha + t * titleShot.spin;
-        camera.target.set(titleShot.x, titleShot.y, titleShot.z);
-        camera.alpha = a;
-        camera.beta = titleShot.beta;
-        camera.radius = titleShot.radius;
+        if (titleShot.t0 == null) titleShot.t0 = t;
+        titleParSX += (titleParX - titleParSX) * Math.min(1, dt * 3);
+        titleParSY += (titleParY - titleParSY) * Math.min(1, dt * 3);
+        let tx = titleShot.x, ty = titleShot.y, tz = titleShot.z, al = titleShot.alpha + t * titleShot.spin, be = titleShot.beta, ra = titleShot.radius;
+        const cr = titleShot.crane;
+        if (cr) {
+          const k = Math.max(0, Math.min(1, (t - titleShot.t0) / cr.secs));
+          const e = k * k * k * (k * (k * 6 - 15) + 10); // smootherstep: the crane settles, it doesn't stop
+          const F = cr.from, T = cr.to;
+          tx = F.x + (T.x - F.x) * e; ty = F.y + (T.y - F.y) * e; tz = F.z + (T.z - F.z) * e;
+          al = F.alpha + (T.alpha - F.alpha) * e; be = F.beta + (T.beta - F.beta) * e; ra = F.radius + (T.radius - F.radius) * e;
+          if (k >= 1) { // after the landing: a slow breath, so the key art is never a still
+            al += 0.012 * Math.sin((t - titleShot.t0) * 0.35);
+            be += 0.006 * Math.sin((t - titleShot.t0) * 0.5);
+          }
+        }
+        const par = cr ? 1 : 0.4;
+        camera.target.set(tx, ty, tz);
+        camera.alpha = al + titleParSX * 0.045 * par;
+        camera.beta = be + titleParSY * 0.025 * par;
+        camera.radius = ra;
         cam.inited = false;
         cam.user = 0;
         sun.position.set(titleShot.x - sun.direction.x * 40, 40, titleShot.z - sun.direction.z * 40);
@@ -2180,7 +2339,12 @@
         cam.beta = camera.beta;
         cam.radius = camera.radius;
       } else {
-        cam.alpha = cam.snapAlpha ? alphaGoal : dampAngle(cam.alpha, alphaGoal, dt, 1.2);
+        if (cam.snapAlpha) cam.alpha = alphaGoal;
+        else {
+          // the hand-back from the player's camera swings round at most 150 deg/s (the playtest's turn-rate limit is 180)
+          const da = dampAngle(cam.alpha, alphaGoal, dt, 1.2) - cam.alpha;
+          cam.alpha += Math.max(-2.6 * dt, Math.min(2.6 * dt, da));
+        }
         cam.snapAlpha = false;
         cam.beta = damp(cam.beta, shot.beta, dt, 1.2);
         cam.radius = damp(cam.radius, shot.radius, dt, 1.2);
@@ -2468,6 +2632,9 @@
         sun,
         hemi,
         pipeline,
+        camera,
+        get shadows() { return shadows; },
+        setShadows(g) { if (g) shadows = g; }, // js/render-pipeline.js: the cascaded generator takes over, casters carried across
         road: roadM,
         bedsideFill,
         bedroomLight: (roomLights.find((rl) => rl.id === "bedroom") || {}).light || null,
@@ -2549,10 +2716,16 @@
         cam.user = 0;
       },
       titleShot: setTitleShot,
+      titleParallax: setTitleParallax,
+      titleCrane: () => (titleShot && titleShot.crane && titleShot.t0 != null ? Math.min(1, (elapsed - titleShot.t0) / titleShot.crane.secs) : null),
       officePower: (k) => { officePowerK = Math.max(0, Math.min(1, k)); return officePowerK; },
       officePowerNow: () => officePowerK,
       cineShot: setCineShot,
+      chapterSign: setChapterSign,
+      chapterSignK: (k) => { if (sign) { sign.k = k; paintChapterSign(k); } },
+      chapterSignInfo: () => (sign ? { kind: sign.kind, text: sign.text, k: sign.k, puffs: sign.puffs.length, scale: sign.mesh.scaling.x, w: sign.w, position: [sign.mesh.position.x, sign.mesh.position.y, sign.mesh.position.z] } : null),
       cineOn: () => !!cine,
+      cameraInside,
       cineInfo: () => (cine ? { frames: cine.frames, inside: cine.inside, minClear: cine.minClear, t: cine.t } : cineLast),
       titleShotOn: () => !!titleShot,
       person: me.root, // read by the playtest

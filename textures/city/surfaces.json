@@ -1,0 +1,69 @@
+{
+ "_about": "Gen-made PBR sets that exist in the repo (js/surfaces.js loads only these). Albedo/normal/roughness webp at 1024, plus -512 for low quality.",
+ "sets": {
+  "brick": {
+   "albedo": "textures/city/brick-albedo.webp",
+   "normal": "textures/city/brick-normal.webp",
+   "roughness": "textures/city/brick-roughness.webp",
+   "albedo512": "textures/city/brick-albedo-512.webp",
+   "normal512": "textures/city/brick-normal-512.webp",
+   "roughness512": "textures/city/brick-roughness-512.webp"
+  },
+  "stucco": {
+   "albedo": "textures/city/stucco-albedo.webp",
+   "normal": "textures/city/stucco-normal.webp",
+   "roughness": "textures/city/stucco-roughness.webp",
+   "albedo512": "textures/city/stucco-albedo-512.webp",
+   "normal512": "textures/city/stucco-normal-512.webp",
+   "roughness512": "textures/city/stucco-roughness-512.webp"
+  },
+  "concrete": {
+   "albedo": "textures/city/concrete-albedo.webp",
+   "normal": "textures/city/concrete-normal.webp",
+   "roughness": "textures/city/concrete-roughness.webp",
+   "albedo512": "textures/city/concrete-albedo-512.webp",
+   "normal512": "textures/city/concrete-normal-512.webp",
+   "roughness512": "textures/city/concrete-roughness-512.webp"
+  },
+  "glass": {
+   "albedo": "textures/city/glass-albedo.webp",
+   "normal": "textures/city/glass-normal.webp",
+   "roughness": "textures/city/glass-roughness.webp",
+   "albedo512": "textures/city/glass-albedo-512.webp",
+   "normal512": "textures/city/glass-normal-512.webp",
+   "roughness512": "textures/city/glass-roughness-512.webp"
+  },
+  "asphalt": {
+   "albedo": "textures/city/asphalt-albedo.webp",
+   "normal": "textures/city/asphalt-normal.webp",
+   "roughness": "textures/city/asphalt-roughness.webp",
+   "albedo512": "textures/city/asphalt-albedo-512.webp",
+   "normal512": "textures/city/asphalt-normal-512.webp",
+   "roughness512": "textures/city/asphalt-roughness-512.webp"
+  },
+  "pavers": {
+   "albedo": "textures/city/pavers-albedo.webp",
+   "normal": "textures/city/pavers-normal.webp",
+   "roughness": "textures/city/pavers-roughness.webp",
+   "albedo512": "textures/city/pavers-albedo-512.webp",
+   "normal512": "textures/city/pavers-normal-512.webp",
+   "roughness512": "textures/city/pavers-roughness-512.webp"
+  },
+  "tar": {
+   "albedo": "textures/city/tar-albedo.webp",
+   "normal": "textures/city/tar-normal.webp",
+   "roughness": "textures/city/tar-roughness.webp",
+   "albedo512": "textures/city/tar-albedo-512.webp",
+   "normal512": "textures/city/tar-normal-512.webp",
+   "roughness512": "textures/city/tar-roughness-512.webp"
+  },
+  "gravel": {
+   "albedo": "textures/city/gravel-albedo.webp",
+   "normal": "textures/city/gravel-normal.webp",
+   "roughness": "textures/city/gravel-roughness.webp",
+   "albedo512": "textures/city/gravel-albedo-512.webp",
+   "normal512": "textures/city/gravel-normal-512.webp",
+   "roughness512": "textures/city/gravel-roughness-512.webp"
+  }
+ }
+}

@@ -239,7 +239,15 @@ export function startScore(dayApi) {
   let ctx = null;
   let master = null;
   let musicBus = null;
+  let bedBus = null; // the weather beds' own bus: js/stems.js mutes it while the stems play under control
+  let bedGoal = 1;
   let ambBus = null;
+  let lim = null;
+  let fogLp = null;
+  let fogDelay = null;
+  let fogWet = null;
+  let fogColorK = 0;
+  let birdLiftUntil = 0;
   let unlocked = false;
   let loading = null;
   const buffers = Object.create(null);
@@ -265,6 +273,7 @@ export function startScore(dayApi) {
   let pk = 0;
   let duckUntil = 0;
   let duckK = 1;
+  let usingMix = false; // js/mix.js owns the destination when true
   const live = {
     bed: null,
     target: null,
@@ -316,12 +325,27 @@ export function startScore(dayApi) {
     if (ctx) return ctx;
     if (!window.AudioContext && !window.webkitAudioContext) return null;
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      ctx = new Ctx();
+      // Prefer the shared mix graph (js/mix.js): music/ambience buses → master compressor/limiter.
+      const Mix = (day && day.mix) || window.mix;
+      if (Mix && typeof Mix.ctx === "function") {
+        try { if (typeof Mix.unlock === "function") Mix.unlock(); } catch (e) { /* */ }
+        ctx = Mix.ctx();
+      }
+      if (!ctx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        ctx = new Ctx();
+      }
+      const mixMusic = Mix && typeof Mix.bus === "function" ? Mix.bus("music") : null;
+      const mixAmb = Mix && typeof Mix.bus === "function" ? Mix.bus("ambience") : null;
+      usingMix = !!(mixMusic && mixMusic.bus && mixAmb && mixAmb.bus && Mix.ctx && Mix.ctx() === ctx);
+
       master = ctx.createGain();
       master.gain.value = 0;
       musicBus = ctx.createGain();
       musicBus.gain.value = 1;
+      bedBus = ctx.createGain();
+      bedBus.gain.value = 1;
+      bedBus.connect(musicBus);
       tone = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
       if (tone) {
         tone.type = "lowpass";
@@ -330,12 +354,61 @@ export function startScore(dayApi) {
       }
       ambBus = ctx.createGain();
       ambBus.gain.value = 1;
-      if (tone) {
-        musicBus.connect(tone);
-        tone.connect(master);
-      } else musicBus.connect(master);
-      ambBus.connect(master);
-      master.connect(ctx.destination);
+      // Fog colour: world bus low-pass + a short wet delay that grows with fog.
+      fogLp = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
+      if (fogLp) {
+        fogLp.type = "lowpass";
+        fogLp.frequency.value = 18000;
+        fogLp.Q.value = 0.5;
+      }
+      try {
+        fogDelay = ctx.createDelay(1.0);
+        fogDelay.delayTime.value = 0.08;
+        fogWet = ctx.createGain();
+        fogWet.gain.value = 0;
+      } catch (err) {
+        fogDelay = null;
+        fogWet = null;
+      }
+      if (usingMix) {
+        // Tone/fog into the shared music & ambience buses; mix owns the master chain + ducking.
+        if (tone) {
+          musicBus.connect(tone);
+          tone.connect(mixMusic.bus);
+        } else musicBus.connect(mixMusic.bus);
+        if (fogLp) {
+          ambBus.connect(fogLp);
+          fogLp.connect(mixAmb.bus);
+        } else ambBus.connect(mixAmb.bus);
+        if (fogDelay && fogWet) {
+          ambBus.connect(fogDelay);
+          fogDelay.connect(fogWet);
+          fogWet.connect(mixAmb.bus);
+        }
+        // Local master stays disconnected: mix owns the destination. Callers that
+        // write master.gain (unlock fade) are no-ops on this dead node when mix is up.
+        lim = null;
+      } else {
+        lim = ctx.createDynamicsCompressor();
+        if (lim.threshold) lim.threshold.value = -6;
+        if (lim.knee) lim.knee.value = 12;
+        if (lim.ratio) lim.ratio.value = 12;
+        if (lim.attack) lim.attack.value = 0.003;
+        if (lim.release) lim.release.value = 0.2;
+        if (tone) {
+          musicBus.connect(tone);
+          tone.connect(fogLp || master);
+        } else musicBus.connect(fogLp || master);
+        ambBus.connect(fogLp || master);
+        if (fogLp) fogLp.connect(master);
+        if (fogDelay && fogWet) {
+          master.connect(fogDelay);
+          fogDelay.connect(fogWet);
+          fogWet.connect(lim);
+        }
+        master.connect(lim);
+        lim.connect(ctx.destination);
+      }
     } catch (err) {
       ctx = null;
       return null;
@@ -503,7 +576,7 @@ export function startScore(dayApi) {
     const url = bedUrl(bed, c);
     const buf = buffers[url];
     if (!buf) return null;
-    music[bed] = startLoop(buf, musicBus, 0);
+    music[bed] = startLoop(buf, bedBus || musicBus, 0);
     return music[bed];
   }
 
@@ -764,9 +837,9 @@ export function startScore(dayApi) {
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     const m = meta || {};
     const dist = m.dist != null ? m.dist : kind === "near" ? 12 : 68;
-    const expectedDelay = m.delay != null ? m.delay : Math.min(2.2, Math.max(0.06, 0.06 + dist / 85));
+    const expectedDelay = m.delay != null ? m.delay : (dist <= 30 ? 0 : Math.min(2.8, dist / 343));
     const actualDelay = m.flashAt != null ? Math.max(0, (now - m.flashAt) / 1000) : expectedDelay;
-    const near = kind === "near" || (kind !== "far" && dist < 22);
+    const near = kind === "near" || (kind !== "far" && dist <= 30);
     const pan = m.pan != null ? Math.max(-1, Math.min(1, m.pan)) : 0;
     live.lastThunder = {
       kind: near ? "near" : "far",
@@ -777,6 +850,7 @@ export function startScore(dayApi) {
       at: Math.round(now),
     };
     live.amb.thunder = near ? 1 : 0.65;
+    if (m.silent) return true; // js/sfx.js already played the layered body/rumble; just keep the log
     if (!soundOn() || !unlocked) return false;
     if (now - lastCrack < 180) return true;
     lastCrack = now;
@@ -784,6 +858,23 @@ export function startScore(dayApi) {
     const url = near ? c.ambience.thunderNear : c.ambience.thunderFar;
     const vol = (near ? 1 : 0.68) * c.mix.thunder * c.ambVol;
     return playOneShot(url, vol, undefined, pan);
+  }
+
+  /** Sidechain music + ambience by 6 dB for `sec` seconds (a close strike hits the chest). */
+  function duckStrike(sec) {
+    const ms = Math.max(0.4, sec == null ? 1.5 : sec) * 1000;
+    duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + ms;
+    // Force the duck floor to 0.5 (−6 dB) for the strike window (mix.duck may be lower for voice).
+    live.strikeDuck = 0.5;
+    return true;
+  }
+  function fogColor(k) {
+    fogColorK = Math.max(fogColorK, Math.max(0, Math.min(1, k == null ? 1 : k)));
+    return fogColorK;
+  }
+  function birdLift(sec) {
+    birdLiftUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + Math.max(0.5, sec || 4) * 1000;
+    return true;
   }
 
   /** Compute spatialized weather soundscape targets for the current state, rooftop height, camera yaw, and crowd. */
@@ -940,11 +1031,20 @@ export function startScore(dayApi) {
     const c = cfg();
     const d = Math.min(0.5, Math.max(0, dt != null ? dt : 0.05));
     const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const duckTo = nowMs < duckUntil ? c.mix.duck : 1;
+    const duckTo = nowMs < duckUntil ? (live.strikeDuck != null ? live.strikeDuck : c.mix.duck) : 1;
+    if (nowMs >= duckUntil) live.strikeDuck = null;
     duckK += (duckTo - duckK) * Math.min(1, d * (duckTo < duckK ? 8 : 1.5));
     const titleUp = !!(day.title && day.title.showing && day.title.showing());
     live.duck = duckK;
     live.title = titleUp;
+
+    // Fog: world bus low-passes and a wet delay grows as fog thickens (ability or forecast).
+    let fogAmt = 0;
+    try {
+      const wn = window.weather && window.weather.now && window.weather.now();
+      fogAmt = Math.max(fogColorK, wn && wn.fog != null ? wn.fog : wn && wn.state === "fog" ? 0.85 : 0);
+    } catch (e) { fogAmt = fogColorK; }
+    fogColorK = Math.max(0, fogColorK - d * 0.25);
 
     // Pressure: how full the meter is (0..1), eased so a call's spend falls away smoothly.
     let pTarget = 0;
@@ -964,8 +1064,9 @@ export function startScore(dayApi) {
     const hour = simHour();
     const night = isNightHour(hour, c);
     live.tod = night ? "night" : "day";
-    const toneGoal = night ? c.mix.nightTone + (18000 - c.mix.nightTone) * tk * 0.5 : 18000;
+    const toneGoal = (night ? c.mix.nightTone + (18000 - c.mix.nightTone) * tk * 0.5 : 18000) * (1 - 0.55 * fogAmt) + 900 * fogAmt;
     live.tone = Math.round(live.tone + (toneGoal - live.tone) * Math.min(1, d * 0.6));
+    live.fog = Math.round(fogAmt * 100) / 100;
 
     setBed(bedFor(state, hour), false);
     if (ctx) {
@@ -995,10 +1096,14 @@ export function startScore(dayApi) {
     }
 
     if (on && ctx.state === "suspended") ctx.resume();
-    setGainSmooth(master, on ? c.mix.master : 0, 0.04);
-    const musicGoal = c.musicVol * duckK * (titleUp ? c.mix.title / Math.max(0.01, c.musicVol) : 1);
+    const masterGoal = on ? c.mix.master : 0;
+    setGainSmooth(master, masterGoal, 0.04);
+    // When mix owns the destination, fold the master level into the bus goals (local master is disconnected).
+    const masterK = usingMix ? masterGoal : 1;
+    const musicGoal = c.musicVol * duckK * masterK * (titleUp ? c.mix.title / Math.max(0.01, c.musicVol) : 1);
     setGainSmooth(musicBus, musicGoal, 0.05);
-    setGainSmooth(ambBus, c.ambVol * (titleUp ? 0.5 : 1), 0.05);
+    setGainSmooth(bedBus, bedGoal, 0.25);
+    setGainSmooth(ambBus, c.ambVol * masterK * (titleUp ? 0.5 : 1), 0.05);
 
     const T = ensureTension();
     if (T) {
@@ -1012,6 +1117,15 @@ export function startScore(dayApi) {
     });
     if (tone) {
       tone.frequency.value = live.tone;
+    }
+    if (fogLp) {
+      const fogHz = 18000 - fogAmt * 15500;
+      fogLp.frequency.value = Math.max(700, fogHz);
+    }
+    if (fogWet) fogWet.gain.value = on ? fogAmt * 0.35 : 0;
+    if (nowMs < birdLiftUntil) {
+      live.amb.birds = Math.min(1, Math.max(live.amb.birds || 0, 0.85));
+      scape.birds = live.amb.birds;
     }
 
     let driving = false;
@@ -1082,6 +1196,7 @@ export function startScore(dayApi) {
       tension: live.tension,
       rate: live.rate,
       pulse: live.pulse,
+      bedLevel: bedGoal,
       mix: Object.assign({}, cfg().mix),
       // which file each of the day/night beds is playing (its own, or the fallback until Gen's file lands)
       files: { day: ctx ? bedUrl("day", cfg()) : null, night: ctx ? bedUrl("night", cfg()) : null },
@@ -1104,18 +1219,30 @@ export function startScore(dayApi) {
   );
 
   // His spoken lines (js/voice.js): the music dips under them for a couple of seconds.
+  // When js/mix.js is up it owns the −8 dB / −4 dB duck on the shared buses — skip the
+  // local duck so we don't stack another −7 dB on top.
   window.addEventListener("day:voice", () => {
+    if (usingMix || (day.mix || window.mix)) return;
     duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + 2600;
   });
   // and under the story's and neighbors' spoken lines (js/dialogue.js)
   window.addEventListener("day:dialogue", () => {
+    if (usingMix || (day.mix || window.mix)) return;
     duckUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + 3200;
   });
 
-  // Heroic sting when the player takes him.
+  // Heroic sting + whoosh when the player takes him; whoosh again on let-go (pairs with the camera blend).
   window.addEventListener("day:control", (ev) => {
     const d = (ev && ev.detail) || {};
-    if (d.action === "take") sting();
+    if (d.action === "take") { sting(); whoosh(); }
+    else if (d.action === "let-go") whoosh();
+  });
+  // Loading card → title crane: arm the beds under the fade when Sound is already on.
+  window.addEventListener("day:loading", (ev) => {
+    const d = (ev && ev.detail) || {};
+    if ((d.action === "handoff" || d.action === "done") && soundOn()) {
+      try { unlock(); } catch (e) { /* needs a gesture on some browsers */ }
+    }
   });
 
   const api = {
@@ -1125,9 +1252,17 @@ export function startScore(dayApi) {
     momentSting,
     whoosh,
     crack,
+    duckStrike,
+    fogColor,
+    birdLift,
     unlock,
     fixLoopSeam: (buf, fadeSec) => fixLoopSeam(ctx, buf, fadeSec),
     equalPowerGains,
+    /** js/stems.js: the music bus and context (null until Sound is on and unlocked), and the beds' level (0 = muted). */
+    bus: () => (ctx && musicBus ? { ctx, bus: musicBus, unlocked, on: soundOn() } : null),
+    /** js/daysound.js: the ambience bus (rain/city and diegetic day loops), once Sound has unlocked the graph. */
+    ambienceBus: () => (ctx && ambBus ? { ctx, bus: ambBus, unlocked, on: soundOn() } : null),
+    bedLevel: (k) => { bedGoal = Math.max(0, Math.min(1, Number(k))); live.bedLevel = bedGoal; return bedGoal; },
     usingSamples: () => live.samples,
     bedFor: (state, hour) => bedFor(state, hour == null ? simHour() : hour),
     isNight: (hour) => isNightHour(hour == null ? simHour() : hour, cfg()),

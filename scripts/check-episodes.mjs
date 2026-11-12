@@ -177,6 +177,18 @@ ok(pickEnding(mk([true, true, true]), 3, E.endings.rules) === "C", "all three sc
 ok(pickEnding({ parts: { 3: { scarred: false } } }, 3, E.endings.rules) === "B", "an unplayed part keeps it from Fair Weather");
 ["A", "B", "C"].forEach((k) => ok(E.endings[k] && E.endings[k].name && E.endings[k].scene && E.endings[k].last.length === 2, `ending ${k} has a name, scene and last line`));
 ok(E.endings.A.last[1] === "Clear skies. He did that, and then stopped." && E.endings.B.last[1] === "It worked. It cost." && E.endings.C.last[0] === "He", "endings keep the sheet's last lines");
+const scenes = E.endings.scenes || {};
+["A", "B", "C"].forEach((k) => {
+  const s = scenes[k];
+  ok(s && s.secs > 0 && s.secs <= 40, `ending scene ${k} is at most 40 s`);
+  ok(s && Array.isArray(s.shots) && s.shots.length >= 1, `ending scene ${k} has a camera path`);
+  ok(s && Array.isArray(s.lines) && s.lines.length >= 2, `ending scene ${k} has at least 2 voiced lines`);
+  ok(s && (s.sting === "resolution" || s.sting === "failure"), `ending scene ${k} uses the score's resolution or failure sting`);
+  (s.lines || []).forEach((L) => {
+    ok((L.caption || L.text || "").length <= 40, `ending ${k} caption too long for one phone line`);
+    ok(L.who !== "He" || !/\b(he|him|his)\b/i.test(L.text), `ending ${k}: "${L.text}" is narration, not spoken`);
+  });
+});
 const fa = cityFared({ parts: { 1: { goals: ["rain-park", "stalls"], kicks: ["flood"] }, 2: { goals: ["turn"], kicks: [] }, 3: { goals: ["charge", "fill"], kicks: [] } } }, E.endings.fared);
 ok(fa.map((f) => f.state).join(",") === "scar,ok,ok,ok" && fa.length === 4 && fa.every((f) => f.text && !/: (ok|scar|open)$/.test(f.text)), `the city fared: ${fa.map((f) => f.state)}`);
 ok(cityFared({ parts: {} }, E.endings.fared).every((f) => f.state === "open"), "nothing played, every need open");
@@ -252,10 +264,17 @@ ok(nextEpisode(E.list, chain[0].id).id === chain[1].id && nextEpisode(E.list, ch
 ok(episodeLock(E.list, {}, "tutorial") === null, "unknown or tutorial ids are never locked");
 
 
-// The finale: the Light show's cues, timing and score
+// The finale: Night Show payoff — cues, roofs, Pilot farewell, credits, tomorrow ask
 const nt = E.list.find((e) => e.id === "night");
 const F = nt && nt.finale;
 ok(F && F.cues.length >= 12 && F.closing && F.closing.neighbors.length === 3, "the finale has a show of 12+ cues and a closing card with the three neighbors");
+ok(F.farewell && /don't need me/i.test(F.farewell.text), "Pilot farewell hands him the sky");
+ok(Array.isArray(F.roofs) && F.roofs.length === 3 && ["birdie", "dex", "quill"].every((id) => F.roofs.some((r) => r.id === id && r.text && r.at != null)), "Birdie, Dex and Ines each have a roof line");
+ok(F.credits && Array.isArray(F.credits.cast) && F.credits.cast.length >= 5 && F.credits.shot && F.credits.secs >= 12, "credits roll has cast and a crane shot");
+ok(["Small Weather", "Pilot", "Birdie", "Dex", "Ines", "Studio"].every((n) => F.credits.cast.some((c) => String(c.role || "").includes(n.split(" ")[0]))), "credits name the cast and the Studio");
+ok(F.postCredits && F.postCredits.fallback, "post-credits shows tomorrow's sky request");
+const showSpan = F.cues[F.cues.length - 1].at + (F.afterSec || 5) + (F.credits.secs || 26) + (F.postCredits.secs || 7) + 12;
+ok(showSpan < 180, `the Night Show payoff fits in 3 minutes (${showSpan.toFixed(0)} s with score buffer)`);
 const kinds = new Set(F.cues.map((c) => c.power));
 ok(["bolt", "rain", "fog", "gale", "sunbreak"].every((k) => kinds.has(k)) && nt.variety === 5, "the show uses all five effects and asks for five");
 ok(F.cues.every((c, i) => i === 0 || c.at > F.cues[i - 1].at), "cues are in time order");
@@ -274,7 +293,7 @@ const same = (grade) => scoreBreakdown(showTally({ cues: showAll.cues.map((c) =>
 ok(same("perfect") > same("good") && same("good") > same(null), "score drops with timing");
 const vp = (names) => scoreBreakdown(showTally({ cues: showAll.cues, best: 18, off: 0, used: new Set(names) }, F, 5), E.scoring).points;
 ok(vp(["bolt", "rain", "fog", "gale", "sunbreak"]) > vp(["bolt"]), "score drops with variety");
-["start", "gather", "end:S", "end:A", "end:B", "end:C"].forEach((k) => ok(Array.isArray(nt.say[k]) && nt.say[k].length, `night: dialogue for ${k}`));
+["start", "gather", "roof:birdie", "roof:dex", "roof:quill", "end:S", "end:A", "end:B", "end:C"].forEach((k) => ok(Array.isArray(nt.say[k]) && nt.say[k].length, `night: dialogue for ${k}`));
 ["S", "A", "B", "C"].forEach((k) => ok(F.closing.last[k] && F.closing.last[k].length === 2, `closing: last line for rank ${k}`));
 ["A", "B", "C", "none"].forEach((k) => ok(F.closing.intro[k], `closing: intro for ending ${k}`));
 

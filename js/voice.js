@@ -118,6 +118,7 @@ html.touch-ui .voice-caption b{display:none}
 html.touch-ui .voice-caption{max-width:92vw;padding:8px 14px;font-size:.92rem}
 html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .voice-caption b{font:600 .65rem/1 Outfit,system-ui,sans-serif;letter-spacing:.28em;text-transform:uppercase;color:#7ec8ff}
+.voice-caption .bust{flex:0 0 28px;width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid rgba(126,200,255,.4)}
 `;
   document.head.appendChild(style);
   const caption = document.createElement("div");
@@ -125,15 +126,25 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
   caption.className = "voice-caption";
   caption.hidden = true;
   caption.setAttribute("role", "status");
-  caption.innerHTML = `<b>Small Weather</b><span id="voice-caption-text"></span>`;
+  caption.innerHTML = `<img class="bust" alt="" hidden/><b>Small Weather</b><span id="voice-caption-text"></span>`;
   document.body.appendChild(caption);
   const captionText = caption.querySelector("#voice-caption-text");
+  const captionBust = caption.querySelector(".bust");
 
   const captionWho = caption.querySelector("b");
   function showCaption(text, who, secs) {
     if (captionTimer) clearTimeout(captionTimer);
-    captionWho.textContent = who || "Small Weather";
+    const name = who || "Small Weather";
+    captionWho.textContent = name;
     captionText.textContent = text || "";
+    const art = window.uiArt || (window.day && window.day.uiArt);
+    if (art && art.bust && captionBust) {
+      const src = art.bust(name);
+      if (src && /pilot|birdie|dex|ines/i.test(name)) {
+        captionBust.src = src;
+        captionBust.hidden = false;
+      } else captionBust.hidden = true;
+    } else if (captionBust) captionBust.hidden = true;
     caption.hidden = false;
     caption.classList.remove("leaving");
     live.caption = text || null;
@@ -269,8 +280,24 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
           playing = null;
           playPri = 0;
           live.playing = false;
+          emit({ action: "end", id: line.id, group: line.group });
+          drainPilot();
         }
       });
+      // Route Small Weather's clips into the shared voice bus when the mix is up.
+      try {
+        const Mix = mixApi();
+        if (Mix && typeof Mix.ctx === "function" && !a.__voiceBus) {
+          if (typeof Mix.unlock === "function") Mix.unlock();
+          audioCtx = Mix.ctx() || audioCtx;
+          if (audioCtx) {
+            const src = audioCtx.createMediaElementSource(a);
+            const voiceBus = Mix.bus && Mix.bus("voice");
+            src.connect((voiceBus && voiceBus.bus) || audioCtx.destination);
+            a.__voiceBus = true;
+          }
+        }
+      } catch (err) { /* plain element playback */ }
       audioEls[line.file] = a;
     }
     a.volume = cfg().volume;
@@ -280,6 +307,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
   }
 
   function stopCurrent() {
+    const was = playing;
     if (playing && playing.el) {
       try {
         playing.el.pause();
@@ -290,6 +318,8 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     playing = null;
     playPri = 0;
     live.playing = false;
+    if (was) emit({ action: "end", id: was.id, group: was.group });
+    if (day.pilot && day.pilot.pulse) day.pilot.pulse(false);
   }
 
   function emit(detail) {
@@ -420,6 +450,9 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
    * Returns { id, file, secs } (file null when no clip is in the build or Sound is off: the caption still shows).
    */
   let audioCtx = null;
+  function mixApi() {
+    return day.mix || window.mix || day.audio || null;
+  }
   function placeVoice(el, opts) {
     const w = day.world && day.world();
     const cam = w && w.scene && w.scene.activeCamera;
@@ -435,13 +468,38 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     }
     el.volume = Math.min(1, cfg().volume * gain);
     try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC && !el.__pan) {
-        audioCtx = audioCtx || new AC();
-        const src = audioCtx.createMediaElementSource(el);
-        const sp = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
-        if (sp) { src.connect(sp); sp.connect(audioCtx.destination); } else src.connect(audioCtx.destination);
-        el.__pan = sp || true;
+      const Mix = mixApi();
+      if (Mix && typeof Mix.ctx === "function" && !el.__pan) {
+        try { if (typeof Mix.unlock === "function") Mix.unlock(); } catch (e) { /* */ }
+        audioCtx = Mix.ctx() || audioCtx;
+        if (audioCtx) {
+          const src = audioCtx.createMediaElementSource(el);
+          const sp = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+          const voiceBus = Mix.bus && Mix.bus("voice");
+          const dest = (voiceBus && voiceBus.bus) || audioCtx.destination;
+          if (sp) { src.connect(sp); sp.connect(dest); } else src.connect(dest);
+          el.__pan = sp || true;
+          // Positional neighbor lines also get HRTF/occlusion when mix.place is there.
+          if (opts.x != null && Mix.place) {
+            try {
+              const world = Mix.place(opts.x, 1.5, opts.z, { bus: "voice" });
+              if (world && world.input) {
+                if (sp) { try { sp.disconnect(); sp.connect(world.input); } catch (e) { /* */ } }
+                else { try { src.disconnect(); src.connect(world.input); } catch (e) { /* */ } }
+                el.__world = world;
+              }
+            } catch (e) { /* */ }
+          }
+        }
+      } else if (!el.__pan) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          audioCtx = audioCtx || new AC();
+          const src = audioCtx.createMediaElementSource(el);
+          const sp = audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null;
+          if (sp) { src.connect(sp); sp.connect(audioCtx.destination); } else src.connect(audioCtx.destination);
+          el.__pan = sp || true;
+        }
       }
       if (el.__pan && el.__pan.pan) el.__pan.pan.value = pan;
     } catch (err) {
@@ -467,6 +525,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
       done = true;
       if (playing && playing.id === id) { playing = null; playPri = 0; live.playing = false; }
       if (opts.onend) opts.onend();
+      drainPilot();
     };
     let a = null;
     if (canPlay) {
@@ -626,6 +685,141 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     });
   }
 
+  /* Pilot (day.config.js `pilot`): calm AI lines, radio-filtered, caption labelled Pilot.
+     Never talks over Small Weather or a neighbor: waits until the channel is free, then holds it. */
+  let audioCtxPilot = null;
+  const pilotQueue = [];
+  function drainPilot() {
+    if (playing || !pilotQueue.length) return;
+    const next = pilotQueue.shift();
+    if (next) next();
+  }
+  function wireRadio(el, radio) {
+    try {
+      if (el.__radio) return;
+      const Mix = mixApi();
+      if (Mix && typeof Mix.ctx === "function") {
+        try { if (typeof Mix.unlock === "function") Mix.unlock(); } catch (e) { /* */ }
+        audioCtxPilot = Mix.ctx() || audioCtxPilot;
+      }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!audioCtxPilot && AC) audioCtxPilot = new AC();
+      if (!audioCtxPilot) return;
+      const src = audioCtxPilot.createMediaElementSource(el);
+      const hp = audioCtxPilot.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = (radio && radio.highpass) || 520;
+      const lp = audioCtxPilot.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = (radio && radio.lowpass) || 2900;
+      const g = audioCtxPilot.createGain();
+      g.gain.value = 1;
+      src.connect(hp);
+      hp.connect(lp);
+      lp.connect(g);
+      const voiceBus = Mix && Mix.bus && Mix.bus("voice");
+      g.connect((voiceBus && voiceBus.bus) || audioCtxPilot.destination);
+      el.__radio = { hp, lp, g };
+    } catch (err) {
+      /* no web audio: plain playback */
+    }
+  }
+  /**
+   * Speak a Pilot line. opts: { via, force, queue (default true), onend, radio }.
+   * Returns the line once playback starts, or null if refused / Voices off.
+   */
+  function speakPilot(line, opts) {
+    opts = opts || {};
+    if (!line || !line.text) return null;
+    if (!voicesOn()) return null;
+    const run = () => {
+      if (playing) {
+        if (opts.queue !== false) pilotQueue.push(run);
+        return;
+      }
+      const radio = opts.radio || ((window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.radio) || {});
+      const file = line.file;
+      const have = file && !missing[file];
+      const canPlay = have && soundOn() && voicesOn();
+      let secs = Math.max(2.2, Math.min(6.5, 1.1 + line.text.length * 0.05));
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (playing && playing.id === line.id) {
+          playing = null;
+          playPri = 0;
+          live.playing = false;
+        }
+        if (day.pilot && day.pilot.pulse) day.pilot.pulse(false);
+        if (opts.onend) opts.onend();
+        drainPilot();
+      };
+      live.last = {
+        id: line.id,
+        group: "pilot-" + (line.group || "line"),
+        text: line.text,
+        file: have ? file : null,
+        who: "Pilot",
+        via: opts.via || "pilot",
+        at: performance.now() / 1000,
+      };
+      lastAt = performance.now() / 1000;
+      heard++;
+      live.heard = heard;
+      let a = null;
+      if (canPlay) {
+        a = audioEls[file];
+        if (!a) {
+          a = new Audio(file);
+          a.preload = "auto";
+          a.addEventListener("error", () => {
+            missing[file] = true;
+          });
+          audioEls[file] = a;
+        }
+        a.onended = finish;
+        a.playbackRate = 1;
+        a.volume = Math.min(1, (window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.volume) || 0.8);
+        wireRadio(a, radio);
+      }
+      showCaption(line.text, "Pilot", secs);
+      quietNote(`Pilot: ${line.text}`);
+      if (day.pilot && day.pilot.pulse) day.pilot.pulse(true);
+      if (a) {
+        try {
+          a.currentTime = 0;
+          const p = a.play();
+          if (p && p.catch) p.catch(() => finish());
+          playing = { id: line.id, group: live.last.group, text: line.text, file, who: "Pilot", el: a };
+          playPri = 85;
+          live.playing = true;
+          if (isFinite(a.duration) && a.duration > 0) secs = a.duration + 0.35;
+        } catch (err) {
+          a = null;
+        }
+      }
+      if (!a) setTimeout(finish, secs * 1000);
+      emit({
+        action: "play",
+        id: line.id,
+        group: live.last.group,
+        text: line.text,
+        file: a ? file : null,
+        who: "Pilot",
+        via: opts.via || "pilot",
+        radio: true,
+        caption: true,
+      });
+    };
+    if (playing && opts.queue !== false) {
+      pilotQueue.push(run);
+      return line;
+    }
+    run();
+    return line;
+  }
+
   const api = {
     now: () => ({
       last: live.last,
@@ -639,9 +833,11 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
       voiceId: cfg().voiceId,
       lines: cfg().lines.length,
       spoken: Object.keys(cfg().spoken).length,
+      who: playing && playing.who ? playing.who : live.last && live.last.who ? live.last.who : null,
     }),
     say,
     speakAs,
+    speakPilot,
     play: (id, opts) => say(id, Object.assign({ force: true, ignoreCooldown: true, ignoreLineCooldown: true }, opts || {})),
     groups: () => Object.keys(Object.assign({}, groups, cfg().spoken)),
     lines: () => cfg().lines.slice(),

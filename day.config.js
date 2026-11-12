@@ -104,7 +104,16 @@ window.DAY_CONFIG = {
   dayStart: "7:30", // the day (and the timeline) begins here; the night before ends here
   seed: "date", // "date" = a different but repeatable day every date. Any other text = always the same day.
   start: { at: "bed", car: "parkHome" },
-  sky: { sunrise: "7:05", sunset: "18:25" }, // mid-October // where the person and the car are when the day begins
+  sky: {
+    sunrise: "7:05", sunset: "18:25",
+    // Painted equirect skies (Hawkes Gen image.panorama, recipes sky-*): js/sky.js crossfades them by the clock; storm comes in with the cover.
+    // yaw turns the picture so the night's painted moon sits to the right of the default eastward view.
+    yaw: 0.215,
+    panoramas: {
+      dawn: "textures/sky/sky-dawn.webp", noon: "textures/sky/sky-noon.webp", golden: "textures/sky/sky-golden.webp",
+      dusk: "textures/sky/sky-dusk.webp", night: "textures/sky/sky-night.webp", storm: "textures/sky/sky-storm.webp",
+    },
+  }, // mid-October // where the person and the car are when the day begins
 
   person: {
     name: "Small Weather", // shown in the side panel; he/him in every line below
@@ -197,10 +206,35 @@ window.DAY_CONFIG = {
     musicOn: "Music on",
     musicOff: "Music off",
     hint: "Enter to play",
+    settings: "Settings",
+    continue: "Continue", // Play's word when a save exists
+    logoText: ["I Can Be", "AI"], // the lockup in type until the Gen-made logo (logo) is in the repo
+    logo: "images/logo-icanbe-ai.png", // Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
+    // the key-art crane: ends on Small Weather on the apartment roof (the pose the cold open's camera starts from)
+    crane: {
+      secs: 7,
+      from: { x: 70, y: 34, z: 18, alpha: -1.0, beta: 1.0, radius: 150 },
+      to: { x: -21, y: 7.51, z: 0.5, alpha: 3.1416, beta: 1.22, radius: 9 },
+    },
+    hero: { x: -21, y: 6.16, z: 0.5, yaw: 1.5708 },
+    glintEvery: [2.6, 5.2], // seconds between the storm's glints in the clouds
     day: "Day",
     night: "Night",
   },
 
+  /* ------------------------------------------------------------------------
+     SEAMLESS TRANSITIONS (js/transition.js) — storm-cloud wipe on episode jumps, prop fade-in, frame timing.
+     Loading card fades into the title crane (index.html); take/let-go pair a whoosh with the camera blend.
+     ------------------------------------------------------------------------ */
+  transition: {
+    wipeSec: 1.2,
+    coverIn: 0.28,
+    coverOut: 0.35,
+    fadeInSec: 0.3,
+    warmMs: 500,
+    holdCapMs: 900,
+    whooshOnControl: true,
+  },
   /* ------------------------------------------------------------------------
      THE COLD OPEN (js/coldopen.js) — a new player's first Play: no card, no step list. The title closes and he is
      the player's in the same frame, standing on the apartment roof at dusk while a storm cell he didn't call rolls
@@ -216,7 +250,8 @@ window.DAY_CONFIG = {
     rod: { x: 50, z: 0.5, roofY: 3.3, height: 2.2 }, // the shop roof's lightning rod
     cell: { state: "rain", intensity: 0.75 }, // the cell nobody called (weather via "cell")
     holdSec: 0.55, // how long the bolt is held before it goes
-    firstLine: 1.4, // seconds after he lands before he speaks
+    dive: { from: 9, secs: 1.0 }, // Play from the title: the title's last shot is this pose at radius 9; the camera dives in over this long
+    firstLine: 0.8, // seconds after he lands before he speaks
     reactDelay: 1.0, // seconds from the look-up to Birdie's call
     prompt: { keys: "Hold E", touch: "Hold the bolt" },
     lines: {
@@ -314,6 +349,85 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     ARC (`arc`) — the five-chapter arc (docs/world-bible.md "The five chapters"; js/moments.js `chapter`, js/episodes.js)
+     ------------------------------------------------------------------------
+     Each chapter has a line (what he wants, shown under its name in the Episodes menu), the episodes in it, and an
+     OPENER: the first time one of its episodes starts, a staged in-engine scene of 20 s at most plays before the
+     episode: a camera that sweeps round the title hung in the sky over the place (`sign.kind` "cloud" = clouds
+     forming the words, "billboard" = a lit neon sign; never a text card), the score's four-note motif and a sting, one
+     spoken exchange between him (`who: "He"`, his Eric voice, clips under audio/dialogue) and Pilot (`who: "Pilot"`,
+     `pilot.lines` id `pilot-chapter-N`, clips under audio/pilot), one caption line at a time, Skip at the bottom
+     (a tap anywhere, Esc or the button). The camera orbits `shot.t*` (the sign hangs there, 34 m up, above every roof).
+     ------------------------------------------------------------------------ */
+  arc: [
+    {
+      n: 1, id: "sky", title: "The Sky", line: "He wants it.",
+      episodes: ["tutorial", "morning"],
+      opener: {
+        secs: 16, sting: "drought",
+        sign: { kind: "cloud", text: "The Sky", w: 17, from: 0.8, to: 6.5 },
+        shot: { tx: [-22, -14], ty: 34, tz: 12, alpha: [-2.25, -1.55], beta: [1.34, 1.28], radius: [34, 28], fov: 0.05 },
+        lines: [
+          { who: "He", at: 2.4, text: "Every day runs on rails. The sky is the one thing that doesn't.", caption: "The sky is the one thing that doesn't." },
+          { who: "Pilot", at: 9.2, text: "Schedule says desk. The sky is not on it.", caption: "The sky is not on it.", id: "pilot-chapter-1" },
+        ],
+      },
+    },
+    {
+      n: 2, id: "neighbours", title: "The Neighbours", line: "The city needs him.",
+      episodes: ["dry-park"],
+      opener: {
+        secs: 16, sting: "turbines",
+        sign: { kind: "cloud", text: "The Neighbours", w: 18, from: 0.8, to: 6.5 },
+        shot: { tx: [-6, 2], ty: 34, tz: 44, alpha: [-2.2, -1.5], beta: [1.34, 1.28], radius: [34, 29], fov: 0.05 },
+        lines: [
+          { who: "He", at: 2.4, text: "Birdie's tomatoes. Dex's parcels. The whole street is asking.", caption: "The whole street is asking." },
+          { who: "Pilot", at: 9.2, text: "Seven requests logged. Answer them in order.", caption: "Answer them in order.", id: "pilot-chapter-2" },
+        ],
+      },
+    },
+    {
+      n: 3, id: "drought", title: "The Long Drought", line: "Power has a cost.",
+      episodes: ["still-blades", "low-tank"],
+      opener: {
+        secs: 17, sting: "twist",
+        sign: { kind: "cloud", text: "The Long Drought", w: 19, from: 0.8, to: 7 },
+        shot: { tx: [150, 158], ty: 34, tz: 10, alpha: [-2.3, -1.6], beta: [1.34, 1.28], radius: [35, 30], fov: 0.05 },
+        lines: [
+          { who: "He", at: 2.6, text: "Every call costs something. The district keeps count.", caption: "Every call costs something." },
+          { who: "Pilot", at: 9.6, text: "So do I. You are close to the limit.", id: "pilot-chapter-3" },
+        ],
+      },
+    },
+    {
+      n: 4, id: "chasers", title: "Storm Chasers", line: "He saves people. Pilot doubts him.",
+      episodes: ["lunch", "commute-home"],
+      opener: {
+        secs: 17, sting: "bridge",
+        sign: { kind: "cloud", text: "Storm Chasers", w: 18, from: 0.8, to: 6.5 },
+        shot: { tx: [60, 68], ty: 34, tz: 10, alpha: [-2.2, -1.5], beta: [1.34, 1.28], radius: [34, 29], fov: 0.05 },
+        lines: [
+          { who: "He", at: 2.4, text: "Somebody is stuck out there. I can reach them.", caption: "Somebody is stuck out there." },
+          { who: "Pilot", at: 9.0, text: "You can also hurt them. Think before you call.", caption: "Think before you call.", id: "pilot-chapter-4" },
+        ],
+      },
+    },
+    {
+      n: 5, id: "night", title: "The Night Show", line: "Pilot gives him the sky.",
+      episodes: ["night"],
+      opener: {
+        secs: 17, sting: "tank",
+        sign: { kind: "billboard", text: "The Night Show", w: 18, from: 0.8, to: 6 },
+        shot: { tx: [112, 120], ty: 34, tz: 28, alpha: [-2.2, -1.5], beta: [1.34, 1.28], radius: [34, 29], fov: 0.05 },
+        lines: [
+          { who: "Pilot", at: 2.6, text: "Tonight the whole sky is yours. No schedule.", caption: "Tonight the whole sky is yours.", id: "pilot-chapter-5" },
+          { who: "He", at: 9.0, text: "Then let's give them a show.", caption: "Then let's give them a show." },
+        ],
+      },
+    },
+  ],
+
+  /* ------------------------------------------------------------------------
      FIRST VISIT — one minute, then it stays quiet
      ------------------------------------------------------------------------
      The first time the page opens, a card walks the player through taking
@@ -353,6 +467,39 @@ window.DAY_CONFIG = {
      while autopilot still has the weather he left behind. Steps and pools
      can use `when: { weather: "rain" }` (or an array) against the forecast.
      ------------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------------
+     WIND AND FOG YOU CAN SEE (js/windfog.js)
+     One global wind (direction, strength, time) that bends the street trees, planters and awnings in a
+     vertex shader, streaks ribbons along a gust, swirls leaves and papers through eddies, streams the flags
+     and laundry, and flips walkers' umbrellas inside out. Fog is ground fog in noise slices that slide in
+     from the river (it lies to the north, +z) and hug the streets. `prevailing` is the wind's own direction
+     (x, z) when nobody has cast; a Gust or a Gale turns it to the way he is facing and it drifts back.
+     ------------------------------------------------------------------------ */
+  windfog: {
+    prevailing: [0.82, -0.57],
+    river: [0, 1],
+  },
+
+  /* ------------------------------------------------------------------------
+     SUN-BREAK AFTERMATH (js/aftermath.js, js/aftermath-core.js)
+     When Sun break follows rain or a storm within `rainWindowMin` game minutes:
+     steam off roofs / asphalt / car bonnets (`steamSec`), a rainbow opposite the
+     sun at 42° (`rainbowSec`, fades with cloud cover), gutters and awnings drip
+     (`dripSec`, via js/rain.js afterDrip), puddle sparkles, pigeons land on a
+     roof, walkers close umbrellas and a few shop doors open. Phone: half steam
+     and drips; the rainbow always shows. day:crowd action "aftermath" lets Dex
+     say his dry-parcels thanks when he's near.
+     ------------------------------------------------------------------------ */
+  aftermath: {
+    rainWindowMin: 2,
+    steamSec: 20,
+    dripSec: 30,
+    rainbowSec: 28,
+    sparkleSec: 22,
+    birdSec: 15,
+    shopOut: 3,
+  },
+
   weather: {
     blend: 3.4,
     // How long a power's weather lasts and how fast it eases out: ABILITY_HOLD_SEC / ABILITY_FADE_SEC at the top of js/weather.js.
@@ -502,6 +649,92 @@ window.DAY_CONFIG = {
      leave the procedural weather noise in place. Sound stays off until the
      Sound button (browser autoplay). Wind reuses the clear bed.
      ------------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------------
+     DAY SOUND — diegetic loops for the autopilot day (js/daysound.js)
+     ------------------------------------------------------------------------
+     Six soundscapes switched by schedule chapter: home (wake/ready), commute,
+     office (work), park (lunch atmosphere), tv (evening), night (computer/
+     bedtime/sleep). Sources sit at named spots. Phone/low: only the current
+     scape's files load, at most 3 loops at once. Car radio: a 20 s jingle then
+     a short weather report that names a weather from day.memory.facts.
+     Files from Hawkes Gen audio.sfx / audio.voice under audio/daysound/; null
+     paths (or a 404) fall back to a short synth bed of the same id.
+     ------------------------------------------------------------------------ */
+  daysound: {
+    fade: 0.7,
+    mix: 0.55,
+    radioDelay: 4.2,
+    radioEvery: 160,
+    /* file: null until the Gen clip is in audio/daysound/ (a named missing file 404s). Recipes: sfx-day-*. */
+    jingle: null, // "audio/daysound/radio-jingle.mp3"
+    landmarks: {
+      fountain: [118, 26],
+      parkBench: [-2, 44],
+      pond: [8, 48],
+    },
+    reports: {
+      storm: { text: "Weather desk: storms called in over the district. Stay off the roofs.", file: null },
+      rain: { text: "Weather desk: rain over the west avenue today. Umbrellas out.", file: null },
+      fog: { text: "Weather desk: thick fog rolling through the plaza and avenue.", file: null },
+      wind: { text: "Weather desk: high winds on the avenue. Secure loose signs.", file: null },
+      sun: { text: "Weather desk: sun breaks cutting through this afternoon.", file: null },
+      bolt: { text: "Weather desk: lightning strikes reported near the shop and Tank.", file: null },
+      clear: { text: "Weather desk: quiet skies so far. We'll keep watching.", file: null },
+    },
+    scapes: {
+      home: {
+        label: "Apartment morning",
+        layers: [
+          { id: "fridge-hum", file: null, at: "fridge", vol: 0.35 },
+          { id: "kettle-coffee", file: null, at: "counter", vol: 0.4 },
+          { id: "shower", file: null, at: "shower", vol: 0.45, when: "shower" },
+          { id: "rain-window", file: null, at: "livingWindow", vol: 0.38, when: "rain" },
+        ],
+      },
+      commute: {
+        label: "Car cabin",
+        layers: [
+          /* Cabin stays on for the whole commute chapter so the scape is never silent between walks to the car. */
+          { id: "car-cabin", file: null, at: "parkHome", vol: 0.5 },
+          { id: "car-wipers", file: null, at: "parkHome", vol: 0.35, when: "rain" },
+        ],
+      },
+      office: {
+        label: "Office floor",
+        layers: [
+          { id: "hvac", file: null, at: "desk", vol: 0.28 },
+          { id: "keyboard", file: null, at: "desk", vol: 0.48, when: "desk" },
+          { id: "meeting", file: null, at: "meetSeat", vol: 0.32, when: "meeting" },
+          { id: "coffee-machine", file: null, at: "deskStand", vol: 0.3 },
+        ],
+      },
+      park: {
+        label: "Park lunch",
+        layers: [
+          { id: "fountain", file: null, at: "fountain", vol: 0.4 },
+          { id: "kids", file: null, at: "parkBench", vol: 0.34 },
+          { id: "ducks", file: null, at: "pond", vol: 0.32 },
+        ],
+      },
+      tv: {
+        label: "Evening TV",
+        layers: [
+          { id: "tv-muffled", file: null, at: "couch", vol: 0.42 },
+          { id: "fridge-hum", file: null, at: "fridge", vol: 0.22 },
+          { id: "rain-window", file: null, at: "livingWindow", vol: 0.3, when: "rain" },
+        ],
+      },
+      night: {
+        label: "Night quiet",
+        layers: [
+          { id: "clock-tick", file: null, at: "bed", vol: 0.28 },
+          { id: "distant-traffic", file: null, at: "livingWindow", vol: 0.3 },
+          { id: "far-train", file: null, at: "aptRoof", vol: 0.26 },
+        ],
+      },
+    },
+  },
+
   score: {
     fade: 2.8,
     /* The mix, in one place (js/score.js). master: everything the score plays; music: the beds; ambience:
@@ -518,6 +751,15 @@ window.DAY_CONFIG = {
        (top level `gain`), the beds speed up by up to `rate`, and the night low-pass opens. Procedural, no files. */
     pressure: { from: 0.4, gain: 0.5, rate: 0.06 },
     fallback: { day: "clear", night: "snow" },
+    /* THE STEM SCORE (js/stems.js): Small Weather's 4-note motif (notes, in A minor) in three intensity stems at 120 BPM
+       (a bar is 2 s), played in sync while he is the player's; the nine beds above carry the watch view and his own day.
+       `files` are Hawkes Gen's (hawkes.assets.json music-stem-*, music-sting-*): leave a path null until the file is in
+       the repo (a 404 is a console error); null plays the same stems synthesized from the motif. */
+    stems: {
+      bpm: 120, motif: ["A3", "C4", "E4", "D4"],
+      files: { calm: "audio/music/stem-calm.mp3", tension: "audio/music/stem-tension.mp3", storm: "audio/music/stem-storm.mp3", resolution: "audio/music/sting-resolution.mp3", failure: "audio/music/sting-failure.mp3" },
+      hold: { storm: 8, rescue: 11 },
+    },
     music: {
       clear: "audio/music/clear.mp3",
       clouds: "audio/music/clouds.mp3",
@@ -592,12 +834,37 @@ window.DAY_CONFIG = {
       dry: "Not enough charge.",
       locked: "Not unlocked yet.",
     },
+    // Havok debris for the tornado (and bolt/gust shove): street near home plus a dense set on the plaza
+    // so a plaza cast lifts 8+. Caps: 30 desktop, 12 low/phone (js/tornado.js).
     loose: [
-      { kind: "umbrella", x: -1.6, dz: -2.6 },
-      { kind: "umbrella", x: -2.3, dz: -3.3 },
       { kind: "bin", x: -2.0, dz: -1.3 },
       { kind: "bin", x: -8.5, dz: 2.8 },
-      { kind: "umbrella", x: 8.2, dz: 2.8 },
+      { kind: "cone", x: -1.2, dz: -2.8 },
+      { kind: "chair", x: 2.4, dz: 2.4 },
+      { kind: "paper", x: -3.5, dz: -2.0 },
+      { kind: "leaf", x: 4.0, dz: 2.2 },
+      // plaza (x 106–130, z 16.8–36): café chairs, bins, planters, signs, awning cloth, papers, leaves
+      { kind: "chair", x: 110, z: 24 },
+      { kind: "chair", x: 112.5, z: 25.5 },
+      { kind: "chair", x: 115, z: 23 },
+      { kind: "chair", x: 122, z: 25 },
+      { kind: "chair", x: 124.5, z: 27 },
+      { kind: "bin", x: 108.5, z: 22 },
+      { kind: "bin", x: 126, z: 30 },
+      { kind: "cone", x: 109, z: 28 },
+      { kind: "cone", x: 127, z: 22 },
+      { kind: "planter", x: 111, z: 31 },
+      { kind: "planter", x: 125, z: 20 },
+      { kind: "sign", x: 114, z: 19.5 },
+      { kind: "sign", x: 120, z: 33 },
+      { kind: "awning", x: 116, z: 21 },
+      { kind: "awning", x: 123, z: 29 },
+      { kind: "paper", x: 113, z: 26 },
+      { kind: "paper", x: 119, z: 24 },
+      { kind: "leaf", x: 117, z: 28 },
+      { kind: "leaf", x: 121, z: 22 },
+      { kind: "chair", x: 118, z: 27.5 },
+      { kind: "bin", x: 116.5, z: 32 },
     ],
   },
 
@@ -828,6 +1095,195 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     PILOT — the calm AI that runs his day (the "AI" in I Can Be AI).
+     Voice designed via Hawkes Gen audio.voice-design; clips under audio/pilot/.
+     Speaks through js/voice.js (never over Small Weather). Wrist ring on him.
+     ------------------------------------------------------------------------ */
+  pilot: {
+    voiceId: "gv_c2c9cdffeae27b99", // Gen "I Can Be — Pilot" (audio.voice-save, candidate 1)
+    volume: 0.8,
+    captionSecs: 2.6,
+    cooldown: 1.4,
+    lineCooldown: 120,
+    radio: { highpass: 520, lowpass: 2900 },
+    ring: { radius: 0.03, tube: 0.007, emissive: [0.35, 0.9, 1.25], idle: 0.35, talk: 1.15 },
+    /* One schedule nudge per spine block title (played on block change). */
+    schedule: {
+      "Alarm": "Rise. The day is waiting.",
+      "Bathroom, shower, dressed": "Wash up. Desk at nine.",
+      "Coffee, then out the door": "Coffee first. You'll want the umbrella.",
+      "Driveway and the neighborhood": "Drive. Keep both hands.",
+      "Red light": "Red light. Breathe.",
+      "The rest of the drive": "Avenue's clear. For now.",
+      "Park, then up to the desk": "Desk at nine. Bag down.",
+      "Email and messages": "Inbox. Answer the short ones.",
+      "Bathroom, then water": "Water. Then back.",
+      "Work": "Code. The sky can wait.",
+      "Work call": "Call. Headphones on.",
+      "A text": "Text. Keep it short.",
+      "Stretch, snack, save": "Snack. Save your work.",
+      "Microwave": "Lunch. Two minutes.",
+      "Eat": "Eat. Don't scroll yet.",
+      "Phone at the table": "Phone. Then the window.",
+      "Clean up": "Rinse. Back upstairs.",
+      "Bathroom": "Quick stop. Then on.",
+      "A short walk": "Hall window. Check the sky.",
+      "Back to the desk": "Desk again. Soft landing.",
+      "Wake the computer": "Screen on. Afternoon ahead.",
+      "To the meeting room": "Meeting room. Sit straight.",
+      "Meeting": "Meeting. Keep it short.",
+      "Back from the meeting": "Notes. Then the keyboard.",
+      "Bathroom and water, one walk": "Water. Stretch the back.",
+      "Snack and a text": "Snack. One text.",
+      "Call at the desk": "Call at the desk. Notes ready.",
+      "Wrap up": "Wrap up. Clear the list.",
+      "Pack up": "Bag. Coat. Door.",
+      "Out of the building": "Lobby. Find the car.",
+      "The drive home": "Home stretch. Watch the sky.",
+      "A light near home": "Light ahead. Almost home.",
+      "The last streets": "Last streets. Soft brake.",
+      "Driveway": "Driveway. Park straight.",
+      "Home": "Home. Shoes off.",
+      "Television": "TV low. Eyes half on the sky.",
+      "Texting on the couch": "Couch. One more text.",
+      "Volume down": "Volume down. Neighbours.",
+      "Cook": "Cook. Keep it simple.",
+      "Clean up, back to the show": "Dishes. Back to the show.",
+      "Computer": "Evening code. Soft lights.",
+      "A personal call": "Call. Keep it kind.",
+      "Messages": "Messages. Then close.",
+      "Close the computer": "Screen off. Bed ahead.",
+      "Teeth, pajamas": "Teeth. Pajamas. Quiet.",
+      "To the bedroom": "Bedroom. Soft steps.",
+      "Television in bed": "Bed TV. Dim it.",
+      "Last text, alarm, charger": "Alarm set. Phone on charge.",
+      "Out of bed, bathroom, back": "Night bathroom. Back to bed.",
+      "Television off": "TV off. Almost there.",
+      "Lamp off": "Lamp off. Dark room.",
+      "Falling asleep": "Sleep. I've got the night.",
+      "Night bathroom trip": "Quiet night. I'm still here.",
+    },
+    take: [
+      "Fine. You have the sky. Back by five.",
+      "Your move. Try not to flood the park.",
+      "I'll hold the schedule. You hold the weather.",
+    ],
+    letgo: {
+      birdie: "Tomatoes drank. Good. Desk next.",
+      botched: "You missed an ask. I noted it.",
+      flood: "Park's soaked. Expect wet shoes.",
+      roofs: "Roofs again. Watch the clock.",
+      storm: "Storm called. Holding the day.",
+      wind: "Bins remember that. So do I.",
+      fog: "Fog left on. Soft edges stay.",
+      sun: "Sun break spent. Warm for a minute.",
+      rain: "Rain still on the road.",
+      rescue: "Everyone down. Thank you.",
+      answered: "A neighbour said thanks. Logged.",
+      default: "Back on schedule. I'll catch him up.",
+    },
+    worried: [
+      "That was a lot of sky. Ease up.",
+      "Tornado on the avenue. Really.",
+      "The district felt that. Softly, next time.",
+      "Pressure's thin. So is my patience.",
+    ],
+    night: [
+      "Quiet night. I'm still here.",
+      "City's thin. He's sleeping. We're not.",
+      "Lamps are on. Schedule holds.",
+    ],
+    /* Night Show farewell (js/episodes.js): spoken once when the plaza show begins. */
+    farewell: "Tonight you don't need me.",
+    /* Flat table for Gen + playback (id, group, text, file). voiceId filled after design. */
+    lines: [
+      { id: "pilot-sch-alarm", group: "schedule", text: "Rise. The day is waiting.", file: "audio/pilot/pilot-sch-alarm.mp3" },
+      { id: "pilot-sch-bath", group: "schedule", text: "Wash up. Desk at nine.", file: "audio/pilot/pilot-sch-bath.mp3" },
+      { id: "pilot-sch-coffee", group: "schedule", text: "Coffee first. You'll want the umbrella.", file: "audio/pilot/pilot-sch-coffee.mp3" },
+      { id: "pilot-sch-driveway", group: "schedule", text: "Drive. Keep both hands.", file: "audio/pilot/pilot-sch-driveway.mp3" },
+      { id: "pilot-sch-red", group: "schedule", text: "Red light. Breathe.", file: "audio/pilot/pilot-sch-red.mp3" },
+      { id: "pilot-sch-drive", group: "schedule", text: "Avenue's clear. For now.", file: "audio/pilot/pilot-sch-drive.mp3" },
+      { id: "pilot-sch-desk", group: "schedule", text: "Desk at nine. Bag down.", file: "audio/pilot/pilot-sch-desk.mp3" },
+      { id: "pilot-sch-email", group: "schedule", text: "Inbox. Answer the short ones.", file: "audio/pilot/pilot-sch-email.mp3" },
+      { id: "pilot-sch-water", group: "schedule", text: "Water. Then back.", file: "audio/pilot/pilot-sch-water.mp3" },
+      { id: "pilot-sch-work", group: "schedule", text: "Code. The sky can wait.", file: "audio/pilot/pilot-sch-work.mp3" },
+      { id: "pilot-sch-call", group: "schedule", text: "Call. Headphones on.", file: "audio/pilot/pilot-sch-call.mp3" },
+      { id: "pilot-sch-text", group: "schedule", text: "Text. Keep it short.", file: "audio/pilot/pilot-sch-text.mp3" },
+      { id: "pilot-sch-snack", group: "schedule", text: "Snack. Save your work.", file: "audio/pilot/pilot-sch-snack.mp3" },
+      { id: "pilot-sch-micro", group: "schedule", text: "Lunch. Two minutes.", file: "audio/pilot/pilot-sch-micro.mp3" },
+      { id: "pilot-sch-eat", group: "schedule", text: "Eat. Don't scroll yet.", file: "audio/pilot/pilot-sch-eat.mp3" },
+      { id: "pilot-sch-phone", group: "schedule", text: "Phone. Then the window.", file: "audio/pilot/pilot-sch-phone.mp3" },
+      { id: "pilot-sch-clean", group: "schedule", text: "Rinse. Back upstairs.", file: "audio/pilot/pilot-sch-clean.mp3" },
+      { id: "pilot-sch-bath2", group: "schedule", text: "Quick stop. Then on.", file: "audio/pilot/pilot-sch-bath2.mp3" },
+      { id: "pilot-sch-walk", group: "schedule", text: "Hall window. Check the sky.", file: "audio/pilot/pilot-sch-walk.mp3" },
+      { id: "pilot-sch-backdesk", group: "schedule", text: "Desk again. Soft landing.", file: "audio/pilot/pilot-sch-backdesk.mp3" },
+      { id: "pilot-sch-wake", group: "schedule", text: "Screen on. Afternoon ahead.", file: "audio/pilot/pilot-sch-wake.mp3" },
+      { id: "pilot-sch-meetroom", group: "schedule", text: "Meeting room. Sit straight.", file: "audio/pilot/pilot-sch-meetroom.mp3" },
+      { id: "pilot-sch-meeting", group: "schedule", text: "Meeting. Keep it short.", file: "audio/pilot/pilot-sch-meeting.mp3" },
+      { id: "pilot-sch-meetback", group: "schedule", text: "Notes. Then the keyboard.", file: "audio/pilot/pilot-sch-meetback.mp3" },
+      { id: "pilot-sch-water2", group: "schedule", text: "Water. Stretch the back.", file: "audio/pilot/pilot-sch-water2.mp3" },
+      { id: "pilot-sch-snack2", group: "schedule", text: "Snack. One text.", file: "audio/pilot/pilot-sch-snack2.mp3" },
+      { id: "pilot-sch-deskcall", group: "schedule", text: "Call at the desk. Notes ready.", file: "audio/pilot/pilot-sch-deskcall.mp3" },
+      { id: "pilot-sch-wrap", group: "schedule", text: "Wrap up. Clear the list.", file: "audio/pilot/pilot-sch-wrap.mp3" },
+      { id: "pilot-sch-pack", group: "schedule", text: "Bag. Coat. Door.", file: "audio/pilot/pilot-sch-pack.mp3" },
+      { id: "pilot-sch-out", group: "schedule", text: "Lobby. Find the car.", file: "audio/pilot/pilot-sch-out.mp3" },
+      { id: "pilot-sch-homeDrive", group: "schedule", text: "Home stretch. Watch the sky.", file: "audio/pilot/pilot-sch-homeDrive.mp3" },
+      { id: "pilot-sch-light", group: "schedule", text: "Light ahead. Almost home.", file: "audio/pilot/pilot-sch-light.mp3" },
+      { id: "pilot-sch-last", group: "schedule", text: "Last streets. Soft brake.", file: "audio/pilot/pilot-sch-last.mp3" },
+      { id: "pilot-sch-drivewayHome", group: "schedule", text: "Driveway. Park straight.", file: "audio/pilot/pilot-sch-drivewayHome.mp3" },
+      { id: "pilot-sch-home", group: "schedule", text: "Home. Shoes off.", file: "audio/pilot/pilot-sch-home.mp3" },
+      { id: "pilot-sch-tv", group: "schedule", text: "TV low. Eyes half on the sky.", file: "audio/pilot/pilot-sch-tv.mp3" },
+      { id: "pilot-sch-couch", group: "schedule", text: "Couch. One more text.", file: "audio/pilot/pilot-sch-couch.mp3" },
+      { id: "pilot-sch-volume", group: "schedule", text: "Volume down. Neighbours.", file: "audio/pilot/pilot-sch-volume.mp3" },
+      { id: "pilot-sch-cook", group: "schedule", text: "Cook. Keep it simple.", file: "audio/pilot/pilot-sch-cook.mp3" },
+      { id: "pilot-sch-dishes", group: "schedule", text: "Dishes. Back to the show.", file: "audio/pilot/pilot-sch-dishes.mp3" },
+      { id: "pilot-sch-computer", group: "schedule", text: "Evening code. Soft lights.", file: "audio/pilot/pilot-sch-computer.mp3" },
+      { id: "pilot-sch-pcall", group: "schedule", text: "Call. Keep it kind.", file: "audio/pilot/pilot-sch-pcall.mp3" },
+      { id: "pilot-sch-msgs", group: "schedule", text: "Messages. Then close.", file: "audio/pilot/pilot-sch-msgs.mp3" },
+      { id: "pilot-sch-close", group: "schedule", text: "Screen off. Bed ahead.", file: "audio/pilot/pilot-sch-close.mp3" },
+      { id: "pilot-sch-teeth", group: "schedule", text: "Teeth. Pajamas. Quiet.", file: "audio/pilot/pilot-sch-teeth.mp3" },
+      { id: "pilot-sch-bedroom", group: "schedule", text: "Bedroom. Soft steps.", file: "audio/pilot/pilot-sch-bedroom.mp3" },
+      { id: "pilot-sch-bedtv", group: "schedule", text: "Bed TV. Dim it.", file: "audio/pilot/pilot-sch-bedtv.mp3" },
+      { id: "pilot-sch-alarmSet", group: "schedule", text: "Alarm set. Phone on charge.", file: "audio/pilot/pilot-sch-alarmSet.mp3" },
+      { id: "pilot-sch-nightBath", group: "schedule", text: "Night bathroom. Back to bed.", file: "audio/pilot/pilot-sch-nightBath.mp3" },
+      { id: "pilot-sch-tvoff", group: "schedule", text: "TV off. Almost there.", file: "audio/pilot/pilot-sch-tvoff.mp3" },
+      { id: "pilot-sch-lamp", group: "schedule", text: "Lamp off. Dark room.", file: "audio/pilot/pilot-sch-lamp.mp3" },
+      { id: "pilot-sch-sleep", group: "schedule", text: "Sleep. I've got the night.", file: "audio/pilot/pilot-sch-sleep.mp3" },
+      { id: "pilot-sch-nightTrip", group: "schedule", text: "Quiet night. I'm still here.", file: "audio/pilot/pilot-sch-nightTrip.mp3" },
+      { id: "pilot-take-1", group: "take", text: "Fine. You have the sky. Back by five.", file: "audio/pilot/pilot-take-1.mp3" },
+      { id: "pilot-take-2", group: "take", text: "Your move. Try not to flood the park.", file: "audio/pilot/pilot-take-2.mp3" },
+      { id: "pilot-take-3", group: "take", text: "I'll hold the schedule. You hold the weather.", file: "audio/pilot/pilot-take-3.mp3" },
+      { id: "pilot-letgo-birdie", group: "letgo", text: "Tomatoes drank. Good. Desk next.", file: "audio/pilot/pilot-letgo-birdie.mp3" },
+      { id: "pilot-letgo-botched", group: "letgo", text: "You missed an ask. I noted it.", file: "audio/pilot/pilot-letgo-botched.mp3" },
+      { id: "pilot-letgo-flood", group: "letgo", text: "Park's soaked. Expect wet shoes.", file: "audio/pilot/pilot-letgo-flood.mp3" },
+      { id: "pilot-letgo-roofs", group: "letgo", text: "Roofs again. Watch the clock.", file: "audio/pilot/pilot-letgo-roofs.mp3" },
+      { id: "pilot-letgo-storm", group: "letgo", text: "Storm called. Holding the day.", file: "audio/pilot/pilot-letgo-storm.mp3" },
+      { id: "pilot-letgo-wind", group: "letgo", text: "Bins remember that. So do I.", file: "audio/pilot/pilot-letgo-wind.mp3" },
+      { id: "pilot-letgo-fog", group: "letgo", text: "Fog left on. Soft edges stay.", file: "audio/pilot/pilot-letgo-fog.mp3" },
+      { id: "pilot-letgo-sun", group: "letgo", text: "Sun break spent. Warm for a minute.", file: "audio/pilot/pilot-letgo-sun.mp3" },
+      { id: "pilot-letgo-rain", group: "letgo", text: "Rain still on the road.", file: "audio/pilot/pilot-letgo-rain.mp3" },
+      { id: "pilot-letgo-rescue", group: "letgo", text: "Everyone down. Thank you.", file: "audio/pilot/pilot-letgo-rescue.mp3" },
+      { id: "pilot-letgo-answered", group: "letgo", text: "A neighbour said thanks. Logged.", file: "audio/pilot/pilot-letgo-answered.mp3" },
+      { id: "pilot-letgo-default", group: "letgo", text: "Back on schedule. I'll catch him up.", file: "audio/pilot/pilot-letgo-default.mp3" },
+      { id: "pilot-chapter-1", group: "chapter", text: "Schedule says desk. The sky is not on it.", file: "audio/pilot/pilot-chapter-1.mp3" },
+      { id: "pilot-chapter-2", group: "chapter", text: "Seven requests logged. Answer them in order.", file: "audio/pilot/pilot-chapter-2.mp3" },
+      { id: "pilot-chapter-3", group: "chapter", text: "So do I. You are close to the limit.", file: "audio/pilot/pilot-chapter-3.mp3" },
+      { id: "pilot-chapter-4", group: "chapter", text: "You can also hurt them. Think before you call.", file: "audio/pilot/pilot-chapter-4.mp3" },
+      { id: "pilot-chapter-5", group: "chapter", text: "Tonight the whole sky is yours. No schedule.", file: "audio/pilot/pilot-chapter-5.mp3" },
+      { id: "pilot-finale-farewell", group: "finale", text: "Tonight you don't need me.", file: "audio/pilot/pilot-finale-farewell.mp3" },
+      { id: "pilot-ending-a", group: "ending", text: "Fair weather. Logged.", file: "audio/pilot/pilot-ending-a.mp3" },
+      { id: "pilot-ending-c", group: "ending", text: "Sky's still thinking. Stay in.", file: "audio/pilot/pilot-ending-c.mp3" },
+      { id: "pilot-worry-1", group: "worried", text: "That was a lot of sky. Ease up.", file: "audio/pilot/pilot-worry-1.mp3" },
+      { id: "pilot-worry-2", group: "worried", text: "Tornado on the avenue. Really.", file: "audio/pilot/pilot-worry-2.mp3" },
+      { id: "pilot-worry-3", group: "worried", text: "The district felt that. Softly, next time.", file: "audio/pilot/pilot-worry-3.mp3" },
+      { id: "pilot-worry-4", group: "worried", text: "Pressure's thin. So is my patience.", file: "audio/pilot/pilot-worry-4.mp3" },
+      { id: "pilot-night-1", group: "night", text: "Quiet night. I'm still here.", file: "audio/pilot/pilot-night-1.mp3" },
+      { id: "pilot-night-2", group: "night", text: "City's thin. He's sleeping. We're not.", file: "audio/pilot/pilot-night-2.mp3" },
+      { id: "pilot-night-3", group: "night", text: "Lamps are on. Schedule holds.", file: "audio/pilot/pilot-night-3.mp3" },
+    ],
+  },
+
+  /* ------------------------------------------------------------------------
      EPISODES — playable weather missions tied to chapters of his day
      ------------------------------------------------------------------------
      Story: Small Weather lives the developer day on autopilot, but when you
@@ -863,12 +1319,14 @@ window.DAY_CONFIG = {
       scarPenalty: 25,
       lines: { clean: "Clean", scarred: "Scarred", meter: "Sky", of: "of" },
     },
-    /* The ending card after Part 3: chosen from the three parts' marks and the Strain at the Tank (rules.calm /
-       rules.overcast). Same sky each time, different weather. `fared` is the line per need and state
-       (ok, scar, open = never answered). */
+    /* The ending after Part 3: chosen from the three parts' marks and the Strain at the Tank (rules.calm /
+       rules.overcast). Same sky each time, different weather. Lived as an in-engine scene (`scenes`, ≤40 s)
+       with camera cuts, neighbour bodies, the score's resolution/failure sting, one caption + Skip, ending
+       on the Part 3 rank stamp — never a text card. `fared` / `last` stay as quiet labels; spoken lines are
+       in each scene. Outcome persists in js/memory.js for the rest of the real day. */
     endings: {
       rules: { calm: 6, overcast: 10 },
-      lines: { kicker: "How the district fared", tally: "Sky at the Tank", again: "Walk the city" },
+      lines: { kicker: "How the district fared", tally: "Sky at the Tank", again: "Walk the city", skip: "Skip" },
       needs: { park: "The park", turbines: "The turbines", market: "The market", reservoir: "The reservoir" },
       fared: {
         park: { ok: "Green. The pond is up a notch. Birdie's tomatoes are not sulking.", scar: "Green, with a brown patch and a pond that ran over the path.", open: "Still straw." },
@@ -878,18 +1336,74 @@ window.DAY_CONFIG = {
       },
       A: {
         name: "Fair Weather",
-        scene: "Morning. The park is green, the turbines turn, the market is open, the Tank is full. Birdie waves from the bench. Ines is asleep on the annex roof with her chart.",
+        scene: "Rain on the Tank, the park blooms, the plaza dances in the rain.",
         last: ["He", "Clear skies. He did that, and then stopped."],
       },
       B: {
         name: "Heavy Weather",
-        scene: "The district has all four things, with scars: a brown patch on the lawn, a stall shut, a wet avenue. People nod to him on the street instead of speaking.",
+        scene: "Park half green, Dex on a turbine, a bittersweet exchange.",
         last: ["He", "It worked. It cost."],
       },
       C: {
         name: "Overcast",
-        scene: "The sky stays grey for a week. The Board's loudspeaker plays the Weather Warning on a loop. The neighbors watch from windows.",
+        scene: "Flood and umbrellas. Pilot is quiet. He answers.",
         last: ["He", "He asked the sky for everything. It's still thinking about it."],
+      },
+      /* In-engine scenes (js/moments.js `ending`). secs ≤ 40; one caption line; Skip ends it. */
+      scenes: {
+        A: {
+          secs: 36, sting: "resolution",
+          shots: [
+            { at: 0, tx: 190, ty: 5.5, tz: 40, alpha: [-1.45, -1.85], beta: [1.25, 1.2], radius: [26, 18] },
+            { at: 10, tx: [-6, 2], ty: 3.5, tz: [44, 40], alpha: [-1.95, -1.4], beta: [1.05, 1.12], radius: [28, 20] },
+            { at: 20, tx: [118, 116], ty: 3.2, tz: [26, 28], alpha: [-2.2, -1.7], beta: [1.05, 1.1], radius: [24, 16] },
+          ],
+          places: [{ id: "birdie", x: -6, z: 24.5, gesture: "thanks" }, { id: "dex", x: 114, z: 24, gesture: "thanks" }, { id: "ines", x: 120, z: 30, gesture: "surprise" }],
+          fx: [
+            { at: 0.2, weather: "rain", intensity: 0.7 },
+            { at: 10.2, lawnAnim: 1, lawnFrom: 0.15, lawnSecs: 5 },
+            { at: 20.2, celebrate: 14, x: 118, z: 26, r: 22 },
+          ],
+          lines: [
+            { who: "Birdie", at: 12, text: "The lawn drank. Thank you.", caption: "The lawn drank. Thank you." },
+            { who: "He", at: 22, text: "Clear skies. I stopped.", caption: "Clear skies. I stopped." },
+            { who: "Pilot", at: 28, text: "Fair weather. Logged.", caption: "Fair weather. Logged.", id: "pilot-ending-a" },
+          ],
+        },
+        B: {
+          secs: 34, sting: "failure",
+          shots: [
+            { at: 0, tx: [-6, 0], ty: 3.2, tz: [44, 42], alpha: [-1.9, -1.5], beta: [1.05, 1.12], radius: [26, 18] },
+            { at: 12, tx: [154, 150], ty: 6.2, tz: [2, 4], alpha: [-1.1, -1.55], beta: [1.0, 1.08], radius: [28, 20] },
+          ],
+          places: [{ id: "dex", x: 154, z: 4.5, gesture: "work" }, { id: "birdie", x: -8, z: 26, gesture: null }, { id: "ines", x: 158, z: 2, gesture: "surprise" }],
+          fx: [
+            { at: 0.2, lawn: 0.45 },
+            { at: 0.4, weather: "clouds", intensity: 0.55 },
+            { at: 12.2, spin: 0.35 },
+          ],
+          lines: [
+            { who: "Dex", at: 14, text: "Half green. Half still broken.", caption: "Half green. Half still broken." },
+            { who: "He", at: 22, text: "It worked. It cost.", caption: "It worked. It cost." },
+          ],
+        },
+        C: {
+          secs: 34, sting: "failure",
+          shots: [
+            { at: 0, tx: [66, 80], ty: 3.0, tz: [12.6, 14], alpha: [3.0, 3.4], beta: [1.05, 1.12], radius: [26, 18] },
+            { at: 14, tx: [118, 112], ty: 3.2, tz: [26, 24], alpha: [-2.1, -1.6], beta: [1.05, 1.12], radius: [24, 17] },
+          ],
+          places: [{ id: "birdie", x: -18, z: 10, gesture: null }, { id: "dex", x: 48, z: 8, gesture: null }, { id: "ines", x: 152, z: 4, gesture: null }],
+          fx: [
+            { at: 0.2, weather: "rain", intensity: 0.85 },
+            { at: 0.4, flood: true },
+            { at: 14.2, umbrellas: true, secs: 18 },
+          ],
+          lines: [
+            { who: "Pilot", at: 10, text: "Sky's still thinking. Stay in.", caption: "Sky's still thinking. Stay in.", id: "pilot-ending-c" },
+            { who: "He", at: 20, text: "I asked for everything.", caption: "I asked for everything." },
+          ],
+        },
       },
     },
     /* One score for every episode (js/episodes.js `liveScore`): people helped (or goals done), time left,
@@ -925,25 +1439,27 @@ window.DAY_CONFIG = {
          Not tied to a chapter or the clock: it plays wherever he stands. */
       {
         id: "tutorial",
+        chapter: 1,
         tutorial: true,
         title: "Learn the weather",
         tagline: "Lightning, Rain, Wind, Fog and Sun, one at a time.",
         goals: [
-          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Tap E for Lightning. Hold E to call a Storm." },
-          { id: "rain", kind: "ability", power: "rain", label: "Call Rain", prompt: "Press R. Rain, just here, just for a moment.", after: "bolt" },
-          { id: "wind", kind: "ability", power: "wind", label: "Call Wind", prompt: "Tap V for a Gust. Hold V for a Gale; hold longer for a Tornado.", after: "rain" },
-          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Press C. Fog rolls in off the street.", after: "wind" },
-          { id: "sunbreak", kind: "ability", power: "sunbreak", label: "Break the Sun through", prompt: "Press X. The clouds split.", after: "fog" },
+          { id: "bolt", kind: "ability", power: "bolt", label: "Throw Lightning", prompt: "Tap Lightning. Hold to call a Storm." },
+          { id: "rain", kind: "ability", power: "rain", label: "Call Rain", prompt: "Tap Rain. Just here, just for a moment.", after: "bolt" },
+          { id: "wind", kind: "ability", power: "wind", label: "Call Wind", prompt: "Tap Wind for a Gust. Hold for a Gale; hold longer for a Tornado.", after: "rain" },
+          { id: "fog", kind: "ability", power: "fog", label: "Roll in Fog", prompt: "Tap Fog. It rolls in off the street.", after: "wind" },
+          { id: "sunbreak", kind: "ability", power: "sunbreak", label: "Break the Sun through", prompt: "Tap Sun. The clouds split.", after: "fog" },
         ],
         lines: {
           start: "Five verbs. He learns them one at a time.",
           done: "That's all five. The sky is his.",
           skip: "Skipped. Every ability is open.",
-          unlock: "New ability: {name}. Key {key}.",
+          unlock: "New ability: {name}.",
         },
       },
       {
         id: "morning",
+        chapter: 1,
         variety: 2,
         title: "Clear the sky",
         tagline: "Break up the forecast's clouds before he leaves.",
@@ -965,6 +1481,7 @@ window.DAY_CONFIG = {
          is when Birdie is on the bench and Dex is in the plaza, so one run needs no clock jump. */
       {
         id: "dry-park",
+        chapter: 2,
         variety: 2,
         part: 1,
         title: "Part 1: Dry",
@@ -1025,6 +1542,7 @@ window.DAY_CONFIG = {
          Rank S..C is points over `max`. Everything the episode says is `say` ([who, text]). */
       {
         id: "lunch",
+        chapter: 4,
         title: "Rooftop storm",
         tagline: "A storm nobody called. Get the stranded out of it: the plaza, the shop roof, the avenue.",
         chapters: ["lunch"],
@@ -1095,9 +1613,9 @@ window.DAY_CONFIG = {
           },
         ],
         goals: [
-          { id: "shelter", kind: "help", piece: "shelter", count: 3, label: "Shelter the plaza: Sun near each" },
-          { id: "rescue", kind: "help", piece: "rescue", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop" },
-          { id: "street", kind: "help", piece: "street", count: 2, after: "rescue", label: "Clear the street: Wind near each" },
+          { id: "shelter", kind: "help", piece: "shelter", power: "sunbreak", count: 3, label: "Shelter the plaza: Sun near each" },
+          { id: "rescue", kind: "help", piece: "rescue", power: "bolt", count: 1, after: "shelter", label: "Rescue the roof: Lightning near the shop" },
+          { id: "street", kind: "help", piece: "street", power: "wind", count: 2, after: "rescue", label: "Clear the street: Wind near each" },
         ],
         lines: {
           start: "Lunch break. A storm nobody called.",
@@ -1136,6 +1654,7 @@ window.DAY_CONFIG = {
          gale turns them; too much wind (or wind in the plaza) costs the market its stalls. */
       {
         id: "still-blades",
+        chapter: 3,
         variety: 2,
         part: 2,
         title: "Part 2: Still",
@@ -1197,6 +1716,7 @@ window.DAY_CONFIG = {
          break dries it. He is on foot (Take control is locked in the car); driving the car himself is not built. */
       {
         id: "commute-home",
+        chapter: 4,
         title: "Hurricane drive",
         tagline: "The way home is shut in four places. Wind clears, sun dries, rain floods. Pick the right weather at each.",
         /* Offer as he leaves the office / walks the lot (still "work"), and
@@ -1298,10 +1818,10 @@ window.DAY_CONFIG = {
           },
         ],
         goals: [
-          { id: "debris", kind: "help", piece: "debris", count: 2, label: "Clear the road: Wind near each" },
-          { id: "underpass", kind: "help", piece: "underpass", count: 2, after: "debris", label: "Drain the underpass: Sun near each" },
-          { id: "bus", kind: "help", piece: "bus", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it" },
-          { id: "bridge", kind: "help", piece: "bridge", count: 2, after: "bus", label: "Hold the bridge open: Fog near each" },
+          { id: "debris", kind: "help", piece: "debris", power: "wind", count: 2, label: "Clear the road: Wind near each" },
+          { id: "underpass", kind: "help", piece: "underpass", power: "sunbreak", count: 2, after: "debris", label: "Drain the underpass: Sun near each" },
+          { id: "bus", kind: "help", piece: "bus", power: "bolt", count: 2, after: "underpass", label: "Start the stranded bus: Lightning near it" },
+          { id: "bridge", kind: "help", piece: "bridge", power: "fog", count: 2, after: "bus", label: "Hold the bridge open: Fog near each" },
           { id: "home", kind: "reach", spot: "parkHome", r: 8, after: "bridge", label: "Get home" },
         ],
         lines: {
@@ -1359,6 +1879,7 @@ window.DAY_CONFIG = {
          the sky won't stop. Offered once Part 2 has been played; always in the Episodes menu. */
       {
         id: "low-tank",
+        chapter: 3,
         variety: 2,
         part: 3,
         afterPart: 2,
@@ -1400,17 +1921,15 @@ window.DAY_CONFIG = {
         toasts: { "goal:charge": "The mast is charged.", "goal:fill": "The Tank is full." },
         scars: { flood: "the avenue flooded, the market closed for the night", overcast: "the sky stays on and the Board warns the city" },
       },
-      /* The finale. The city gathers on the plaza and he plays the sky: a choreographed light show of cues, each an
-         ability to call on its beat (`js/episodes.js` show logic, the stage in `js/finale.js`). A call inside `good`
-         seconds of its cue's `at` (seconds from the start) is a hit, inside `perfect` a perfect one; a wrong ability
-         or a call with no cue near it is off the beat. Score: Timing (perfect 1, good 0.6), Chain (best run of hits),
-         Clean calls (off-beat calls cost), Variety (distinct abilities hit, of 5). Afterwards the closing card ties the
-         day's stories together from the arc the three parts left (`cityFared`). */
+      /* The Night Show finale. Story payoff: Pilot hands him the sky, neighbors watch from the roofs, he
+         conducts 12+ weather cues on the beat, city lights answer, then a crane-out credits flyover and
+         tomorrow's sky request (`js/episodes.js` + `js/finale.js`). ≤3 minutes end to end. */
       {
         id: "night",
+        chapter: 5,
         variety: 5,
         title: "Light show",
-        tagline: "The city is on the plaza. Play the sky on the beat: lightning, rain, fog, wind, sun.",
+        tagline: "Pilot steps aside. The roofs are watching. Play the sky on the beat.",
         chapters: ["computer", "bedtime"],
         clock: "22:05",
         timer: 150,
@@ -1422,8 +1941,23 @@ window.DAY_CONFIG = {
           lead: 8,
           perfect: 0.45,
           good: 1.1,
+          afterSec: 4,
+          closeAfter: 6,
           beatNeeded: 8,
           rowNames: { people: "Timing", time: "Chain", damage: "Clean calls", variety: "Variety" },
+          /* Pilot's last line before the first cue (also pilot.farewell / pilot-finale-farewell). */
+          farewell: { id: "pilot-finale-farewell", text: "Tonight you don't need me." },
+          /* Birdie / Dex / Ines on walkable roofs overlooking the plaza; each speaks once at `at` show-seconds. */
+          /* Roof lines sit in gaps between cues so a short cutaway can land without eating the next beat. */
+          roofs: [
+            { id: "birdie", who: "Birdie", x: -22, z: 2, at: 15.2, gesture: "surprise", text: "From up here the lawn drinks with us.",
+              shot: { tx: -22, ty: 8.2, tz: 2, alpha: -0.4, beta: 1.05, radius: 14 } },
+            { id: "dex", who: "Dex", x: 48, z: 2, at: 23.2, gesture: "thanks", text: "Best seat on the avenue. Keep the beat.",
+              shot: { tx: 48, ty: 5.5, tz: 2, alpha: -1.2, beta: 1.0, radius: 12 } },
+            { id: "quill", who: "Ines", x: 154, z: 2, at: 47.2, gesture: "surprise", text: "The sky is keeping time. So are we.",
+              shot: { tx: 154, ty: 7.8, tz: 2, alpha: -2.4, beta: 1.05, radius: 14 } },
+          ],
+          roofCutSec: 1.9,
           acts: [
             { at: 7, name: "Pulses" },
             { at: 17, name: "Neon rain" },
@@ -1461,6 +1995,30 @@ window.DAY_CONFIG = {
             off: "Off the beat",
             done: "Curtain call. The sky takes a bow.",
           },
+          /* Journey-style crane out over the skyline; cast scrolls with the motif. */
+          credits: {
+            secs: 26,
+            skip: "Skip",
+            kicker: "I Can Be",
+            title: "The Night Show",
+            motif: "credits",
+            shot: { tx: [118, 92], ty: [5, 32], tz: [26, 48], alpha: [-1.85, -2.55], beta: [1.12, 0.82], radius: [20, 62] },
+            cast: [
+              { role: "Small Weather", name: "He" },
+              { role: "Pilot", name: "The day AI" },
+              { role: "Birdie Alvarez", name: "Gardener" },
+              { role: "Dex Moreno", name: "Courier" },
+              { role: "Ines Quill", name: "Stargazer" },
+              { role: "Hawkes Studio", name: "Made here" },
+            ],
+          },
+          /* After the credits: tomorrow's daily sky request (js/daily.js). */
+          postCredits: {
+            secs: 7,
+            skip: "Continue",
+            kicker: "Tomorrow",
+            fallback: "Tomorrow the sky will ask again.",
+          },
           closing: {
             kicker: "Closing night",
             title: "The district, tonight",
@@ -1491,11 +2049,14 @@ window.DAY_CONFIG = {
             ["He", "They came to look up. Fair enough."],
             ["Ines", "Whatever you do, do it on time. The sky keeps a beat."],
           ],
-          gather: [["Birdie", "Front row! My tomatoes get the front row."]],
+          gather: [["Birdie", "Front row. The tomatoes get the view."]],
+          "roof:birdie": [["Birdie", "From up here the lawn drinks with us."]],
+          "roof:dex": [["Dex", "Best seat on the avenue. Keep the beat."]],
+          "roof:quill": [["Ines", "The sky is keeping time. So are we."]],
           "act:Neon rain": [["Dex", "Mind the puddles. They are about to be very pink."]],
           "act:Grand finish": [["He", "All of it."]],
           "end:S": [["Ines", "Every cue. I'll put it in the charts."], ["He", "Thank you, everyone."]],
-          "end:A": [["Birdie", "Again! Again!"]],
+          "end:A": [["Birdie", "Again. One more for the tomatoes."]],
           "end:B": [["Dex", "Some of that was perfect. Some of that was weather."]],
           "end:C": [["Board", "The show has ended. Please go home. Thank you."]],
         },
@@ -1984,6 +2545,66 @@ window.DAY_CONFIG = {
         ],
       },
     ],
+    /* PERSONAL ARCS (3 beats each, persisted in js/memory.js `arcs` across real days). Beat kinds:
+       `cue` — voiced when he walks up (in-world prop already showing the problem);
+       `ask` — answered by calling `ability` (or any of `abilities`) within `range` m;
+       `scene` — payoff voiced scene + persistent mark (ribbon / lit sign / chart+beacon).
+       Neighbors menu shows progress as 3 pips. Playtest: `neighbor-arcs`. */
+    arcs: {
+      near: 10,
+      range: 18,
+      list: {
+        birdie: {
+          title: "Tomatoes",
+          beats: [
+            { id: "birdie-arc-1", kind: "cue", from: 7, to: 12, prop: "wiltPots",
+              lines: [
+                { who: "Birdie", text: "They're going. The pots are dust." },
+                { who: "He", text: "I see them." },
+              ] },
+            { id: "birdie-arc-2", kind: "ask", from: 7, to: 14, ability: "rain", prop: "greenPots",
+              text: "Rain on the pots. Before they're gone for good?",
+              thanks: "Green again. Bless you." },
+            { id: "birdie-arc-3", kind: "scene", from: 16, to: 20, prop: "ribbonBasket",
+              lines: [
+                { who: "Birdie", text: "First at the block show. Ribbon's on the balcony. Basket's by your door." },
+              ] },
+          ],
+        },
+        dex: {
+          title: "Open sign",
+          beats: [
+            { id: "dex-arc-1", kind: "cue", from: 7, to: 15, prop: "turbinesStill",
+              lines: [
+                { who: "Dex", text: "Shop turbines stalled. No wind, no open sign." },
+              ] },
+            { id: "dex-arc-2", kind: "ask", from: 7, to: 16, abilities: ["gust", "gale", "tornado"], prop: "turbinesSpin",
+              text: "A gust on the shop roof. Keep us turning?",
+              thanks: "They're spinning. We're open." },
+            { id: "dex-arc-3", kind: "scene", from: 17, to: 19.8, prop: "openSign", wave: true,
+              lines: [
+                { who: "Dex", text: "New sign went up. Come by. I'll wave you in." },
+              ] },
+          ],
+        },
+        quill: {
+          title: "Chart wall",
+          beats: [
+            { id: "quill-arc-1", kind: "cue", from: 17, to: 5, prop: "blankChart",
+              lines: [
+                { who: "Ines", text: "Charts are blank. Streetlights eat every star." },
+              ] },
+            { id: "quill-arc-2", kind: "ask", from: 17, to: 5, ability: "fog", prop: "readingChart",
+              text: "Fog over the annex. Soften the lights for one reading?",
+              thanks: "Orion. Hold still." },
+            { id: "quill-arc-3", kind: "scene", from: 20, to: 5, prop: "chartBeacon",
+              lines: [
+                { who: "Ines", text: "Your weather is on my wall. The roof light stays on for you." },
+              ] },
+          ],
+        },
+      },
+    },
   },
 
   /* ------------------------------------------------------------------------

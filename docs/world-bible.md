@@ -93,16 +93,21 @@ Definition of done (all required):
 
 ### The Roofs
 - **Mood:** his playground. Stairs on apt, shop, annex; AC units, tanks, vents, antennas; lightning coils on his arms while the player steers.
-- **Look / sound:** rooftop props and distinct surface zones (gravel ballast bed, metal grating and AC decks, dark tar membrane seams, and a wet roof-drain puddle basin with gutter pipe); layered weather soundscape (light rain patter on roofs vs heavy downpour, gurgling roof gutters, rain drumming on umbrellas below, 3D-panned wind gusts and flapping canvas awnings, rolling thunder delayed by strike distance vs close cracks, sunlit rooftop birds and brightened city hum, and snow-muffled street tone); Small Weather's footsteps change across gravel, metal, tar, and splash in puddles; storm gather over him on hold F; bolt crack and scorch; updraft float; camera orbit with wall pull-in.
+- **Look / sound:** rooftop props and distinct surface zones (gravel ballast bed, metal grating and AC decks, dark tar membrane seams, and a wet roof-drain puddle basin with gutter pipe); layered weather soundscape (light rain patter on roofs vs heavy downpour, gurgling roof gutters, rain drumming on umbrellas below, 3D-panned wind gusts and flapping canvas awnings, layered lightning crack/body/rumble with thunder delayed at 343 m/s — within 30 m with the flash — sunlit rooftop birds and brightened city hum, and snow-muffled street tone); Small Weather's footsteps change across gravel, metal, tar, and splash in puddles; storm gather over him on hold F; bolt crack and scorch; updraft float; camera orbit with wall pull-in.
+- **Rain (js/rain.js):** a Rain cast is heavy and wet: velocity-stretched streaks leaning with the wind, a ring and a crown of droplets where each drop lands (roofs, car roofs, umbrellas, puddles, his shoulders), runnels down the facade windows, drips off gutters and awnings, three curtains of rain sweeping the skyline under the cloud deck, drops that bead and slide on the camera when it looks level or up (not on a phone), and a thicker fog so the far avenue goes soft. The existing rain sound (hiss, roof patter) is untouched.
 - **Size:** three stair roofs plus filler rooftops with units; ramps and parapets.
 - **In / out:** north-face stairs; jump/float between; can't Take control while driving.
 - **In:** control movement (run, triple jump, float), rooftop surface zones and surface footsteps (`gravel`, `metal`, `tar`, `puddle`), layered weather soundscape with equal-power loop and state crossfades, five weather verbs (Lightning/Rain/Wind/Fog/Sun; Storm and Tornado are hold depths), lunch Hollis rescue, Part 2 turbines, smoke playtest roof bolt.
 - **Short:** most filler roofs are props-only (no second stair set pieces); no roof garden or water tower climb verb beyond parkour.
 - **Build:** AC fans spin with wind (code); one extra traverse prop between shop and annex roofs after queue 1.
 
+### Acoustics (the ear knows where he is)
+- **In (`js/mix.js`, `js/mix-core.js`):** six convolution reverb zones — open rooftop, street canyon, plaza, apartment interior, car cabin, office — synthesised IRs (no GPU), crossfaded over 0.5 s as he moves. Buses: music, ambience, sfx, voice, UI → makeup → compressor → limiter (~−16 LUFS). World sources: HRTF + inverse distance on high; stereo pan on low/phone. A building between source and camera low-passes (~1.1 kHz, −6 dB), one raycast per active source, throttled. Voice ducks music −8 dB and ambience −4 dB (150 ms attack). Settings: Music / Effects / Voice sliders (`icanbe.mix`). `day.audio.info()` / playtest `audio-mix`.
+- **Heard as:** the avenue rings; the apt and car stay dry and close; every voiced line cuts through the beds.
+
 ### Main Avenue Commute
 - **Mood:** the day's artery. Morning clear drive; evening can be his own storm's debris.
-- **Look / sound:** asphalt 0.04, lane dashes, crosswalks, signals on a 36 s cycle; cars in two lanes; people on SIDE 3.5 m graphs. Score beds crossfade with weather; rain ambience; far siren at night.
+- **Look / sound:** asphalt 0.04, lane dashes, crosswalks, signals on a 36 s cycle; cars in two lanes; people on SIDE 3.5 m graphs. Score beds crossfade with weather; rain ambience; far siren at night; street-canyon reverb while on foot, car-cabin dry when driving.
 - **Size:** avenues z 12.6 / −34 / 76 from x −48..210; crosses at x −42, 36, 100, 168.
 - **In / out:** his car on the day spine; on foot under control anywhere; Hurricane drive west from lot to parkHome.
 - **In:** crowd + cars, signals, weather reactions, four hurricane closures, lunch street clear (Nell, Ravi).
@@ -133,16 +138,19 @@ Home Block landmark is a vertical-slice deliverable (crown light strip + tomato 
 Same storm caller as Dose Of Destruction (`AllTheCharacters/SmallWeather`). Black messy hair, glasses, navy tech jacket with glowing blue seams, cargo pants, glowing boots. Lives a developer's day on autopilot (`day.config.js` spine); player Take control for third-person walk/run/jump/float and weather powers. Voice: DoD Eric, short first-person; log/barks say "He", never "they". Spoken barks (`voice.spoken`, director in `js/voice.js`): take control, let go, each power's first use, rooftop rescue, neighbour thanks, day end, idle — caption clear of the ability bar, no overlap, ~5 min per-line cooldown; Voices mute separate from Sound. **Five verbs, one Charge:** Lightning (E; hold → Storm), Rain (R), Wind (V; tap Gust, hold Gale, full Tornado; G aliases Gust), Fog (C), Sun (X). Only Charge shows on the ability bar (amber bolt); the old Pressure chip is gone; Body panel **Energy** is fatigue only. Keys 1–7 and hold Q are **Sky studio** in Settings (off by default). On a phone the five verbs sit in an arc on the right with Charge as a ring; the Storm/Bolt/Gust/Tornado pad is gone. Strain ("Sky") is what the district absorbs in the arc. Reacts with barks to needs and sky changes; crowd answers his *manual* weather. Main character model is always Small Weather, never a placeholder while loading. Live log shows only what has happened; when the clock is held, status and clock say Paused.
 
 ### Birdie Alvarez
-Gardener, yellow raincoat and straw hat; apt block. Stops: inside overnight, pots at −21,9.5 from 7, park bench −6,22.5 at noon, home by 20. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). Canon: she asks him for rain for her tomatoes. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* 3–4 idle barks/gestures after the ask (wave from pots, lawn-state comment); second day-keyed beat when lawn is damp; readable hat silhouette before Gen model.
+Gardener, yellow raincoat and straw hat; apt block. Stops: inside overnight, pots at −21,9.5 from 7, park bench −6,22.5 at noon, home by 20. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). **Personal arc (3 beats):** dying pots → rain saves them → garden-show ribbon on her balcony + basket at his door (`neighbors.arcs.birdie`, persisted in memory). Canon: she asks him for rain for her tomatoes. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* 3–4 idle barks/gestures after the ask; readable hat silhouette before Gen model.
 
 ### Dex Moreno
-Courier, orange jacket, white helmet, parcel on his back; lives over the shop. Stoop by day, plaza at lunch. Ask: sun break for damp parcels; thanks; evening humming parcel surprise. Briefs and closes the lunch rescue. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* idle route jokes and helmet silhouette; parcel-carry handoff as a non-weather verb.
+Courier, orange jacket, white helmet, parcel on his back; lives over the shop. Stoop by day, plaza at lunch. Ask: sun break for damp parcels; thanks; evening humming parcel surprise. Briefs and closes the lunch rescue. **Personal arc (3 beats):** stalled shop turbines → Gust keeps them spinning → lit OPEN sign + wave from the doorway (`neighbors.arcs.dex`). *Short:* box figure until GPU neighbor pass. *Build (queue 5):* idle route jokes and helmet silhouette; parcel-carry handoff as a non-weather verb.
 
 ### Ines Quill
-Stargazer, violet coat, glasses, telescope; annex. Inside by day, out from 16:30 through the night. Ask: one bolt for her lens (not at her); thanks; night surprise. Reads the sky in Part 2; names the lunch cell as something "clearing its throat." *Short:* box figure until GPU neighbor pass. *Build (queue 5):* dusk star-point gesture and chart mutter; scope silhouette readable at range.
+Stargazer, violet coat, glasses, telescope; annex. Inside by day, out from 16:30 through the night. Ask: one bolt for her lens (not at her); thanks; night surprise. Reads the sky in Part 2; names the lunch cell as something "clearing its throat." **Personal arc (3 beats):** blank charts under streetlights → Fog for one reading → chart in her window + violet roof beacon (`neighbors.arcs.quill`). *Short:* box figure until GPU neighbor pass. *Build (queue 5):* dusk star-point gesture and chart mutter; scope silhouette readable at range.
 
 ### The District Board *(candidate loudspeaker faction)*
 Utilities voice on the Storm Tank speaker. Plain official tone; does not name him. Reservoir advisories and Weather Warning. *Not settled as full canon* until J answers beat-sheet Q3; lines already play in Parts 1/3 dialogue data. *Build:* physical speaker staging (queue 3).
+
+### Pilot
+The calm, dry, faintly fond AI that runs Small Weather's day — the "AI" in I Can Be AI. Keeps him on schedule and safe; the player is the part of him that wants the sky. Speaks schedule nudges at each spine block, take-over and let-go lines (let-go names the deed just done), worried lines when the sky goes chaotic, and quiet night lines. Diegetic presence: a soft holographic ring on his left wrist that pulses with Pilot's voice; radio filter on the audio; one caption line labelled Pilot. Never talks over Small Weather (queued through `js/voice.js`). Data in `day.config.js` `pilot`; director in `js/pilot.js`. See **Characters → Pilot**.
 
 ### Crowd citizens and drivers
 Up to ~260 people / 64 cars on the day curve (commute, lunch, dinner, thin 2–5). Walk graph, cross on red for cars, enter/leave doors. React to ability weather: storm look-up then run; rain run / duck indoors; wind lean + hat; fog slow; sun break cheer. Named lunch/drive stranded: Odile, Pim, Gus, Hollis, Nell, Ravi, Marlo, Cass, Tamsin, Wren, Hale, Odette, Sorrel, Pike, Juno (challenge).
@@ -153,9 +161,56 @@ Up to ~260 people / 64 cars on the day curve (commute, lunch, dinner, thin 2–5
 - Birds remain daytime fair-weather sfx until pigeon meshes exist.
 
 ### How they react to the player
-Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather ending: nods — candidate until J settles Q4). Neighbors speak when he is near in their window and answer asks when he calls the right ability in range. Cars brake for him in lane. Episode stranded thank him with voice/bubble lines.
+Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather ending: nods — candidate until J settles Q4). Neighbors speak when he is near in their window and answer asks when he calls the right ability in range. Cars brake for him in lane. Episode stranded thank him with voice/bubble lines. Pilot comments on take-over, let-go and chaos, and nudges the schedule while the day runs itself.
+
+## Characters
+
+### Small Weather
+- Want: to keep a quiet developer day while the sky stays his to call when something needs weather.
+- Arc: lives on Pilot's schedule → player takes the sky → deeds reshape his day and the district → night rest under Pilot again.
+- Moment: Take control / Let go; cold-open bolt; Birdie's rain; the light show.
+- Personality: dry, patient, understated.
+- Voice: DoD Eric `cjVigY5qzO86Huf0OWal`.
+- Animations: idle, walk, talk (idle stance with a small hand gesture while his voiced line plays; the caption and wrist ring pulse with it), run, jump, fall, float, cast, throw, sit, type, phone, lie, side, recline (`models/small-weather.glb`); hero beats lookup (clear-sky idle look up), windbolt (Lightning wind-up; Mixamo-posed stand-in), windrain (Rain/Fog wind-up; Gen), triumph (fist after Storm/Tornado), shelter (rain shrug), window (evening sit-at-the-window) in `models/clips/` (lookup/windrain/triumph/shelter/window Gen-baked); two-bone foot IK plants boots on roofs, stairs and the ramp.
+
+### Pilot
+- Want: keep Small Weather on schedule and safe; hand the sky back by five.
+- Arc: runs the quiet day alone → yields the sky on take-over with a dry aside → names what the player did on let-go → worries when chaos spikes → at the Night Show hands the sky over for good ("Tonight you don't need me.") → holds the quiet after credits.
+- Moment: every Take control and Let go (voiced Pilot line + wrist-ring pulse); schedule nudge at each spine block on a 1200× day; Night Show farewell before the first cue.
+- Personality: calm, dry, fond.
+- Voice: gv_c2c9cdffeae27b99
+- Animations: idle (dim wrist-ring pulse), walk (ring follows the left wrist while he moves), talk (bright voice-synced pulse). No separate body — Pilot is the ring and the radio voice.
+
+### Birdie Alvarez
+- Want: rain for her tomatoes, and the block's garden-show ribbon.
+- Arc: dying pots on the stoop → rain that greens them → tomatoes win the block show (ribbon on her balcony, a basket at his door). Same-day ask/thanks/surprise still loop; the arc persists across real days in `icanbe.memory` `arcs.birdie`.
+- Moment: Rain near her pots; then the ribbon and basket standing after beat 3 (same-day reload keeps them).
+- Personality: warm, plain, grateful.
+- Voice: dialogue cast `Birdie` `EXAVITQu4vr4xnSDxMaL` (Sarah).
+- Animations: idle, walk, talk (peoplekit; Gen model later).
+
+### Dex Moreno
+- Want: dry parcels, spinning shop-roof turbines, and a shop that stays open.
+- Arc: shop turbines stalled (no open sign) → player's Gust/Gale keeps them turning → a new lit OPEN sign and Dex waving from the doorway. Progress in `icanbe.memory` `arcs.dex`.
+- Moment: Gust or Gale on the shop roof; night screenshot of the lit sign after beat 3.
+- Personality: brisk, practical, upbeat.
+- Voice: dialogue cast `Dex` `TX3LPaxmHKxFdv7VOQHJ` (Liam).
+- Animations: idle, walk, talk (peoplekit; Gen model later).
+
+### Ines Quill
+- Want: a clean sky reading for her lens and charts.
+- Arc: blank charts under drowning streetlights → Fog softens the annex lights for one reading → her chart hangs in the annex window with a soft violet roof beacon. Progress in `icanbe.memory` `arcs.quill`. Grounded in her existing fog/stars/chart writing (street teach + daily photo asks).
+- Moment: Fog near the annex; chart + violet beacon after beat 3.
+- Personality: precise, quiet, curious.
+- Voice: dialogue cast `Ines` `Xb7hH8MSUJpSbSDYk0k2` (Alice).
+- Animations: idle, walk, talk (peoplekit; Gen model later).
 
 ## What happens
+
+### Seamless scene changes (*In*, `js/transition.js`)
+- **Player feel:** the day never cuts to black between moments. Loading fades (0.9 s) into the title crane; episode menu / Replay / Next starts roll a **1.2 s storm-cloud wipe** (navy cloud front, not a black frame) that hides the clock jump, prop spawn and shader warm-up; take control and let go pair the camera blend with a whoosh; day-bar scrubs crossfade grade and exposure (~0.7 s) instead of stepping; episode props fade in over 0.3 s so nothing pops within 30 m.
+- **Heard / seen:** wipe is weather-diegetic (the same storm navy as the rest of the sky); `day:transition` events; playtest `episode-jump` (desktop + `{"touch":true}` phone).
+- **Canon:** scene changes are continuous like God of War (2018) — one world, no load cuts.
 
 ### Density walks (acceptance beads; ≤8 s / ≤30 m between)
 A later playtest walks these under control at walk speed and fails if quiet > 10 s (`quality.maxQuietSeconds`). Each bead is something new to see, hear or do. Spacing is a table in metres on every avenue segment (auto-checked from placed beads), not only the three hand walks.
@@ -164,28 +219,28 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 2. **Shop → plaza → Tank (second slice):** shop neon buzz → Dex stoop / parcel carry / door knock → signal-box spark or crosswalk wait → vendor cart → fountain coin toss + Clock faces → cafe wipe or stall crates / tip busker → annex turbines (spin or still) → Tank neon + speaker idle hiss → yard clipboard worker by day.
 3. **Park north → Needle:** path lamp → park edge crowd → cart roll / worker → Needle beacon pulse → (optional) deck lookout sting.
 4. **South avenue z −34 (full length):** same kerb pool as the main avenue; no stretch without a bead every ≤30 m.
-5. **Night (23:00–06:00) and 2–5 lull:** lit-window silhouettes, late diner glow, street sweeper pass, dog-walker, stoop cat; thin crowd still counts as life if something moves or sounds every ≤8 s.
+5. **Night (23:00–06:00) and 2–5 lull:** *In:* lit-window rooms on schedules (dusk on ~18:00–20:00, bedtime off after 23:30; apt/office follow Small Weather's day), neon flicker/buzz, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares, wet-street reflections (SSR high, reflection probe low), bolt flicker on windows. *Build (queue 2):* late diner, street sweeper, dog-walker, stoop cat — lights alone do not meet the ≤8 s night density rule. Playtest: `night-glow`.
 6. **Apt ↔ shop ↔ annex roofs:** spinning AC / vent puff / antenna sway with wind, plus one parkour prop bead between stairs — roofs are on the density table, not only parkour and powers.
 
 ### West Avenue Home Block
 - **Interactions:** Take control / Let go; walk, run, jump, float; call Rain for Birdie; climb apt stair; knock props with Gust; look through cutaway rooms; **Build:** carry watering can to pots; knock/enter apt (fridge hum, radio); sit on stoop.
 - **On their own:** his autopilot morning; Birdie's pot watering path; crowd thin→commute; lamps by sky; day-end moment when the clock rolls.
-- **Ambient:** birds, city hum, footsteps, alarm/coffee diegetic day sounds, title/score beds under the page.
-- **Over time:** model-constant look; windows and lamps follow dusk/night; opening once per new player.
-- **Short:** no fridge/radio loop; few porch interactions after Birdie goes in.
+- **Ambient:** birds, city hum, footsteps; **diegetic day soundscapes** (`js/daysound.js`): fridge hum, kettle/coffee, shower, rain on the window; evening TV muffled programme; night clock tick, distant traffic and a far train; title/score beds under the page.
+- **Over time:** model-constant look; windows follow occupant schedules (dusk on, bedtime off) and Small Weather's apt lights; lamps and neon by dusk/night; opening once per new player.
+- **Short:** few porch interactions after Birdie goes in.
 
 ### The Park
 - **Interactions:** Rain (and over-hold overflow), sit near Birdie for ask/thanks, bolt scorch grass, explore pond/bandstand; **Build:** sit on bench/bandstand (camera + ambient); pigeon scatter without spending Pressure (walk-up or Gust).
 - **On their own:** Birdie noon bench; park lamps; lawn state after Part 1 (*should* persist — Build queue 1); crowd on edges.
-- **Ambient:** softer bed under trees; rain on leaves when wet; bandstand quiet creak (Build).
+- **Ambient:** softer bed under trees; rain on leaves when wet; bandstand quiet creak (Build); **lunch soundscape** kids, fountain and ducks while his schedule is on the lunch chapter (`daysound` park).
 - **Over time:** straw→damp→scar brown patch across the arc day.
 - **Short:** need always-on state + 2–3 microevents so a non-episode walk still breathes.
 
 ### Shop Strip
 - **Interactions:** Dex sun break; shop roof bolt/rod precision; shove bins; observe crowd doors; Storm hold; **Build:** carry Dex's dropped parcel to the stoop; knock/enter one shop bay; dawn stoop cat pet/leave.
 - **On their own:** Dex routine; shop neon; people enter shops; umbrellas.
-- **Ambient:** neon buzz (Build), car pass-bys, courier shoes.
-- **Over time:** dusk neon weight; lunch cell drifts east toward Tank.
+- **Ambient:** neon tube buzz (sfx under the signs at night), car pass-bys, courier shoes.
+- **Over time:** dusk neon weight with Gen textures when present (`textures/neon/*.webp`); lunch cell drifts east toward Tank.
 - **Short:** enterable shop or window shoppers would kill empty-facade feel (queue 5 / art).
 
 ### Plaza Market
@@ -198,7 +253,7 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 ### Office Lot and Annex East
 - **Interactions:** Gale hold on turbines; Ines bolt ask; start Hurricane drive; desk is autopilot until Take control.
 - **On their own:** lights/lifts with power (*should* be visible — Build); Ines telescope; evening commute crowd.
-- **Ambient:** HVAC, keyboard (day), roof wind, Board distant from Tank.
+- **Ambient:** HVAC and coffee machine as room tone; **keyboard clatter only while he is at the desk** (stops when he leaves); murmured meeting when he is in the meeting room; roof wind; Board distant from Tank.
 - **Over time:** still blades → spinning → overspeed scar.
 - **Short:** coworkers as bodies; turbines permanent.
 
@@ -218,14 +273,14 @@ A later playtest walks these under control at walk speed and fails if quiet > 10
 ### The Roofs
 - **Interactions:** full power set; parkour; walk across gravel, metal grates, tar seams and puddle drain basins (surface footsteps and splashes); lunch Hollis; Part 2 gale; smoke bolt.
 - **On their own:** AC fans spin with wind (Build); antennas; roof gutters trickle when wet; crowd below.
-- **Ambient:** layered weather soundscape (roof rain patter vs heavy downpour, gutters, umbrella patter below, 3D-panned wind gusts, flapping awnings, distance-delayed thunder, sunlit birds, muffled snow city), ability whoosh/crack.
+- **Ambient:** layered weather soundscape (roof rain patter vs heavy downpour, gutters, umbrella patter below, 3D-panned wind gusts, flapping awnings, distance-delayed thunder at 343 m/s with layered crack/body/rumble variants, sunlit birds, muffled snow city), ability whoosh/gale loop, tornado roar+debris+pressure by proximity, fog world-bus hush, sun-break shimmer.
 - **Over time:** dusk→night bloom; wet sheen only on ability weather.
 - **Short:** more traverse routes between the three stairs.
 
 ### Main Avenue Commute
 - **Interactions:** weather abilities; Gust/Tornado debris; Hurricane four closures (help vs hurt powers); crosswalk timing; brake-test by standing in lane carefully.
 - **On their own:** crowd curve, signals, weather forecast (off by default) vs ability weather, sirens at night.
-- **Ambient:** score + ambience beds, cars, birds, siren.
+- **Ambient:** score + ambience beds, cars, birds, siren; **commute cabin** rumble and wipers in rain; **car radio** plays a short station jingle then a weather-desk line that names a weather the player called today (from `day.memory.facts`).
 - **Over time:** rush hours; episode debris; flood patches.
 - **Short:** junction turns; kerb micro-events every ~8 s of walk east.
 
@@ -243,21 +298,23 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 | 6 | Rooftop storm lunch | ~12:20 | Uncalled cell; Dex phone brief (voice); Shelter / Hollis rod / street clear; fog twist + debris; Ines throat line (voice); rank end line spoken | HUD goals ≤1 line each |
 | 7 | Still blades | work / evening annex | Office lights dim + lift crawl **before** any log; Ines; Gale 10 s spins turbines (visible + whoosh); intact stalls; kick: overspeed + stall topple | log may echo after |
 | 8 | Hurricane drive | ~17:53 lot→home | Board wind advisory (voice); four closures help/hurt; bus twist; reach parkHome; Board close-out by rank (voice) + his one line | HUD ≤1 line |
-| 9 | Tank low + ending | ~22:20 Tank / after Part 3 | Board critical on pulsing speaker; Ines charge line; two Lightning hits + mast flash/thunder; Rain fills gauge (bolt-storm does not count); Strain as flood patch or held storm + Warning on speaker; **ending:** in-engine camera (or Gen still once budgeted) over four needs, then his last voiced line; card is caption only | caption under camera |
-| 10 | Light show finale | ~22:05 plaza | Walk into plaza; 18 cues on beat; stage beams/pools/aurora; grand salvo; closing holds crowd (Birdie, Dex, Ines) while cityFared stingers + his last line by rank are spoken | card captions audio |
+| 9 | Tank low + ending | ~22:20 Tank / after Part 3 | Board critical on pulsing speaker; Ines charge line; two Lightning hits + mast flash/thunder; Rain fills gauge (bolt-storm does not count); Strain as flood patch or held storm + Warning on speaker; **ending:** three in-engine scenes (A rain+bloom+plaza dance; B half-green park + Dex on a turbine; C flood/umbrellas + Pilot/He), ≤40 s, Skip + one caption, ends on the rank stamp; no ending text card; memory keeps the park green after A | caption under camera |
+| 10 | Light show finale | ~22:05 plaza / roofs | Pilot farewell on the wrist ("Tonight you don't need me."); Birdie, Dex and Ines on apt / shop / annex roofs — each beat cuts the camera to that roof ~2 s while they speak; walk into plaza; 12+ cues on beat (city flicker, flash, plaza crowd); stage beams/pools/aurora; grand salvo; score; crane-out credits with theme + cast; post-credits lands on tomorrow's asker and speaks the ask | cue HUD ≤1 line; credits ≥14 px |
 | 11 | Neighbor surprises | evening windows | Bubble + reward + Pressure; spoken when clips exist, else babble + bubble — never log-only | toast ≤1 line |
+| 11b | Neighbor personal arcs | Birdie pots / Dex shop / Ines annex, across real days | Three beats each (cue → weather ask → payoff scene); voiced exchange + persistent prop/light; Neighbors menu shows 3 pips; `js/memory.js` `arcs` | caption ≤1 line |
 | 12 | Day end recap | clock rolls next day | Dim score; sign-off voice; three in-world flashes tied to log events; one last spoken breath; Skip/Esc/timer | ≤1 line under flashes |
 | 13 | Crowd weather breath | any day under control | Manual weather → look-up, run, hats, cheer, umbrellas, wipers; hold then fade | none |
+| 14 | Pilot on the wrist | every day / take / let-go | Schedule nudge + radio chirp + wrist-ring pulse; take-over and let-go Pilot lines (let-go names the deed); worried on chaos; night hold | caption ≤1 line labelled Pilot |
 
 ### Beats that must not stay text-only (hard fails until fixed)
 - Opening lines → voice (Eric) or cut.
 - Board advisories → loudspeaker mesh pulse + voice + world audio duck.
-- Ending / closing → camera or still of the district + voiced last line; card text is caption only.
+- Ending / closing → in-engine ending scene (A/B/C) or closing camera + voiced lines; no ending text card; caption under camera only.
 - Day end recap → sign-off voice + three staged flashes; no recap that is only a list of sentences.
 - Part 2 power ration → office lights dim and lift audio crawl *before* any log line.
 
 ### What already exists vs short
-- **In:** neighbors (box figures + beats), Parts 1–3, lunch rescue, hurricane drive, light show, tutorial, opening (text beats), moments, crowd reactions, landmarks, cityscape density, spoken dialogue pipeline for story/neighbor lines (~104 clips), Strain/endings as cards.
+- **In:** neighbors (box figures + beats), Parts 1–3, lunch rescue, hurricane drive, light show, tutorial, opening (text beats), moments, crowd reactions, landmarks, cityscape density, spoken dialogue pipeline for story/neighbor lines (~104 clips), Strain, Part 3 endings as in-engine scenes (A/B/C: plaza rain-dance, Dex work-pose on a turbine, silent umbrellas; ending voice clips still pending Gen credits).
 - **Must build next (matches fun-review gaps, same order as Build queue):** (1) always-on park / plaza stalls / annex turbines + day-keyed states; (2) micro-life + night/south-avenue density beads + playtest; (3) four non-weather verbs with Pressure at 0; (4) Tank loudspeaker + day-end flashes + ending camera/voice (`textOnlyBeats` = 0); (5) neighbor idle life past the ask + silhouettes; (6) Needle life; (7) second-slice gate shop→plaza; (8) GPU art when J approves budget.
 
 ### Canon flags (do not quietly flip)
@@ -272,10 +329,17 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 ## The city remembers (js/memory.js)
 
 - **Areas:** the park lawn (green after rain), the avenue (scorch, puddles, toppled bins, a leaning sign), roofs and plaza (scorch where a bolt landed), Birdie's tomato wall (fuller after her rain).
-- **Landmarks:** the scorch on the road, the leaning sign by the kerb, the green lawn seen from the bandstand.
-- **Who lives here:** Birdie's tomatoes answer her rain; the pigeons and the crowd are unchanged. No new characters.
-- **What happens:** the deeds he does under control (asks answered or botched, each power by zone, rescues, scars, endings) are kept by real local date in `icanbe.memory`. Marks are full for the rest of that real day and fade over 3 real days; 20 decals at most, 6 on a phone.
-- **Story beats:** none new. The city simply shows what he did, the way the Goose's bell pile does: come back later the same day and it's still there.
+- **Landmarks:** the scorch on the road, the leaning sign by the kerb, the green lawn seen from the bandstand; after neighbor arcs — Birdie's balcony ribbon + door basket, Dex's lit shop OPEN sign, Ines's chart window and violet annex beacon.
+- **Who lives here:** Birdie's tomatoes answer her rain; Dex's shop turbines and sign answer his gusts; Ines's charts answer her fog. No new characters.
+- **What happens:** the deeds he does under control (asks answered or botched, each power by zone, rescues, scars, endings) are kept by real local date in `icanbe.memory`. Marks are full for the rest of that real day and fade over 3 real days; 20 decals at most, 6 on a phone. Neighbor personal arcs live in `icanbe.memory.arcs` (`birdie`/`dex`/`quill` = 0..3) and rebuild their props on load/reload so a same-day refresh keeps beat-3 marks.
+- **Story beats:** neighbor arc payoffs (11b) leave a lasting mark the city shows without a card.
+
+## Neighbor personal arcs (js/neighbors.js, data `neighbors.arcs`)
+
+Stardew-style heart progress for Birdie, Dex and Ines: three beats each the player drives, persisted across real days, shown in the world and as 3 pips in the Neighbors menu. Playtest: `neighbor-arcs`.
+- **Birdie — Tomatoes:** (1) dying pots on the stoop, voiced cue; (2) Rain near the pots greens them; (3) garden-show ribbon on her balcony + basket at his door.
+- **Dex — Open sign:** (1) shop-roof turbines stalled; (2) Gust/Gale spins them and keeps the shop open; (3) lit OPEN sign at night, Dex waves from the doorway.
+- **Ines — Chart wall:** (1) blank chart under drowning streetlights; (2) Fog at the annex for one reading; (3) chart in her window + violet roof beacon.
 
 ## He remembers (Let go, his day, the neighbors; js/deeds.js, js/schedule.js `remembers`)
 
@@ -303,3 +367,46 @@ Each episode's big beat is seen and heard in the city, not read as a toast: a sh
 - **Rooftop storm, the twist (the shop roof and the avenue):** the rain stops, the fog comes in and the lamps stutter, junk in the avenue; Ines: "That wasn't rain. That was something clearing its throat." He: "It's moving. Not passing."
 - **Hurricane drive, the bridge closes (the bridge):** the camera down the avenue, the gate arm swings down as the Board warns "The bridge will close on high wind."
 The stings are synthesized (`score.momentSting`): warm swell and rain shimmer, rising saws, low brass and the Board's two flat tones, a minor cluster and thunder, two far tolls. The episode's clock waits while a moment plays.
+
+## Wind and fog you can see (js/windfog.js, config `windfog`)
+
+- **Areas:** everywhere he can stand. The wind is felt most where the district has cloth and green: the street trees and planters along the avenues, the park's flowerbeds, the shop and annex roofs (a laundry line each on the west edge), the apt roof (the corner flag pole and a bedsheet on a line, both hero cloth), and the plaza (a flag pole at each north corner, one of them hero cloth). The fog comes from the river, which lies north of the district (+z, past the north avenue).
+- **Landmarks:** the flags on the roof corners of nine blocks, streaming downwind; the hero flag on the apt roof, the bedsheet beside it, and the plaza's flag: three small simulated cloths that whip and snap when he calls a Gust (desktop; a phone gets the same flags in a vertex shader).
+- **Who lives here:** the walkers. Ones who carry an umbrella open it when the wind comes up, and a strong gust turns it inside out, spinning off downwind on its stick; the pavement's litter (leaves, papers) is pulled into three slow eddies.
+- **What happens:** a Gust (tap Wind) is a strong wind for about three seconds that dies away over ten: ribbons of white streak along the way he faces, leaves and papers swirl through the eddies, the crowns of the trees lean and shiver, the awnings flap, the flags snap out, umbrellas flip. A Gale holds it. Fog (C) slides a bank of ground-fog slices in from the north in about three seconds: the streets fill with layered drifting white, the lamps at dusk hang light shafts in it, cars cut headlight cones, and three veil rings take the far skyline out a ring at a time. Both ease out with the weather's own timing.
+- **Story beats:** none of its own. It is the sky answering him: the beat is the street reacting (umbrella snaps, a leaf storm, the skyline swallowed), told by picture and sound, with no text.
+- **Not done:** the Babylon cloth is a small verlet sim (no collisions with the pole or the roof); tree shadows don't sway; wind through the neighbours' own clothes, the model's coat, and the Fog's sound bed need art and Gen audio.
+
+## The five chapters (js/moments.js `chapter`, config `arc`; canon, supersedes `docs/story-arc-beat-sheet.md` where they disagree)
+
+The episodes are one arc of five chapters. Each chapter has a line (what he wants), its episodes, and an opener: an in-engine scene of 20 s at most that plays before the first episode started in that chapter (once per player; the Episodes menu groups episodes by chapter under the chapter's name and line, and the story order is the chapters' order).
+- **Areas:** each opener hangs its title 34 m up over a place and orbits it, above every roof: Ch1 over the apt block and avenue, Ch2 over the park, Ch3 over the annex and its turbines, Ch4 over the shop and the avenue, Ch5 over the plaza.
+- **Landmarks:** the title itself. Ch1-4: white cloud puffs that form the letters one by one (shaded undersides). Ch5: a lit neon billboard that flickers on. It scales to the screen so a phone shows the whole title. Never a text card.
+- **Who lives here:** Small Weather (his Eric voice, `dlg-He-*` clips) and Pilot (`gv_c2c9cdffeae27b99`, radio filter, `pilot-chapter-N` clips) speak in each opener. Birdie, Dex and Ines are the "street" Ch2 is about.
+- **Characters:** Small Weather wants the sky (Ch1), to answer what the street asks (Ch2), to learn what each call costs (Ch3), to reach the people stuck in it (Ch4), and to give the city a show (Ch5). Pilot goes from schedule-keeper (Ch1: "The sky is not on it"), to bookkeeper (Ch2, Ch3: "You are close to the limit"), to doubter (Ch4: "You can also hurt them"), to the one who hands over the sky (Ch5: "Tonight the whole sky is yours").
+- **What happens:** Opener = the camera sweeps round the sign, the four-note motif plays (A C E D) with the chapter's sting, he and Pilot trade two spoken lines (one caption line at a time), then the episode starts. Skip: the bottom button (48 px), a tap anywhere, or Esc; it still starts the episode.
+- **Story beats:** Ch1 The Sky ("He wants it": Learn the weather, Clear the sky). Ch2 The Neighbours ("The city needs him": Part 1 Dry). Ch3 The Long Drought ("Power has a cost": Part 2 Still, Part 3 Low; Strain and the endings). Ch4 Storm Chasers ("He saves people. Pilot doubts him": Rooftop storm, Hurricane drive). Ch5 The Night Show ("Pilot gives him the sky": the Light show, roof neighbors, credits flyover, tomorrow's ask). The Episodes chain follows this order.
+- **Lines:** Ch1 He "Every day runs on rails. The sky is the one thing that doesn't." / Pilot "Schedule says desk. The sky is not on it." Ch2 He "Birdie's tomatoes. Dex's parcels. The whole street is asking." / Pilot "Seven requests logged. Answer them in order." Ch3 He "Every call costs something. The district keeps count." / Pilot "So do I. You are close to the limit." Ch4 He "Somebody is stuck out there. I can reach them." / Pilot "You can also hurt them. Think before you call." Ch5 Pilot "Tonight the whole sky is yours. No schedule." / He "Then let's give them a show." Show start (farewell): Pilot "Tonight you don't need me." Roofs: Birdie "From up here the lawn drinks with us." / Dex "Best seat on the avenue. Keep the beat." / Ines "The sky is keeping time. So are we."
+
+## The painted sky (js/sky.js, config `sky`)
+
+The sky is a painted, moving thing: dawn peach at 6:30, a bright cumulus noon, a golden-hour sun low in the west, an amber-and-navy dusk, and a starry night with the moon to the right of the default view. Weather is the drama: a Storm or Lightning thickens and darkens the cloud deck and brings in the storm shelf cloud; every strike lights the deck from inside; Sun break tears a ragged gap with a sun in it and god rays through it (high quality), and the glass and wet streets reflect whichever sky is up. No new characters or areas; Small Weather's line "Sky's mine for a minute." is the beat this serves.
+
+## UI art kit (js/ui-art.js, css/ui-kit.css, textures/ui/)
+
+One storm-navy HUD language across every player-facing screen (Persona-bold frames, not a second skin).
+- **Areas:** ability arc, Episodes / Neighbors / Settings menus, toasts, voice captions, episode HUD goals, score card ranks.
+- **Landmarks:** five painted verb icons (Lightning, Rain, Wind, Fog, Sun) with lit/unlit states; 9-slice panel frame; S/A/B/C rank stamps; busts of Birdie, Dex, Ines; Pilot wrist-ring glyph.
+- **Who lives here:** the same five verbs and three neighbours; Pilot's glyph tags his caption.
+- **Characters:** unchanged wants/arcs; the kit only paints how they appear in menus.
+- **What happens:** ready verbs glow; a cast runs a radial cooldown wipe; menus slide 150 ms; goal rows show an icon plus words with no bracketed key letters. Self-hosted Fraunces (display) + Outfit (text) woff2 ≤80 KB total.
+- **Story beats:** none of their own — the kit makes every menu read as the same game. Playtest: `ui-art-kit`. Gen recipes `ui-verbs-lit` / `ui-verbs-unlit` / `ui-panel-frame` / `ui-ranks` / `ui-busts` / `ui-pilot` in `hawkes.assets.json`; SVG stand-ins ship until Gen credits refill.
+
+## Sun-break aftermath (js/aftermath.js, config `aftermath`)
+
+- **Areas:** the whole district under an open sky — roofs, asphalt, car bonnets, gutters, awnings, the apt/shop/annex roofs where pigeons land.
+- **Landmarks:** the rainbow arc opposite the sun at 42° (shader ribbon; always on, including phone), steam wisps off wet surfaces, dripping gutters after the rain stops.
+- **Who lives here:** the crowd (umbrellas fold, a few shop doors open), bandstand pigeons that relocate to a roof, Dex Moreno when he is near (his existing dry-parcels thanks).
+- **Characters:** Dex — Want: dry parcels; Moment: Sun break after rain, he says "Dry as a bone. I owe you a delivery." if he is within ~28 m (no new line).
+- **What happens:** Rain or a storm marks the game clock; a Sun break within 2 game minutes fires the aftermath — steam ~20 s, rainbow ~28 s (fades with cloud cover), drips ~30 s (js/rain.js `afterDrip`), puddle sparkles, birds home, umbrellas close, shop owners step out; the render grade already warms from `weather.now().sun`. Phone: half steam and drip counts; rainbow stays. Playtest: `sun-aftermath`.
+- **Story beats:** clearing a storm feels like a reward — told by steam, the rainbow, dripping gutters, umbrellas folding and Dex's voice, not a text card.

@@ -99,7 +99,7 @@ ok(world.stage.bedroomLight && world.stage.bedroomLight.intensity > 0.35, `bedro
 world.update(sandbox.DayEngine.frame(day, 12 * 60), 0.016, { snap: true });
 world.look.quality('low');
 const low = world.look.info();
-ok(low.quality === 'low' && low.bloom === false && low.shadows === false && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
+ok(low.quality === 'low' && low.bloom === true && low.shadows === true && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
 world.look.quality('high');
 ok(world.look.info().bloom === true, 'high quality left bloom off');
 
@@ -349,7 +349,15 @@ if (modelPath) {
     const bytes = fs.readFileSync(file);
     ok(bytes.length < 3 * 1024 * 1024, `${modelPath} is ${(bytes.length / 1048576).toFixed(2)} MB (must be < 3 MB)`);
     const { loadSmallWeather, SKIN_CLIPS } = await import(new URL('js/small-weather.js', root).href);
-    const skin = await loadSmallWeather(world, null, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length));
+    const extras = {};
+    for (const name of ['lookup', 'windbolt', 'windrain', 'triumph', 'shelter', 'window']) {
+      const ep = new URL('models/clips/' + name + '.glb', root);
+      if (fs.existsSync(ep)) {
+        const b = fs.readFileSync(ep);
+        extras[name] = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+      }
+    }
+    const skin = await loadSmallWeather(world, null, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length), { extras });
     ok(skin.meshes.every((m) => !world.scene.meshes.includes(m)), 'his model is in the scene before it is put on (it would show at the origin while loading)');
     const missing = SKIN_CLIPS.filter((c) => !skin.clips.includes(c));
     ok(!missing.length, `${modelPath} has no clip for ${missing.join(', ')}`);

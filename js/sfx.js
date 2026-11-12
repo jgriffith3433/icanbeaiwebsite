@@ -4,12 +4,15 @@
 
    - Moving him: footsteps timed to his stride (wetter in rain), a jump whoosh, a landing thump that grows
      with the fall, a puff of dust where he lands, a falling sweep when the player lets go.
-   - Powers: an instant crack where the bolt lands (the thunder follows from powers.js), a travelling
-     tornado roar panned to where it is, a soft blip when a call is refused.
+   - Powers: layered Gen clips in audio/sfx/power (crack + body + rumble, whoosh, gale, sun shimmer,
+     tornado roar/debris/pressure); synth only as the fallback. Thunder delay is distance / 343 m/s
+     (js/powers.js). Instant crack at the flash; body + rumble after the delay, low-passed by distance,
+     sub-bass on close strikes; music/ambience sidechain-ducked 6 dB for 1.5 s.
    - Episodes and the finale: goal, fail, hurt, piece, kick, unlock, score (major when cleared, minor when
      not), show cues graded perfect / good / off, the ending.
    - Story: every line in the episode dialogue and every neighbor bubble gets a short babble, a voice of
      its own per speaker (pitch from the name), so the story is heard as well as read.
+   - Recorded foley first (audio/foley, see the bank below), the synthesis only as the fallback.
    - The city: birds by day in fair weather, cars passing (more in rush hour, from the crowd), a far siren
      now and then at night.
 
@@ -33,8 +36,29 @@
     const btn = document.getElementById && document.getElementById("sound");
     return !!(btn && btn.getAttribute("aria-pressed") === "true");
   }
+  function mixApi() {
+    return (day && day.mix) || window.mix || (day && day.audio) || null;
+  }
   function ctx() {
     if (!soundOn()) return null;
+    if (!audio) {
+      try {
+        const Mix = mixApi();
+        if (Mix && typeof Mix.ctx === "function") {
+          try { if (typeof Mix.unlock === "function") Mix.unlock(); } catch (e) { /* */ }
+          const c = Mix.ctx();
+          if (c) {
+            const bus = Mix.bus && Mix.bus("sfx");
+            const master = (bus && bus.bus) || (Mix.master && Mix.master()) || c.createGain();
+            const len = c.sampleRate * 2;
+            const white = c.createBuffer(1, len, c.sampleRate);
+            const d = white.getChannelData(0);
+            for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+            audio = { c, master, lim: true, white, mix: true, ui: Mix.bus && Mix.bus("ui") };
+          }
+        }
+      } catch (err) { /* fall through */ }
+    }
     if (!audio) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return null;
@@ -42,14 +66,20 @@
         const c = new Ctx();
         const master = c.createGain();
         master.gain.value = 0.7;
-        const comp = c.createDynamicsCompressor();
-        master.connect(comp);
-        comp.connect(c.destination);
+        // Master limiter: phone speakers must not clip during a storm (true-peak headroom).
+        const lim = c.createDynamicsCompressor();
+        if (lim.threshold) lim.threshold.value = -6;
+        if (lim.knee) lim.knee.value = 12;
+        if (lim.ratio) lim.ratio.value = 12;
+        if (lim.attack) lim.attack.value = 0.003;
+        if (lim.release) lim.release.value = 0.18;
+        master.connect(lim);
+        lim.connect(c.destination);
         const len = c.sampleRate * 2;
         const white = c.createBuffer(1, len, c.sampleRate);
         const d = white.getChannelData(0);
         for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-        audio = { c, master, white };
+        audio = { c, master, lim, white, mix: false };
       } catch (err) {
         audio = null;
         return null;
@@ -62,7 +92,9 @@
     return audio.c.state === "closed" ? null : audio;
   }
 
-  /* Where a point in the world sits for the ear: pan by the camera's right vector, quieter with distance. */
+  /* Where a point in the world sits for the ear: pan by the camera's right vector, quieter with distance.
+     When js/mix.js is up, placeWorld() builds a real PannerNode (HRTF / occlusion); this helper stays for
+     the synth oneshots that only need a pan value. */
   function place(x, z) {
     const cam = scene.activeCamera;
     if (!cam || x == null || z == null) return { pan: 0, gain: 1 };
@@ -77,15 +109,42 @@
     } catch (err) { /* no camera matrix yet */ }
     return { pan: Math.max(-0.9, Math.min(0.9, pan)), gain: 1 / (1 + Math.max(0, dist - 8) / 18) };
   }
-  function out(a, pan) {
-    if (!pan || !a.c.createStereoPanner) return a.master;
+  function placeWorld(x, y, z, opts) {
+    const Mix = mixApi();
+    if (Mix && typeof Mix.place === "function") {
+      try { return Mix.place(x, y != null ? y : 1.2, z, opts || { bus: "sfx" }); } catch (e) { /* */ }
+    }
+    return null;
+  }
+  function out(a, pan, busName, world) {
+    // Prefer the mix spatial graph when a world position was attached.
+    const w = world || (a && a.__world);
+    if (w && w.input) return w.input;
+    const dest = (busName === "ui" && a.ui && a.ui.bus) ? a.ui.bus
+      : (busName === "sfx" && a.mix && a.master) ? a.master
+      : a.master;
+    if (pan == null || pan === false || !a.c.createStereoPanner) return dest;
     const p = a.c.createStereoPanner();
     p.pan.value = pan;
-    p.connect(a.master);
+    p.connect(dest);
     return p;
   }
+  /** Connect a synth oneshot into an HRTF/occlusion place when mix is up; else stereo pan. */
+  function outAt(a, x, z, busName) {
+    if (x != null && z != null) {
+      const w = placeWorld(x, 1.2, z, { bus: busName || "sfx" });
+      if (w && w.input) {
+        // Auto-stop the spatial slot after a couple of seconds (oneshots are short).
+        setTimeout(() => { try { w.stop(); } catch (e) { /* */ } }, 2800);
+        return w.input;
+      }
+      const at = place(x, z);
+      return out(a, at.pan, busName);
+    }
+    return out(a, 0, busName);
+  }
 
-  /** Filtered noise: a hit, a thump, a whoosh (sweep with `to`). */
+  /** Filtered noise: a hit, a thump, a whoosh (sweep with `to`). Pass x/z for HRTF+occlusion via mix. */
   function noise(o) {
     const a = ctx();
     if (!a) return;
@@ -105,11 +164,12 @@
     g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
     src.connect(f);
     f.connect(g);
-    g.connect(out(a, o.pan));
+    const bus = o.bus || "sfx";
+    g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
     src.start(t, Math.random() * 1.5);
     src.stop(t + o.dur + 0.05);
   }
-  /** One oscillator note, optionally gliding. */
+  /** One oscillator note, optionally gliding. Pass x/z for HRTF+occlusion via mix. */
   function tone(o) {
     const a = ctx();
     if (!a) return;
@@ -132,11 +192,358 @@
       node = f;
     }
     node.connect(g);
-    g.connect(out(a, o.pan));
+    const bus = o.bus || "sfx";
+    g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
     osc.start(t);
     osc.stop(t + o.dur + 0.05);
   }
   const notes = (freqs, gap, vol, wave, dur) => freqs.forEach((f, i) => tone({ freq: f, dur: dur || 0.5, vol, wave: wave || "triangle", delay: i * gap }));
+
+
+  /* ---------------- the foley bank (audio/foley/*.mp3, made with Hawkes Gen audio.sfx) ----------------
+     Recorded clips first, the synthesis below only as the fallback for a clip that isn't in the build. audio/foley/index.json
+     (vite.config.js writes it from the files on disk) lists what exists, so nothing 404s. A clip is <kind>-<n>.mp3; a kind
+     belongs to a lazy group: `ui` and `move` load when Sound comes on, `crowd` and `city` on the first time one is wanted.
+     Every play picks a variant that isn't the one before, with 5-10% pitch and 5-10% volume jitter. */
+  const GROUPS = [
+    [/^(jump|land-)/, "move"],
+    [/^(crowd-|umbrella-)/, "crowd"],
+    [/^(car-|siren|pigeon|bird)/, "city"],
+    [/^ui-/, "ui"],
+  ];
+  const groupOf = (kind) => { for (const [re, g] of GROUPS) if (re.test(kind)) return g; return "misc"; };
+  const bank = { index: null, indexing: false, files: {}, buffers: {}, groups: {}, last: {}, plays: [], sources: {}, bytes: 0 };
+  const lastRate = {};
+  function loadGroup(g) {
+    if (bank.groups[g] || !bank.index) return;
+    bank.groups[g] = "loading";
+    const a = audio;
+    const todo = Object.keys(bank.files).filter((k) => groupOf(k) === g);
+    let left = todo.reduce((n, k) => n + bank.files[k].length, 0);
+    if (!left) { bank.groups[g] = "empty"; return; }
+    todo.forEach((kind) => bank.files[kind].forEach((url) => {
+      fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status)))).then((buf) => {
+        bank.bytes += buf.byteLength;
+        return new Promise((ok, no) => a.c.decodeAudioData(buf, ok, no));
+      }).then((b) => { (bank.buffers[kind] = bank.buffers[kind] || []).push({ url, b }); }).catch(() => {}).then(() => { if (--left === 0) bank.groups[g] = "ready"; });
+    }));
+  }
+  function wantGroup(g) {
+    if (!audio) return;
+    if (!bank.index) {
+      if (!bank.indexing && typeof fetch === "function") {
+        bank.indexing = true;
+        fetch("audio/foley/index.json").then((r) => (r.ok ? r.json() : { files: [] })).catch(() => ({ files: [] })).then((j) => {
+          (j.files || []).forEach((f) => {
+            const m = /([^/]+?)-(\d+)\.mp3$/.exec(f);
+            if (m) (bank.files[m[1]] = bank.files[m[1]] || []).push(f);
+          });
+          bank.index = true;
+          Object.keys(bank.pending || {}).forEach(loadGroup);
+        });
+      }
+      (bank.pending = bank.pending || {})[g] = 1;
+      return;
+    }
+    loadGroup(g);
+  }
+  /** Play a recorded clip for `kind`; false when there isn't one loaded (the caller synthesizes instead). */
+  function sample(kind, o) {
+    o = o || {};
+    const a = ctx();
+    if (!a) return true; // Sound off: silence, nothing to fall back to
+    wantGroup(groupOf(kind));
+    const list = bank.buffers[kind];
+    if (!list || !list.length) return false;
+    let pick = list[Math.floor(Math.random() * list.length)];
+    if (list.length > 1 && pick.url === bank.last[kind]) pick = list[(list.indexOf(pick) + 1) % list.length];
+    bank.last[kind] = pick.url;
+    let rate = 1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1); // 5-10% either way
+    if (Math.abs(rate - (lastRate[pick.url] || 0)) < 0.01) rate += 0.012;
+    lastRate[pick.url] = rate;
+    const vol = (o.gain == null ? 1 : o.gain) * (1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1));
+    const src = a.c.createBufferSource();
+    src.buffer = pick.b;
+    src.playbackRate.value = rate;
+    const g = a.c.createGain();
+    g.gain.value = Math.max(0.0002, vol);
+    src.connect(g);
+    const bus = o.bus || (String(kind).startsWith("ui-") ? "ui" : "sfx");
+    g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
+    src.start(a.c.currentTime + (o.delay || 0));
+    const tag = groupOf(kind) === "move" ? (kind === "jump" ? "jump" : "landing") : kind.split("-")[0] === "crowd" || kind === "umbrella-pop" ? "crowd" : kind.startsWith("car") || kind === "siren-far" ? "car" : kind === "bird" || kind === "pigeon" ? "bird" : "ui";
+    bank.sources[tag] = "file";
+    bank.plays.push({ kind, file: pick.url, rate: +rate.toFixed(3), t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
+    if (bank.plays.length > 60) bank.plays.shift();
+    note("file-" + kind);
+    return true;
+  }
+  /** What a sound kind is for info(): a recorded clip played, or the synthesis stood in. */
+  const synthTag = (tag) => { if (bank.sources[tag] !== "file") bank.sources[tag] = "synth"; };
+  const fx = (kind, tag, o, synth) => { if (sample(kind, o)) return; synthTag(tag); synth(); };
+
+  /* ---------------- power bank (audio/sfx/power/*.mp3) — layered cast sounds ----------------
+     Eager: load the first crack/whoosh set when Sound is on so the first cast answers within 100 ms.
+     Lazy: remaining variants and loops when first wanted. Index rewritten at build from disk. */
+  const power = {
+    index: null,
+    indexing: false,
+    files: {},
+    buffers: {},
+    last: {},
+    plays: [],
+    sources: {},
+    eager: false,
+    bytes: 0,
+  };
+  const POWER_EAGER = ["crack", "whoosh"];
+  function powerIndex() {
+    if (power.index || power.indexing || typeof fetch !== "function") return;
+    power.indexing = true;
+    fetch("audio/sfx/power/index.json")
+      .then((r) => (r.ok ? r.json() : { files: [] }))
+      .catch(() => ({ files: [] }))
+      .then((j) => {
+        (j.files || []).forEach((f) => {
+          const m = /([^/]+?)-(\d+)\.mp3$/.exec(f);
+          if (m) (power.files[m[1]] = power.files[m[1]] || []).push(f);
+        });
+        power.index = true;
+        if (soundOn() && ctx()) loadPowerKinds(POWER_EAGER);
+      });
+  }
+  function loadPowerKinds(kinds) {
+    const a = audio;
+    if (!a || !power.index) return;
+    kinds.forEach((kind) => {
+      const urls = power.files[kind];
+      if (!urls || !urls.length || power.buffers[kind]) return;
+      power.buffers[kind] = [];
+      urls.forEach((url) => {
+        fetch(url)
+          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+          .then((buf) => {
+            power.bytes += buf.byteLength;
+            return new Promise((ok, no) => a.c.decodeAudioData(buf, ok, no));
+          })
+          .then((b) => {
+            power.buffers[kind].push({ url, b });
+            power.sources[kind] = "file";
+          })
+          .catch(() => {});
+      });
+    });
+  }
+  function wantPower(kind) {
+    powerIndex();
+    if (!power.index) return;
+    // First cast: eager set already loading; also pull this kind.
+    loadPowerKinds(POWER_EAGER.concat([kind]));
+  }
+  function pickPower(kind) {
+    const list = power.buffers[kind];
+    if (!list || !list.length) return null;
+    let pick = list[Math.floor(Math.random() * list.length)];
+    if (list.length > 1 && pick.url === power.last[kind]) pick = list[(list.indexOf(pick) + 1) % list.length];
+    power.last[kind] = pick.url;
+    return pick;
+  }
+  /** Play one power clip through a filter/gain chain. Returns false when no buffer yet. */
+  function playPowerBuf(pick, o) {
+    const a = ctx();
+    if (!a || !pick) return false;
+    const t = a.c.currentTime + (o.delay || 0);
+    const src = a.c.createBufferSource();
+    src.buffer = pick.b;
+    src.playbackRate.value = o.rate || 1 + (Math.random() * 0.06 - 0.03);
+    let node = src;
+    if (o.lp != null && a.c.createBiquadFilter) {
+      const f = a.c.createBiquadFilter();
+      f.type = "lowpass";
+      f.frequency.value = Math.max(120, o.lp);
+      f.Q.value = 0.7;
+      src.connect(f);
+      node = f;
+    }
+    const g = a.c.createGain();
+    const vol = Math.max(0.0002, o.gain == null ? 1 : o.gain);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + (o.attack || 0.008));
+    if (o.dur) g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+    node.connect(g);
+    g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, "sfx") : out(a, o.pan, "sfx"));
+    src.start(t);
+    if (o.dur) try { src.stop(t + o.dur + 0.05); } catch (err) { /* ok */ }
+    power.plays.push({ kind: o.kind || "power", file: pick.url, t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
+    if (power.plays.length > 40) power.plays.shift();
+    note("power-" + (o.kind || "clip"));
+    return true;
+  }
+  function powerSample(kind, o) {
+    o = o || {};
+    wantPower(kind);
+    const pick = pickPower(kind);
+    if (!pick) return false;
+    return playPowerBuf(pick, Object.assign({ kind }, o));
+  }
+  /** Distance → low-pass cutoff (Hz): close stays bright, far rolls off. */
+  function distLp(dist) {
+    const d = Math.max(0, dist || 0);
+    return Math.max(280, 5200 - d * 12);
+  }
+  /** Instant crack at the flash (and a chest sub hit when the strike is close). */
+  function crackLayered(pan, gain, dist, at) {
+    wantPower("crack");
+    const g = gain == null ? 1 : gain;
+    const d = dist == null ? 12 : dist;
+    const xz = at && at.x != null ? { x: at.x, z: at.z } : null;
+    const filed = powerSample("crack", { pan, gain: 0.95 * g, lp: distLp(d * 0.35), x: xz && xz.x, z: xz && xz.z });
+    if (!filed) {
+      note("bolt-crack");
+      synthTag("bolt");
+      noise({ type: "highpass", freq: 2600, dur: 0.16, vol: 0.5 * g, attack: 0.002, pan, ...(xz || {}) });
+      noise({ type: "bandpass", freq: 900, q: 0.7, dur: 0.35, vol: 0.25 * g, attack: 0.004, pan, delay: 0.01, ...(xz || {}) });
+    } else note("bolt-crack");
+    if (d < 30) {
+      // Sub-bass hit in the chest on close strikes.
+      tone({ freq: 48, to: 28, dur: 0.55, vol: 0.32 * g, wave: "sine", attack: 0.004, pan, ...(xz || {}) });
+      tone({ freq: 70, to: 40, dur: 0.35, vol: 0.14 * g, wave: "triangle", attack: 0.004, pan, ...(xz || {}) });
+      note("bolt-sub");
+    }
+    return true;
+  }
+  /**
+   * Delayed body + rumble after the flash (powers.js schedules by thunderDelay).
+   * Low-passed by distance; logs lastThunder for the playtest.
+   */
+  function thunderLayered(meta) {
+    const m = meta || {};
+    const dist = m.dist != null ? m.dist : 40;
+    const pan = m.pan != null ? m.pan : 0;
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const expectedDelay = m.delay != null ? m.delay : (dist <= 30 ? 0 : Math.min(2.8, dist / 343));
+    const actualDelay = m.flashAt != null ? Math.max(0, (now - m.flashAt) / 1000) : expectedDelay;
+    const near = dist <= 30;
+    liveThunder = {
+      kind: near ? "near" : "far",
+      dist: Math.round(dist * 10) / 10,
+      expectedDelay: Math.round(expectedDelay * 1000) / 1000,
+      actualDelay: Math.round(actualDelay * 1000) / 1000,
+      pan: Math.round(pan * 100) / 100,
+      crack: power.last.crack || null,
+      body: null,
+      rumble: null,
+      at: Math.round(now),
+    };
+    if (!soundOn()) return false;
+    wantPower("body");
+    wantPower("rumble");
+    const lp = distLp(dist);
+    const bodyGain = near ? 0.95 : Math.max(0.35, 0.95 - dist / 220);
+    const rumbleGain = near ? 0.7 : Math.max(0.4, 0.85 - dist / 280);
+    let ok = false;
+    const body = pickPower("body");
+    if (body) {
+      ok = playPowerBuf(body, { kind: "body", pan, gain: bodyGain, lp, attack: 0.02 }) || ok;
+      liveThunder.body = body.url;
+    }
+    const rumble = pickPower("rumble");
+    if (rumble) {
+      ok = playPowerBuf(rumble, { kind: "rumble", pan, gain: rumbleGain, lp: Math.min(lp, 900), attack: 0.05, delay: near ? 0.04 : 0.08 }) || ok;
+      liveThunder.rumble = rumble.url;
+    }
+    if (!ok) {
+      // Fall back: let score.crack play the near/far beds; caller also keeps a synth under.
+      note("thunder-synth");
+      return false;
+    }
+    note("thunder-layered");
+    if (day.score && day.score.crack) {
+      // Keep the score's lastThunder log in sync for weather-audio / checks.
+      day.score.crack(near ? "near" : "far", { dist, delay: expectedDelay, flashAt: m.flashAt, pan, silent: true });
+    }
+    return true;
+  }
+  let liveThunder = null;
+  let galeLoop = null;
+
+  function castPower(id) {
+    const a = ctx();
+    if (!a) return false;
+    if (id === "gust") {
+      if (powerSample("whoosh", { gain: 0.85 })) { note("gust-whoosh"); return true; }
+      note("gust-whoosh");
+      noise({ type: "bandpass", freq: 400, to: 1800, q: 1.1, dur: 0.55, vol: 0.14, attack: 0.02 });
+      return true;
+    }
+    if (id === "gale") {
+      const whoosh = powerSample("whoosh", { gain: 0.7 });
+      wantPower("gale-loop");
+      const pick = pickPower("gale-loop");
+      if (pick && !galeLoop) {
+        const src = a.c.createBufferSource();
+        src.buffer = pick.b;
+        src.loop = true;
+        const g = a.c.createGain();
+        g.gain.value = 0.0001;
+        src.connect(g);
+        g.connect(a.master);
+        const t = a.c.currentTime;
+        g.gain.exponentialRampToValueAtTime(0.22, t + 0.35);
+        g.gain.setValueAtTime(0.22, t + 2.2);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
+        src.start(t);
+        try { src.stop(t + 3.5); } catch (err) { /* ok */ }
+        galeLoop = { until: t + 3.5 };
+        setTimeout(() => { galeLoop = null; }, 3600);
+        note("gale-loop");
+        return true;
+      }
+      if (whoosh) return true;
+      note("gale-whoosh");
+      return false;
+    }
+    if (id === "fog") {
+      note("fog-veil");
+      if (day.score && day.score.fogColor) day.score.fogColor(1);
+      pad2Fog();
+      return true;
+    }
+    if (id === "sunbreak") {
+      const shimmer = powerSample("sun-shimmer", { gain: 0.75 });
+      note("sun-shimmer");
+      if (!shimmer) {
+        tone({ freq: 523.25, dur: 1.2, vol: 0.08, wave: "triangle", attack: 0.15 });
+        tone({ freq: 783.99, dur: 1.4, vol: 0.06, wave: "triangle", attack: 0.2, delay: 0.1 });
+      }
+      // Birds returning: nudge the score's bird bed up briefly.
+      if (day.score && day.score.birdLift) day.score.birdLift(4);
+      return true;
+    }
+    if (id === "rain") {
+      note("rain-cast");
+      return false; // keep the powers.js hiss (or a future rain-cast clip)
+    }
+    return false;
+  }
+  function pad2Fog() {
+    const a = ctx();
+    if (!a) return;
+    const t = a.c.currentTime;
+    [110, 165, 220].forEach((hz, i) => {
+      const o = a.c.createOscillator();
+      const g = a.c.createGain();
+      o.type = "sine";
+      o.frequency.value = hz * (1 + i * 0.002);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.05, t + 1.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
+      o.connect(g);
+      g.connect(a.master);
+      o.start(t);
+      o.stop(t + 3.45);
+    });
+  }
 
   /* ---------------- surface detection (rooftop gravel, metal, tar, puddle + street) ---------------- */
   const SURFACES = ["gravel", "metal", "tar", "puddle", "pavement", "grass", "wood"];
@@ -270,11 +677,16 @@
     },
     jump(air) {
       note("jump");
+      if (sample("jump", { gain: air ? 0.8 : 1 })) return;
+      synthTag("jump");
       noise({ type: "bandpass", freq: air ? 600 : 400, to: air ? 2400 : 1600, q: 1.2, dur: 0.28, vol: 0.09, attack: 0.03 });
     },
-    land(h) {
+    land(h, surf) {
       note("land");
       const k = Math.max(0.2, Math.min(1, h / 6));
+      const sk = surf === "metal" ? "grating" : surf === "gravel" || surf === "tar" ? surf : "pavement";
+      if (sample(`land-${sk}-${h > 2.2 ? "hard" : "soft"}`, { gain: 0.6 + 0.4 * k })) return;
+      synthTag("landing");
       noise({ type: "lowpass", freq: 260 + 300 * k, dur: 0.18 + 0.3 * k, vol: 0.1 + 0.25 * k });
       tone({ freq: 90, to: 45, dur: 0.15 + 0.25 * k, vol: 0.08 + 0.22 * k });
     },
@@ -287,26 +699,28 @@
       note("updraft");
       noise({ type: "bandpass", freq: 300, to: 1800, q: 1.3, dur: 0.9, vol: 0.08, attack: 0.2 });
     },
-    crack(pan, gain) {
-      note("bolt-crack");
-      noise({ type: "highpass", freq: 2600, dur: 0.16, vol: 0.5 * gain, attack: 0.002, pan });
-      noise({ type: "bandpass", freq: 900, q: 0.7, dur: 0.35, vol: 0.25 * gain, attack: 0.004, pan, delay: 0.01 });
+    crack(pan, gain, dist, at) {
+      crackLayered(pan, gain, dist, at);
     },
     denied() {
       note("denied");
       tone({ freq: 220, to: 180, dur: 0.16, vol: 0.06, wave: "square", band: 600 });
     },
-    chimeUp() { note("goal"); notes([660, 990], 0.1, 0.09); },
+    chimeUp() { note("goal"); fx("ui-goal", "ui", {}, () => notes([660, 990], 0.1, 0.09)); },
     /* neighbour body gestures (peoplekit ask / thanks / surprise) */
-    wave(pan, gain) {
+    wave(pan, gain, at) {
       const g = gain == null ? 1 : gain;
+      const xz = at && at.x != null ? { x: at.x, z: at.z } : {};
       note("gesture-ask");
-      noise({ type: "bandpass", freq: 900, to: 1600, q: 1.2, dur: 0.22, vol: 0.05 * g, attack: 0.01, pan });
-      tone({ freq: 520, to: 780, dur: 0.18, vol: 0.04 * g, wave: "triangle", pan });
+      noise({ type: "bandpass", freq: 900, to: 1600, q: 1.2, dur: 0.22, vol: 0.05 * g, attack: 0.01, pan, ...xz });
+      tone({ freq: 520, to: 780, dur: 0.18, vol: 0.04 * g, wave: "triangle", pan, ...xz });
     },
-    clap(pan, gain) {
+    clap(pan, gain, at) {
       const g = gain == null ? 1 : gain;
+      const xz = at && at.x != null ? { x: at.x, z: at.z } : {};
       note("gesture-thanks");
+      if (sample("crowd-laugh", { gain: 0.7 * g, pan, ...xz })) return;
+      synthTag("crowd");
       noise({ type: "bandpass", freq: 1800, to: 900, q: 0.8, dur: 0.08, vol: 0.12 * g, attack: 0.001, pan });
       tone({ freq: 240, to: 120, dur: 0.12, vol: 0.06 * g, pan });
       setTimeout(() => {
@@ -316,26 +730,61 @@
     gasp(pan, gain) {
       const g = gain == null ? 1 : gain;
       note("gesture-surprise");
+      if (sample("crowd-gasp", { gain: 0.8 * g, pan })) return;
+      synthTag("crowd");
       tone({ freq: 380, to: 520, dur: 0.28, vol: 0.05 * g, wave: "sine", attack: 0.04, pan });
       noise({ type: "highpass", freq: 600, dur: 0.2, vol: 0.04 * g, attack: 0.02, pan });
+    },
+    /* Crowd scream when a tornado tears through (day:crowd scatter). */
+    scream(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("scream");
+      if (sample("crowd-scream", { gain: g, pan })) return;
+      synthTag("crowd");
+      for (let i = 0; i < 3; i++) {
+        const f = 420 + i * 90 + Math.random() * 80;
+        tone({ freq: f, to: f * 1.35, dur: 0.35, vol: 0.045 * g, wave: "sawtooth", band: 1400, delay: i * 0.07, pan: (pan || 0) + (i - 1) * 0.15 });
+      }
+      noise({ type: "bandpass", freq: 1200, to: 700, q: 0.8, dur: 0.5, vol: 0.08 * g, attack: 0.02, pan });
     },
     umbSnap(pan, gain) {
       const g = gain == null ? 1 : gain;
       note("umbrella");
+      if (sample("umbrella-pop", { gain: g, pan })) return;
+      synthTag("crowd");
       noise({ type: "lowpass", freq: 400, to: 1200, q: 1, dur: 0.25, vol: 0.08 * g, attack: 0.01, pan });
       tone({ freq: 180, to: 90, dur: 0.2, vol: 0.05 * g, pan });
     },
-    thud() { note("fail"); tone({ freq: 120, to: 55, dur: 0.45, vol: 0.18 }); tone({ freq: 127, to: 58, dur: 0.45, vol: 0.08, wave: "sawtooth", band: 300 }); },
-    blip() { note("blip"); tone({ freq: 1250, to: 1600, dur: 0.12, vol: 0.06, wave: "triangle" }); },
+    /* Soft steam hiss off wet roofs after a Sun-break clear (js/aftermath.js). */
+    steamHiss(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("steam");
+      synthTag("city");
+      noise({ type: "highpass", freq: 900, to: 1400, q: 0.6, dur: 0.7, vol: 0.045 * g, attack: 0.12, pan });
+      noise({ type: "bandpass", freq: 500, to: 300, q: 0.7, dur: 0.9, vol: 0.03 * g, attack: 0.2, pan });
+    },
+    /* One gutter drip tick during the after-drip window. */
+    dripTick(pan, gain) {
+      const g = gain == null ? 1 : gain;
+      note("drip");
+      synthTag("city");
+      tone({ freq: 880 + Math.random() * 400, to: 220, dur: 0.07, vol: 0.035 * g, wave: "sine", pan });
+      noise({ type: "bandpass", freq: 1600, to: 600, q: 1.2, dur: 0.05, vol: 0.025 * g, attack: 0.001, pan });
+    },
+    thud() { note("fail"); if (sample("ui-fail")) return; synthTag("ui"); tone({ freq: 120, to: 55, dur: 0.45, vol: 0.18 }); tone({ freq: 127, to: 58, dur: 0.45, vol: 0.08, wave: "sawtooth", band: 300 }); },
+    blip() { note("blip"); if (sample("ui-toast")) return; synthTag("ui"); tone({ freq: 1250, to: 1600, dur: 0.12, vol: 0.06, wave: "triangle" }); },
     rumble() { note("rumble"); noise({ type: "lowpass", freq: 120, dur: 0.9, vol: 0.25, attack: 0.05 }); },
-    sparkle() { note("unlock"); notes([784, 988, 1175, 1568], 0.07, 0.07, "triangle", 0.7); },
-    flourish(major) { note(major ? "fanfare" : "fanfare-minor"); notes(major ? [523, 659, 784, 1047] : [523, 622, 784, 932], 0.13, 0.1, "triangle", 1.1); },
+    sparkle() { note("unlock"); if (sample("ui-unlock")) return; synthTag("ui"); notes([784, 988, 1175, 1568], 0.07, 0.07, "triangle", 0.7); },
+    flourish(major) { note(major ? "fanfare" : "fanfare-minor"); if (sample("ui-rank")) return; synthTag("ui"); notes(major ? [523, 659, 784, 1047] : [523, 622, 784, 932], 0.13, 0.1, "triangle", 1.1); },
     tick(grade) {
       note("cue-" + grade);
       if (grade === "perfect") notes([1320, 1760], 0.05, 0.08, "triangle", 0.4);
       else if (grade === "good") tone({ freq: 880, dur: 0.25, vol: 0.07, wave: "triangle" });
       else tone({ freq: 180, dur: 0.12, vol: 0.06, wave: "square", band: 500 });
     },
+    cheer(pan, gain) { note("cheer"); fx("crowd-cheer", "crowd", { gain: gain == null ? 1 : gain, pan }, () => S.clap(pan, gain)); },
+    whoa(pan, gain) { note("whoa"); fx("crowd-whoa", "crowd", { gain: gain == null ? 1 : gain, pan }, () => S.gasp(pan, gain)); },
+    horn(pan, gain) { note("horn"); fx("car-horn", "car", { gain: 0.8 * (gain == null ? 1 : gain), pan }, () => tone({ freq: 410, dur: 0.3, vol: 0.02, wave: "square", band: 900, pan })); },
     pad(freqs) { note("pad"); freqs.forEach((f) => tone({ freq: f, dur: 3, vol: 0.05, attack: 0.8 })); },
     /* A voice of sorts: syllables through a formant band, the pitch from the speaker's name. */
     babble(who, text, pan, gain) {
@@ -352,12 +801,16 @@
     },
     bird(pan, gain) {
       note("bird");
+      if (sample(Math.random() < 0.3 ? "pigeon" : "bird", { gain: 0.8 * gain, pan })) return;
+      synthTag("bird");
       const f = 2600 + Math.random() * 1800;
       const n = 2 + Math.floor(Math.random() * 3);
       for (let i = 0; i < n; i++) tone({ freq: f, to: f * (1.2 + Math.random() * 0.4), dur: 0.08, vol: 0.025 * gain, delay: i * 0.11, pan });
     },
     car(pan, gain) {
       note("car");
+      if (sample("car-pass", { gain, pan: pan * 0.6 })) { if (Math.random() < 0.12) S.horn(pan, gain); return; }
+      synthTag("car");
       const a = ctx();
       if (!a) return;
       const t = a.c.currentTime;
@@ -386,7 +839,33 @@
     },
     siren() {
       note("siren");
+      if (sample("siren-far", { gain: 0.7, pan: -0.5 })) return;
+      synthTag("siren");
       for (let i = 0; i < 4; i++) tone({ freq: 700, to: 950, dur: 0.55, vol: 0.012, wave: "triangle", delay: i * 0.6, pan: -0.5 });
+    },
+    /** Soft 120 Hz neon tube buzz under the shop signs at night (called from props.js). */
+    neonBuzz(level) {
+      note("neon");
+      const a = ctx();
+      if (!a) return;
+      const t = a.c.currentTime;
+      const osc = a.c.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(120, t);
+      const f = a.c.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.setValueAtTime(240, t);
+      f.Q.setValueAtTime(4, t);
+      const g = a.c.createGain();
+      const vol = 0.012 * Math.max(0.2, Math.min(1, level == null ? 0.7 : level));
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      osc.connect(f);
+      f.connect(g);
+      g.connect(a.master);
+      osc.start(t);
+      osc.stop(t + 0.6);
     },
   };
 
@@ -465,7 +944,7 @@
     if (st.grounded && !him.grounded) {
       const h = him.peak - st.y;
       if (h > 0.35) {
-        S.land(h);
+        S.land(h, surfaceAt(st.x, st.y, st.z, wet()));
         puff(st.x, st.y, st.z, Math.min(1, h / 6));
       }
     }
@@ -485,9 +964,17 @@
     him.grounded = !!st.grounded;
   }
 
-  /* ---------------- the tornado's roar ---------------- */
+  /* ---------------- the tornado's roar (looping roar + debris + pressure; proximity ≥6 dB 60→10 m) ---------------- */
   let roar = null;
   let roarCheck = 0;
+  let roarLastDb = null;
+  /** Linear-in-dB proximity: 60 m → −12 dB, 10 m → 0 dB (12 dB rise, criterion needs ≥6). */
+  function tornadoProxGain(dist) {
+    const d = Math.max(2, Math.min(80, dist == null ? 40 : dist));
+    const t = Math.max(0, Math.min(1, (60 - d) / 50));
+    const db = -12 + t * 12;
+    return { gain: Math.pow(10, db / 20), db };
+  }
   function watchTornado(dt) {
     roarCheck -= dt;
     if (roarCheck > 0 && !roar) return;
@@ -498,35 +985,66 @@
     if (!a) return;
     const now = a.c.currentTime;
     if (t && !roar) {
-      const src = a.c.createBufferSource();
-      src.buffer = a.white;
-      src.loop = true;
-      const f = a.c.createBiquadFilter();
-      f.type = "lowpass";
-      f.frequency.value = 340;
-      f.Q.value = 2.5;
-      const g = a.c.createGain();
-      g.gain.value = 0.0001;
+      wantPower("tornado-roar");
+      wantPower("tornado-debris");
+      wantPower("tornado-pressure");
+      const layers = [];
+      const addLoop = (kind, baseVol, lpHz) => {
+        const pick = pickPower(kind);
+        const src = a.c.createBufferSource();
+        if (pick) {
+          src.buffer = pick.b;
+          power.sources[kind] = "file";
+        } else {
+          src.buffer = a.white;
+        }
+        src.loop = true;
+        const f = a.c.createBiquadFilter();
+        f.type = "lowpass";
+        f.frequency.value = lpHz;
+        f.Q.value = 1.8;
+        const g = a.c.createGain();
+        g.gain.value = 0.0001;
+        src.connect(f);
+        f.connect(g);
+        layers.push({ src, f, g, baseVol, kind, file: pick ? pick.url : "synth" });
+        return g;
+      };
+      const gRoar = addLoop("tornado-roar", 0.32, 420);
+      addLoop("tornado-debris", 0.16, 1800);
+      addLoop("tornado-pressure", 0.22, 180);
       const p = a.c.createStereoPanner ? a.c.createStereoPanner() : null;
-      src.connect(f);
-      f.connect(g);
-      if (p) { g.connect(p); p.connect(a.master); } else g.connect(a.master);
-      src.start();
-      roar = { src, f, g, p };
+      layers.forEach((L) => {
+        if (p) L.g.connect(p);
+        else L.g.connect(a.master);
+        L.src.start();
+      });
+      if (p) p.connect(a.master);
+      roar = { layers, p, gRoar };
       note("tornado");
     }
     if (!roar) return;
     if (t) {
+      const cam = scene.activeCamera;
+      const cp = cam && (cam.globalPosition || cam.position);
+      const dist = cp ? Math.hypot((t.x || 0) - cp.x, (t.z || 0) - cp.z) : 40;
+      const prox = tornadoProxGain(dist);
       const at = place(t.x, t.z);
       const life = Math.max(0, Math.min(1, t.life == null ? 1 : t.life));
-      roar.g.gain.setTargetAtTime(0.28 * at.gain * Math.min(1, life * 3), now, 0.2);
-      roar.f.frequency.setTargetAtTime(260 + 260 * Math.random(), now, 0.3);
+      const lifeK = Math.min(1, life * 3);
+      roar.layers.forEach((L) => {
+        L.g.gain.setTargetAtTime(Math.max(0.0001, L.baseVol * prox.gain * lifeK), now, 0.2);
+        if (L.kind === "tornado-roar") L.f.frequency.setTargetAtTime(300 + 200 * Math.random(), now, 0.3);
+      });
       if (roar.p) roar.p.pan.setTargetAtTime(at.pan, now, 0.2);
+      roarLastDb = { dist: Math.round(dist * 10) / 10, db: Math.round(prox.db * 10) / 10, gain: Math.round(prox.gain * 1000) / 1000 };
     } else {
       const r = roar;
       roar = null;
-      r.g.gain.setTargetAtTime(0.0001, now, 0.25);
-      try { r.src.stop(now + 1.5); } catch (err) { /* already stopped */ }
+      r.layers.forEach((L) => {
+        L.g.gain.setTargetAtTime(0.0001, now, 0.25);
+        try { L.src.stop(now + 1.5); } catch (err) { /* already stopped */ }
+      });
     }
   }
 
@@ -571,6 +1089,34 @@
     }
   });
 
+
+  /* UI: a press on any button plays the press clip at once (the ability arc, Episodes, cards); the Episodes menu opens and closes
+     with its own swish. Capture phase, so it sounds even where a handler stops the event. Sound also starts loading the
+     `ui` and `move` groups on the first press (or when Sound turns on), so the first press already has its clip. */
+  let lastPress = 0;
+  const pressable = (el) => el && el.closest && el.closest("button, [role=button], .ability, a[href], #sound, #time-btn");
+  if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
+    if (!pressable(e.target) || !soundOn()) return;
+    const t = performance.now();
+    if (t - lastPress < 60) return;
+    lastPress = t;
+    if (!sample("ui-press", { gain: 0.8, bus: "ui" })) { synthTag("ui"); tone({ freq: 1250, to: 1500, dur: 0.05, vol: 0.04, wave: "triangle", bus: "ui" }); }
+    note("ui-press");
+  }, true);
+  if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
+  try {
+    if (typeof MutationObserver === "undefined") throw new Error("no observer");
+    const menuEl = () => document.getElementById("ep-menu") || document.querySelector(".ep-menu");
+    let menuWas = document.documentElement.classList.contains("ep-menu-up");
+    new MutationObserver(() => {
+      const up = document.documentElement.classList.contains("ep-menu-up");
+      if (up === menuWas) return;
+      menuWas = up;
+      if (!sample(up ? "ui-open" : "ui-close", { gain: 0.8 })) synthTag("ui");
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    void menuEl;
+  } catch (err) { /* no DOM observer: the press sound still plays */ }
+
   /* ---------------- events ---------------- */
   window.addEventListener("day:control", (e) => {
     const d = e.detail || {};
@@ -585,9 +1131,22 @@
       let s = null;
       try { s = day.powers.now().strike; } catch (err) { s = null; }
       const at = s ? place(s.x, s.z) : { pan: 0, gain: 1 };
-      S.crack(at.pan, at.gain);
-    }
+      S.crack(at.pan, at.gain, s && s.dist, s ? { x: s.x, z: s.z } : null);
+      if (day.score && day.score.duckStrike) day.score.duckStrike(1.5);
+    } else if (d.action === "tornado") wantPower("tornado-roar");
   });
+  // Eager-load the first crack set as soon as Sound is on (first cast ≤100 ms).
+  if (typeof document !== "undefined" && document.getElementById) {
+    const soundBtn = document.getElementById("sound");
+    if (soundBtn && typeof soundBtn.addEventListener === "function") {
+      soundBtn.addEventListener("click", () => { if (soundOn()) { powerIndex(); if (ctx()) loadPowerKinds(POWER_EAGER); } });
+    }
+  }
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("pointerdown", () => {
+      if (soundOn()) { powerIndex(); if (ctx()) loadPowerKinds(POWER_EAGER); }
+    }, true);
+  }
   window.addEventListener("day:episode", (e) => {
     const d = e.detail || {};
     switch (d.action) {
@@ -610,6 +1169,44 @@
     if (d.action === "unlock") S.sparkle(); // a neighbor's ask opened a verb (js/street.js)
     else if (d.action === "thanks") S.blip();
   });
+  window.addEventListener("day:crowd", (e) => {
+    const d = e.detail || {};
+    if (d.action === "reaction") {
+      if (d.kind === "storm") S.whoa(0, 0.9);
+      else if (d.kind === "sun") S.cheer(0, 0.8);
+      else if (d.kind === "wind") S.clap(0, 0.8);
+      return;
+    }
+    if (d.action === "aftermath") {
+      S.cheer(0, 0.85);
+      S.bird(0, 1.1);
+      S.steamHiss(0, 1);
+      // a few umbrella folds as the street clears
+      setTimeout(() => S.umbSnap(-0.3, 0.7), 180);
+      setTimeout(() => S.umbSnap(0.25, 0.65), 420);
+      setTimeout(() => S.umbSnap(0.05, 0.55), 780);
+      return;
+    }
+    if (d.action === "umbrellas-closed" && (d.count | 0) > 0) {
+      if (performance.now() - lastUmb > 400) { lastUmb = performance.now(); S.umbSnap(0, 0.6); }
+      return;
+    }
+    if (d.action === "flinch") { S.gasp(0, 0.7); return; }
+    if (d.action === "scatter" || d.action === "scream") {
+      const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
+      S.scream(at.pan, at.gain);
+    }
+  });
+  window.addEventListener("day:aftermath", (e) => {
+    const d = e.detail || {};
+    if (d.action === "start") {
+      S.cheer(0, 0.7);
+      S.bird(-0.2, 1);
+      S.steamHiss(0.1, 0.9);
+      // gutter ticks for the first few seconds of after-drip
+      for (let i = 0; i < 6; i++) setTimeout(() => S.dripTick((i % 3) * 0.3 - 0.3, 0.7), 300 + i * 480);
+    } else if (d.action === "bird-land") S.bird(0.3, 0.7);
+  });
   window.addEventListener("day:story", (e) => {
     const d = e.detail || {};
     // a line with its own voice clip (js/dialogue.js) isn't babbled over
@@ -617,6 +1214,15 @@
     else if (d.action === "twist") S.rumble();
   });
   let lastUmb = -1e9;
+  let lastFlip = -1e9;
+  // a strong gust turns walkers' umbrellas inside out (js/windfog.js, js/crowd.js): the snap of the canopy
+  window.addEventListener("day:wind", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action !== "umbrella-flip") return;
+    if (performance.now() - lastFlip < 800) return;
+    lastFlip = performance.now();
+    S.umbSnap(0, 0.9);
+  });
   window.addEventListener("day:neighbor", (e) => {
     const d = e.detail || {};
     if (d.action === "beat") {
@@ -627,9 +1233,10 @@
     } else if (d.action === "gesture") {
       let at = { pan: 0, gain: 1 };
       if (d.x != null && d.z != null) at = place(d.x, d.z);
-      if (d.kind === "ask") S.wave(at.pan, at.gain);
-      else if (d.kind === "thanks") S.clap(at.pan, at.gain);
-      else if (d.kind === "surprise") S.gasp(at.pan, at.gain);
+      const where = d.x != null ? { x: d.x, z: d.z } : null;
+      if (d.kind === "ask") S.wave(at.pan, at.gain, where);
+      else if (d.kind === "thanks") S.clap(at.pan, at.gain, where);
+      else if (d.kind === "surprise") S.gasp(at.pan, at.gain, where);
     } else if (d.action === "umbrella") {
       if (performance.now() - lastUmb < 800) return;
       lastUmb = performance.now();
@@ -638,6 +1245,15 @@
       S.umbSnap(at.pan, at.gain);
     } else if (d.action === "reward") S.chimeUp();
     else if (d.action === "beat-missed") tone({ freq: 440, to: 330, dur: 0.35, vol: 0.05, wave: "triangle" });
+    else if (d.action === "arc-scene") {
+      // voice.speakAs already carries the line + caption; no second babble
+    } else if (d.action === "arc-beat") {
+      // mark appears / beat lands: soft chime (beat 3 is a brighter goal chime)
+      if ((d.beat | 0) >= 3) S.chimeUp();
+      else tone({ freq: 520, to: 780, dur: 0.22, vol: 0.06, wave: "triangle" });
+    } else if (d.action === "arc-cast") {
+      S.wave(0, 0.7);
+    }
   });
 
   day.sfx = {
@@ -649,7 +1265,31 @@
       lastSurface,
       recentSteps: recentSteps.slice(),
       tornado: !!roar,
+      tornadoDb: roarLastDb,
+      lastThunder: liveThunder,
+      sources: { jump: "synth", landing: "synth", crowd: "synth", car: "synth", bird: "synth", ui: "synth", bolt: power.sources.crack || "synth", ...bank.sources, ...power.sources },
+      bank: { indexed: bank.index ? Object.keys(bank.files).reduce((n, k) => n + bank.files[k].length, 0) : 0, groups: { ...bank.groups }, loaded: Object.keys(bank.buffers).length, bytes: bank.bytes },
+      power: {
+        indexed: power.index ? Object.keys(power.files).reduce((n, k) => n + power.files[k].length, 0) : 0,
+        kinds: { ...Object.keys(power.files).reduce((o, k) => ((o[k] = (power.buffers[k] || []).length), o), {}) },
+        files: { ...power.files },
+        plays: power.plays.slice(),
+        bytes: power.bytes,
+        limiter: !!(audio && audio.lim),
+      },
+      plays: bank.plays.slice(),
     }),
+    sample,
+    thunder: (meta) => {
+      const m = meta || {};
+      let pan = m.pan;
+      if (pan == null && m.x != null && m.z != null) pan = place(m.x, m.z).pan;
+      return thunderLayered(Object.assign({}, m, { pan: pan || 0 }));
+    },
+    cast: (id) => castPower(id),
+    tornadoGainAt: (dist) => tornadoProxGain(dist),
+    _bank: bank, // the check injects buffers here
+    _power: power,
     surfaceAt,
     step: (wetOrSurface, pan, surf) => S.step(wetOrSurface, pan, surf),
     play: (name, ...args) => (S[name] ? (S[name](...args), true) : false),

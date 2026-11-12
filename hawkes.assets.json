@@ -4,7 +4,7 @@
  "assets": [
   {
    "id": "small-weather",
-   "note": "Small Weather, the player character (canon m_9743a1dfe970, the same storm caller as Dose Of Destruction): a clean A-pose front sheet from DoD's art (AllTheCharacters/SmallWeather/anims/_reference.png, library a_02d916892b5b8a2d), a textured mesh (best of 3, picked against the reference from mesh.rig's turntables: the chain can't judge meshes), then Gen's auto-rig with 14 Mixamo-skeleton clips. The clips are scripts/small-weather-clips.mjs's output (art/small-weather/clips, from PH Origins' ch33 hero's Mixamo rig: Idle, Walk, Run, Jump, Sitting Idle, plus posed fall, float, cast, throw and the day's poses), uploaded to the entity icanbe/small-weather (slots clip-src/*). The glow on the seams and boots and the arm lightning are added in the page (js/small-weather.js). Entity: icanbe/small-weather.",
+   "note": "Small Weather, the player character (canon m_9743a1dfe970, the same storm caller as Dose Of Destruction): a clean A-pose front sheet from DoD's art (AllTheCharacters/SmallWeather/anims/_reference.png, library a_02d916892b5b8a2d), a textured mesh (best of 3, picked against the reference from mesh.rig's turntables: the chain can't judge meshes), then Gen's auto-rig with Mixamo-skeleton clips. Locomotion and day poses are scripts/small-weather-clips.mjs (art/small-weather/clips, from PH Origins' ch33 hero or models/small-weather.glb: Idle, Walk, Run, Jump, Sitting Idle, posed fall/float/cast/throw/type/phone/lie/side/recline). Hero beats lookup/windbolt/windrain/triumph/shelter/window: Gen motion.from-text on models/small-weather.glb (Mixamo, inPlace; shelter/window loop), motion.check, then lean Mixamo clip GLBs (hips at stand 0.99 / sit ~0.37) in models/clips/ and art/small-weather/clips/. Baked from Gen (c_37fa982a1195): lookup j_199b2e5b7b41 a_506c554576f266e5, windrain j_359eaffe46ab a_9b12408ddbbb7408, triumph j_5fa02fdac95f a_f3f0e5aa0d59ece2, shelter j_d4ba203cae33 a_e4fc4e472cd7a601, window j_80570561e85a a_f88461787828b1ac. windbolt stays Mixamo-posed (scripts/small-weather-clips.mjs): Gen takes j_d91dafa505d4 / j_47e5b2f45d04 failed motion.check foot skate (0.611 then 0.362); PM closed GPU pending (Talk 2026-11-12). Uploaded to the entity icanbe/small-weather (slots clip-src/*). Glow, arm lightning, foot IK and rim light are in js/small-weather.js. Entity: icanbe/small-weather.",
    "steps": [
     {
      "tool": "image.edit",
@@ -1115,38 +1115,6 @@
    }
   },
   {
-   "id": "city-asphalt",
-   "note": "Wet asphalt for the avenues (js/look.js). Dark navy, rain-wet, stylized like Dose Of Destruction. texture.maps makes the normal and roughness from the albedo.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark wet asphalt, nearly black with deep navy, rain-wet sheen, faint electric-blue reflections in the damp, fine grain and a few soft cracks, even all over, no focal point. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, not a photograph. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    {
-     "tool": "texture.maps",
-     "inputs": {
-      "image": "$prev"
-     },
-     "params": {
-      "strength": 1.6
-     },
-     "save": "maps"
-    }
-   ],
-   "files": {
-    "take": "textures/city/asphalt-take.png",
-    "maps.albedo": "textures/city/asphalt-albedo.png",
-    "maps.normal": "textures/city/asphalt-normal.png",
-    "maps.roughness": "textures/city/asphalt-roughness.png"
-   }
-  },
-  {
    "id": "city-concrete",
    "note": "Wet concrete for sidewalks, the driveway and the ramps.",
    "steps": [
@@ -1176,102 +1144,6 @@
     "maps.albedo": "textures/city/concrete-albedo.png",
     "maps.normal": "textures/city/concrete-normal.png",
     "maps.roughness": "textures/city/concrete-roughness.png"
-   }
-  },
-  {
-   "id": "city-brick",
-   "note": "Dark wet brick for the shorter blocks.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark brick wall in running bond, bricks a deep navy-brown, mortar a cooler grey, surfaces rain-wet. Even all over, no single featured brick. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    {
-     "tool": "texture.maps",
-     "inputs": {
-      "image": "$prev"
-     },
-     "params": {
-      "strength": 1.6
-     },
-     "save": "maps"
-    }
-   ],
-   "files": {
-    "take": "textures/city/brick-take.png",
-    "maps.albedo": "textures/city/brick-albedo.png",
-    "maps.normal": "textures/city/brick-normal.png",
-    "maps.roughness": "textures/city/brick-roughness.png"
-   }
-  },
-  {
-   "id": "city-glass",
-   "note": "Dark glass curtain wall for the tall blocks.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Dark glass curtain wall, navy-black reflective panes divided by thin darker mullions, a faint electric-blue reflection, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark, no people.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    {
-     "tool": "texture.maps",
-     "inputs": {
-      "image": "$prev"
-     },
-     "params": {
-      "strength": 1.2
-     },
-     "save": "maps"
-    }
-   ],
-   "files": {
-    "take": "textures/city/glass-take.png",
-    "maps.albedo": "textures/city/glass-albedo.png",
-    "maps.normal": "textures/city/glass-normal.png",
-    "maps.roughness": "textures/city/glass-roughness.png"
-   }
-  },
-  {
-   "id": "city-roof",
-   "note": "Wet tar rooftops.",
-   "steps": [
-    {
-     "tool": "image.generate",
-     "params": {
-      "prompt": "Seamless tileable game texture, straight down, orthographic, no horizon. Flat rooftop, dark wet tar, navy-black, soft seams and a few shallow puddles reflecting a dull blue, even all over. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic. Flat even lighting, no cast shadows, no text, no watermark.",
-      "width": 512,
-      "height": 512,
-      "seamless": true
-     },
-     "save": "take"
-    },
-    {
-     "tool": "texture.maps",
-     "inputs": {
-      "image": "$prev"
-     },
-     "params": {
-      "strength": 1.6
-     },
-     "save": "maps"
-    }
-   ],
-   "files": {
-    "take": "textures/city/roof-take.png",
-    "maps.albedo": "textures/city/roof-albedo.png",
-    "maps.normal": "textures/city/roof-normal.png",
-    "maps.roughness": "textures/city/roof-roughness.png"
    }
   },
   {
@@ -1356,6 +1228,2572 @@
     "umbrella": "audio/sfx/rain-umbrella.mp3",
     "awning": "audio/sfx/wind-awning.mp3",
     "birds": "audio/sfx/sun-birds.mp3"
+   }
+  },
+  {
+   "id": "sfx-day-soundscapes",
+   "note": "Diegetic autopilot-day loops (js/daysound.js): apartment, car, office, park lunch, evening TV, night. Seamless 8 s beds, mono, ≤200 KB each under audio/daysound/.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Diegetic day soundscape loops for Small Weather's apartment, car, office, park and night",
+      "duration": 8,
+      "loop": true,
+      "crossfade": 1,
+      "format": "mp3_22050_32",
+      "variants": [
+       "quiet apartment refrigerator hum low steady buzz seamless loop no music",
+       "kitchen electric kettle boiling then coffee drip soft steam seamless loop no music",
+       "bathroom shower water spray on tile soft steam seamless loop no music",
+       "muffled television programme dialogue and ads through a living room wall soft distant seamless loop no music",
+       "rain tapping gently on a closed apartment window pane soft indoor perspective seamless loop no music",
+       "car cabin road rumble low engine hum from inside a sedan seamless loop no music",
+       "car cabin windshield wipers rhythmic soft rubber swipe in light rain seamless loop no music",
+       "office open-plan soft keyboard typing clatter mid distance seamless loop no music",
+       "office conference room murmured meeting voices soft distant seamless loop no music",
+       "office coffee machine brew gurgle and drip short ambient loop no music",
+       "office HVAC air duct hum steady soft seamless loop no music",
+       "city park kids playing distant cheerful voices and laughter seamless loop no music",
+       "plaza fountain water splashing soft mid distance seamless loop no music",
+       "park pond ducks soft quacks and water paddle seamless loop no music",
+       "quiet bedroom analog clock soft tick tock close seamless loop no music",
+       "distant city night traffic soft whoosh far away seamless loop no music",
+       "far train horn and rumble across a quiet night city soft distant seamless loop no music"
+      ]
+     }
+    }
+   ],
+   "files": {
+    "fridge": "audio/daysound/fridge-hum.mp3",
+    "kettle": "audio/daysound/kettle-coffee.mp3",
+    "shower": "audio/daysound/shower.mp3",
+    "tv": "audio/daysound/tv-muffled.mp3",
+    "rainWindow": "audio/daysound/rain-window.mp3",
+    "cabin": "audio/daysound/car-cabin.mp3",
+    "wipers": "audio/daysound/car-wipers.mp3",
+    "keyboard": "audio/daysound/keyboard.mp3",
+    "meeting": "audio/daysound/meeting.mp3",
+    "coffeeMachine": "audio/daysound/coffee-machine.mp3",
+    "hvac": "audio/daysound/hvac.mp3",
+    "kids": "audio/daysound/kids.mp3",
+    "fountain": "audio/daysound/fountain.mp3",
+    "ducks": "audio/daysound/ducks.mp3",
+    "clock": "audio/daysound/clock-tick.mp3",
+    "traffic": "audio/daysound/distant-traffic.mp3",
+    "train": "audio/daysound/far-train.mp3"
+   }
+  },
+  {
+   "id": "sfx-day-radio-jingle",
+   "note": "20 s car-radio station jingle bed under the weather report (js/daysound.js commute).",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "short upbeat local radio station jingle sting with soft synth beds and a cheerful station ID bed under 20 seconds, instrumental only, no voice, no lyrics",
+      "duration": 20,
+      "loop": false,
+      "format": "mp3_22050_32"
+     }
+    }
+   ],
+   "files": {
+    "jingle": "audio/daysound/radio-jingle.mp3"
+   }
+  },
+  {
+   "id": "voice-day-radio-weather",
+   "note": "Car radio weather desk lines that name the weather the player called today (js/daysound.js). Calm mid adult announcer; one clip per weather.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Weather desk: rain over the west avenue today. Umbrellas out.",
+      "description": "Calm mid adult radio weather announcer, warm station voice, clear diction",
+      "direction": "calm radio weather read, slight smile",
+      "provider": "open",
+      "format": "mp3_22050_32"
+     }
+    }
+   ],
+   "files": {
+    "rain": "audio/daysound/radio-wx-rain.mp3"
+   }
+  },
+  {
+   "id": "mat-brick",
+   "note": "Red brick for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/brick-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and brick-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Wall of red-brown brick in running bond, rain-darkened navy-brown tones, cooler grey mortar, subtle variation brick to brick, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even red brick tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "maps.albedo": "textures/city/brick-albedo.webp",
+    "maps.normal": "textures/city/brick-normal.webp",
+    "maps.roughness": "textures/city/brick-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-stucco",
+   "note": "Painted stucco for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/stucco-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and stucco-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Painted stucco wall, muted slate-blue paint over fine trowelled plaster, hairline cracks and light stains, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even painted stucco tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "maps.albedo": "textures/city/stucco-albedo.webp",
+    "maps.normal": "textures/city/stucco-normal.webp",
+    "maps.roughness": "textures/city/stucco-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-concrete",
+   "note": "Board-formed concrete for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/concrete-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and concrete-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Board-formed concrete: horizontal timber board grain pressed into cool grey concrete, tie-hole dimples, faint stains, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even board-formed concrete tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "maps.albedo": "textures/city/concrete-albedo.webp",
+    "maps.normal": "textures/city/concrete-normal.webp",
+    "maps.roughness": "textures/city/concrete-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-glass",
+   "note": "Glass curtain wall for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/glass-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and glass-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Glass curtain wall: navy-black reflective panes divided by thin dark aluminium mullions, a faint electric-blue reflection, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even glass curtain wall tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "maps.albedo": "textures/city/glass-albedo.webp",
+    "maps.normal": "textures/city/glass-normal.webp",
+    "maps.roughness": "textures/city/glass-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-asphalt",
+   "note": "Wet asphalt for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/asphalt-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and asphalt-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Dark wet asphalt, nearly black navy, fine aggregate grain, a few soft cracks and patched seams, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even wet asphalt tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "maps.albedo": "textures/city/asphalt-albedo.webp",
+    "maps.normal": "textures/city/asphalt-normal.webp",
+    "maps.roughness": "textures/city/asphalt-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-pavers",
+   "note": "Sidewalk pavers for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/pavers-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and pavers-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Sidewalk of rectangular concrete pavers laid in a herringbone with thin dark joints, cool grey with a navy cast, worn edges, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even sidewalk pavers tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "maps.albedo": "textures/city/pavers-albedo.webp",
+    "maps.normal": "textures/city/pavers-normal.webp",
+    "maps.roughness": "textures/city/pavers-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-tar",
+   "note": "Roof tar membrane for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/tar-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and tar-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Flat rooftop tar membrane, navy-black torch-down sheets with welded seams and patched repairs, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even roof tar membrane tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "maps.albedo": "textures/city/tar-albedo.webp",
+    "maps.normal": "textures/city/tar-normal.webp",
+    "maps.roughness": "textures/city/tar-roughness.webp"
+   }
+  },
+  {
+   "id": "mat-gravel",
+   "note": "Gravel ballast for the city's PBR set (js/surfaces.js): seamless 1024 albedo (best of 2 takes) plus normal and roughness from texture.maps. Shipped as webp: textures/city/gravel-{albedo,normal,roughness}.webp (1024, <= 256 KB each) and gravel-{...}-512.webp for low quality; surfaces.json lists the sets that exist.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Rooftop gravel ballast: small rounded grey and navy stones packed together, even all over. Seamless tileable game texture, straight down, orthographic, no horizon. Stylized 3D cartoon, same look as Dose Of Destruction, clean shapes, cinematic, dark navy-leaning palette. Flat even lighting, no cast shadows, no text, no watermark, no people.",
+      "width": 1024,
+      "height": 1024,
+      "seamless": true
+     },
+     "save": "take"
+    },
+    {
+     "tool": "texture.maps",
+     "inputs": {
+      "image": "$prev"
+     },
+     "params": {
+      "strength": 1.6
+     },
+     "save": "maps"
+    }
+   ],
+   "candidates": 2,
+   "pickAt": 0,
+   "pick": "a seamless, even gravel ballast tile with clear relief, no focal point, no visible seam or repeated blotch",
+   "files": {
+    "maps.albedo": "textures/city/gravel-albedo.webp",
+    "maps.normal": "textures/city/gravel-normal.webp",
+    "maps.roughness": "textures/city/gravel-roughness.webp"
+   }
+  },
+  {
+   "id": "music-stem-calm",
+   "note": "STEM 1 of 3 (js/stems.js, score.stems.files.calm): calm, walking and exploring. Same key and tempo as tension/storm; made 60 s, looped with audio.music-loop, normalised to about -16 LUFS. Phone budget: all three stems together under ~1.3 MB (mono or 56 kbps mp3, audio.process).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. Calm layer: soft warm pads and a gentle felt-piano playing the motif every other bar, spacious, electric-blue night city mood, no drums, seamless loop, Am F C G one chord per four bars",
+      "lyrics": "[Instrumental]",
+      "seconds": 60,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.music-loop",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "mode": "loop",
+      "crossfade": 2,
+      "format": "mp3",
+      "normalize": true
+     }
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/stem-calm.mp3"
+   }
+  },
+  {
+   "id": "music-stem-tension",
+   "note": "STEM 2 of 3 (js/stems.js, score.stems.files.tension): tension, a cast winding up. Same key/tempo/chord plan as calm so it sums with it; eighth-note pulse, rising filter; 60 s looped, -16 LUFS.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. Tension layer to play on top of a calm pad: pulsing eighth-note synth bass on the chord root, tight rising arpeggio of the motif, anticipation, no melody pads, seamless loop, Am F C G one chord per four bars",
+      "lyrics": "[Instrumental]",
+      "seconds": 60,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.music-loop",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "mode": "loop",
+      "crossfade": 2,
+      "format": "mp3",
+      "normalize": true
+     }
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/stem-tension.mp3"
+   }
+  },
+  {
+   "id": "music-stem-storm",
+   "note": "STEM 3 of 3 (js/stems.js, score.stems.files.storm): the full storm, a big cast, a rescue or a tornado. Same key/tempo/chord plan; 60 s looped, -16 LUFS.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. Full storm layer to play on top of calm and tension: huge low drum hits on every beat, distorted synth stabs, choir-like brass playing the motif two octaves up, thunderous, triumphant, seamless loop, Am F C G one chord per four bars",
+      "lyrics": "[Instrumental]",
+      "seconds": 60,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.music-loop",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "mode": "loop",
+      "crossfade": 2,
+      "format": "mp3",
+      "normalize": true
+     }
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/stem-storm.mp3"
+   }
+  },
+  {
+   "id": "music-sting-resolution",
+   "note": "6 s resolution sting (episode success), the same motif turned to A major and held, then the calm stem takes over (js/stems.js sting('resolution')). Not looped; -16 LUFS.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. A 6 second resolution sting: the motif resolving upward into a warm held A major chord with a soft bell and pad tail, relief, no drums, ends naturally",
+      "lyrics": "[Instrumental]",
+      "seconds": 6,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/sting-resolution.mp3"
+   }
+  },
+  {
+   "id": "music-sting-failure",
+   "note": "4 s failure sting (episode failed or time up), the same motif falling and left unfinished (js/stems.js sting('failure')). Not looped; -16 LUFS.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. A 4 second failure sting: the motif falling downward in a minor key, a low dull tone, unresolved, quiet, ends naturally",
+      "lyrics": "[Instrumental]",
+      "seconds": 4,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/sting-failure.mp3"
+   }
+  },
+  {
+   "id": "foley-jump-1",
+   "note": "Foley (move) for js/sfx.js: jump, variant 1 of 3. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Cartoon-realistic foley: a short sneaker push-off and cloth rustle of a person jumping on a rooftop, dry, close, no music",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/jump-1.mp3"
+   }
+  },
+  {
+   "id": "foley-jump-2",
+   "note": "Foley (move) for js/sfx.js: jump, variant 2 of 3. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Cartoon-realistic foley: a short sneaker push-off and cloth rustle of a person jumping on a rooftop, dry, close, no music (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/jump-2.mp3"
+   }
+  },
+  {
+   "id": "foley-jump-3",
+   "note": "Foley (move) for js/sfx.js: jump, variant 3 of 3. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Cartoon-realistic foley: a short sneaker push-off and cloth rustle of a person jumping on a rooftop, dry, close, no music (variation 3, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1014
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/jump-3.mp3"
+   }
+  },
+  {
+   "id": "foley-land-gravel-soft-1",
+   "note": "Foley (move) for js/sfx.js: land-gravel-soft, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft landing of sneakers on rooftop gravel ballast, a few crunching pebbles, dry close recording",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-gravel-soft-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-gravel-soft-2",
+   "note": "Foley (move) for js/sfx.js: land-gravel-soft, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft landing of sneakers on rooftop gravel ballast, a few crunching pebbles, dry close recording (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-gravel-soft-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-gravel-hard-1",
+   "note": "Foley (move) for js/sfx.js: land-gravel-hard, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard heavy landing on rooftop gravel, deep thud and scattering pebbles, dry close recording",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-gravel-hard-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-gravel-hard-2",
+   "note": "Foley (move) for js/sfx.js: land-gravel-hard, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard heavy landing on rooftop gravel, deep thud and scattering pebbles, dry close recording (variation 2, a different take)",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-gravel-hard-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-grating-soft-1",
+   "note": "Foley (move) for js/sfx.js: land-grating-soft, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft sneaker landing on a metal grating catwalk, light hollow clank, dry close recording",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-grating-soft-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-grating-soft-2",
+   "note": "Foley (move) for js/sfx.js: land-grating-soft, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft sneaker landing on a metal grating catwalk, light hollow clank, dry close recording (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-grating-soft-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-grating-hard-1",
+   "note": "Foley (move) for js/sfx.js: land-grating-hard, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on metal grating, loud hollow clang with a short ring, dry close recording",
+      "duration": 0.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-grating-hard-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-grating-hard-2",
+   "note": "Foley (move) for js/sfx.js: land-grating-hard, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on metal grating, loud hollow clang with a short ring, dry close recording (variation 2, a different take)",
+      "duration": 0.8,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-grating-hard-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-tar-soft-1",
+   "note": "Foley (move) for js/sfx.js: land-tar-soft, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft landing on a tar roof membrane, muted sticky thump, dry close recording",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-tar-soft-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-tar-soft-2",
+   "note": "Foley (move) for js/sfx.js: land-tar-soft, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft landing on a tar roof membrane, muted sticky thump, dry close recording (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-tar-soft-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-tar-hard-1",
+   "note": "Foley (move) for js/sfx.js: land-tar-hard, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on a tar roof, deep dull thud with a boot scuff, dry close recording",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-tar-hard-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-tar-hard-2",
+   "note": "Foley (move) for js/sfx.js: land-tar-hard, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on a tar roof, deep dull thud with a boot scuff, dry close recording (variation 2, a different take)",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-tar-hard-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-pavement-soft-1",
+   "note": "Foley (move) for js/sfx.js: land-pavement-soft, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft sneaker landing on city pavement, short slap and scuff, dry close recording",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-pavement-soft-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-pavement-soft-2",
+   "note": "Foley (move) for js/sfx.js: land-pavement-soft, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: soft sneaker landing on city pavement, short slap and scuff, dry close recording (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-pavement-soft-2.mp3"
+   }
+  },
+  {
+   "id": "foley-land-pavement-hard-1",
+   "note": "Foley (move) for js/sfx.js: land-pavement-hard, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on concrete pavement, heavy thud and grit scrape, dry close recording",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-pavement-hard-1.mp3"
+   }
+  },
+  {
+   "id": "foley-land-pavement-hard-2",
+   "note": "Foley (move) for js/sfx.js: land-pavement-hard, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: hard landing on concrete pavement, heavy thud and grit scrape, dry close recording (variation 2, a different take)",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/land-pavement-hard-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-gasp-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-gasp, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small street crowd gasping together in surprise, outdoors, no words, no music",
+      "duration": 1.2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-gasp-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-gasp-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-gasp, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small street crowd gasping together in surprise, outdoors, no words, no music (variation 2, a different take)",
+      "duration": 1.2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-gasp-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-cheer-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-cheer, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small street crowd cheering and whooping, outdoors, short, no music",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-cheer-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-cheer-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-cheer, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small street crowd cheering and whooping, outdoors, short, no music (variation 2, a different take)",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-cheer-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-laugh-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-laugh, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A few people laughing together on a street, warm and short, no words",
+      "duration": 1.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-laugh-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-laugh-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-laugh, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A few people laughing together on a street, warm and short, no words (variation 2, a different take)",
+      "duration": 1.8,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-laugh-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-scream-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-scream, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small crowd screaming in panic and scattering, outdoors, short, no music",
+      "duration": 1.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-scream-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-scream-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-scream, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A small crowd screaming in panic and scattering, outdoors, short, no music (variation 2, a different take)",
+      "duration": 1.8,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-scream-2.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-whoa-1",
+   "note": "Foley (crowd) for js/sfx.js: crowd-whoa, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A few people saying a long surprised \"whoa\" together, outdoors",
+      "duration": 1.4,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-whoa-1.mp3"
+   }
+  },
+  {
+   "id": "foley-crowd-whoa-2",
+   "note": "Foley (crowd) for js/sfx.js: crowd-whoa, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A few people saying a long surprised \"whoa\" together, outdoors (variation 2, a different take)",
+      "duration": 1.4,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/crowd-whoa-2.mp3"
+   }
+  },
+  {
+   "id": "foley-umbrella-pop-1",
+   "note": "Foley (crowd) for js/sfx.js: umbrella-pop, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: an umbrella snapping open, canopy fabric snap and ribs clicking, close recording",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/umbrella-pop-1.mp3"
+   }
+  },
+  {
+   "id": "foley-umbrella-pop-2",
+   "note": "Foley (crowd) for js/sfx.js: umbrella-pop, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Foley: an umbrella snapping open, canopy fabric snap and ribs clicking, close recording (variation 2, a different take)",
+      "duration": 0.7,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/umbrella-pop-2.mp3"
+   }
+  },
+  {
+   "id": "foley-car-pass-1",
+   "note": "Foley (city) for js/sfx.js: car-pass, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A single car driving past on a wet city street, tyres on asphalt, approaching and receding, no music",
+      "duration": 3,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/car-pass-1.mp3"
+   }
+  },
+  {
+   "id": "foley-car-pass-2",
+   "note": "Foley (city) for js/sfx.js: car-pass, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A single car driving past on a wet city street, tyres on asphalt, approaching and receding, no music (variation 2, a different take)",
+      "duration": 3,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/car-pass-2.mp3"
+   }
+  },
+  {
+   "id": "foley-car-horn-1",
+   "note": "Foley (city) for js/sfx.js: car-horn, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A short car horn, two quick beeps, city street, a bit distant",
+      "duration": 1.2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/car-horn-1.mp3"
+   }
+  },
+  {
+   "id": "foley-car-horn-2",
+   "note": "Foley (city) for js/sfx.js: car-horn, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A short car horn, two quick beeps, city street, a bit distant (variation 2, a different take)",
+      "duration": 1.2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/car-horn-2.mp3"
+   }
+  },
+  {
+   "id": "foley-siren-far-1",
+   "note": "Foley (city) for js/sfx.js: siren-far, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A distant city siren wailing far away between buildings at night, soft",
+      "duration": 3.2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/siren-far-1.mp3"
+   }
+  },
+  {
+   "id": "foley-siren-far-2",
+   "note": "Foley (city) for js/sfx.js: siren-far, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A distant city siren wailing far away between buildings at night, soft (variation 2, a different take)",
+      "duration": 3.2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/siren-far-2.mp3"
+   }
+  },
+  {
+   "id": "foley-pigeon-1",
+   "note": "Foley (city) for js/sfx.js: pigeon, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Pigeons cooing and wing flaps on a rooftop, close, no music",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/pigeon-1.mp3"
+   }
+  },
+  {
+   "id": "foley-pigeon-2",
+   "note": "Foley (city) for js/sfx.js: pigeon, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Pigeons cooing and wing flaps on a rooftop, close, no music (variation 2, a different take)",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/pigeon-2.mp3"
+   }
+  },
+  {
+   "id": "foley-bird-1",
+   "note": "Foley (city) for js/sfx.js: bird, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Small songbirds chirping in a city park in the morning, short, no music",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/bird-1.mp3"
+   }
+  },
+  {
+   "id": "foley-bird-2",
+   "note": "Foley (city) for js/sfx.js: bird, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Small songbirds chirping in a city park in the morning, short, no music (variation 2, a different take)",
+      "duration": 2,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/bird-2.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-press-1",
+   "note": "Foley (ui) for js/sfx.js: ui-press, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A soft clean UI button press click, tactile, short, no music",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-press-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-press-2",
+   "note": "Foley (ui) for js/sfx.js: ui-press, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A soft clean UI button press click, tactile, short, no music (variation 2, a different take)",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-press-2.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-toast-1",
+   "note": "Foley (ui) for js/sfx.js: ui-toast, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A gentle UI notification pop, two soft notes, short",
+      "duration": 0.6,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-toast-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-unlock-1",
+   "note": "Foley (ui) for js/sfx.js: ui-unlock, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A bright UI unlock sparkle, rising soft chime, short",
+      "duration": 0.9,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-unlock-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-goal-1",
+   "note": "Foley (ui) for js/sfx.js: ui-goal, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A satisfying goal-complete chime, two rising notes, short, clean",
+      "duration": 0.9,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-goal-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-fail-1",
+   "note": "Foley (ui) for js/sfx.js: ui-fail, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A low soft UI fail thud with a descending tone, short",
+      "duration": 0.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-fail-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-rank-1",
+   "note": "Foley (ui) for js/sfx.js: ui-rank, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A rank stamp: heavy rubber stamp thump on paper with a small shimmer",
+      "duration": 0.8,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-rank-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-open-1",
+   "note": "Foley (ui) for js/sfx.js: ui-open, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A soft UI menu opening swish, short",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-open-1.mp3"
+   }
+  },
+  {
+   "id": "foley-ui-close-1",
+   "note": "Foley (ui) for js/sfx.js: ui-close, variant 1 of 1. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A soft UI menu closing swish, short, descending",
+      "duration": 0.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/ui-close-1.mp3"
+   }
+  },
+  {
+   "id": "title-logo",
+   "note": "The title's logo lockup \"I Can Be AI\" (js/title.js, day.config.js title.logo): 4 takes of image.generate, the pick goes through image.remove-background, then baked to images/logo-icanbe-ai.png and title.logo set. Until then the title draws the lockup in type with the same lightning glint. Gen job j_b67c8eedbcff (project org_eb0d5c82e8da8c2d.icanbe).",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game title logo lockup, the words \"I CAN BE AI\" in bold stylized 3D lettering, electric blue and white metal letters with glowing cyan lightning cracks running through them, small sparks, centered, perfectly flat front view, on a plain solid black background, clean bold readable silhouette, cinematic storm game logo, no extra text, no watermark",
+      "width": 1536,
+      "height": 640,
+      "count": 4
+     },
+     "save": "take"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$pick"
+     },
+     "save": "logo"
+    }
+   ],
+   "files": {
+    "logo": "images/logo-icanbe-ai.png"
+   }
+  },
+  {
+   "id": "pilot-chapter-1",
+   "note": "Pilot chapter-opener line: \"Schedule says desk. The sky is not on it.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Schedule says desk. The sky is not on it.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-1.mp3"
+   }
+  },
+  {
+   "id": "pilot-chapter-2",
+   "note": "Pilot chapter-opener line: \"Seven requests logged. Answer them in order.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Seven requests logged. Answer them in order.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-2.mp3"
+   }
+  },
+  {
+   "id": "pilot-chapter-3",
+   "note": "Pilot chapter-opener line: \"So do I. You are close to the limit.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "So do I. You are close to the limit.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-3.mp3"
+   }
+  },
+  {
+   "id": "pilot-chapter-4",
+   "note": "Pilot chapter-opener line: \"You can also hurt them. Think before you call.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "You can also hurt them. Think before you call.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-4.mp3"
+   }
+  },
+  {
+   "id": "pilot-chapter-5",
+   "note": "Pilot chapter-opener line: \"Tonight the whole sky is yours. No schedule.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Tonight the whole sky is yours. No schedule.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-chapter-5.mp3"
+   }
+  },
+  {
+   "id": "pilot-finale-farewell",
+   "note": "Pilot Night Show farewell before the first cue: \"Tonight you don't need me.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Tonight you don't need me.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat, handing over"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-finale-farewell.mp3"
+   }
+  },
+  {
+   "id": "sky-dawn",
+   "note": "Sky panorama 'dawn' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_f759c8039a5a.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, clear dawn: pale peach and rose glow low on the eastern horizon fading to soft teal then clear light blue overhead, a few thin pink streak clouds, calm and open, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1101
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-dawn.webp"
+   }
+  },
+  {
+   "id": "sky-noon",
+   "note": "Sky panorama 'noon' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_d02e73c29d0e.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, bright clear noon: saturated blue sky, big soft white cumulus clouds scattered all around, high sun, haze at the horizon, readable and bright, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1102
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-noon.webp"
+   }
+  },
+  {
+   "id": "sky-golden",
+   "note": "Sky panorama 'golden' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_05b83316878d.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, golden hour: low warm sun glowing orange gold in the west, long amber lit clouds, blue sky turning to peach near the horizon, rays of warm light, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1103
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-golden.webp"
+   }
+  },
+  {
+   "id": "sky-dusk",
+   "note": "Sky panorama 'dusk' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_627f3b36350e.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, dusk: deep navy and violet overhead, amber and electric blue band at the horizon, dramatic dark clouds edged with magenta and orange light, cinematic, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1104
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-dusk.webp"
+   }
+  },
+  {
+   "id": "sky-night",
+   "note": "Sky panorama 'night' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_047d360d1234.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, starry night: deep navy black sky full of crisp stars and a faint milky way band, a bright full moon with soft glow on the right side, a few wispy dark clouds, faint blue glow at the horizon, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1105
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-night.webp"
+   }
+  },
+  {
+   "id": "sky-storm",
+   "note": "Sky panorama 'storm' for the dome in js/sky.js (equirect 2:1, Hawkes Gen image.panorama, Qwen-Image 2512 360 LoRA). The clock crossfades dawn/noon/golden/dusk/night and the weather's cover brings in the storm one. Shipped as webp, at most 600 KB. Gen job j_2ba334579597.",
+   "steps": [
+    {
+     "tool": "image.panorama",
+     "params": {
+      "prompt": "360 equirectangular sky panorama, stylized 3D cartoon, storm shelf cloud: a huge dark arcus shelf cloud rolling across the whole sky, slate grey and teal green underside, heavy rain curtains in the distance, a thin bright gap of pale light low at the horizon, ominous, empty distant flat horizon, no buildings, no ground detail, no people, no text",
+      "width": 2048,
+      "height": 1024,
+      "seed": 1106
+     },
+     "save": "pano"
+    }
+   ],
+   "files": {
+    "pano": "textures/sky/sky-storm.webp"
+   }
+  },
+  {
+   "id": "neon-sign-noodles",
+   "note": "Neon shop sign NOODLES for js/props.js (textures/neon/noodles.webp). image.generate then cutout. Stylized DoD neon, navy night, electric pink.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading NOODLES only, bold tube neon letters, hot pink and magenta glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/noodles.webp"
+   }
+  },
+  {
+   "id": "neon-sign-bar",
+   "note": "Neon shop sign BAR for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading BAR only, bold tube neon letters, electric cyan glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/bar.webp"
+   }
+  },
+  {
+   "id": "neon-sign-24h",
+   "note": "Neon shop sign 24H for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading 24H only, bold tube neon letters, mint green glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/24h.webp"
+   }
+  },
+  {
+   "id": "neon-sign-cafe",
+   "note": "Neon shop sign CAFE for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading CAFE only, bold tube neon letters, warm amber gold glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/cafe.webp"
+   }
+  },
+  {
+   "id": "neon-sign-arcade",
+   "note": "Neon shop sign ARCADE for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading ARCADE only, bold tube neon letters, violet purple glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/arcade.webp"
+   }
+  },
+  {
+   "id": "neon-sign-books",
+   "note": "Neon shop sign BOOKS for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading BOOKS only, bold tube neon letters, orange coral glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/books.webp"
+   }
+  },
+  {
+   "id": "neon-sign-hotel",
+   "note": "Neon shop sign HOTEL for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading HOTEL only, bold tube neon letters, electric cyan glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/hotel.webp"
+   }
+  },
+  {
+   "id": "neon-sign-pharmacy",
+   "note": "Neon shop sign PHARMACY for js/props.js.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Neon shop sign reading PHARMACY only, bold tube neon letters, mint green glow, black background, front view, stylized 3D cartoon like Dose Of Destruction, cinematic navy night city, no extra words, no people, no watermark",
+      "width": 512,
+      "height": 256,
+      "transparent": true
+     },
+     "save": "sign"
+    }
+   ],
+   "files": {
+    "sign": "textures/neon/pharmacy.webp"
+   }
+  },
+  {
+   "id": "power-crack-1",
+   "note": "Power SFX for js/sfx.js: crack variant 1/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice",
+      "duration": 0.7,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4215
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/crack-1.mp3"
+   }
+  },
+  {
+   "id": "power-crack-2",
+   "note": "Power SFX for js/sfx.js: crack variant 2/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 2, a different take)",
+      "duration": 0.7,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4226
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/crack-2.mp3"
+   }
+  },
+  {
+   "id": "power-crack-3",
+   "note": "Power SFX for js/sfx.js: crack variant 3/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 3, a different take)",
+      "duration": 0.7,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4237
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/crack-3.mp3"
+   }
+  },
+  {
+   "id": "power-crack-4",
+   "note": "Power SFX for js/sfx.js: crack variant 4/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Close lightning crack transient over a city rooftop, sharp electric snap only, dry, no rain bed, no music, no voice (variation 4, a different take)",
+      "duration": 0.7,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4248
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/crack-4.mp3"
+   }
+  },
+  {
+   "id": "power-body-1",
+   "note": "Power SFX for js/sfx.js: body variant 1/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music",
+      "duration": 1.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4212
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/body-1.mp3"
+   }
+  },
+  {
+   "id": "power-body-2",
+   "note": "Power SFX for js/sfx.js: body variant 2/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 2, a different take)",
+      "duration": 1.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4223
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/body-2.mp3"
+   }
+  },
+  {
+   "id": "power-body-3",
+   "note": "Power SFX for js/sfx.js: body variant 3/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 3, a different take)",
+      "duration": 1.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4234
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/body-3.mp3"
+   }
+  },
+  {
+   "id": "power-body-4",
+   "note": "Power SFX for js/sfx.js: body variant 4/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Lightning body boom mid punch right after a strike, short chest thud over a city street, dry, no rain bed, no music (variation 4, a different take)",
+      "duration": 1.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4245
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/body-4.mp3"
+   }
+  },
+  {
+   "id": "power-rumble-1",
+   "note": "Power SFX for js/sfx.js: rumble variant 1/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music",
+      "duration": 3.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4218
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/rumble-1.mp3"
+   }
+  },
+  {
+   "id": "power-rumble-2",
+   "note": "Power SFX for js/sfx.js: rumble variant 2/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 2, a different take)",
+      "duration": 3.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4229
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/rumble-2.mp3"
+   }
+  },
+  {
+   "id": "power-rumble-3",
+   "note": "Power SFX for js/sfx.js: rumble variant 3/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 3, a different take)",
+      "duration": 3.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4240
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/rumble-3.mp3"
+   }
+  },
+  {
+   "id": "power-rumble-4",
+   "note": "Power SFX for js/sfx.js: rumble variant 4/4. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Rolling thunder rumble tail after a lightning strike, low distant roll across a city, no rain bed, no music (variation 4, a different take)",
+      "duration": 3.2,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4251
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/rumble-4.mp3"
+   }
+  },
+  {
+   "id": "power-whoosh-1",
+   "note": "Power SFX for js/sfx.js: whoosh variant 1/3. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music",
+      "duration": 1.1,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4218
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/whoosh-1.mp3"
+   }
+  },
+  {
+   "id": "power-whoosh-2",
+   "note": "Power SFX for js/sfx.js: whoosh variant 2/3. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music (variation 2, a different take)",
+      "duration": 1.1,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4229
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/whoosh-2.mp3"
+   }
+  },
+  {
+   "id": "power-whoosh-3",
+   "note": "Power SFX for js/sfx.js: whoosh variant 3/3. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Short wind gust whoosh past the ears on a city rooftop, dry airy pass, no music (variation 3, a different take)",
+      "duration": 1.1,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4240
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/whoosh-3.mp3"
+   }
+  },
+  {
+   "id": "power-gale-loop-1",
+   "note": "Power SFX for js/sfx.js: gale-loop variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Sustained gale wind loop for a city street, strong continuous rush, seamless loop, no music",
+      "duration": 4,
+      "loop": true,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4227
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/gale-loop-1.mp3"
+   }
+  },
+  {
+   "id": "power-tornado-roar-1",
+   "note": "Power SFX for js/sfx.js: tornado-roar variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Seamless looping tornado roar, thick swirling wind funnel over city streets, no music",
+      "duration": 4,
+      "loop": true,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4236
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/tornado-roar-1.mp3"
+   }
+  },
+  {
+   "id": "power-tornado-debris-1",
+   "note": "Power SFX for js/sfx.js: tornado-debris variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Tornado debris rattle loop, wood and metal scrap clatter in wind, seamless, no music",
+      "duration": 4,
+      "loop": true,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4242
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/tornado-debris-1.mp3"
+   }
+  },
+  {
+   "id": "power-tornado-pressure-1",
+   "note": "Power SFX for js/sfx.js: tornado-pressure variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Deep pressure drone under a tornado, low humming air pressure, seamless loop, no music",
+      "duration": 4,
+      "loop": true,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4248
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/tornado-pressure-1.mp3"
+   }
+  },
+  {
+   "id": "power-sun-shimmer-1",
+   "note": "Power SFX for js/sfx.js: sun-shimmer variant 1/1. Mono, under 120 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Warm sun break shimmer swell, soft bright air opening after rain, hint of distant birds, no music",
+      "duration": 2.5,
+      "loop": false,
+      "sampleRate": 22050,
+      "provider": "open",
+      "normalize": true,
+      "targetLufs": -18,
+      "seed": 4233
+     },
+     "save": "sfx"
+    }
+   ],
+   "files": {
+    "sfx": "audio/sfx/power/sun-shimmer-1.mp3"
+   }
+  },
+  {
+   "id": "pilot-ending-a",
+   "note": "Pilot ending-scene line: \"Fair weather. Logged.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Fair weather. Logged.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-ending-a.mp3"
+   }
+  },
+  {
+   "id": "pilot-ending-c",
+   "note": "Pilot ending-scene line: \"Sky's still thinking. Stay in.\", Gen voice gv_c2c9cdffeae27b99 (I Can Be - Pilot), audio.voice.",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "text": "Sky's still thinking. Stay in.",
+      "voice": "gv_c2c9cdffeae27b99",
+      "direction": "calm, dry, faintly fond, radio-flat"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/pilot/pilot-ending-c.mp3"
+   }
+  },
+  {
+   "id": "ui-verbs-lit",
+   "note": "UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game HUD icon sheet, five weather ability icons in a horizontal row equally spaced, left to right: (1) jagged electric lightning bolt, (2) rain cloud with three heavy raindrops, (3) swirling wind gust ribbons, (4) soft fog bank wisps, (5) sun breaking through clouds with warm rays. Style: stylized painted cartoon UI icons, Dose Of Destruction look, clean bold silhouettes readable at 44 pixels, storm-navy and black with LIT glowing electric cyan-blue edge light and soft bloom, flat front orthographic, each icon centered in its cell, plain solid magenta background #ff00ff, no text, no letters, no watermark, no keycaps",
+      "width": 1280,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/verb-sheet-lit.png"
+   }
+  },
+  {
+   "id": "ui-verbs-unlit",
+   "note": "UI art kit: five unlit (dim) weather verb icons sheet. Same layout as ui-verbs-lit. Stand-ins: textures/ui/verb-*-unlit.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game HUD icon sheet, five weather ability icons in a horizontal row equally spaced, left to right: (1) jagged lightning bolt, (2) rain cloud with three raindrops, (3) swirling wind ribbons, (4) fog bank wisps, (5) sun behind clouds. Style: stylized painted cartoon UI icons, Dose Of Destruction look, clean bold silhouettes readable at 44 pixels, storm-navy and muted slate UNLIT state, dim desaturated blue-grey, no glow, flat front orthographic, each icon centered in its cell, plain solid magenta background #ff00ff, no text, no letters, no watermark",
+      "width": 1280,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/verb-sheet-unlit.png"
+   }
+  },
+  {
+   "id": "ui-panel-frame",
+   "note": "UI art kit: 9-slice panel frame (Persona-bold angular corners, storm-navy + cyan). Stand-in: textures/ui/panel-frame.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI 9-slice panel frame only, square frame with ornate sharp Persona-5-like angular corner pieces and a thin electric-blue neon edge on storm-navy metal, hollow center completely filled with solid magenta #ff00ff for cutout, bold AAA game menu frame, flat front orthographic, cinematic dark navy and black with cyan accents, no text, no icons inside, no watermark",
+      "width": 512,
+      "height": 512,
+      "count": 1
+     },
+     "save": "frame"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/panel-frame.png"
+   }
+  },
+  {
+   "id": "ui-ranks",
+   "note": "UI art kit: S/A/B/C rank stamps in one sheet. Stand-ins: textures/ui/rank-S.svg etc.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI rank stamp sheet, four stamps in a horizontal row: big letter S, letter A, letter B, letter C. Each is a bold painted wax-seal style stamp with sharp angular frame, storm-navy metal and electric blue glow, S brightest gold-cyan, A teal, B blue, C muted copper-red. Flat front orthographic, plain solid magenta background #ff00ff, stylized cartoon AAA game UI, readable at small size, no other text, no watermark",
+      "width": 1024,
+      "height": 256,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/rank-sheet.png"
+   }
+  },
+  {
+   "id": "ui-busts",
+   "note": "UI art kit: portrait busts of Birdie (yellow raincoat, straw hat), Dex (orange jacket, white helmet), Ines (violet coat, glasses) in one sheet. Stand-ins: textures/ui/bust-*.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI portrait bust sheet, three character busts in a horizontal row on magenta #ff00ff: (1) Birdie Alvarez short gardener woman yellow raincoat straw hat warm skin, (2) Dex Moreno courier man orange jacket white helmet parcel strap, (3) Ines Quill tall woman violet coat round glasses dark hair. Stylized 3D cartoon Dose Of Destruction look, storm-navy rim light, front-facing busts from shoulders up, bold readable silhouettes, no text, no watermark",
+      "width": 1152,
+      "height": 384,
+      "count": 1
+     },
+     "save": "sheet"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/bust-sheet.png"
+   }
+  },
+  {
+   "id": "ui-pilot",
+   "note": "UI art kit: Pilot glyph (holographic wrist-ring / AI mark). Stand-in: textures/ui/pilot.svg.",
+   "steps": [
+    {
+     "tool": "image.generate",
+     "params": {
+      "prompt": "Game UI glyph icon, a holographic wrist ring and soft radio pulse mark for an AI called Pilot, electric cyan on storm-navy, circular badge, stylized painted cartoon, clean silhouette readable at 28 px, plain solid magenta background #ff00ff, no text, no letters, no watermark",
+      "width": 256,
+      "height": 256,
+      "count": 1
+     },
+     "save": "glyph"
+    },
+    {
+     "tool": "image.remove-background",
+     "inputs": {
+      "image": "$prev"
+     },
+     "save": "cut"
+    }
+   ],
+   "files": {
+    "cut": "textures/ui/pilot.png"
    }
   },
   {
@@ -3031,14 +5469,14 @@
    }
   },
   {
-   "id": "dlg-birdie-1s1s78s",
-   "note": "Spoken line (night:gather), Birdie: \"Front row! My tomatoes get the front row.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "id": "dlg-birdie-1ie71aw",
+   "note": "Spoken line (night:gather), Birdie: \"Front row. The tomatoes get the view.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "Front row! My tomatoes get the front row.",
+      "text": "Front row. The tomatoes get the view.",
       "voice": "EXAVITQu4vr4xnSDxMaL",
       "model": "eleven_v4"
      },
@@ -3046,7 +5484,64 @@
     }
    ],
    "files": {
-    "audio": "audio/dialogue/dlg-birdie-1s1s78s.mp3"
+    "audio": "audio/dialogue/dlg-birdie-1ie71aw.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-cx39rz",
+   "note": "Spoken line (night:roof:birdie), Birdie: \"From up here the lawn drinks with us.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "From up here the lawn drinks with us.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-cx39rz.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1t4o4zf",
+   "note": "Spoken line (night:roof:dex), Dex: \"Best seat on the avenue. Keep the beat.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Best seat on the avenue. Keep the beat.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1t4o4zf.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-glzsvo",
+   "note": "Spoken line (night:roof:quill), Ines: \"The sky is keeping time. So are we.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The sky is keeping time. So are we.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-glzsvo.mp3"
    }
   },
   {
@@ -3126,14 +5621,14 @@
    }
   },
   {
-   "id": "dlg-birdie-1fkchhm",
-   "note": "Spoken line (night:end:A), Birdie: \"Again! Again!\", Hawkes Gen audio.voice (ElevenLabs).",
+   "id": "dlg-birdie-6fbp7f",
+   "note": "Spoken line (night:end:A), Birdie: \"Again. One more for the tomatoes.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "Again! Again!",
+      "text": "Again. One more for the tomatoes.",
       "voice": "EXAVITQu4vr4xnSDxMaL",
       "model": "eleven_v4"
      },
@@ -3141,7 +5636,7 @@
     }
    ],
    "files": {
-    "audio": "audio/dialogue/dlg-birdie-1fkchhm.mp3"
+    "audio": "audio/dialogue/dlg-birdie-6fbp7f.mp3"
    }
   },
   {
@@ -4339,6 +6834,253 @@
    ],
    "files": {
     "audio": "audio/dialogue/dlg-ines-ito856.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-fwngib",
+   "note": "Spoken line (arc:birdie-arc-1), Birdie: \"They're going. The pots are dust.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're going. The pots are dust.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-fwngib.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1fau5dm",
+   "note": "Spoken line (arc:birdie-arc-1), He: \"I see them.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I see them.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1fau5dm.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-4d93xv",
+   "note": "Spoken line (arc:birdie-arc-2:ask), Birdie: \"Rain on the pots. Before they're gone for good?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rain on the pots. Before they're gone for good?",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-4d93xv.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-sa1m1r",
+   "note": "Spoken line (arc:birdie-arc-2:thanks), Birdie: \"Green again. Bless you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Green again. Bless you.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-sa1m1r.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-dhyy88",
+   "note": "Spoken line (arc:birdie-arc-3), Birdie: \"First at the block show. Ribbon's on the balcony. Basket's by your door.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "First at the block show. Ribbon's on the balcony. Basket's by your door.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-dhyy88.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-sr2lqi",
+   "note": "Spoken line (arc:dex-arc-1), Dex: \"Shop turbines stalled. No wind, no open sign.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Shop turbines stalled. No wind, no open sign.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-sr2lqi.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-8912u9",
+   "note": "Spoken line (arc:dex-arc-2:ask), Dex: \"A gust on the shop roof. Keep us turning?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "A gust on the shop roof. Keep us turning?",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-8912u9.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1cm9ym6",
+   "note": "Spoken line (arc:dex-arc-2:thanks), Dex: \"They're spinning. We're open.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "They're spinning. We're open.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1cm9ym6.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-lj0d38",
+   "note": "Spoken line (arc:dex-arc-3), Dex: \"New sign went up. Come by. I'll wave you in.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "New sign went up. Come by. I'll wave you in.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-lj0d38.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-nvh5s",
+   "note": "Spoken line (arc:quill-arc-1), Ines: \"Charts are blank. Streetlights eat every star.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Charts are blank. Streetlights eat every star.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-nvh5s.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-14bmtu8",
+   "note": "Spoken line (arc:quill-arc-2:ask), Ines: \"Fog over the annex. Soften the lights for one reading?\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Fog over the annex. Soften the lights for one reading?",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-14bmtu8.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-dss53k",
+   "note": "Spoken line (arc:quill-arc-2:thanks), Ines: \"Orion. Hold still.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Orion. Hold still.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-dss53k.mp3"
+   }
+  },
+  {
+   "id": "dlg-ines-cpcdtw",
+   "note": "Spoken line (arc:quill-arc-3), Ines: \"Your weather is on my wall. The roof light stays on for you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Your weather is on my wall. The roof light stays on for you.",
+      "voice": "Xb7hH8MSUJpSbSDYk0k2",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-ines-cpcdtw.mp3"
    }
   },
   {
@@ -5555,6 +8297,196 @@
    ],
    "files": {
     "audio": "audio/dialogue/dlg-he-15gfxux.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-csqwkt",
+   "note": "Spoken line (chapter:sky), He: \"Every day runs on rails. The sky is the one thing that doesn't.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Every day runs on rails. The sky is the one thing that doesn't.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-csqwkt.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1pz7yd4",
+   "note": "Spoken line (chapter:neighbours), He: \"Birdie's tomatoes. Dex's parcels. The whole street is asking.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Birdie's tomatoes. Dex's parcels. The whole street is asking.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1pz7yd4.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-an2325",
+   "note": "Spoken line (chapter:drought), He: \"Every call costs something. The district keeps count.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Every call costs something. The district keeps count.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-an2325.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-tmm8c8",
+   "note": "Spoken line (chapter:chasers), He: \"Somebody is stuck out there. I can reach them.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Somebody is stuck out there. I can reach them.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-tmm8c8.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-16sik41",
+   "note": "Spoken line (chapter:night), He: \"Then let's give them a show.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Then let's give them a show.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-16sik41.mp3"
+   }
+  },
+  {
+   "id": "dlg-birdie-19yu9tc",
+   "note": "Spoken line (ending:A), Birdie: \"The lawn drank. Thank you.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "The lawn drank. Thank you.",
+      "voice": "EXAVITQu4vr4xnSDxMaL",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-birdie-19yu9tc.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-13iwa7g",
+   "note": "Spoken line (ending:A), He: \"Clear skies. I stopped.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Clear skies. I stopped.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-13iwa7g.mp3"
+   }
+  },
+  {
+   "id": "dlg-dex-1sya96w",
+   "note": "Spoken line (ending:B), Dex: \"Half green. Half still broken.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Half green. Half still broken.",
+      "voice": "TX3LPaxmHKxFdv7VOQHJ",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-dex-1sya96w.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1ydcp1r",
+   "note": "Spoken line (ending:B), He: \"It worked. It cost.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "It worked. It cost.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1ydcp1r.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1fnrim7",
+   "note": "Spoken line (ending:C), He: \"I asked for everything.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "I asked for everything.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1fnrim7.mp3"
    }
   }
  ]

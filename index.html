@@ -13,9 +13,7 @@
     <meta name="build" content="b2c4a141f5" />
     <title>I Can Be · Small Weather</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310131a'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23f6f1e8' stroke-width='2'/%3E%3C/svg%3E" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,420&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/ui-kit.css?v=b2c4a141f5" />
     <link rel="stylesheet" href="css/site.css?v=b2c4a141f5" />
     <link rel="stylesheet" href="css/hud.css?v=b2c4a141f5" />
     <style id="loading-css">
@@ -23,7 +21,7 @@
       html.loading .hud, html.loading .hud-left, html.loading .side, html.loading .privacy-tag, html.loading .version-tag, html.loading .public-toggle, html.loading .update-pill { visibility: hidden !important; }
       #loading { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; overflow: auto;
         padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-        background: radial-gradient(120% 90% at 50% 20%, #1a2233 0%, #0b0e15 70%); color: #f6f1e8; font: 500 1rem/1.4 Outfit, system-ui, sans-serif; opacity: 1; transition: opacity .45s ease; }
+        background: radial-gradient(120% 90% at 50% 20%, #1a2233 0%, #0b0e15 70%); color: #f6f1e8; font: 500 1rem/1.4 Outfit, system-ui, sans-serif; opacity: 1; transition: opacity .9s ease; }
       #loading[hidden] { display: none; }
       #loading.leaving { opacity: 0; pointer-events: none; }
       #loading .card { box-sizing: border-box; width: min(100%, 380px); margin: auto; text-align: left; }
@@ -117,10 +115,12 @@
           if (state !== "loading") return;
           state = "done"; clearTimeout(slowT);
           bar.style.width = "100%";
+          /* Handoff: the card fades over the title's crane (already under it) so the day never cuts to a black frame.
+             Theme beds unlock on the first gesture when Sound is saved on (js/score.js listens for day:loading handoff). */
           card.classList.add("leaving");
           html.classList.remove("loading");
-          setTimeout(function () { card.hidden = true; }, 480);
-          emit("done", { seconds: Math.round((performance.now() - t0) / 100) / 10 });
+          emit("handoff", { seconds: Math.round((performance.now() - t0) / 100) / 10 });
+          setTimeout(function () { card.hidden = true; emit("done", { seconds: Math.round((performance.now() - t0) / 100) / 10 }); }, 920);
         }
         function done() {
           if (state !== "loading") return;

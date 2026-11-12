@@ -58,6 +58,7 @@ class Part {
     this.idx = [];
     this.prims = []; // world-space boxes of every box/cylinder/ball: the city audit (js/city-audit.js) clusters them into props
     this.f = { ox: 0, oz: 0, oy: 0, c: 1, s: 0 };
+    this.bend = 0; // 0 = rigid; up to 1 = flexible in the wind: stored as the vertex alpha (1 - bend / 2), read by js/windfog.js's shader
   }
   frame(ox, oz, yaw, oy) {
     this.f = { ox, oz, oy: oy || 0, c: Math.cos(yaw || 0), s: Math.sin(yaw || 0) };
@@ -90,7 +91,7 @@ class Part {
       this.pos.push(q[0], q[1], q[2]);
       const m = this.wn(n[0], n[1], n[2]);
       this.nrm.push(m[0], m[1], m[2]);
-      this.col.push(col[0], col[1], col[2], 1);
+      this.col.push(col[0], col[1], col[2], 1 - 0.5 * this.bend);
     });
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
@@ -118,7 +119,7 @@ class Part {
       const w = this.w(q[0], q[1], q[2]);
       this.pos.push(w[0], w[1], w[2]);
       this.nrm.push(m[0], m[1], m[2]);
-      this.col.push(col[0], col[1], col[2], 1);
+      this.col.push(col[0], col[1], col[2], 1 - 0.5 * this.bend);
     });
     this.idx.push(base, base + 1, base + 2);
     if (p.length === 4) this.idx.push(base, base + 2, base + 3);
@@ -194,12 +195,12 @@ class Part {
         const up = this.wn(0, 1, 0);
         this.pos.push(c[0], c[1], c[2]);
         this.nrm.push(up[0], up[1], up[2]);
-        this.col.push(col[0], col[1], col[2], 1);
+        this.col.push(col[0], col[1], col[2], 1 - 0.5 * this.bend);
         [p(r1, a0, y0 + h), p(r1, a1, y0 + h)].forEach((q) => {
           const wq = this.w(q[0], q[1], q[2]);
           this.pos.push(wq[0], wq[1], wq[2]);
           this.nrm.push(up[0], up[1], up[2]);
-          this.col.push(col[0], col[1], col[2], 1);
+          this.col.push(col[0], col[1], col[2], 1 - 0.5 * this.bend);
         });
         this.idx.push(top, top + 1, top + 2); // the cap faces up (it was culled from above)
       }
@@ -266,6 +267,7 @@ export function installProps(ctx) {
   const solid = new Part(); // lit by the scene, vertex colours
   const warm = new Part(); // glows with the lamps: globes, tower faces, bus stop panels, string lights
   const colliders = [];
+  const conductors = []; // tall things a bolt prefers (js/powers.js reads them through info().conductors)
   const stats = { trees: 0, benches: 0, hydrants: 0, bins: 0, busStops: 0, signs: 0, parkLamps: 0, plazaLamps: 0, roofUnits: 0, landmarks: 0, planters: 0 };
   const clear = (x, z, r) => !blocked(x - r, z - r, x + r, z + r, 0.15);
   const clearIn = (x, z, r) => !hitsSolid(x - r, z - r, x + r, z + r, 0.15); // inside the park or plaza, which cityscape keeps free of lots
@@ -287,8 +289,10 @@ export function installProps(ctx) {
     solid.frame(x, z, 0, G);
     solid.cyl(0, 0, 0, 0.17 * s, 0.11 * s, 2.1 * s, 6, hex("#5a4230"));
     const lc = LEAF[Math.floor(rng() * LEAF.length)];
+    solid.bend = 0.75; // the crown bends in the wind (a vertex shader, js/windfog.js)
     solid.ball(0, 3.0 * s, 0, 1.5 * s, 0.85, lc, 7);
     solid.ball(0.5 * s, 2.5 * s, 0.3 * s, 1.0 * s, 0.8, lc.map((v) => v * 0.9), 6);
+    solid.bend = 0;
     colliders.push({ x, y: G + 1, z, w: 0.4, h: 2, d: 0.4 });
     stats.trees++;
   }
@@ -379,7 +383,11 @@ export function installProps(ctx) {
 
   G = 0;
 
-  /* ---------------- shop signs and neon ---------------- */
+  /* ---------------- shop signs and neon ----------------
+     Canvas stand-ins always work; Gen textures at textures/neon/<word>.webp replace them when present
+     (recipes neon-sign-* in hawkes.assets.json). Each sign flickers a little at night. */
+  const neonGen = {};
+  const signFlicker = SIGNS.map(() => ({ phase: Math.random() * 6.28, rate: 0.7 + Math.random() * 1.4, dead: 0 }));
   const signMats = SIGNS.map((sg, i) => {
     const W = 512;
     const H = 128;
@@ -407,8 +415,32 @@ export function installProps(ctx) {
     // One-sided: a double-sided plane's back copy carries the same UVs (mirrored text) and, drawn second at the same
     // depth, won from the front. The back faces the wall 8 cm behind it, so nobody sees it.
     m.backFaceCulling = true;
+    m.metadata = { neonWord: sg.word, neonGen: false };
+    // Hawkes Gen cutout (textures/neon/<word>.webp): only fetch words listed in textures/neon/index.json (no 404s)
     return m;
   });
+  // Lazy: one index fetch, then only the signs that are actually on disk
+  try {
+    if (typeof fetch === "function") {
+      fetch("textures/neon/index.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).then((list) => {
+        const have = new Set((Array.isArray(list) ? list : []).map((s) => String(s).toLowerCase()));
+        signMats.forEach((m, i) => {
+          const word = SIGNS[i].word.toLowerCase();
+          if (!have.has(word)) return;
+          const url = "textures/neon/" + word + ".webp";
+          const tex = new B.Texture(url, scene, true, false, B.Texture.BILINEAR_SAMPLINGMODE, () => {
+            m.diffuseTexture = tex;
+            m.emissiveTexture = tex;
+            m.useAlphaFromDiffuseTexture = true;
+            m.opacityTexture = tex;
+            m.metadata.neonGen = true;
+            neonGen[SIGNS[i].word] = true;
+          }, () => { /* canvas stand-in stays */ });
+          tex.hasAlpha = true;
+        });
+      }).catch(() => { /* stand-ins */ });
+    }
+  } catch (e) { /* NullEngine */ }
   const signPlane = SIGNS.map((sg, i) => {
     const p = B.MeshBuilder.CreatePlane("sign-" + sg.word, { width: 1, height: 0.25 }, scene);
     p.material = signMats[i];
@@ -501,7 +533,9 @@ export function installProps(ctx) {
     [[-11, 24, "#d85a7a"], [-5, 24, "#e6b84a"], [-11, 64, "#9a6ad8"], [-5, 64, "#e6b84a"], [4, 45, "#d85a7a"]].forEach(([x, z, c]) => {
       if (!clearIn(x, z, 0.8)) return;
       solid.bbox(x, LAWN_TOP, z, 2.6, 0.22, 1.3, hex("#5b4636"), 0.04);
+      solid.bend = 0.8; // the flowers lean in the wind
       for (let k = 0; k < 7; k++) solid.ball(x - 1.1 + k * 0.37, LAWN_TOP + 0.3, z + ((k % 2) - 0.5) * 0.5, 0.17, 1, hex(c), 4);
+      solid.bend = 0;
       stats.planters++;
     });
     // lamps and benches along the path (x = -8), on the lawn
@@ -693,6 +727,7 @@ export function installProps(ctx) {
     stats.roofUnits++;
   }
   function antenna(x, y, z, tall) {
+    conductors.push({ x, y: y + tall + 0.4, z, kind: "antenna" });
     roof.frame(x, z, 0);
     roof.bbox(0, y, 0, 0.12, tall, 0.12, METAL, 0.02);
     roof.bbox(0, y + tall * 0.7, 0, 1.4, 0.08, 0.08, METAL, 0.015);
@@ -808,23 +843,54 @@ export function installProps(ctx) {
   const baseBloom = pipeline && pipeline.bloomWeight != null ? pipeline.bloomWeight : 0.16;
   let state = { neon: 0, glow: 0, bloom: baseBloom };
 
+  let neonBuzzAcc = 0;
   /* called from the city's night loop (every 0.3 s) with the same weights it lights the windows by */
   function update(w, lit) {
     const neon = Math.min(1, lit.shops);
     const lamps = Math.min(1, lit.lamps);
-    signMats.forEach((m) => m.emissiveColor.set(0.3 + neon * 1.0, 0.3 + neon * 1.0, 0.3 + neon * 1.0));
+    const t = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+    signMats.forEach((m, i) => {
+      const f = signFlicker[i];
+      // occasional dead tube flicker, otherwise a soft 50–60 Hz shimmer
+      if (f.dead > 0) f.dead -= 0.3;
+      else if (Math.random() < 0.015 * neon) f.dead = 0.15 + Math.random() * 0.35;
+      const shimmer = 0.85 + 0.15 * Math.sin(t * (8 + f.rate) + f.phase);
+      const k = f.dead > 0 ? (Math.random() < 0.55 ? 0.08 : 0.55) : shimmer;
+      const e = (0.3 + neon * 1.0) * k;
+      m.emissiveColor.set(e, e, e);
+    });
     Object.values(spillMats).forEach((m) => m.emissiveColor.set(neon * 0.8, neon * 0.8, neon * 0.8));
     warmMat.emissiveColor.set(0.15 + lamps * 1.35, 0.15 + lamps * 1.35, 0.15 + lamps * 1.2);
     // soft bloom swells as the light goes
     const bloom = baseBloom + 0.16 * Math.min(1, w.dusk * 0.6 + w.night);
     if (pipeline && Math.abs(bloom - pipeline.bloomWeight) > 0.003) pipeline.bloomWeight = bloom;
-    state = { neon, glow: lamps, bloom };
+    // neon buzz: a quiet 120 Hz hum under the signs while Sound is on and neon is up
+    neonBuzzAcc += 0.3;
+    if (neonBuzzAcc > 2.4 && neon > 0.4) {
+      neonBuzzAcc = 0;
+      try {
+        if (window.day && window.day.sfx && window.day.sfx.neonBuzz) window.day.sfx.neonBuzz(neon);
+      } catch (e) { /* sfx optional */ }
+    }
+    state = { neon, glow: lamps, bloom, flicker: true, gen: Object.keys(neonGen).length };
   }
 
   return {
     update,
     info() {
-      return { ...stats, meshes: meshes.length, colliders: colliders.length, signKinds: SIGNS.length, lit: { ...state }, plaza: { ...R.plaza }, needle: { ...R.needle }, tank: { ...R.tank } };
+      return {
+        ...stats,
+        meshes: meshes.length,
+        colliders: colliders.length,
+        signKinds: SIGNS.length,
+        neonGen: Object.keys(neonGen).length,
+        neonWords: SIGNS.map((s) => s.word),
+        lit: { ...state },
+        plaza: { ...R.plaza },
+        needle: { ...R.needle },
+        conductors: conductors.slice(),
+        tank: { ...R.tank },
+      };
     },
   };
 }

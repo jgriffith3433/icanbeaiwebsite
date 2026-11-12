@@ -17,10 +17,20 @@ import "./cityscape.js"; // the city's density: facades, lit windows, fillers, s
 import "./crowd.js"; // the district's people and cars, on the day's clock (thin instances)
 import "./control.js"; // the player can take control of him
 import "./weather.js"; // the day's forecast, and the weather he commands while he's the player's
+import "./mix.js"; // shared buses, reverb zones, HRTF/occlusion, voice duck, Settings sliders (before score/sfx/voice)
 import "./score.js"; // weather music beds, sampled ambience, take-control sting (after weather)
+import "./stems.js"; // the stem score under control: one 4-note motif, three synced layers, stings (after score.js)
+import "./daysound.js"; // autopilot diegetic soundscapes by schedule block (after score: uses ambience bus)
+import "./render-pipeline.js"; // the picture: ACES, a grade LUT per hour and weather, emissive bloom, SSAO2, cascaded shadows (after weather: it follows weather.now())
+import "./sky.js"; // the sky: painted panoramas by the clock, a cloud deck, Sun break god rays, sky reflections (after look, weather and the pipeline)
+import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyline curtains, window runnels, drips, lens drops, height fog (after weather)
+import "./aftermath.js"; // Sun break after rain: steam, rainbow at 42°, dripping gutters, pigeons home, umbrellas fold (after rain + sky)
+import "./ui-art.js"; // UI art kit: verb icons, frames, ranks, busts, fonts (before powers paints the bar)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
+import "./windfog.js"; // wind and fog you can see: a shader bend, ribbons, leaves, flags, cloth, umbrellas, ground-fog slices (after powers, weather, crowd)
 import "./barks.js"; // Small Weather's needs and weather reactions in the log, once each per day (docs/voice-style.md)
 import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
+import "./pilot.js"; // Pilot: the AI that runs his day — schedule nudges, take/let-go, wrist ring (after voice.js)
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
@@ -33,6 +43,7 @@ import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples,
 import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
 import "./daily.js"; // today's request: one neighbour asks for one bit of weather, by the real date (before title.js shows it)
+import "./transition.js"; // storm-cloud wipe, prop fade-in, frame timing around every scene change (before title handoff)
 import "./title.js"; // the title screen: the skyline, Play and Episodes (opens first)
 import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause perf & leak monitor (window.hawkesPerf)
 import HavokPhysics from "@babylonjs/havok";

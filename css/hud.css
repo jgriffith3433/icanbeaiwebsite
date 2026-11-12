@@ -91,6 +91,29 @@ html.touch-ui.in-control .control-btn { bottom: auto; top: max(10px, env(safe-ar
 @media (max-width: 700px) { .settings-pop { position: static; align-items: flex-end; } }
 html.touch-ui .settings-pop { position: static; align-items: flex-end; }
 
+/* Mix sliders (Music / Effects / Voice) — ≥44 px tall hit targets on phone */
+.mix-sliders { display: flex; flex-direction: column; gap: 6px; min-width: 168px; padding: 4px 0; }
+.mix-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; margin: 0; min-height: 44px; justify-content: center; }
+.mix-row .mix-name { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.75; }
+.mix-row input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 28px; margin: 0; background: transparent; cursor: pointer;
+}
+.mix-row input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.22); }
+.mix-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 22px; height: 22px; margin-top: -8px; border-radius: 50%;
+  background: #8ec8ff; border: 2px solid #0b1220; box-shadow: 0 0 0 1px rgba(142,200,255,0.4);
+}
+.mix-row input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.22); }
+.mix-row input[type="range"]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%; border: 2px solid #0b1220; background: #8ec8ff;
+}
+html.touch-ui .mix-row { min-height: 48px; }
+html.touch-ui .mix-row input[type="range"] { height: 44px; }
+html.touch-ui .mix-row input[type="range"]::-webkit-slider-thumb { width: 28px; height: 28px; margin-top: -11px; }
+html.touch-ui .mix-row input[type="range"]::-moz-range-thumb { width: 28px; height: 28px; }
+
 /* ---------- the controls hint ---------- */
 .control-hint {
   position: fixed;
@@ -173,6 +196,7 @@ html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-
 /* a turning-point moment (js/moments.js `play`): one caption line and Skip at the bottom, in the thumb's reach; the rest of the HUD steps aside */
 .mo-cine { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(36px, calc(env(safe-area-inset-bottom) + 28px)); width: min(94vw, 40em); z-index: 39; }
 .mo-cine-tap { position: fixed; inset: 0; z-index: 38; }
+.mo-stamp { position: fixed; inset: 0; z-index: 40; }
 html.cine-up .hud, html.cine-up .side, html.cine-up .hud-left, html.cine-up .abilitybar, html.cine-up .powerpad, html.cine-up .touchpad,
 html.cine-up .control-btn, html.cine-up .control-hint, html.cine-up .public-toggle, html.cine-up .version-tag, html.cine-up .update-pill,
 html.cine-up .quality-btn, html.cine-up .voices-btn, html.cine-up .tutorial, html.cine-up .nb-btn, html.cine-up .ep-btn, html.cine-up .ep-hud,
@@ -256,3 +280,6 @@ html.cold-open .ep-btn, html.cold-open .power-reticle, html.cold-open .pressure,
 html.touch-ui .co-prompt { left: auto; right: var(--safe-r); transform: none; bottom: calc(var(--safe-b) + 232px); }
 html.touch-ui .co-say { bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px)); }
 html.title-up .co-prompt, html.title-up .co-bolt, html.title-up .co-say { visibility: hidden; }
+
+/* ---- the rain's lens: drops on the camera (js/rain.js). Not a control: it never takes a touch or a click. ---- */
+#rain-lens { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; display: none; }

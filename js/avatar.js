@@ -18,8 +18,11 @@
 export const CLIPS = ["idle", "walk", "run", "jump", "fall", "float", "cast"];
 
 /* Clip names in a GLB vary ("Idle", "Armature|run", "SW_Jump"): match by the word. Missing clips fall back. */
-const FALLBACK = { run: "walk", walk: "idle", fall: "jump", jump: "fall", float: "fall", cast: "idle" };
-const LOOPS = new Set(["idle", "walk", "run", "fall", "float"]);
+const FALLBACK = {
+  run: "walk", walk: "idle", fall: "jump", jump: "fall", float: "fall", cast: "idle",
+  windbolt: "cast", windrain: "cast", lookup: "idle", triumph: "cast", shelter: "idle", window: "sit",
+};
+const LOOPS = new Set(["idle", "walk", "run", "fall", "float", "shelter", "window"]);
 
 export function clipAvatar(root, animationGroups, opts = {}) {
   const names = opts.clips || CLIPS; // js/small-weather.js adds the day's clips (sit, type, lie...)

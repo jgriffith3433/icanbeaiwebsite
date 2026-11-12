@@ -129,14 +129,20 @@ export function startAbilityBar(abilities, onPress, opt) {
 .abilitybar{z-index:6;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;font:600 0.74rem/1.15 system-ui,sans-serif;color:#e7eef8}
 .abilitybar[hidden]{display:none}
 .abilitybar .row{display:flex;gap:8px}
-.abilitybar .ab{position:relative;width:64px;height:64px;box-sizing:border-box;border-radius:12px;border:1px solid rgba(126,200,255,.55);background:rgba(10,14,22,.62);overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;pointer-events:auto;cursor:pointer;touch-action:none}
-.abilitybar .ab .k{font-size:1.05rem;color:#9fd4ff;letter-spacing:.04em}
-.abilitybar .ab .n{font-size:.66rem;opacity:.85}
-.abilitybar .ab .c{position:absolute;top:3px;right:5px;font-size:.62rem;color:#7ec8ff}
-.abilitybar .ab .sweep{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(3,6,12,.72)}
-.abilitybar .ab .cd{position:absolute;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;padding:1px 0;font-size:.7rem;line-height:1;color:#fff;background:rgba(3,6,12,.8)}
+.abilitybar .ab{position:relative;width:64px;height:64px;box-sizing:border-box;border-radius:14px;border:1px solid rgba(126,200,255,.55);background:rgba(10,14,22,.72);overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;pointer-events:auto;cursor:pointer;touch-action:none}
+.abilitybar .ab .face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:transform 80ms ease}
+.abilitybar .ab:active .face,.abilitybar .ab.pressed .face{transform:scale(.9)}
+.abilitybar .ab .ico{width:70%;height:70%;object-fit:contain;pointer-events:none;filter:drop-shadow(0 0 6px rgba(126,200,255,.25))}
+.abilitybar .ab .k,.abilitybar .ab .n{display:none}
+.abilitybar .ab .c{position:absolute;top:3px;right:5px;z-index:2;font-size:.62rem;color:#7ec8ff;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.abilitybar .ab .wipe{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;background:conic-gradient(from -90deg,rgba(3,6,12,.78) calc(var(--cd,0)*360deg),transparent 0)}
+.abilitybar .ab.cooling .wipe{opacity:1}
+.abilitybar .ab .cd{position:absolute;left:0;right:0;bottom:0;z-index:2;display:none;align-items:center;justify-content:center;padding:1px 0;font-size:.7rem;line-height:1;color:#fff;background:transparent;text-shadow:0 1px 4px rgba(0,0,0,.9)}
 .abilitybar .ab.cooling .cd{display:flex}
-.abilitybar .ab.cooling .k,.abilitybar .ab.cooling .n{opacity:.5}
+.abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor){border-color:#9fd4ff;box-shadow:0 0 0 1px rgba(159,212,255,.35),0 0 18px rgba(126,200,255,.75)}
+.abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor) .ico{filter:drop-shadow(0 0 10px rgba(126,200,255,.85)) brightness(1.12)}
+.abilitybar .ab.locked .ico{filter:grayscale(1) brightness(.7);opacity:.55}
+.abilitybar .ab.cooling .ico{opacity:.55;filter:grayscale(.35) brightness(.85)}
 .abilitybar .ab.poor{border-color:rgba(196,85,74,.7)}
 .abilitybar .ab.poor .k{color:#e08a80}
 .abilitybar .ab.locked{opacity:.38;border-style:dashed;filter:grayscale(1)}
@@ -169,10 +175,10 @@ html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(52px,-40px)}
 html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(62px,18px)}
 html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(40px,68px)}
 html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(-8px,86px)}
-html.touch-ui .abilitybar .ab .k{display:none}
-html.touch-ui .abilitybar .ab .n{font-size:.55rem;opacity:1;color:#d5e8ff;white-space:nowrap}
+html.touch-ui .abilitybar .ab .ico{width:78%;height:78%}
 html.touch-ui .abilitybar .ab .c{top:2px;right:4px;font-size:.58rem}
-html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:.85rem;background:rgba(3,6,12,.55);border-radius:50%}
+html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:.85rem;background:transparent;border-radius:50%}
+html.touch-ui .abilitybar .ab .wipe{border-radius:50%}
 @media (orientation:landscape) and (max-height:520px){
   html.touch-ui .abilitybar{width:210px;height:118px}
   html.touch-ui .abilitybar .row{width:210px;height:118px}
@@ -210,17 +216,26 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
   const slots = {};
   const HOLD_VERBS = new Set(["bolt", "wind"]);
 
+  function iconUrl(id, lit) {
+    const art = window.uiArt || (window.day && window.day.uiArt);
+    if (art && art.verbIcon) return art.verbIcon(id, lit);
+    return `textures/ui/verb-${id}-${lit ? "lit" : "unlit"}.svg`;
+  }
   function slot(a, verbIndex) {
     const b = document.createElement("div");
     b.className = "ab";
     b.id = "ability-" + a.id;
     b.dataset.ability = a.id;
+    b.dataset.hawkesUi = "1";
     b.dataset.touch = verbs.includes(a.id) ? "1" : "0";
     if (verbIndex >= 0) b.dataset.verb = String(verbIndex);
     b.setAttribute("role", "button");
-    b.setAttribute("aria-label", `${a.name}, key ${String(a.key).toUpperCase()}, costs ${a.cost} Charge`);
-    b.innerHTML = `<span class="c">${a.cost}</span><span class="k">${String(a.key).toUpperCase()}</span><span class="n">${a.name}</span><span class="sweep"></span><span class="cd"></span>`;
+    b.setAttribute("aria-label", `${a.name}, costs ${a.cost} Charge`);
+    b.innerHTML = `<span class="face"><img class="ico" alt="" draggable="false"/><span class="wipe" aria-hidden="true"></span></span><span class="c">${a.cost}</span><span class="cd"></span>`;
+    const ico = b.querySelector(".ico");
+    ico.src = iconUrl(a.id, true);
     const down = (e) => {
+      b.classList.add("pressed");
       if (HOLD_VERBS.has(a.id) && onHold) {
         onHold(a.id, true);
         b.classList.add("held");
@@ -228,6 +243,7 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
       e.preventDefault();
     };
     const up = (e) => {
+      b.classList.remove("pressed");
       if (HOLD_VERBS.has(a.id) && onHold) {
         onHold(a.id, false);
         b.classList.remove("held");
@@ -239,7 +255,7 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
     b.addEventListener("pointercancel", up);
     b.addEventListener("pointerleave", (e) => { if (e.buttons) up(e); });
     row.appendChild(b);
-    slots[a.id] = { b, sweep: b.querySelector(".sweep"), cd: b.querySelector(".cd") };
+    slots[a.id] = { b, wipe: b.querySelector(".wipe"), cd: b.querySelector(".cd"), ico };
   }
 
   window.addEventListener("day:power", (e) => {
@@ -292,13 +308,23 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
         if (h && h.remaining > remaining) { remaining = h.remaining; fraction = h.fraction; }
         if (h && h.active) active = true;
       }
-      sl.b.classList.toggle("cooling", remaining > 0.05);
+      const cooling = remaining > 0.05;
+      const ready = !locked && !cooling && affordable;
+      sl.b.classList.toggle("cooling", cooling);
       sl.b.classList.toggle("locked", locked);
       sl.b.classList.toggle("poor", !affordable && !locked);
       sl.b.classList.toggle("active", active);
-      sl.sweep.style.height = Math.round(fraction * 100) + "%";
-      sl.cd.textContent = remaining > 0.05 ? remaining.toFixed(remaining < 10 ? 1 : 0) : "";
-      sl.b.dataset.state = locked ? "locked" : remaining > 0.05 ? "cooldown" : affordable ? "ready" : "energy";
+      sl.b.classList.toggle("ready", ready);
+      if (sl.wipe) sl.wipe.style.setProperty("--cd", String(Math.max(0, Math.min(1, fraction))));
+      sl.cd.textContent = cooling ? remaining.toFixed(remaining < 10 ? 1 : 0) : "";
+      if (sl.ico) {
+        const next = iconUrl(id, ready || active);
+        if (sl.ico.dataset.src !== next) {
+          sl.ico.dataset.src = next;
+          sl.ico.src = next;
+        }
+      }
+      sl.b.dataset.state = locked ? "locked" : cooling ? "cooldown" : affordable ? "ready" : "energy";
     });
     // Hide any non-verb slots left over from an older paint (storm etc. never get slots now).
     Object.keys(slots).forEach((id) => {

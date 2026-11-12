@@ -385,6 +385,22 @@ export function buildFigure(B, scene, id, look, scale = 1) {
         a.sh.rotation.z = -a.dir * 0.25 * k;
       });
       torso.rotation.x = -0.1 * k;
+    } else if (name === "work") {
+      // Dex patching a turbine: reach up along a blade, lean in, a small twist of the wrist
+      const twist = Math.sin(t * 7) * 0.18 * k;
+      arms[1].sh.rotation.x = -2.35 * k;
+      arms[1].sh.rotation.z = (-0.15 + twist) * k;
+      arms[1].el.rotation.x = -0.45 * k;
+      arms[1].wr.rotation.z = twist * 1.4;
+      arms[0].sh.rotation.x = -1.1 * k;
+      arms[0].sh.rotation.z = 0.35 * k;
+      arms[0].el.rotation.x = -0.55 * k;
+      head.rotation.x = -0.55 * k;
+      neck.rotation.x = -0.18 * k;
+      torso.rotation.x = -0.14 * k;
+      torso.rotation.z = 0.08 * k;
+      legs[0].hip.rotation.x = 0.18 * k;
+      legs[1].hip.rotation.x = -0.12 * k;
     }
   }
 
@@ -457,7 +473,7 @@ export function buildFigure(B, scene, id, look, scale = 1) {
   /**
    * One animation frame. ctx:
    *   dt, speed (m/s ground), moving, yawErr (rad), sit, weather ('rain'|'storm'|'sun'|...),
-   *   sunShield (0..1), gesture ('ask'|'thanks'|'surprise'|null), personality ('phone'|'plants'|...),
+   *   sunShield (0..1), gesture ('ask'|'thanks'|'surprise'|'work'|null), personality ('phone'|'plants'|...),
    *   jump (true = big teleport: reset plants)
    */
   function step(ctx) {
@@ -485,10 +501,18 @@ export function buildFigure(B, scene, id, look, scale = 1) {
       anim.gesture = ctx.gesture;
       anim.gestureT = 0;
     }
-    const gestDur = anim.gesture === "thanks" ? 1.8 : anim.gesture === "surprise" ? 1.5 : anim.gesture === "react" ? 1.2 : 2.2;
+    const gestDur = anim.gesture === "thanks" ? 1.8
+      : anim.gesture === "surprise" ? 1.5
+      : anim.gesture === "react" ? 1.2
+      : anim.gesture === "work" ? 6.5
+      : 2.2;
     if (anim.gesture) {
       anim.gestureT += dt;
-      if (anim.gestureT > gestDur) anim.gesture = null;
+      // work loops while the ending still wants it (ctx.gesture stays "work")
+      if (anim.gestureT > gestDur) {
+        if (anim.gesture === "work" && ctx.gesture === "work") anim.gestureT = 0;
+        else anim.gesture = null;
+      }
     }
 
     // weather blend

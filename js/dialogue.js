@@ -80,6 +80,17 @@ export function dialogueLines(config) {
     [st.ask, st.call, st.thanks].forEach((t) => add(who, t, `street:${st.id}`));
     if (st.then) add(who, st.then.thanks, `street:${st.id}-then`);
   });
+  // Personal arcs (neighbors.arcs): cue / ask / thanks / payoff lines in each speaker's voice.
+  const arcs = (C.neighbors && C.neighbors.arcs && C.neighbors.arcs.list) || {};
+  Object.keys(arcs).forEach((id) => {
+    const p = people.find((x) => x.id === id);
+    const who = p ? neighborWho(p) : id;
+    (arcs[id].beats || []).forEach((b) => {
+      (b.lines || []).forEach((L) => add(L.who, L.text, `arc:${b.id}`));
+      if (b.text) add(who, b.text, `arc:${b.id}:ask`);
+      if (b.thanks) add(who, b.thanks, `arc:${b.id}:thanks`);
+    });
+  });
   // The autopilot's memory steps (`say` on a spine step or a pool entry with `remembers`): his voice.
   const walk = (steps, where) => (steps || []).forEach((st) => {
     if (!st) return;
@@ -98,6 +109,13 @@ export function dialogueLines(config) {
   // The cold open's lines ([who, text] pairs in coldopen.lines): his in Eric's voice, Birdie's in hers.
   const cold = (C.coldopen && C.coldopen.lines) || {};
   Object.keys(cold).forEach((k) => add(cold[k][0], cold[k][1], `coldopen:${k}`));
+  // The chapter openers' lines (day.config.js `chapters`): his in Eric's voice; Pilot's are `pilot.lines`, not here.
+  (C.arc || []).forEach((ch) => ((ch.opener && ch.opener.lines) || []).forEach((L) => { if (L.who !== "Pilot") add(L.who, L.text, `chapter:${ch.id}`); }));
+  // Part 3 ending scenes (episodes.endings.scenes): Birdie / Dex / He; Pilot's are `pilot.lines`.
+  const scenes = (C.episodes && C.episodes.endings && C.episodes.endings.scenes) || {};
+  Object.keys(scenes).forEach((id) => ((scenes[id] && scenes[id].lines) || []).forEach((L) => {
+    if (L.who && L.who !== "Pilot") add(L.who, L.text, `ending:${id}`);
+  }));
   return out;
 }
 

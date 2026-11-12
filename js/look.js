@@ -5,6 +5,7 @@
    that blends day / dusk / night and weather state (weather.js calls setSky),
    controlled bloom on emissives, and a quality toggle for phones.
    ========================================================================== */
+import { installSurfaces } from "./surfaces.js";
 const B = window.BABYLON;
 
 const TILE = 64;
@@ -440,6 +441,30 @@ export function installLook(world) {
           uniform vec3 horizonColor;
           uniform vec3 skyTint;
           uniform vec4 weather;
+          uniform sampler2D pano0;
+          uniform sampler2D pano1;
+          uniform sampler2D pano2;
+          uniform sampler2D pano3;
+          uniform sampler2D pano4;
+          uniform sampler2D pano5;
+          uniform vec3 panoA;   // weights of dawn, noon, golden
+          uniform vec3 panoB;   // weights of dusk, night, storm
+          uniform vec2 panoOn;  // x: painted skies loaded (0..1), y: yaw of the picture (turns)
+
+          // The painted skies are equirect: one sample per lit panorama, no mipmaps (the atan wrap can't show a seam line).
+          vec3 panoSky(vec3 dir, float lift) {
+            float u = fract(atan(dir.x, dir.z) / 6.2831853 + 0.5 + panoOn.y);
+            float v = clamp(0.5 + asin(clamp(dir.y, -1.0, 1.0)) / 3.14159265 + lift, 0.0, 1.0);
+            vec2 uv = vec2(u, v);
+            vec3 c = vec3(0.0);
+            if (panoA.x > 0.002) c += texture2D(pano0, uv).rgb * panoA.x;
+            if (panoA.y > 0.002) c += texture2D(pano1, uv).rgb * panoA.y;
+            if (panoA.z > 0.002) c += texture2D(pano2, uv).rgb * panoA.z;
+            if (panoB.x > 0.002) c += texture2D(pano3, uv).rgb * panoB.x;
+            if (panoB.y > 0.002) c += texture2D(pano4, uv).rgb * panoB.y;
+            if (panoB.z > 0.002) c += texture2D(pano5, uv).rgb * panoB.z;
+            return c;
+          }
 
           float hash2(vec2 p) {
             vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -487,7 +512,14 @@ export function installLook(world) {
 
             sky = mix(sky, skyTint * 0.88, cover * 0.65);
 
-            if (up > 0.01) {
+            float painted = panoOn.x;
+            if (painted > 0.001) {
+              // the painted sky, with the same horizon lift as the procedural one so the two cross-fade without a jump
+              vec3 pc = panoSky(dir, 0.0);
+              sky = mix(sky, pc, painted);
+            }
+
+            if (up > 0.01 && painted < 0.999) {
               vec2 cloudUv = dir.xz / (up + 0.38) * 1.6 + vec2(t * 0.018, t * 0.008);
               float n = fbm2(cloudUv);
               float thresh = mix(0.58, 0.25, cover);
@@ -498,10 +530,10 @@ export function installLook(world) {
               vec3 cCol = mix(cLight, cStorm, cover * 0.85);
               float rim = smoothstep(0.48, 0.72, n) * (storm * 0.35 + flash * 0.75);
               cCol += vec3(0.35, 0.68, 1.0) * rim;
-              sky = mix(sky, cCol, cMask * (0.35 + cover * 0.55));
+              sky = mix(sky, cCol, cMask * (0.35 + cover * 0.55) * (1.0 - painted));
             }
 
-            if (weights.z > 0.25 && up > 0.15 && cover < 0.75) {
+            if (weights.z > 0.25 && up > 0.15 && cover < 0.75) { // twinkle sits on the painted stars too
               vec2 starCell = floor(dir.xz / (up + 0.25) * 90.0);
               float s = hash2(starCell);
               if (s > 0.9965) {
@@ -510,13 +542,17 @@ export function installLook(world) {
               }
             }
 
-            float horBlend = smoothstep(-0.04, 0.22, h);
+            // the horizon: the sky meets the fog's colour over a band of sky, never a line (a painted sky is blended lower, so its glow stays)
+            float horBlend = smoothstep(-0.04, mix(0.22, 0.12, painted), h);
             vec3 finalCol = mix(horizonColor, sky, horBlend);
+            // a lightning flash lights the whole dome a little
+            finalCol += vec3(0.30, 0.42, 0.62) * flash * (0.25 + 0.5 * cover) * smoothstep(0.0, 0.5, h + 0.1);
             gl_FragColor = vec4(finalCol, 1.0);
           }`,
       }, {
         attributes: ["position"],
-        uniforms: ["worldViewProjection", "weights", "horizonColor", "skyTint", "weather"],
+        uniforms: ["worldViewProjection", "weights", "horizonColor", "skyTint", "weather", "panoA", "panoB", "panoOn"],
+        samplers: ["pano0", "pano1", "pano2", "pano3", "pano4", "pano5"],
       });
       skyMat.backFaceCulling = false;
       skyMat.disableDepthWrite = false;
@@ -524,6 +560,9 @@ export function installLook(world) {
       skyMat.setVector3("horizonColor", new B.Vector3(0.5, 0.62, 0.74));
       skyMat.setVector3("skyTint", new B.Vector3(0.5, 0.62, 0.74));
       skyMat.setVector4("weather", new B.Vector4(0, 0, 0, 0));
+      skyMat.setVector3("panoA", new B.Vector3(0, 0, 0));
+      skyMat.setVector3("panoB", new B.Vector3(0, 0, 0));
+      skyMat.setVector2("panoOn", new B.Vector2(0, 0)); // js/sky.js loads the painted skies, fills the samplers and turns this on
       // Big enough that the farthest skyline towers (about 400 m out) stand in front of it, inside camera.maxZ (600).
       dome = B.MeshBuilder.CreateSphere("skyDome", { diameter: 1100, segments: 24 }, scene);
       dome.material = skyMat;
@@ -550,6 +589,10 @@ export function installLook(world) {
   let lastSnow = -1;
   let lastIbl = -1;
   let lastLow = null;
+  let smoothExp = 0.94;
+  let smoothFog = 0.0045;
+  let lastHourLook = null;
+  let scrubUntil = 0;
   scene.fogMode = B.Scene.FOGMODE_EXP2;
 
   function weightsNow() {
@@ -570,11 +613,15 @@ export function installLook(world) {
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     engine.setHardwareScalingLevel(low ? 1 : 1 / Math.min(dpr, 1.5));
     if (pipeline) {
-      pipeline.bloomEnabled = !low;
+      // Low (phones) keeps the tonemap, the grade and a half-res bloom; FXAA stays high-only (js/render-pipeline.js does the rest:
+      // one 1024 shadow cascade, no SSAO, no aberration).
+      pipeline.bloomEnabled = true;
+      pipeline.bloomKernel = low ? 16 : 24;
+      pipeline.bloomScale = 0.5;
       pipeline.samples = 1;
       pipeline.fxaaEnabled = !low;
     }
-    if (sun) sun.shadowEnabled = !low;
+    if (sun) sun.shadowEnabled = true;
     if (glow) {
       glow.intensity = low ? 0.35 : 0.55;
       glow.blurKernelSize = 16;
@@ -603,8 +650,24 @@ export function installLook(world) {
     w.dusk /= s;
     w.night /= s;
     const defaultExp = 0.94 * w.day + 0.85 * w.dusk + 0.78 * w.night;
-    const exposure = override && override.exposure != null ? override.exposure : defaultExp;
-    const fogDensity = override && override.fogDensity != null ? override.fogDensity : 0.0045 + w.night * 0.0038 + w.dusk * 0.0015;
+    const defaultFog = 0.0045 + w.night * 0.0038 + w.dusk * 0.0015;
+    // Weather overrides (lightning flash, storm) snap; only the clock's own exposure/fog crossfades on a scrub.
+    const hourNow = clockHour();
+    const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (lastHourLook != null) {
+      let dh = Math.abs(hourNow - lastHourLook);
+      if (dh > 12) dh = 24 - dh;
+      if (dh > 0.05) scrubUntil = nowMs + 1400;
+    }
+    lastHourLook = hourNow;
+    const eng = scene.getEngine && scene.getEngine();
+    const dt = Math.min(0.1, ((eng && eng.getDeltaTime ? eng.getDeltaTime() : 16) / 1000));
+    const tau = nowMs < scrubUntil ? 0.7 : 0.25;
+    const k = 1 - Math.exp(-dt / tau);
+    smoothExp += (defaultExp - smoothExp) * k;
+    smoothFog += (defaultFog - smoothFog) * k;
+    const exposure = override && override.exposure != null ? override.exposure : smoothExp;
+    const fogDensity = override && override.fogDensity != null ? override.fogDensity : smoothFog;
     if (pipeline && pipeline.imageProcessing) {
       const safeExp = Math.abs(exposure - 1) < 1e-4 ? 1.0002 : exposure;
       const ipc = pipeline.imageProcessing.imageProcessingConfiguration;
@@ -680,7 +743,7 @@ export function installLook(world) {
           else m.albedoColor.set(r, g, b);
           if (meta.wet) {
             const wEff = Math.max(wet, surfaceWet * 0.78);
-            const wetRough = Math.max(0.2, dryRough - wEff * 0.54);
+            const wetRough = Math.max(0.15, dryRough - wEff * 0.72); // wet: about 0.15 on a full downpour
             m.roughness = wetRough + (0.9 - wetRough) * snowK;
             if (m.clearCoat) {
               const wantCoat = !low; // always on at high quality (intensity carries the wetness): no mid-play recompile
@@ -780,6 +843,10 @@ export function installLook(world) {
   };
   scene.metadata = scene.metadata || {};
   scene.metadata.dayLook = api;
+  if (typeof document !== "undefined") api.surfaces = installSurfaces(api, scene); // Gen PBR sets, once the page is up
+  api.skyDome = dome; // js/sky.js: the painted panoramas, cloud deck, god rays and the sky's reflections hang off these
+  api.skyMat = skyMat;
+  api.override = () => override;
   world.look = api;
   if (window.day) window.day.look = api;
   return api;

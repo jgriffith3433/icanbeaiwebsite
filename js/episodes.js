@@ -274,7 +274,12 @@ export function episodeDone(best, id) {
 
 /** The playable episodes in menu order (the tutorial is always open and is not part of the chain). */
 export function chainOf(list) {
-  return (Array.isArray(list) ? list : []).filter((e) => e && e.id && !e.tutorial);
+  // the story's order is the chapters' (`ep.chapter`); inside a chapter, the list's own order
+  return (Array.isArray(list) ? list : [])
+    .filter((e) => e && e.id && !e.tutorial)
+    .map((e, i) => ({ e, i }))
+    .sort((a, b) => (a.e.chapter || 0) - (b.e.chapter || 0) || a.i - b.i)
+    .map((x) => x.e);
 }
 
 /** Why an episode is locked: the title of the episode before it that is not finished yet, or null when it is open.
@@ -363,7 +368,9 @@ html.touch-ui .ep-btn{display:inline-flex;align-items:center;justify-content:cen
 html.touch-ui .ep-hud{width:min(420px,calc(100vw - 24px))}
 .ep-hud[hidden]{display:none}
 .ep-hud .ep-card{pointer-events:auto;background:rgba(10,14,22,.72);border:1px solid rgba(126,200,255,.35);border-radius:16px;padding:12px 14px;backdrop-filter:blur(14px)}
-.ep-hud h3{margin:0 0 4px;font-size:0.95rem;letter-spacing:.02em}
+.ep-hud li .g-ico{flex:0 0 22px;width:22px;height:22px;margin-top:1px;object-fit:contain;filter:drop-shadow(0 0 6px rgba(126,200,255,.45))}
+.ep-hud .prompt .g-ico{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
+.ep-hud h3{margin:0 0 4px;font-size:0.95rem;letter-spacing:.02em;font-family:Fraunces,Georgia,serif}
 .ep-hud .tag{margin:0 0 8px;color:rgba(231,238,248,.7);font-weight:500}
 .ep-hud ul{margin:0;padding:0;list-style:none}
 .ep-hud li{display:flex;gap:8px;align-items:flex-start;margin:4px 0;color:rgba(231,238,248,.88)}
@@ -390,7 +397,8 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
 .ep-hud .rankline b{font-size:1.15rem;color:#f6f1e8}
 .ep-hud .pieceline{margin-top:6px;color:#9fd4ff}
 .ep-hud .pieceline.late{color:#e58a7a}
-.ep-panel .rank{margin:6px 0 0;font:800 4rem/1 Outfit,system-ui,sans-serif;letter-spacing:.02em;color:#f0c27a}
+.ep-panel .rank{margin:6px 0 0;font:800 4rem/1 Outfit,system-ui,sans-serif;letter-spacing:.02em;color:#f0c27a;text-align:center}
+.ep-panel .rank .ui-rank-img{display:block;width:72px;height:72px;margin:0 auto 2px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(126,200,255,.35))}
 .ep-panel .rank.r-S{color:#ffe08a;text-shadow:0 0 22px rgba(255,224,138,.6)}.ep-panel .rank.r-A{color:#8dceb0}.ep-panel .rank.r-B{color:#9fd4ff}.ep-panel .rank.r-C{color:#e58a7a}
 .ep-panel .rankdetail{font-size:.9rem;color:rgba(246,241,232,.75);margin:2px 0 8px}
 .ep-say{z-index:22;transform:translate(-50%,8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;max-width:min(520px,calc(100vw - 28px));padding:10px 16px;border-radius:14px;background:#f6f1e8;color:#1a1c22;font:600 0.9rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.45)}
@@ -421,10 +429,14 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
 .ep-panel .nextline{margin:8px 0 0;font-size:.82rem;color:rgba(246,241,232,.55)}
 .ep-panel button[disabled]{opacity:.45;cursor:default}
 .ep-menu .ep-row.locked{opacity:.5;cursor:default}
-.ep-menu .ep-row .rk{display:inline-block;min-width:1.2em;margin-right:6px;font-weight:800;color:#f0c27a}
+.ep-menu .ep-row .rk{display:inline-block;min-width:1.2em;margin-right:6px;font-weight:800;color:#f0c27a;vertical-align:-2px}
+.ep-menu .ep-row .rk.ui-rank-inline{width:1.35em;height:1.35em;min-width:1.35em;background:center/contain no-repeat var(--ui-rank);color:transparent;text-shadow:none;overflow:hidden}
 .ep-menu .ep-list{max-height:min(60vh,520px);overflow:auto}
 .ep-panel .unlockline{margin:6px 0 0;font-size:.9rem;color:#9fd4ff;font-weight:700}
 .ep-menu .ep-row.chal{padding-left:24px;border-style:dashed}
+.ep-menu .ep-chapter{display:flex;flex-direction:column;gap:1px;margin:12px 2px 2px;padding:0 2px;color:#f6f1e8}
+.ep-menu .ep-chapter b{font:700 .72rem Outfit,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#7ec8ff}
+.ep-menu .ep-chapter small{font:italic 500 .95rem Fraunces,Georgia,serif;opacity:.85}
 .ep-menu .ep-row.chal[disabled]{opacity:.45;cursor:default}
 .ep-panel .bestline{font-size:0.82rem;color:rgba(246,241,232,.55)}
 .ep-ending .ep-panel{width:min(520px,100%)}
@@ -437,6 +449,27 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
 .ep-ending .lastline{font-size:1.05rem;color:#f6f1e8;margin:10px 0 4px}
 .ep-ending .lastline i{display:block;font-style:normal;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#7ec8ff}
 .ep-ending .tally{font-size:.85rem;color:#9fd4ff;margin:0 0 6px}
+.ep-credits,.ep-post{position:fixed;inset:0;z-index:24;display:flex;align-items:flex-end;justify-content:center;pointer-events:none;padding:max(18px,env(safe-area-inset-top)) 18px max(28px,calc(env(safe-area-inset-bottom) + 18px))}
+.ep-credits[hidden],.ep-post[hidden]{display:none}
+.ep-credits{background:linear-gradient(180deg,rgba(4,6,12,.15) 0%,rgba(4,6,12,.55) 42%,rgba(4,6,12,.82) 100%);pointer-events:auto}
+.ep-credits .roll{width:min(420px,100%);text-align:center;color:#f6f1e8;font:500 1rem/1.45 Outfit,system-ui,sans-serif;transform:translateY(40vh);animation:epCreditsUp var(--ep-credits-secs,26s) linear forwards}
+.ep-credits .roll .kicker{margin:0 0 4px;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:#9fd4ff}
+.ep-credits .roll h2{margin:0 0 18px;font:700 clamp(1.35rem,5vw,1.8rem)/1.15 Fraunces,Georgia,serif}
+.ep-credits .cast{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.ep-credits .cast li{margin:0}
+.ep-credits .cast b{display:block;font-size:max(14px,.95rem);font-weight:700;color:#f6f1e8}
+.ep-credits .cast span{display:block;font-size:max(14px,.82rem);color:rgba(246,241,232,.7);margin-top:2px}
+.ep-credits .skip,.ep-post .skip{pointer-events:auto;appearance:none;border:1px solid rgba(246,241,232,.28);background:rgba(14,16,22,.72);color:#f6f1e8;border-radius:12px;padding:12px 18px;min-height:44px;min-width:44px;font:600 .9rem Outfit,system-ui,sans-serif;cursor:pointer;position:absolute;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom) + 14px));transform:translateX(-50%)}
+@keyframes epCreditsUp{from{transform:translateY(42vh)}to{transform:translateY(-110%)}}
+.ep-post{align-items:center;background:rgba(6,8,14,.62);pointer-events:auto}
+.ep-post .card{width:min(420px,100%);background:rgba(14,16,22,.92);border:1px solid rgba(246,241,232,.18);border-radius:18px;padding:20px 20px 16px;color:#f6f1e8;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.ep-post .kicker{margin:0 0 4px;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:#9fd4ff}
+.ep-post h2{margin:0 0 8px;font:700 max(16px,1.15rem)/1.25 Fraunces,Georgia,serif}
+.ep-post p{margin:0 0 14px;font-size:max(14px,.95rem);color:rgba(246,241,232,.82);line-height:1.4}
+.ep-post .skip{position:static;transform:none;background:#f0c27a;color:#1a1c22;border-color:transparent}
+@media (max-width:700px){
+  .ep-credits .cast b,.ep-credits .cast span,.ep-post h2,.ep-post p{font-size:max(14px,1rem)}
+}
 .ep-menu .ep-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 .ep-menu .ep-row{display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:100%;gap:2px}
 .ep-menu .ep-row small{font-weight:500;color:rgba(246,241,232,.55)}
@@ -480,6 +513,19 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   closeEl.hidden = true;
   closeEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><p class="kicker"></p><h2></h2><p class="scene"></p><ul class="fared"></ul><ul class="neighbors"></ul><p class="lastline"></p><p class="tally"></p><div class="actions"><button type="button" class="primary again"></button></div></div>`;
 
+  /* Credits flyover (Night Show payoff): cast scroll over a crane-out shot, then tomorrow's sky request. */
+  const creditsEl = document.createElement("div");
+  creditsEl.id = "credits-roll";
+  creditsEl.className = "ep-credits";
+  creditsEl.hidden = true;
+  creditsEl.innerHTML = `<div class="roll" aria-live="polite"><p class="kicker"></p><h2></h2><ul class="cast"></ul></div><button type="button" class="skip">Skip</button>`;
+
+  const postEl = document.createElement("div");
+  postEl.id = "post-credits";
+  postEl.className = "ep-post";
+  postEl.hidden = true;
+  postEl.innerHTML = `<div class="card" role="dialog" aria-modal="true"><p class="kicker"></p><h2></h2><p class="ask"></p><button type="button" class="skip">Continue</button></div>`;
+
   const menu = document.createElement("div");
   menu.id = "episode-menu";
   menu.className = "ep-menu";
@@ -499,7 +545,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   say.setAttribute("aria-live", "polite");
 
   (document.getElementById("hud-left") || document.body).append(menuBtn);
-  document.body.append(hud, offer, scoreEl, endEl, closeEl, menu, toast, say);
+  document.body.append(hud, offer, scoreEl, endEl, closeEl, creditsEl, postEl, menu, toast, say);
 
   const hudTitle = hud.querySelector("h3");
   const hudTag = hud.querySelector(".tag");
@@ -917,14 +963,24 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     hudTitle.textContent = active.ep.title;
     hudTag.textContent = active.ep.tagline || "";
     hudList.innerHTML = "";
+    const art = window.uiArt || (window.day && window.day.uiArt);
     active.goals.forEach((g) => {
       const li = document.createElement("li");
       if (g.done) li.className = "done";
       else if (g.failed) li.className = "failed";
       const markEl = document.createElement("i");
       markEl.textContent = g.done ? "✓" : g.failed ? "✗" : "·";
+      const verb = art && art.goalVerb ? art.goalVerb(g, active.ep.pieces) : (g.power || null);
+      if (verb && art && art.verbIcon) {
+        const ico = document.createElement("img");
+        ico.className = "g-ico";
+        ico.alt = "";
+        ico.src = art.verbIcon(verb, !g.done && !g.failed);
+        li.appendChild(ico);
+      }
       const label = document.createElement("span");
       let text = g.label || g.id;
+      if (art && art.stripKeyLetters) text = art.stripKeyLetters(text);
       if ((g.kind === "ability-in" && g.count > 1) || g.kind === "rods" || g.kind === "bolts" || g.kind === "timed-bolts" || g.kind === "debris" || g.kind === "help" || g.kind === "show-hits" || g.kind === "show-variety") {
         const need = g.count | 0;
         const have = Math.min(need, g.progress | 0);
@@ -967,7 +1023,20 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (active.ep.tutorial) hudRank.hidden = true;
     const cur = active.ep.tutorial ? currentTutorialGoal(active) : null;
     hudPrompt.hidden = !cur;
-    hudPrompt.textContent = cur ? cur.prompt || "" : "";
+    if (cur) {
+      const artP = window.uiArt || (window.day && window.day.uiArt);
+      const prompt = artP && artP.stripKeyLetters ? artP.stripKeyLetters(cur.prompt || "") : (cur.prompt || "");
+      const verbP = artP && artP.goalVerb ? artP.goalVerb(cur, active.ep.pieces) : (cur.power || null);
+      hudPrompt.textContent = "";
+      if (verbP && artP && artP.verbIcon) {
+        const ico = document.createElement("img");
+        ico.className = "g-ico";
+        ico.alt = "";
+        ico.src = artP.verbIcon(verbP, true);
+        hudPrompt.appendChild(ico);
+      }
+      hudPrompt.appendChild(document.createTextNode(prompt));
+    } else hudPrompt.textContent = "";
     hudSkip.hidden = !active.ep.tutorial;
     if (active.show) paintCue();
     else if (active.ep.cue) {
@@ -1522,6 +1591,203 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   let stageHold = false; // keep the stage up after the show for the score and closing cards
   let pendingClosing = null;
   let closeAuto = 0;
+  let creditsOn = null; // { t0, secs, cfg, card, timer }
+  let postOn = null; // { t0, secs, ask, timer }
+  let lastFinale = null; // last night finale cfg (for credits after endQuiet)
+  function clearRoofStands() {
+    const N = day.neighbors;
+    if (!N || !N.stand) return;
+    ["birdie", "dex", "quill"].forEach((id) => { try { N.stand(id, null, null); } catch (e) { /* */ } });
+  }
+  function placeRoofs(F) {
+    const N = day.neighbors;
+    if (!N || !N.stand || !F || !F.roofs) return [];
+    const placed = [];
+    F.roofs.forEach((r) => {
+      if (N.stand(r.id, r.x, r.z)) {
+        if (N.gesture && r.gesture) N.gesture(r.id, r.gesture);
+        placed.push({ id: r.id, who: r.who, x: r.x, z: r.z });
+      }
+    });
+    return placed;
+  }
+  function speakFarewell(F) {
+    const text = (F && F.farewell && F.farewell.text) || (window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.farewell);
+    if (!text) return false;
+    const id = (F && F.farewell && F.farewell.id) || "pilot-finale-farewell";
+    const lines = (window.DAY_CONFIG && window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.lines) || [];
+    const line = lines.find((p) => p.id === id) || { id, group: "finale", text, file: "audio/pilot/pilot-finale-farewell.mp3" };
+    let ok = false;
+    try {
+      if (day.voice && day.voice.speakPilot) ok = !!day.voice.speakPilot(line, { via: "finale", queue: false, radio: window.DAY_CONFIG.pilot && window.DAY_CONFIG.pilot.radio });
+    } catch (e) { /* */ }
+    mark("show-farewell", { id: "night", text, voiced: ok });
+    if (day.note) day.note(`Pilot: ${text}`);
+    return true;
+  }
+  let roofCut = null; // { until, id }
+  function speakRoof(r) {
+    if (!r || r.said) return;
+    r.said = true;
+    const who = r.who || r.id;
+    const text = r.text;
+    // sayKey → #episode-say + day:story (js/dialogue.js speaks in their voice)
+    sayKey("roof:" + r.id);
+    try {
+      if (day.neighbors && day.neighbors.gesture) day.neighbors.gesture(r.id, r.gesture || "thanks");
+    } catch (e) { /* */ }
+    // Brief cutaway so the roof watcher is seen from the plaza, not only heard
+    const cut = (lastFinale && lastFinale.roofCutSec) || 1.9;
+    if (r.shot && day.world && day.world()) {
+      try {
+        if (day.control && day.control.hold) day.control.hold(true);
+        document.documentElement.classList.add("cine-up");
+        day.world().cineShot(Object.assign({ secs: cut }, r.shot));
+        try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(cut + 0.4); } catch (e) { /* */ }
+        roofCut = { until: performance.now() + cut * 1000, id: r.id };
+        setTimeout(() => {
+          if (!roofCut || roofCut.id !== r.id) return;
+          roofCut = null;
+          try { if (day.world && day.world() && day.world().cineShot) day.world().cineShot(null); } catch (e) { /* */ }
+          try { if (day.control && day.control.hold) day.control.hold(false); } catch (e) { /* */ }
+          if (!creditsOn) document.documentElement.classList.remove("cine-up");
+        }, cut * 1000);
+      } catch (e) { /* */ }
+    }
+    mark("show-roof", { id: "night", who, neighbor: r.id, text, x: r.x, z: r.z, cutaway: !!r.shot });
+  }
+  function cityAnswers(grade, power) {
+    const k = grade === "perfect" ? 1 : 0.65;
+    try {
+      if (day.cityscape && day.cityscape.flicker) day.cityscape.flicker(0.55 + 0.55 * k);
+    } catch (e) { /* */ }
+    try {
+      const W = window.weather || day.weather;
+      if (W && W.triggerFlash && (power === "bolt" || grade === "perfect")) W.triggerFlash(18 + (1 - k) * 30, 0);
+    } catch (e) { /* */ }
+    try {
+      // Plaza crowd answers the light with him (cheer / look-up near the fountain)
+      window.dispatchEvent(new window.CustomEvent("day:crowd", { detail: { action: grade === "perfect" ? "celebrate" : "flinch", secs: 1.2 + k, x: 118, z: 26, r: 28 } }));
+    } catch (e) { /* */ }
+  }
+  function tomorrowAskLine(cfg) {
+    const post = cfg || {};
+    try {
+      const D = day.daily;
+      const today = day.memory && day.memory.today && day.memory.today().date;
+      if (D && D.forDate && today) {
+        const [yy, mm, dd] = String(today).split("-").map(Number);
+        const n = new Date(yy, mm - 1, dd + 1, 12);
+        const key = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+        const ask = D.forDate(key);
+        if (ask && ask.title) return { key, ask, line: `Tomorrow: ${ask.title}` };
+      }
+      if (D && D.today) {
+        const t = D.today();
+        if (t && t.title) return { key: null, ask: t, line: `Tomorrow: ${t.title}` };
+      }
+    } catch (e) { /* */ }
+    return { key: null, ask: null, line: post.fallback || "Tomorrow the sky will ask again." };
+  }
+  function endCredits(how) {
+    const c = creditsOn;
+    if (!c) return false;
+    creditsOn = null;
+    if (c.timer) clearTimeout(c.timer);
+    creditsEl.hidden = true;
+    try { if (day.world && day.world() && day.world().cineShot) day.world().cineShot(null); } catch (e) { /* */ }
+    try { if (day.control && day.control.hold) day.control.hold(false); } catch (e) { /* */ }
+    document.documentElement.classList.remove("cine-up");
+    try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* */ }
+    mark("credits", { id: "night", how: how || "end", secs: c.secs, cast: (c.cfg.cast || []).length });
+    showPostCredits();
+    return true;
+  }
+  function showCredits(card) {
+    const F = lastFinale;
+    const C = F && F.credits;
+    if (!C) { showClosing(card); return false; }
+    const secs = Math.max(12, Math.min(40, C.secs || 26));
+    creditsOn = { t0: performance.now(), secs, cfg: C, card, timer: null };
+    creditsEl.style.setProperty("--ep-credits-secs", secs + "s");
+    creditsEl.querySelector(".kicker").textContent = C.kicker || "I Can Be";
+    creditsEl.querySelector("h2").textContent = C.title || "The Night Show";
+    creditsEl.querySelector(".skip").textContent = C.skip || "Skip";
+    const ul = creditsEl.querySelector(".cast");
+    ul.innerHTML = "";
+    (C.cast || []).forEach((row) => {
+      const li = document.createElement("li");
+      const b = document.createElement("b");
+      b.textContent = row.role || row.name || "";
+      const sp = document.createElement("span");
+      sp.textContent = row.name && row.role ? row.name : "";
+      li.append(b);
+      if (sp.textContent) li.append(sp);
+      ul.appendChild(li);
+    });
+    const roll = creditsEl.querySelector(".roll");
+    roll.style.animation = "none";
+    void roll.offsetWidth;
+    roll.style.animation = "";
+    creditsEl.hidden = false;
+    document.documentElement.classList.add("cine-up");
+    try { if (day.control && day.control.hold) day.control.hold(true); } catch (e) { /* */ }
+    try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(secs + 1); } catch (e) { /* */ }
+    try {
+      if (day.world && day.world() && day.world().cineShot && C.shot) day.world().cineShot(Object.assign({ secs }, C.shot));
+    } catch (e) { /* */ }
+    try {
+      if (day.stems && day.stems.motif) day.stems.motif(C.motif || "credits");
+    } catch (e) { /* */ }
+    mark("credits-start", { id: "night", secs, cast: (C.cast || []).length });
+    creditsOn.timer = setTimeout(() => endCredits("end"), secs * 1000);
+    return true;
+  }
+  function endPost(how) {
+    const p = postOn;
+    if (!p) return false;
+    postOn = null;
+    if (p.timer) clearTimeout(p.timer);
+    postEl.hidden = true;
+    try { if (day.world && day.world() && day.world().cineShot) day.world().cineShot(null); } catch (e) { /* */ }
+    try { if (day.control && day.control.hold) day.control.hold(false); } catch (e) { /* */ }
+    document.documentElement.classList.remove("cine-up");
+    clearRoofStands();
+    stopStage();
+    mark("post-credits", { id: "night", how: how || "end", line: p.line, ask: p.ask && p.ask.id });
+    return true;
+  }
+  function showPostCredits() {
+    const P = (lastFinale && lastFinale.postCredits) || { secs: 7, fallback: "Tomorrow the sky will ask again.", kicker: "Tomorrow", skip: "Continue" };
+    const info = tomorrowAskLine(P);
+    const secs = Math.max(4, Math.min(14, P.secs || 7));
+    postOn = { t0: performance.now(), secs, ask: info.ask, line: info.line, timer: null };
+    postEl.querySelector(".kicker").textContent = P.kicker || "Tomorrow";
+    postEl.querySelector("h2").textContent = info.ask && info.ask.name ? info.ask.name : "The sky";
+    postEl.querySelector(".ask").textContent = info.line;
+    postEl.querySelector(".skip").textContent = P.skip || "Continue";
+    postEl.hidden = false;
+    // Land the crane on tomorrow's asker when we know where they stand
+    try {
+      const ask = info.ask;
+      const place = ask && (ask.stand || ask.place);
+      const x = place && (place.x != null ? place.x : place[0]);
+      const z = place && (place.z != null ? place.z : place[1]);
+      if (x != null && z != null && day.world && day.world() && day.world().cineShot) {
+        if (day.control && day.control.hold) day.control.hold(true);
+        document.documentElement.classList.add("cine-up");
+        day.world().cineShot({ secs, tx: x, ty: 3.2, tz: z, alpha: -1.6, beta: 1.05, radius: 16 });
+      }
+    } catch (e) { /* */ }
+    mark("post-credits-show", { id: "night", line: info.line, ask: info.ask && info.ask.id });
+    try {
+      if (info.ask && info.ask.ask && day.voice && day.voice.speakAs) {
+        const place = info.ask.stand || info.ask.place || {};
+        day.voice.speakAs(info.ask.name || info.ask.who || "Birdie", info.ask.ask, { x: place.x, z: place.z, via: "finale-tomorrow", queue: false });
+      }
+    } catch (e) { /* */ }
+    postOn.timer = setTimeout(() => endPost("end"), secs * 1000);
+  }
   function stopStage() {
     if (stage) stage.stop();
     stage = null;
@@ -1529,13 +1795,17 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   }
   function startShow(ep) {
     const F = ep.finale;
+    lastFinale = F;
     active.show = {
       started: false, t: 0, over: false, endAt: 0, hits: 0, perfect: 0, off: 0, chain: 0, best: 0, act: -1, judge: "", judgeKind: "",
+      farewell: false, roofsSaid: 0,
       used: new Set(), cues: F.cues.map((c) => Object.assign({ state: "wait", grade: null, dt: null }, c)),
+      roofs: (F.roofs || []).map((r) => Object.assign({ said: false }, r)),
     };
+    const placed = placeRoofs(F);
     stage = createFinale(world, B, F);
     if (stage) stage.start(F.spectators);
-    mark("show-stage", { id: ep.id, spectators: F.spectators, cues: F.cues.length });
+    mark("show-stage", { id: ep.id, spectators: F.spectators, cues: F.cues.length, roofs: placed.map((p) => p.id).join(",") });
   }
   const inPlaza = () => {
     const pos = playerPos();
@@ -1571,6 +1841,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     S.judge = `${F.lines[m.grade]}${m.dt >= 0 ? " +" : " "}${m.dt.toFixed(2)} s · ×${S.chain}`;
     S.judgeKind = m.grade;
     if (stage) stage.cue(power, m.grade);
+    cityAnswers(m.grade, power);
     mark("show-cue", { id: A.ep.id, cue: m.index, power, grade: m.grade, dt: +m.dt.toFixed(2), chain: S.chain, hits: S.hits });
     A.goals.forEach((g) => {
       if (g.kind === "show-hits") { g.progress = S.hits; if (S.hits >= (g.count | 0)) completeGoal(g, "show"); }
@@ -1587,13 +1858,20 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
         S.started = true;
         const a = abil();
         if (a && a.reset) a.reset(100);
+        if (!S.farewell) { S.farewell = true; speakFarewell(F); }
         sayKey("gather");
-        mark("show-begin", { id: A.ep.id, gathered: stage ? stage.info().gathered : 0 });
+        mark("show-begin", { id: A.ep.id, gathered: stage ? stage.info().gathered : 0, farewell: S.farewell, roofs: (S.roofs || []).length });
         paintHud();
       }
       return;
     }
     S.t += dt;
+    (S.roofs || []).forEach((r) => {
+      if (!r.said && S.t >= r.at) {
+        speakRoof(r);
+        S.roofsSaid = (S.roofsSaid || 0) + 1;
+      }
+    });
     F.acts.forEach((a, i) => {
       if (i > S.act && S.t >= a.at) {
         S.act = i;
@@ -1618,7 +1896,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       const k = S.hits / S.cues.length;
       if (stage) stage.grand(k);
       if (day.note) day.note(F.lines.done);
-      mark("show-over", { id: A.ep.id, hits: S.hits, perfect: S.perfect, best: S.best, off: S.off, of: S.cues.length });
+      mark("show-over", { id: A.ep.id, hits: S.hits, perfect: S.perfect, best: S.best, off: S.off, of: S.cues.length, roofs: S.roofsSaid || 0 });
     }
     if (S.over && S.t >= S.endAt) {
       stageHold = true;
@@ -1651,20 +1929,56 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     cueJudge.textContent = S.judge || "";
     cueJudge.className = "cj " + (S.judgeKind || "");
   }
+  /* ---- chapter openers (js/moments.js `chapter`, config `arc`): the first start of any episode in a chapter plays
+     that chapter's opener first (once per player: localStorage icanbe.chapters); skipping it still starts the episode. ---- */
+  const CH_KEY = "icanbe.chapters";
+  const chapterList = () => (window.DAY_CONFIG && window.DAY_CONFIG.arc) || [];
+  const chapterOf = (id) => { const c = chapterList().find((x) => x.episodes.indexOf(id) >= 0); return c ? c.n : 0; };
+  function chaptersSeen() { try { return JSON.parse(localStorage.getItem(CH_KEY) || "[]"); } catch (e) { return []; } }
+  function chapterSeen(n) { const a = chaptersSeen(); if (a.indexOf(n) < 0) { a.push(n); try { localStorage.setItem(CH_KEY, JSON.stringify(a)); } catch (e) { /* private mode */ } } }
   function start(ep, via, opts) {
     if (!ep) return false;
-    if (opts && opts.challenge && !ep.tutorial) ep = challengeEp(ep, cfg.challenge);
-    hideOffer();
-    hideMenu();
-    if (active) endQuiet();
-    const C = day.control;
-    if (C && C.mode && C.mode() === "schedule") {
-      if (day.jump && ep.clock) day.jump(ep.clock);
-      // Wait a beat for the frame, then take control if needed.
-      setTimeout(() => {
-        if (C.mode() === "schedule") C.take();
-      }, 80);
+    const n = chapterOf(ep.id);
+    if (n && !(opts && opts.noOpener) && chaptersSeen().indexOf(n) < 0 && day.moments && day.moments.chapter && day.moments.enabled && day.moments.enabled()) {
+      hideOffer();
+      hideMenu();
+      if (active) endQuiet();
+      const openChapter = () => {
+        chapterSeen(n);
+        const played = day.moments.chapter(n, {
+          onEnd: (how, d) => {
+            // let-go or another moment replacing it means he didn't mean to start the episode
+            if (d && (d.via === "let-go" || d.via === "replaced")) return;
+            startNow(ep, via, Object.assign({}, opts, { noOpener: true }));
+          },
+        });
+        if (played) { mark("chapter", { chapter: n, id: ep.id }); return true; }
+        return startNow(ep, via, opts);
+      };
+      const T = day.transition;
+      // Clock jump under the storm wipe so the chapter opener never hard-cuts the hour in the open.
+      if (T && T.wipe && ep.clock && day.jump) {
+        T.wipe(() => { day.jump(ep.clock); }, { kind: "chapter", id: "ch-" + n }).then(openChapter);
+        return true;
+      }
+      if (ep.clock && day.jump) day.jump(ep.clock);
+      return openChapter();
     }
+    return startNow(ep, via, opts);
+  }
+  /** Fade newly spawned episode meshes in over 0.3 s so they never pop within 30 m. */
+  function fadeNewProps() {
+    const T = day.transition;
+    if (!T || !T.fadeIn) return;
+    const nodes = [];
+    story.stalls.forEach((s) => s.node && nodes.push(s.node));
+    story.turbines.forEach((t) => t.root && nodes.push(t.root));
+    if (story.gauge && story.gauge.root) nodes.push(story.gauge.root);
+    props.rods.forEach((r) => { if (r.mesh) nodes.push(r.mesh); if (r.ball) nodes.push(r.ball); });
+    props.debris.forEach((m) => m && nodes.push(m));
+    if (nodes.length) T.fadeIn(nodes);
+  }
+  function armEpisode(ep, via, opts) {
     active = {
       ep,
       goals: goalState(ep),
@@ -1707,6 +2021,8 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (ep.turbines) spawnTurbines(ep.turbines);
     if (ep.id === "still-blades" && world.officePower) world.officePower(0.15); // "the lights are low": the moment brings them back
     if (ep.gauge) spawnGauge(ep.gauge);
+    // Fade after the wipe lifts (caller), or now if there was no wipe.
+    if (!(opts && opts.wiped)) fadeNewProps();
     stopStage();
     pendingClosing = null;
     closeAuto = 0;
@@ -1721,7 +2037,31 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     }
     if (ep.lines && ep.lines.start && day.note) day.note(ep.lines.start);
     paintHud();
-    mark("start", { id: ep.id, via: via || "play", title: ep.title, challenge: !!ep.challengeOn, timer: ep.timer || 0 });
+    mark("start", { id: ep.id, via: via || "play", title: ep.title, challenge: !!ep.challengeOn, timer: ep.timer || 0, wipe: !!(opts && opts.wiped) });
+  }
+  function startNow(ep, via, opts) {
+    if (!ep) return false;
+    if (opts && opts.challenge && !ep.tutorial) ep = challengeEp(ep, cfg.challenge);
+    hideOffer();
+    hideMenu();
+    if (active) endQuiet();
+    const C = day.control;
+    const T = day.transition;
+    const wantWipe = !(opts && opts.noWipe) && T && T.wipe;
+    if (wantWipe) {
+      // Storm-cloud wipe hides the clock jump, prop swap, take-control blend and shader warm-up.
+      T.wipe(() => {
+        if (day.jump && ep.clock) day.jump(ep.clock);
+        armEpisode(ep, via, Object.assign({}, opts, { wiped: true }));
+        if (C && C.mode && C.mode() === "schedule") C.take();
+      }, { kind: "episode", id: ep.id }).then(() => { fadeNewProps(); });
+      return true;
+    }
+    if (C && C.mode && C.mode() === "schedule") {
+      if (day.jump && ep.clock) day.jump(ep.clock);
+      setTimeout(() => { if (C.mode() === "schedule") C.take(); }, 80);
+    }
+    armEpisode(ep, via, opts);
     return true;
   }
   function endQuiet() {
@@ -1793,7 +2133,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       if (run.ep.part === 3) {
         const id = pickEnding(arc, run.strain, END.rules);
         arc.ending = { id, tank: run.strain };
-        pendingEnding = id;
+        pendingEnding = { id, rank: card.rank || "C" };
       }
       saveBest(arcKey, arc);
       mark("arc", { id: run.ep.id, part: run.ep.part, scarred: !!card.scarred, strain: run.strain });
@@ -1814,6 +2154,10 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     scoreRank.hidden = false;
     scoreRank.textContent = card.rank;
     scoreRank.className = "rank r-" + card.rank;
+    try {
+      const artR = window.uiArt || (window.day && window.day.uiArt);
+      if (artR && artR.applyRank && card.rank) artR.applyRank(scoreRank, card.rank);
+    } catch (e) { /* */ }
     scoreRankDetail.hidden = false;
     {
       const R = run.rescue;
@@ -1859,39 +2203,32 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     return card;
   }
   let pendingEnding = null;
-  /* The ending card: which of the three endings, how each need came out, his last line, the Sky total. */
-  function showEnding(id) {
+  /* The ending scene (not a text card): which of A/B/C, lived in-engine via js/moments.js `ending`. */
+  function showEnding(id, opts) {
+    opts = opts || {};
     const e = END[id];
     if (!e) return null;
     const arc = loadArc();
     const fared = cityFared(arc, END.fared);
-    const L2 = END.lines || {};
-    endKicker.textContent = L2.kicker || "How the district fared";
-    endTitle.textContent = e.name;
-    endScene.textContent = e.scene;
-    endFared.innerHTML = "";
-    fared.forEach((f) => {
-      const li = document.createElement("li");
-      li.className = f.state;
-      const b = document.createElement("b");
-      b.textContent = (END.needs && END.needs[f.need]) || f.need;
-      li.append(b, document.createTextNode(f.text));
-      li.dataset.need = f.need;
-      endFared.appendChild(li);
-    });
-    endLast.innerHTML = "";
-    const who = document.createElement("i");
-    who.textContent = e.last[0];
-    endLast.append(who, document.createTextNode(e.last[1]));
     const tank = (arc.ending && arc.ending.tank) || 0;
-    endTally.textContent = `${L2.tally || "Sky at the Tank"}: ${tank}`;
-    endAgain.textContent = L2.again || "Walk the city";
+    const rank = opts.rank || (arc.ending && arc.ending.rank) || "C";
+    endEl.hidden = true; // never the old summary card
     endEl.dataset.ending = id;
-    endEl.hidden = false;
-    if (day.note) day.note(`${e.name}. ${e.last[0]}: ${e.last[1]}`);
-    mark("ending", { id: "ending", ending: id, name: e.name, tank, fared: fared.map((f) => f.need + ":" + f.state).join(",") });
-    storyEvent("ending", { ending: id, name: e.name, tank, fared: fared.map((f) => ({ need: f.need, state: f.state })) });
-    return { id, name: e.name, fared };
+    if (day.note) day.note(`${e.name}.`);
+    mark("ending", { id: "ending", ending: id, name: e.name, tank, rank, fared: fared.map((f) => f.need + ":" + f.state).join(",") });
+    storyEvent("ending", { ending: id, name: e.name, tank, rank, fared: fared.map((f) => ({ need: f.need, state: f.state })) });
+    const M = day.moments;
+    const played = !!(M && M.ending && M.ending(id, {
+      rank,
+      onEnd: () => {
+        try { window.dispatchEvent(new window.CustomEvent("day:episode", { detail: { action: "ending-done", ending: id, name: e.name, rank } })); } catch (err) { /* */ }
+      },
+    }));
+    if (!played) {
+      // fallback: stamp only if moments aren't up yet (NullEngine / early boot)
+      mark("ending-scene", { id: "ending", ending: id, fallback: true });
+    }
+    return { id, name: e.name, fared, rank, scene: played };
   }
   /* Replay and Next episode on the score card. Next shows what it opens, or why it is shut. */
   function paintScoreButtons(why) {
@@ -1908,8 +2245,14 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     scoreNextLine.textContent = lock ? `Next episode is locked. Finish ${lock} first.` : "";
     scoreEl.dataset.next = nxt && !lock && !scoreNext.hidden ? nxt.id : "";
   }
-  /* Jump the clock to an episode's chapter, take control and start it (the menu, Replay and Next all go this way). */
+  /* Jump the clock to an episode's chapter, take control and start it (the menu, Replay and Next all go this way).
+     With js/transition.js the clock jump and prop swap run under the storm wipe — never in the open. */
   function launch(ep, opts) {
+    const T = day.transition;
+    if (T && T.wipe) {
+      start(ep, "menu", opts);
+      return;
+    }
     if (day.jump && ep.clock) day.jump(ep.clock);
     const C = day.control;
     setTimeout(() => {
@@ -1921,13 +2264,14 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     scoreEl.hidden = true;
     closeAuto = 0;
     if (pendingEnding) {
-      const id = pendingEnding;
+      const pe = pendingEnding;
       pendingEnding = null;
-      showEnding(id);
+      showEnding(typeof pe === "string" ? pe : pe.id, typeof pe === "string" ? {} : pe);
     } else if (pendingClosing) {
       const c = pendingClosing;
       pendingClosing = null;
-      showClosing(c);
+      if (lastFinale && lastFinale.credits) showCredits(c);
+      else showClosing(c);
     } else if (!active) stopStage();
   }
   /* The closing card: how the day's stories ended (from the arc the three parts left), the neighbors in the crowd, his last line. */
@@ -1976,8 +2320,16 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   }
   closeEl.querySelector(".again").addEventListener("click", () => {
     closeEl.hidden = true;
+    clearRoofStands();
     stopStage();
   });
+  creditsEl.querySelector(".skip").addEventListener("click", () => endCredits("skip"));
+  postEl.querySelector(".skip").addEventListener("click", () => endPost("skip"));
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" && e.key !== "Enter") return;
+    if (!creditsEl.hidden) { e.preventDefault(); endCredits("key"); }
+    else if (!postEl.hidden) { e.preventDefault(); endPost("key"); }
+  }, true);
 
   function hideMenu() {
     menu.hidden = true;
@@ -1986,7 +2338,26 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   function showMenu() {
     const best = loadBest(storageKey);
     menuList.innerHTML = "";
-    list.forEach((ep) => {
+    // grouped by chapter: each chapter's name and line, then its episodes (the tutorial sits in the first)
+    const order = [];
+    chapterList().forEach((c) => {
+      const eps = list.filter((e) => e.chapter === c.n);
+      if (!eps.length) return;
+      order.push({ head: c });
+      eps.forEach((e) => order.push({ ep: e }));
+    });
+    list.filter((e) => !chapterOf(e.id)).forEach((e) => order.push({ ep: e }));
+    order.forEach((row) => {
+      if (row.head) {
+        const h = document.createElement("div");
+        h.className = "ep-chapter";
+        h.id = "ep-chapter-" + row.head.n;
+        h.dataset.chapter = String(row.head.n);
+        h.innerHTML = `<b>Chapter ${row.head.n} · ${row.head.title}</b><small>${row.head.line}</small>`;
+        menuList.appendChild(h);
+        return;
+      }
+      const ep = row.ep;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ep-row";
@@ -1995,9 +2366,15 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       const lock = ep.tutorial ? null : episodeLock(list, best, ep.id);
       btn.dataset.locked = lock ? "1" : "0";
       btn.dataset.rank = b && b.rank ? b.rank : "";
+      const artM = window.uiArt || (window.day && window.day.uiArt);
+      const rk = b && b.rank
+        ? (artM && artM.rankStamp
+          ? `<span class="rk ui-rank-inline" style="--ui-rank:url('${artM.rankStamp(b.rank)}')" title="${b.rank}">${b.rank}</span>`
+          : `<span class="rk">${b.rank}</span>`)
+        : "";
       btn.innerHTML = lock
         ? `<strong>${ep.title}</strong><small>Locked · finish ${lock} first</small>`
-        : `<strong>${b && b.rank ? `<span class="rk">${b.rank}</span>` : ""}${ep.title}</strong><small>${ep.tagline || ""}${b ? ` · ${L.best} ${b.rank ? "rank " + b.rank + " · " : ""}${b.pct}%${episodeDone(best, ep.id) ? " · finished" : ""}` : ""}</small>`;
+        : `<strong>${rk}${ep.title}</strong><small>${ep.tagline || ""}${b ? ` · ${L.best} ${b.rank ? "rank " + b.rank + " · " : ""}${b.pct}%${episodeDone(best, ep.id) ? " · finished" : ""}` : ""}</small>`;
       if (lock) {
         btn.disabled = true;
         btn.classList.add("locked");
@@ -2368,10 +2745,40 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       if (!active || !active.show) return null;
       const S = active.show;
       const nx = S.cues.find((c) => c.state === "wait");
-      return { started: S.started, t: S.t, over: S.over, hits: S.hits, perfect: S.perfect, off: S.off, chain: S.chain, best: S.best, used: [...S.used], next: nx ? { power: nx.power, at: nx.at, in: nx.at - S.t } : null, cues: S.cues.map((c) => ({ at: c.at, power: c.power, state: c.state, grade: c.grade })), judge: S.judge, stage: stage ? stage.info() : null };
+      return {
+        started: S.started, t: S.t, over: S.over, hits: S.hits, perfect: S.perfect, off: S.off, chain: S.chain, best: S.best, used: [...S.used],
+        farewell: !!S.farewell, roofsSaid: S.roofsSaid || 0,
+        roofs: (S.roofs || []).map((r) => ({ id: r.id, who: r.who, x: r.x, z: r.z, at: r.at, said: !!r.said, text: r.text })),
+        next: nx ? { power: nx.power, at: nx.at, in: nx.at - S.t } : null,
+        cues: S.cues.map((c) => ({ at: c.at, power: c.power, state: c.state, grade: c.grade })),
+        judge: S.judge, stage: stage ? stage.info() : null,
+      };
     },
     stage: () => (stage ? stage.info() : null),
     closing: () => ({ shown: !closeEl.hidden, rank: closeEl.dataset.rank || null, ending: closeEl.dataset.ending || null, pending: !!pendingClosing, fared: [...closeEl.querySelectorAll(".fared li")].map((li) => li.dataset.need + ":" + li.className), neighbors: [...closeEl.querySelectorAll(".neighbors li")].map((li) => li.dataset.neighbor) }),
+    credits: () => ({
+      shown: !creditsEl.hidden,
+      pending: !!creditsOn,
+      secs: creditsOn ? creditsOn.secs : ((lastFinale && lastFinale.credits && lastFinale.credits.secs) || 0),
+      cast: [...creditsEl.querySelectorAll(".cast b")].map((b) => b.textContent),
+      fontPx: (() => { const b = creditsEl.querySelector(".cast b"); return b ? parseFloat(getComputedStyle(b).fontSize) || 0 : 0; })(),
+    }),
+    postCredits: () => ({
+      shown: !postEl.hidden,
+      pending: !!postOn,
+      line: (postEl.querySelector(".ask") || {}).textContent || (postOn && postOn.line) || "",
+      ask: postOn && postOn.ask ? postOn.ask.id : null,
+      fontPx: (() => { const p = postEl.querySelector(".ask"); return p ? parseFloat(getComputedStyle(p).fontSize) || 0 : 0; })(),
+    }),
+    roofs: () => {
+      const people = (day.neighbors && day.neighbors.now && day.neighbors.now().people) || [];
+      const want = (lastFinale && lastFinale.roofs) || [];
+      return want.map((r) => {
+        const p = people.find((q) => q.id === r.id);
+        const near = p ? Math.hypot(p.x - r.x, p.z - r.z) < 3.5 : false;
+        return { id: r.id, who: r.who, wantX: r.x, wantZ: r.z, x: p ? p.x : null, z: p ? p.z : null, text: r.text, onRoof: near };
+      });
+    },
     offer: () => (offerEp ? { id: offerEp.id, title: offerEp.title } : null),
     best: () => loadBest(storageKey),
     lock: (id) => episodeLock(list, loadBest(storageKey), id),
@@ -2410,10 +2817,39 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     arc: () => loadArc(),
     ending: () => {
       const a = loadArc();
-      return a.ending ? { id: a.ending.id, name: (END[a.ending.id] || {}).name, tank: a.ending.tank, shown: !endEl.hidden, fared: cityFared(a, END.fared) } : null;
+      const sceneOn = !!(day.moments && day.moments.playing && day.moments.playing() && /^ending-/.test((day.moments.now() || {}).turning || ""));
+      const stamp = typeof document !== "undefined" && document.getElementById("ending-stamp");
+      return a.ending ? {
+        id: a.ending.id,
+        name: (END[a.ending.id] || {}).name,
+        tank: a.ending.tank,
+        shown: sceneOn || !!(stamp && !stamp.hidden),
+        card: !endEl.hidden,
+        fared: cityFared(a, END.fared),
+      } : null;
     },
-    showEnding: (id) => showEnding(id || (loadArc().ending || {}).id),
+    showEnding: (id, opts) => showEnding(id || (loadArc().ending || {}).id, opts),
+    /** Spin the annex turbines for a staged ending beat (0..1 of full). */
+    spinTurbines: (k) => {
+      const want = Math.max(0, Math.min(1, +k || 0)) * 6;
+      story.turbines.forEach((t) => { t.w = want; t.still = want < 0.4; });
+      story.spin = want;
+      story.momentSpin = want > 0.5;
+      return story.spin;
+    },
+    /** Make sure Part 2's turbines exist (Heavy Weather ending may run after Part 3 cleared them). */
+    ensureTurbines: () => {
+      if (story.turbines.length) return story.turbines.length;
+      const ep2 = list.find((e) => e.id === "still-blades");
+      if (ep2 && ep2.turbines) spawnTurbines(ep2.turbines);
+      return story.turbines.length;
+    },
+    /** Drop a flood patch on the avenue (Overcast ending). */
+    floodAvenue: () => patch("flood", 66, 12.6, 4.5, "#3a6a8a", 0.55),
     resetArc: () => saveBest(arcKey, { parts: {} }),
+    chapterSeen: () => chaptersSeen(),
+    resetChapters: () => { try { localStorage.removeItem(CH_KEY); } catch (e) { /* none */ } },
+    chapterOf,
   };
   day.episodes = api;
   window.episodes = api;

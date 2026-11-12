@@ -52,11 +52,18 @@ export function strength(madeKey, todayKey) {
   return n <= 0 ? 1 : Math.max(0, 1 - n / FADE_DAYS);
 }
 
-export function emptyStore() { return { v: 1, days: {} }; }
+export function emptyArcs() { return { birdie: 0, dex: 0, quill: 0 }; }
+export function emptyStore() { return { v: 1, days: {}, arcs: emptyArcs() }; }
 export function parse(raw) {
   try {
     const s = raw ? JSON.parse(raw) : null;
-    return s && s.v === 1 && s.days && typeof s.days === "object" ? s : emptyStore();
+    if (!(s && s.v === 1 && s.days && typeof s.days === "object")) return emptyStore();
+    if (!s.arcs || typeof s.arcs !== "object") s.arcs = emptyArcs();
+    ["birdie", "dex", "quill"].forEach((id) => {
+      const n = Number(s.arcs[id]) || 0;
+      s.arcs[id] = n < 0 ? 0 : n > 3 ? 3 : (n | 0);
+    });
+    return s;
   } catch (e) { return emptyStore(); }
 }
 function dayOf(store, key) {
@@ -101,6 +108,7 @@ export function liveFlag(store, todayKey, test) {
   return best;
 }
 export const parkRain = (d) => !!((d.zones.park && d.zones.park.rain) || d.deeds.birdieRain);
+export const endingHalfLawn = (d) => !!(d.deeds && d.deeds.endingHalf);
 export const birdieRain = (d) => !!d.deeds.birdieRain;
 /** Add up the deeds and zones of the last `days` days (today counts as 1). */
 export function sinceDays(store, todayKey, days) {
@@ -206,6 +214,17 @@ export function installMemory(day, world) {
       board.parent = root; board.position.y = 2.1; board.material = M.board;
       [pole, board].forEach((q) => (q.isPickable = false));
       built.push(pole, board, root);
+    } else if (m.kind === "chair" || m.kind === "cone" || m.kind === "planter" || m.kind === "awning" || m.kind === "debris") {
+      // tornado wreck: a tipped stand-in that lasts the real day (the live Havok body stays in-session;
+      // this mark is what a later visit / reload still shows)
+      const y = surf(m.x, m.z);
+      const body = B.MeshBuilder.CreateBox("mem-" + m.kind, { width: 0.5, height: 0.4, depth: 0.5 }, scene);
+      body.material = M.bin;
+      body.rotation.z = Math.PI / 2;
+      body.rotation.y = m.yaw || 0;
+      body.position.set(m.x, y + 0.22, m.z);
+      body.isPickable = false;
+      built.push(body);
     }
   };
 
@@ -223,8 +242,12 @@ export function installMemory(day, world) {
       counts[m.kind] = (counts[m.kind] || 0) + 1;
     });
     const lawn = liveFlag(store, t, parkRain);
+    const half = liveFlag(store, t, endingHalfLawn);
     const tom = liveFlag(store, t, birdieRain);
-    try { day.slice && day.slice.setLawn && day.slice.setLawn(lawn > 0 ? "damp" : "straw", lawn || 1, true); } catch (e) { /* slice not up */ }
+    try {
+      if (half > 0 && lawn > 0) day.slice && day.slice.setLawn && day.slice.setLawn("damp", 0.45 * half, true);
+      else day.slice && day.slice.setLawn && day.slice.setLawn(lawn > 0 ? "damp" : "straw", lawn || 1, true);
+    } catch (e) { /* slice not up */ }
     try { day.slice && day.slice.setTomatoes && day.slice.setTomatoes(tom); } catch (e) { /* slice not up */ }
     nowInfo = { lawn: +lawn.toFixed(2), tomatoes: +tom.toFixed(2), decals: list.length, quality: low ? "low" : "high", date: t, ...counts };
     emit("apply", Object.assign({ why }, nowInfo));
@@ -288,10 +311,37 @@ export function installMemory(day, world) {
     else if (d.action === "beat-missed") record("askBotched", "botched", d.id);
     else if (d.action === "reward" && d.id === "birdie") record("birdieRain", "park", "rain");
     else if (d.action === "reward") record("neighborReward", undefined, d.id);
+    else if (d.action === "arc-beat" && d.id && d.beat != null) {
+      // neighbors.js already wrote the beat via setArc; record a deed so Let go / facts can name it
+      record("arc-" + d.id, d.id, "beat" + d.beat);
+      if (d.id === "birdie" && d.beat >= 2) record("birdieRain", "park", "rain");
+    }
   });
   window.addEventListener("day:episode", (e) => {
     const d = e.detail || {};
     if (["score", "ending", "arc"].includes(d.action)) record("episode-" + d.action, undefined, d.id);
+    // Part 3 ending scenes: the district keeps the outcome for the rest of the real day.
+    if (d.action === "ending" || d.action === "ending-scene") {
+      const id = d.ending || d.id;
+      if (id === "A") {
+        // Fair Weather: park stays green on a same-day reload
+        record("power", "park", "rain");
+        record("birdieRain", "park", "rain");
+      } else if (id === "B") {
+        // Heavy Weather: half-green lawn + a leaning sign scar
+        record("endingHalf", "park", "B");
+        record("power", "park", "rain");
+        addMark(store, today(), { at: Date.now(), kind: "sign", x: 154, z: 4.5 });
+        save();
+        apply("ending-B");
+      } else if (id === "C") {
+        addMark(store, today(), { at: Date.now(), kind: "puddle", x: 66, z: 12.6, r: 3.2 });
+        addMark(store, today(), { at: Date.now(), kind: "puddle", x: 80, z: 13.2, r: 2.4 });
+        addMark(store, today(), { at: Date.now(), kind: "scorch", x: 70, z: 12.6, y: 0.05 });
+        save();
+        apply("ending-C");
+      }
+    }
   });
   window.addEventListener("day:story", (e) => {
     const d = e.detail || {};
@@ -347,9 +397,45 @@ export function installMemory(day, world) {
     skyDays: () => Object.keys(store.days).filter((k) => Object.keys(store.days[k].deeds).length > 0).length,
     /** For the playtest: write a deed as if he had done it (named setup shortcut). */
     note: (kind, zone, power) => { record(kind, zone, power); return api.facts(); },
+    /** Neighbor personal arcs (0..3 each). Persists across real days; same-day reload keeps beat-3 marks. */
+    arcs: () => Object.assign(emptyArcs(), store.arcs || {}),
+    /** Set one neighbour's arc beat (0..3). Emits day:memory action `arc`. */
+    setArc(id, beat) {
+      if (!store.arcs) store.arcs = emptyArcs();
+      if (!(id in store.arcs) && id !== "birdie" && id !== "dex" && id !== "quill") return api.arcs();
+      store.arcs[id] = Math.max(0, Math.min(3, beat | 0));
+      save();
+      emit("arc", { id, beat: store.arcs[id], arcs: api.arcs() });
+      return api.arcs();
+    },
+    /** Tornado wreck that stayed: keep a few solid marks (skip paper/leaf) so scorches aren't flooded out. */
+    noteDebris(marks) {
+      const keep = (marks || []).filter((m) => m && m.x != null && m.z != null
+        && m.kind !== "paper" && m.kind !== "leaf");
+      const t = today();
+      // at most 4 wreck marks per cast (bins/chairs/signs read clearest)
+      keep.slice(0, 4).forEach((m) => {
+        const kind = m.kind === "bin" || m.kind === "sign" || m.kind === "chair" || m.kind === "cone"
+          || m.kind === "planter" || m.kind === "awning" ? m.kind : "debris";
+        addMark(store, t, { at: Date.now(), kind, x: +m.x, z: +m.z, y: m.y, yaw: m.yaw || 0 });
+      });
+      if (keep.length) {
+        prune(store, t);
+        save();
+        apply("tornado");
+        emit("deed", { kind: "tornadoDebris", zone: zoneOf(keep[0].x, keep[0].z), power: "tornado", mark: "debris", count: Math.min(4, keep.length) });
+      }
+      return Math.min(4, keep.length);
+    },
     apply: () => apply("api"),
     reset() { store = emptyStore(); session = {}; factsCache = null; save(); apply("reset"); },
   };
+  // keep arcs on the store after reload
+  if (!store.arcs) store.arcs = emptyArcs();
+  window.addEventListener("day:tornado-debris", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.marks && d.marks.length) api.noteDebris(d.marks);
+  });
   day.memory = api;
   apply("load");
   return api;
