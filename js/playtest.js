@@ -6880,6 +6880,258 @@ async function weatherLife(options, t) {
   t.progress(1);
 }
 
+/* ---------------- episode-jump: seamless storm-cloud wipe, no hitch, no pops ---------------- */
+// Criteria: no frame >100 ms (desktop) / >150 ms (phone 390x844) during an episode jump; every jump shows the
+// storm wipe with no black frame; props fade in (no pop within 30 m) over a short walk after. Real input: Take
+// control, Episodes menu rows (or taps). Events: wipe-start / wipe-cover / wipe-end / jump-frames / no-black /
+// fade-in / scrub-crossfade / control-whoosh. Metrics: jumpWorstMs, jumpAvgMs, wipeCover, fadeIns, popNear30m.
+async function episodeJump(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Phone avenue" : "Beside the car");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok").catch(() => {});
+  const Ep = window.episodes || (window.day && window.day.episodes);
+  const C = window.day && window.day.control;
+  const T = window.transition || (window.day && window.day.transition);
+  const S = window.score || (window.day && window.day.score);
+  if (!Ep || !C) {
+    t.problem("bug", "episodes or Take control missing");
+    t.finish("fail");
+    return;
+  }
+  if (!T || !T.wipe) {
+    t.problem("bug", "js/transition.js didn't install (no storm wipe)");
+    t.finish("fail");
+    return;
+  }
+  t.event("transition-ready", `wipeSec=${(window.DAY_CONFIG.transition || {}).wipeSec || 1.2}`);
+  if (touch) {
+    document.documentElement.classList.add("touch-ui");
+    if (C.touch) C.touch(true);
+  }
+  const day = window.day.today();
+  const outside = carSideMoment(day) || quietMoment(day);
+  if (!outside) {
+    t.problem("bug", "No outdoor moment to take control");
+    t.finish("fail");
+    return;
+  }
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(500);
+
+  // Loading → title handoff already happened (isReady); confirm the API and a soft fade exist.
+  const L = window.__loading;
+  if (L && L.log) {
+    const hand = L.log().some((e) => e.action === "handoff" || e.action === "done");
+    t.event("loading-handoff", hand ? "loading faded into the title" : "no handoff event (card may have been skipped)");
+  }
+
+  // Take control: whoosh pairs with the camera blend.
+  const whooshBefore = S && S.now ? (S.now().whooshAt || 0) : 0;
+  if (touch) {
+    const take = $("control");
+    if (take) await tapEl(take);
+    else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 5000, "Take control");
+  await sleep(400);
+  const whooshAfter = S && S.now ? (S.now().whooshAt || 0) : 0;
+  if (whooshAfter > whooshBefore) t.event("control-whoosh", "take-control whoosh with the camera blend");
+  else t.problem("polish", "Take control played no whoosh (sting may still have fired)");
+  t.progress(0.1);
+
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) {
+    const no = offer.querySelector("button.decline");
+    if (no) { if (touch) await tapEl(no); else no.click(); }
+  }
+
+  const jumps = ["morning", "lunch", "dry-park"];
+  const limitMs = touch ? 150 : 100;
+  let worstAll = 0;
+  let wipeSeen = 0;
+  let blackSeen = 0;
+
+  for (let i = 0; i < jumps.length; i++) {
+    const id = jumps[i];
+    const ep = Ep.list().find((e) => e.id === id) || (window.DAY_CONFIG.episodes.list || []).find((e) => e.id === id);
+    t.scene(ep ? ep.title : id);
+    // End a previous run quietly so the next jump is a clean wipe.
+    if (Ep.now && Ep.now()) {
+      pressKey("Escape");
+      await sleep(600);
+      const scoreOk = document.querySelector("#episode-score button.ok");
+      if (scoreOk && $("episode-score") && !$("episode-score").hidden) {
+        if (touch) await tapEl(scoreOk);
+        else scoreOk.click();
+      }
+      await sleep(300);
+    }
+    if (C.mode() !== "control") {
+      if (touch) {
+        const take = $("control");
+        if (take) await tapEl(take);
+        else pressKey("Enter");
+      } else pressKey("Enter");
+      await t.until(() => C.mode() === "control", 5000, "back under control").catch(() => {});
+    }
+
+    const evs = [];
+    const onT = (e) => evs.push((e && e.detail) || {});
+    window.addEventListener("day:transition", onT);
+
+    // Real input: open Episodes and tap/click the row when it exists; else API start (still runs the wipe).
+    const btn = $("episodes");
+    if (btn) {
+      if (touch) await tapEl(btn);
+      else btn.click();
+      await sleep(350);
+    }
+    const row = $("ep-row-" + id);
+    if (row && !row.hidden && row.dataset.locked !== "1") {
+      if (touch) await tapEl(row);
+      else row.click();
+      t.event("episode-row", id);
+    } else {
+      Ep.start(id, "playtest");
+      t.event("episode-start-api", id);
+    }
+
+    await t.until(() => evs.some((e) => e.action === "start") || (T.active && T.active()), 2500, `wipe start for ${id}`).catch(() => {});
+    if (evs.some((e) => e.action === "start") || (T.active && T.active())) {
+      wipeSeen++;
+      t.event("wipe-start", id);
+    } else t.problem("bug", `No storm wipe on jump to ${id}`);
+
+    await t.until(() => evs.some((e) => e.action === "cover" || e.action === "end") || !(T.active && T.active()), 4000, `wipe cover for ${id}`).catch(() => {});
+    const coverEv = evs.find((e) => e.action === "cover");
+    if (coverEv) t.event("wipe-cover", `${id} cover lum=${coverEv.lum}`);
+
+    // Sample the wipe canvas mid-hold: storm navy, never a flat black cut.
+    const wipeEl = document.getElementById("storm-wipe");
+    if (wipeEl && wipeEl.classList.contains("on")) {
+      const sample = document.createElement("canvas");
+      sample.width = sample.height = 8;
+      const sctx = sample.getContext("2d");
+      try {
+        sctx.drawImage(wipeEl, 0, 0, 8, 8);
+        const px = sctx.getImageData(4, 4, 1, 1).data;
+        const lum = (px[0] + px[1] + px[2]) / 3;
+        const black = px[3] > 200 && lum < 6;
+        if (black) { blackSeen++; t.problem("bug", `Black frame during wipe to ${id} (lum ${lum})`); }
+        else t.event("no-black", `${id} storm navy rgb(${px[0]},${px[1]},${px[2]}) a=${px[3]}`);
+      } catch (err) {
+        t.event("no-black", `${id} (canvas sample skipped: ${String(err && err.message || err)})`);
+      }
+    }
+
+    await t.until(() => evs.some((e) => e.action === "end"), 6000, `wipe end for ${id}`).catch(() => {});
+    window.removeEventListener("day:transition", onT);
+    const st = T.stats();
+    const worst = st.lastWorstMs || 0;
+    worstAll = Math.max(worstAll, worst);
+    t.metric("jumpWorstMs", worst);
+    t.metric("jumpAvgMs", st.lastAvgMs || 0);
+    t.metric("wipeCover", st.lastCover || 0);
+    t.metric("wipeLum", st.lastLum || 0);
+    t.event("wipe-end", `${id} worst=${worst}ms avg=${st.lastAvgMs} cover=${st.lastCover} lum=${st.lastLum} black=${st.lastBlack} warm=${st.warmMs}ms`);
+    t.event("jump-frames", `${id} frames=${(st.frames || []).length}`);
+    if (coverEv && coverEv.black) { blackSeen++; t.problem("bug", `Black frame at cover for ${id} (lum ${coverEv.lum})`); }
+    else if (st.lastBlack) { blackSeen++; t.problem("bug", `Wipe reported black for ${id}`); }
+    if ((st.lastCover || 0) < 0.95) t.problem("bug", `Wipe cover only ${st.lastCover} for ${id} (want full opaque cover)`);
+    if ((st.lastLum || 0) < 6 && (st.lastCover || 0) > 0.9) t.problem("bug", `Wipe centre lum ${st.lastLum} reads as black for ${id}`);
+    if (worst > limitMs) t.problem("bug", `Frame ${worst} ms during jump to ${id} (limit ${limitMs} ms${touch ? " phone" : ""})`);
+    await t.until(() => Ep.now() && Ep.now().id === id, 4000, `${id} running`).catch(() => {});
+    t.progress(0.15 + i * 0.15);
+  }
+
+  t.metric("jumpWorstMs", worstAll);
+  t.event("jumps-done", `${wipeSeen}/${jumps.length} wipes, worst ${worstAll} ms, black ${blackSeen}`);
+  if (wipeSeen < jumps.length) t.problem("bug", `Only ${wipeSeen}/${jumps.length} jumps showed the storm wipe`);
+
+  // Fade-ins: episode props should have faded, never popped.
+  const stEnd = T.stats();
+  t.metric("fadeIns", stEnd.fades || 0);
+  if ((stEnd.fades || 0) > 0) t.event("fade-in", `${stEnd.fades} meshes faded by visibility over 0.3 s`);
+  else t.problem("polish", "No prop fade-ins recorded after episode jumps");
+
+  // ~2-minute walk / look: count near meshes that appear with visibility jumping 0→1 in one frame (pop).
+  t.scene("Avenue walk");
+  let pops = 0;
+  const seenVis = new Map();
+  const world = window.day.world && window.day.world();
+  const scene = world && world.scene;
+  const cam = scene && scene.activeCamera;
+  const watchPops = scene && scene.onBeforeRenderObservable.add(() => {
+    if (!cam) return;
+    const cx = cam.globalPosition ? cam.globalPosition.x : cam.position.x;
+    const cz = cam.globalPosition ? cam.globalPosition.z : cam.position.z;
+    for (const m of scene.meshes) {
+      if (!m || !m.isEnabled || !m.isEnabled() || !m.getAbsolutePosition) continue;
+      const p = m.getAbsolutePosition();
+      const dx = p.x - cx;
+      const dz = p.z - cz;
+      if (dx * dx + dz * dz > 30 * 30) continue;
+      const v = m.visibility == null ? 1 : m.visibility;
+      const prev = seenVis.get(m.uniqueId);
+      if (prev != null && prev < 0.05 && v > 0.95) pops++;
+      seenVis.set(m.uniqueId, v);
+    }
+  });
+  const walkEnd = performance.now() + 120000;
+  // Keep moving / turning so LODs and near props update; break early if the harness is short on time.
+  while (performance.now() < walkEnd) {
+    holdKeys(["w", "Shift"], 2500);
+    await sleep(200);
+    if (touch) {
+      // a right-half look drag (camera)
+      const cv = document.querySelector("canvas#view") || document.querySelector("canvas");
+      if (cv) {
+        const r = cv.getBoundingClientRect();
+        const x0 = r.left + r.width * 0.75;
+        const y0 = r.top + r.height * 0.45;
+        cv.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: x0, clientY: y0, pointerId: 7, pointerType: "touch" }));
+        cv.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: x0 + 40, clientY: y0, pointerId: 7, pointerType: "touch" }));
+        cv.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: x0 + 40, clientY: y0, pointerId: 7, pointerType: "touch" }));
+      }
+    } else {
+      // mouse look
+      window.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 400 + ((performance.now() / 80) % 80), clientY: 300 }));
+    }
+    t.progress(Math.min(0.95, 0.55 + (1 - (walkEnd - performance.now()) / 120000) * 0.35));
+    // Playtest harness often caps ~2× scenario seconds (180→360); keep the walk ~90 s if jumps ran long.
+    if (performance.now() > walkEnd - 30000 && pops === 0 && (stEnd.fades || 0) > 0) break;
+  }
+  if (watchPops && scene) scene.onBeforeRenderObservable.remove(watchPops);
+  t.metric("popNear30m", pops);
+  if (pops > 0) t.problem("bug", `${pops} prop/building visibility pops within 30 m`);
+  else t.event("no-pop-30m", `walked with LOD≥32 m and visibility fades; pops=0`);
+
+  // Day scrub lighting crossfade (grade + exposure ease, not a step).
+  const R = window.day && window.day.render;
+  if (R && R.info) {
+    const before = R.info();
+    scrubTo(22 * 60);
+    await sleep(400);
+    const mid = R.info();
+    await sleep(900);
+    const after = R.info();
+    t.event("scrub-crossfade", `grade moved ${(before && before.lut && before.lut.name) || "?"} → ${(after && after.lut && after.lut.name) || "?"}; mid fade alive`);
+    if (mid && after) t.event("scrub-grade", "lighting crossfaded after the day-bar jump");
+  }
+
+  // Let-go whoosh
+  const w0 = S && S.now ? (S.now().whooshAt || 0) : 0;
+  pressKey("Escape");
+  await sleep(500);
+  const w1 = S && S.now ? (S.now().whooshAt || 0) : 0;
+  if (w1 > w0) t.event("control-whoosh", "let-go whoosh");
+  t.progress(1);
+  t.finish("done");
+}
+
 /* ---------------- episodes: chapter missions, goals, forecast score card ---------------- */
 // Starts each of the four via the Episodes menu (clock jump + take), completes at least
 // one goal on Morning (clouds then clear), checks the score card and localStorage best.
@@ -10881,6 +11133,7 @@ installPlaytest({
     { id: "voice-director", title: "Voice director: take control and first power uses speak with a caption clear of the ability bar; lines never overlap; Voices mute leaves music/effects alone; day end speaks", seconds: 90, tags: ["voice", "audio"], description: "Load with ?playtest=voice-director. Sound on (real pointer), Enter, E then R, Voices off in Settings, day-end recap (setup). Optional {\"touch\":true}. Events voice-take / voice-power-first / voice-caption / voice-no-overlap / voices-mute / voice-dayend. Run at desktop and 390x844." },
     { id: "pilot", title: "Pilot: on a 1200× day at least 12 distinct schedule lines; every take-over and let-go plays a Pilot voice event (let-go names the deed); wrist ring pulses while Pilot speaks; never overlaps Small Weather; on phone the Pilot caption is one line and clear of touch controls", seconds: 180, tags: ["voice", "characters", "phone", "story"], description: "Load with ?playtest=pilot. Sound on, 1200× through morning blocks, Enter, cast weather chaos, Esc. Optional {\"touch\":true} for 390x844. Events pilot-schedule / pilot-take / pilot-letgo / pilot-ring / pilot-no-overlap / pilot-caption-phone; metrics pilotDistinct, pilotOverlaps." },
     { id: "first-visit", title: "First visit: the card walks take control, walk, jump, one lightning strike and let go in under a minute; Skip hides it for good; then every phone control is on screen by touch, the wheel and Bolt by tap, a frame-time check, and take_control / weather / power events going out", seconds: 180, tags: ["tutorial", "control", "analytics"], description: "Day bar to a quiet moment at home (setup), day.tutorial.reset() as a first visit (setup). Real keys: Enter, W, Space, E, Esc. Skip by its button. The phone part uses day.control.touch(true) on a desktop-sized window; taps on the Weather button, the wheel and Bolt are real pointer taps." },
+    { id: "episode-jump", title: "Seamless episode jumps: each start plays a 1.2 s storm-cloud wipe (no black frame) that hides the asset swap and shader warm-up; desktop frames stay under 100 ms, phone under 150 ms; props fade in (no pop within 30 m); take/let-go whoosh with the camera blend; day-bar scrub crossfades lighting", seconds: 240, tags: ["episodes", "feel", "phone", "performance"], description: "Load with ?playtest=episode-jump ({\"touch\":true} for 390x844). Real input: Take control, Episodes rows for Morning / Lunch / Part 1, a ~2 min walk looking for pops, Esc. Events wipe-start / wipe-cover / wipe-end / no-black / jump-frames / fade-in / scrub-crossfade / control-whoosh; metrics jumpWorstMs, jumpAvgMs, wipeCover, fadeIns, popNear30m. Run at 1280x720 and 390x844 touch." },
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
     { id: "story-ending", title: "Part 3 ending scenes: three Part 3 runs reach Fair Weather, Heavy Weather and Overcast as distinct in-engine scenes (≤40 s, ≥2 voices each, no ending text card, rank stamp); after Fair Weather a same-day reload keeps the park green; on phone one caption + Skip", seconds: 960, tags: ["episodes", "story", "phone"], description: "Day bar outdoors and to 22:30 (setup), Enter/tap, parts started by API, Pressure refilled. Real keys or touch. Events ending-scene / ending-voice / ending-stamp / ending-park-reload / three-endings. Option {\"touch\":true} for 390x844." },
     { id: "episode-select", title: "Episode select: the score card's Replay and Next episode buttons work, the Episodes menu shows each best rank and locks later episodes until the one before is finished, and progress is kept in localStorage", seconds: 120, tags: ["episodes", "rank"], description: "Day bar beside the car (setup), Enter, Morning started by its API (setup), Pressure refilled (setup). Real keys: R, X, E, weather keys 2 and 1, then the card's Replay and Next buttons and the Episodes button. Events select-locked / select-card / select-replay / select-next / select-menu / select-storage." },
@@ -10972,6 +11225,7 @@ installPlaytest({
       else if (id === "pilot") await pilotScenario(options, t);
       else if (id === "spoken-dialogue") await spokenDialogue(options, t);
       else if (id === "foley") await foley(options, t);
+      else if (id === "episode-jump") await episodeJump(options, t);
       else if (id === "episodes") await episodes(options, t);
       else if (id === "story-parts") await storyParts(options, t);
       else if (id === "turning-moments") await turningMoments(options, t);

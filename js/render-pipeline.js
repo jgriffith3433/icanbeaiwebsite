@@ -518,13 +518,13 @@ export function installRenderPipeline(world) {
     if (lastClock != null) {
       let d = Math.abs(hour - lastClock);
       if (d > 12) d = 24 - d;
-      if (d > 0.05) jumpUntil = now + 700; // a scrub or a jump: catch up fast, then fade as usual
+      if (d > 0.05) jumpUntil = now + 1400; // a scrub or a jump: crossfade lighting (~0.7 s), never a hard step
     }
     lastClock = hour;
     const tT = timeWeights(hour, sunrise, sunset);
     let oT = { storm: 0, fog: 0, sunbreak: 0 };
     try { oT = overlayWeights(window.weather && window.weather.now ? window.weather.now() : null); } catch (e) { /* not up */ }
-    const k = 1 - Math.exp(-dt / (now < jumpUntil ? 0.15 : state.fade));
+    const k = 1 - Math.exp(-dt / (now < jumpUntil ? 0.7 : state.fade));
     for (const n of TOD) state.tw[n] += (tT[n] - state.tw[n]) * k;
     for (const n of OVERLAY_NAMES) state.ow[n] += (oT[n] - state.ow[n]) * k;
     state.target = tT;
