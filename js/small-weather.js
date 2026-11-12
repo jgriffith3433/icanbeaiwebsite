@@ -191,7 +191,7 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     }
     const mat = m.material;
     if (!mat) return;
-    mat.maxSimultaneousLights = 10;
+    mat.maxSimultaneousLights = 6; // vertex UBO limit (14): see world.js mat()
     if ("usePhysicalLightFalloff" in mat) mat.usePhysicalLightFalloff = false;
     /* The GLB leaves metallicFactor at the glTF default of 1 and the scene has no environment map, so a fully
        metallic skin has nothing to reflect and draws solid black: make him cloth and skin, lit by the room. */
