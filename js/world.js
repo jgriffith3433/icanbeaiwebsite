@@ -51,7 +51,7 @@
       m.diffuseColor = B.Color3.FromHexString(color);
       m.specularColor = new B.Color3(opt.spec || 0.04, opt.spec || 0.04, opt.spec || 0.04);
       m.ambientColor = m.diffuseColor.scale(0.32);
-      m.maxSimultaneousLights = 10;
+      m.maxSimultaneousLights = 6; // each light is a vertex UBO: 10 plus plugins and prepass passed the 14-UBO limit on some GPUs
       if (opt.alpha != null) m.alpha = opt.alpha;
       if (opt.emissive) m.emissiveColor = B.Color3.FromHexString(opt.emissive);
       if (!opt.unique) matCache[key] = m;
