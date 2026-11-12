@@ -22,7 +22,7 @@ export function startColdOpen() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "cold-start") quiet = true;
+    if (id && id !== "cold-start" && id !== "title-key-art") quiet = true;
     else if (!id && navigator.webdriver) quiet = true; // the runner's start() without ?playtest=: the scenario arms it
   } catch (e) { /* no location */ }
 
@@ -260,12 +260,17 @@ export function startColdOpen() {
   });
 
   /* ---- the sequence ---- */
+  let fromTitle = false;
   function begin() {
     const C = day.control;
     const sp = cfg.spot;
     C.place(sp.x, sp.z, sp.yaw, { from: sp.from, alpha: cfg.camera.alpha, beta: cfg.camera.beta, radius: cfg.camera.radius });
     if (day.jump && cfg.clock) day.jump(cfg.clock);
-    if (C.push) C.push({ from: cfg.camera.from, fov: cfg.camera.fov, secs: cfg.camera.secs });
+    // From the title's key-art shot (it ends on this very pose, wider) the camera dives in with no cut and no extra fov;
+    // a flash covers the sky changing to dusk. Otherwise the long wide push-in.
+    const dive = fromTitle && cfg.dive;
+    if (C.push) C.push(dive ? { from: dive.from, fov: 0, secs: dive.secs } : { from: cfg.camera.from, fov: cfg.camera.fov, secs: cfg.camera.secs });
+    if (dive && window.weather && window.weather.triggerFlash) window.weather.triggerFlash(60, -0.15);
     const P = window.powers || day.powers;
     if (P) {
       P.abilities.reset(100);
@@ -315,8 +320,9 @@ export function startColdOpen() {
     active: () => on,
     arm() { quiet = false; return true; },
     /** Called by the title's Play, in the click: the same frame the title closes. */
-    start(via) {
+    start(via, opts) {
       if (on || quiet || returning()) return false;
+      fromTitle = !!(opts && opts.fromTitle);
       if (!day.control || !day.control.place) return false;
       on = true;
       t0 = performance.now();

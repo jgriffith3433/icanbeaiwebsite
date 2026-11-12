@@ -1643,9 +1643,18 @@
     /* js/title.js's skyline shot: null = the day's camera */
     let titleShot = null;
     const TITLE_SHOT = { x: 92, y: 16, z: 32, alpha: -1.15, beta: 1.22, radius: 98, spin: 0.018 };
+    /* A crane (opts.crane { secs, from, to }: x y z alpha beta radius each, eased) replaces the slow orbit, and opts.hero
+       { x, y, z, yaw } stands Small Weather on a roof while the title is up (the day's person is hidden by it; the pose is the
+       idle clip with a slow wind lean). titleParallax(x, y) in -1..1 leans the camera a little (mouse, device tilt). */
+    let titleParX = 0, titleParY = 0, titleParSX = 0, titleParSY = 0;
     function setTitleShot(on) {
       titleShot = on ? Object.assign({}, TITLE_SHOT, typeof on === "object" ? on : {}) : null;
+      if (titleShot) { titleShot.t0 = null; titleParX = titleParY = titleParSX = titleParSY = 0; }
       return !!titleShot;
+    }
+    function setTitleParallax(x, y) {
+      titleParX = Math.max(-1, Math.min(1, +x || 0));
+      titleParY = Math.max(-1, Math.min(1, +y || 0));
     }
     /* js/moments.js's cut-away camera for a turning-point moment: orbits a point in the city (target, alpha, beta, radius
        each go from a start to an end value over `secs`, eased), on top of the day's camera and the player's. It stays out
@@ -1912,7 +1921,9 @@
       /* quilt */
       /* opts.player: the player has him (js/control.js), which places and poses him; the day still runs the rest */
       const player = opts.player || null;
-      const pp = player ? Object.assign({}, fr.person, { x: player.x, z: player.z, pose: "stand", walking: player.speed > 0.2, inCar: false }) : fr.person;
+      const hero = !player && titleShot && titleShot.hero ? titleShot.hero : null;
+      const pp = player ? Object.assign({}, fr.person, { x: player.x, z: player.z, pose: "stand", walking: player.speed > 0.2, inCar: false })
+        : hero ? Object.assign({}, fr.person, { x: hero.x, z: hero.z, yaw: hero.yaw, pose: "stand", hand: "none", walking: false, inCar: false }) : fr.person;
       const inBed = spots.bed && Math.hypot(pp.x - spots.bed.x, pp.z - spots.bed.z) < 0.4 && ["lie", "side", "recline"].includes(pp.pose);
       if (quiltUp) {
         quiltUp.setEnabled(inBed && things.blanket !== "down");
@@ -2031,10 +2042,13 @@
         // standing or walking, his feet go on whatever is under him (a room's floor, the sidewalk, the road, the lawn);
         // the poses' heights assume a room's floor
         const gy = spec === POSE.stand || spec === POSE.walk ? feetGround(pp.x, pp.z) : null;
-        me.root.position.set(pp.x, gy == null ? spec.y : spec.y - FLOOR + gy, pp.z);
-        if (state.yaw == null || snap) state.yaw = pp.yaw;
+        me.root.position.set(pp.x, hero ? spec.y - FLOOR + hero.y : gy == null ? spec.y : spec.y - FLOOR + gy, pp.z);
+        if (state.yaw == null || snap || hero) state.yaw = pp.yaw;
         state.yaw = dampAngle(state.yaw, pp.yaw, dt, pp.walking ? 12 : 7);
         me.root.rotation.y = state.yaw;
+        // on the title's roof the wind leans him, a little and never still
+        me.root.rotation.x = hero ? 0.035 + 0.02 * Math.sin(t * 1.3) + 0.012 * Math.sin(t * 3.1) : 0;
+        me.root.rotation.z = hero ? 0.015 * Math.sin(t * 0.9 + 1) : 0;
       }
       if (!player) {
         const moved = state.lastX == null ? 0 : Math.hypot(pp.x - state.lastX, pp.z - state.lastZ);
@@ -2098,11 +2112,27 @@
       /* the title screen (js/title.js): a slow, high orbit over the district so the skyline sits behind the
          menu; the day's own camera snaps back to him when the title closes */
       if (titleShot) {
-        const a = titleShot.alpha + t * titleShot.spin;
-        camera.target.set(titleShot.x, titleShot.y, titleShot.z);
-        camera.alpha = a;
-        camera.beta = titleShot.beta;
-        camera.radius = titleShot.radius;
+        if (titleShot.t0 == null) titleShot.t0 = t;
+        titleParSX += (titleParX - titleParSX) * Math.min(1, dt * 3);
+        titleParSY += (titleParY - titleParSY) * Math.min(1, dt * 3);
+        let tx = titleShot.x, ty = titleShot.y, tz = titleShot.z, al = titleShot.alpha + t * titleShot.spin, be = titleShot.beta, ra = titleShot.radius;
+        const cr = titleShot.crane;
+        if (cr) {
+          const k = Math.max(0, Math.min(1, (t - titleShot.t0) / cr.secs));
+          const e = k * k * k * (k * (k * 6 - 15) + 10); // smootherstep: the crane settles, it doesn't stop
+          const F = cr.from, T = cr.to;
+          tx = F.x + (T.x - F.x) * e; ty = F.y + (T.y - F.y) * e; tz = F.z + (T.z - F.z) * e;
+          al = F.alpha + (T.alpha - F.alpha) * e; be = F.beta + (T.beta - F.beta) * e; ra = F.radius + (T.radius - F.radius) * e;
+          if (k >= 1) { // after the landing: a slow breath, so the key art is never a still
+            al += 0.012 * Math.sin((t - titleShot.t0) * 0.35);
+            be += 0.006 * Math.sin((t - titleShot.t0) * 0.5);
+          }
+        }
+        const par = cr ? 1 : 0.4;
+        camera.target.set(tx, ty, tz);
+        camera.alpha = al + titleParSX * 0.045 * par;
+        camera.beta = be + titleParSY * 0.025 * par;
+        camera.radius = ra;
         cam.inited = false;
         cam.user = 0;
         sun.position.set(titleShot.x - sun.direction.x * 40, 40, titleShot.z - sun.direction.z * 40);
@@ -2567,6 +2597,8 @@
         cam.user = 0;
       },
       titleShot: setTitleShot,
+      titleParallax: setTitleParallax,
+      titleCrane: () => (titleShot && titleShot.crane && titleShot.t0 != null ? Math.min(1, (elapsed - titleShot.t0) / titleShot.crane.secs) : null),
       officePower: (k) => { officePowerK = Math.max(0, Math.min(1, k)); return officePowerK; },
       officePowerNow: () => officePowerK,
       cineShot: setCineShot,
