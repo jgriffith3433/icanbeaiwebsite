@@ -70,9 +70,16 @@ export function inCone(ox, oz, dx, dz, px, pz, length, cosMin) {
   return (vx * dx + vz * dz) / dist >= cosMin;
 }
 
-/** Seconds between the flash and the thunder. Farther strikes wait. */
+/** Speed of sound (m/s). Thunder delay matches Battlefield-style distance roll. */
+export const SPEED_OF_SOUND = 343;
+/** Within this many metres the body/rumble rides the flash (criterion: "with the flash"). */
+export const THUNDER_NEAR_M = 30;
+
+/** Seconds between the flash and the thunder. Farther strikes wait at 343 m/s. */
 export function thunderDelay(distance) {
-  return Math.min(1.6, 0.06 + Math.max(0, distance) / 85);
+  const d = Math.max(0, distance);
+  if (d <= THUNDER_NEAR_M) return 0;
+  return Math.min(2.8, d / SPEED_OF_SOUND);
 }
 
 /**
@@ -690,6 +697,7 @@ export function startPowers(world, dayApi) {
       shove(prop, f.x * k, 16, f.z * k);
       pushes++;
     });
+    if (day && day.sfx && day.sfx.cast) day.sfx.cast("gust");
     gustMesh.setEnabled(true);
     gustMesh.scaling.set(3.2, 1.15, reach);
     gustMesh.position.set(p.x + f.x * (reach * 0.45), 1.05, p.z + f.z * (reach * 0.45));
@@ -747,8 +755,10 @@ export function startPowers(world, dayApi) {
     const w = wx();
     if (id === "rain") {
       if (w && w.set) w.set("rain", 1, "power");
-      noiseWash(5200, 2.4, 0.2, "highpass");
-      noiseWash(1700, 2.0, 0.1, "bandpass");
+      if (!(day && day.sfx && day.sfx.cast && day.sfx.cast("rain"))) {
+        noiseWash(5200, 2.4, 0.2, "highpass");
+        noiseWash(1700, 2.0, 0.1, "bandpass");
+      }
     } else if (id === "gale") {
       if (w && w.set) w.set("wind", 1, "power");
       const p = who();
@@ -763,14 +773,14 @@ export function startPowers(world, dayApi) {
       callFx.dirZ = f.z;
       callFx.until = age + 3;
       shake = Math.max(shake, 0.01);
-      sweep(260, 1500, 2.6, 0.32);
+      if (!(day && day.sfx && day.sfx.cast && day.sfx.cast("gale"))) sweep(260, 1500, 2.6, 0.32);
     } else if (id === "fog") {
       if (w && w.set) w.set("fog", 1, "power");
-      pad2([110, 165, 220], 3.4, 0.07);
+      if (!(day && day.sfx && day.sfx.cast && day.sfx.cast("fog"))) pad2([110, 165, 220], 3.4, 0.07);
     } else if (id === "sunbreak") {
       if (w && w.sunbreak) w.sunbreak();
       else if (w && w.set) w.set("clear", 1, "power");
-      chime([523.25, 659.25, 783.99, 1046.5], 0.12);
+      if (!(day && day.sfx && day.sfx.cast && day.sfx.cast("sunbreak"))) chime([523.25, 659.25, 783.99, 1046.5], 0.12);
     }
     callFx.id = id;
     callFx.at = age;
@@ -1404,10 +1414,22 @@ html.touch-ui.in-control .side{display:none}
       if (strike && strike.id === th.id) strike.thunder = true;
       flash = Math.max(flash, 0.28);
       shake = Math.max(shake, 0.018 + 0.04 * (1 - Math.min(1, th.dist / 40)));
-      // The recorded thunder (near or far by distance), with the synthesized rumble under it; the rumble alone if the
-      // samples aren't unlocked yet.
-      const sampled = !!(day && day.score && day.score.crack && day.score.crack(th.dist < 22 ? "near" : "far", { dist: th.dist, delay: th.delay, flashAt: th.flashAt }));
-      burst(140, 1.35, sampled ? 0.4 : 0.85, "lowpass");
+      // Layered thunder (js/sfx.js): body + rumble variants, distance low-pass, sidechain duck. Falls back to the
+      // recorded near/far cracks in score.js, then a synth rumble under either.
+      let sampled = false;
+      if (day && day.sfx && day.sfx.thunder) {
+        sampled = !!day.sfx.thunder({
+          dist: th.dist,
+          delay: th.delay,
+          flashAt: th.flashAt,
+          x: strike && strike.x,
+          z: strike && strike.z,
+        });
+      }
+      if (!sampled && day && day.score && day.score.crack) {
+        sampled = !!day.score.crack(th.dist < 22 ? "near" : "far", { dist: th.dist, delay: th.delay, flashAt: th.flashAt });
+      }
+      burst(140, 1.35, sampled ? 0.28 : 0.85, "lowpass");
       say("thunder", "world", "bolt");
     }
 
@@ -1581,6 +1603,7 @@ html.touch-ui.in-control .side{display:none}
     now,
     pose,
     command,
+    thunderDelay,
     boltFx: fx,
     abilities: abil,
     /** The opening's hooks: aim every bolt at {x,y,z} (null = back to the reticle); gate(fn(name, via) -> bool) (null = open). */

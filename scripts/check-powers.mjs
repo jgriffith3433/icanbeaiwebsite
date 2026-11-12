@@ -43,8 +43,11 @@ const f = cameraForward(0);
 ok(Math.abs(f.x + 1) < 1e-6 && Math.abs(f.z) < 1e-6, `cameraForward(0) is ${JSON.stringify(f)}, not {-1,0}`);
 ok(inCone(0, 0, 0, 1, 0, 5, 10, Math.cos((52 * Math.PI) / 180)), "point ahead is in the cone");
 ok(!inCone(0, 0, 0, 1, 8, 1, 10, Math.cos((52 * Math.PI) / 180)), "point off to the side is outside the cone");
-ok(thunderDelay(0) < thunderDelay(100), "farther strikes wait longer for thunder");
-ok(thunderDelay(200) <= 1.6, "thunder delay is capped");
+ok(thunderDelay(0) === 0, "a strike at his feet rides the flash");
+ok(thunderDelay(30) === 0, "within 30 m thunder plays with the flash");
+ok(thunderDelay(100) > thunderDelay(50), "farther strikes wait longer for thunder");
+ok(Math.abs(thunderDelay(340) - 340 / 343) < 0.02, `340 m is about 1 s at 343 m/s (got ${thunderDelay(340)})`);
+ok(thunderDelay(200) <= 2.8, "thunder delay is capped");
 
 const cfg = {
   street: { z: 12.6, from: -48, to: 210 },
