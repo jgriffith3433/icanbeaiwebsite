@@ -239,6 +239,8 @@ export function startScore(dayApi) {
   let ctx = null;
   let master = null;
   let musicBus = null;
+  let bedBus = null; // the weather beds' own bus: js/stems.js mutes it while the stems play under control
+  let bedGoal = 1;
   let ambBus = null;
   let unlocked = false;
   let loading = null;
@@ -322,6 +324,9 @@ export function startScore(dayApi) {
       master.gain.value = 0;
       musicBus = ctx.createGain();
       musicBus.gain.value = 1;
+      bedBus = ctx.createGain();
+      bedBus.gain.value = 1;
+      bedBus.connect(musicBus);
       tone = ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
       if (tone) {
         tone.type = "lowpass";
@@ -503,7 +508,7 @@ export function startScore(dayApi) {
     const url = bedUrl(bed, c);
     const buf = buffers[url];
     if (!buf) return null;
-    music[bed] = startLoop(buf, musicBus, 0);
+    music[bed] = startLoop(buf, bedBus || musicBus, 0);
     return music[bed];
   }
 
@@ -998,6 +1003,7 @@ export function startScore(dayApi) {
     setGainSmooth(master, on ? c.mix.master : 0, 0.04);
     const musicGoal = c.musicVol * duckK * (titleUp ? c.mix.title / Math.max(0.01, c.musicVol) : 1);
     setGainSmooth(musicBus, musicGoal, 0.05);
+    setGainSmooth(bedBus, bedGoal, 0.25);
     setGainSmooth(ambBus, c.ambVol * (titleUp ? 0.5 : 1), 0.05);
 
     const T = ensureTension();
@@ -1082,6 +1088,7 @@ export function startScore(dayApi) {
       tension: live.tension,
       rate: live.rate,
       pulse: live.pulse,
+      bedLevel: bedGoal,
       mix: Object.assign({}, cfg().mix),
       // which file each of the day/night beds is playing (its own, or the fallback until Gen's file lands)
       files: { day: ctx ? bedUrl("day", cfg()) : null, night: ctx ? bedUrl("night", cfg()) : null },
@@ -1128,6 +1135,9 @@ export function startScore(dayApi) {
     unlock,
     fixLoopSeam: (buf, fadeSec) => fixLoopSeam(ctx, buf, fadeSec),
     equalPowerGains,
+    /** js/stems.js: the music bus and context (null until Sound is on and unlocked), and the beds' level (0 = muted). */
+    bus: () => (ctx && musicBus ? { ctx, bus: musicBus, unlocked, on: soundOn() } : null),
+    bedLevel: (k) => { bedGoal = Math.max(0, Math.min(1, Number(k))); live.bedLevel = bedGoal; return bedGoal; },
     usingSamples: () => live.samples,
     bedFor: (state, hour) => bedFor(state, hour == null ? simHour() : hour),
     isNight: (hour) => isNightHour(hour == null ? simHour() : hour, cfg()),

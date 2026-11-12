@@ -5700,6 +5700,207 @@
     "maps.normal": "textures/city/gravel-normal.webp",
     "maps.roughness": "textures/city/gravel-roughness.webp"
    }
+  },
+  {
+   "id": "music-stem-calm",
+   "note": "STEM 1 of 3 (js/stems.js, score.stems.files.calm): calm, walking and exploring. Same key and tempo as tension/storm; made 60 s, looped with audio.music-loop, normalised to about -16 LUFS. Phone budget: all three stems together under ~1.3 MB (mono or 56 kbps mp3, audio.process).",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. Calm layer: soft warm pads and a gentle felt-piano playing the motif every other bar, spacious, electric-blue night city mood, no drums, seamless loop, Am F C G one chord per four bars",
+      "lyrics": "[Instrumental]",
+      "seconds": 60,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.music-loop",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "mode": "loop",
+      "crossfade": 2,
+      "format": "mp3",
+      "normalize": true
+     }
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/stem-calm.mp3"
+   }
+  },
+  {
+   "id": "music-stem-tension",
+   "note": "STEM 2 of 3 (js/stems.js, score.stems.files.tension): tension, a cast winding up. Same key/tempo/chord plan as calm so it sums with it; eighth-note pulse, rising filter; 60 s looped, -16 LUFS.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. Tension layer to play on top of a calm pad: pulsing eighth-note synth bass on the chord root, tight rising arpeggio of the motif, anticipation, no melody pads, seamless loop, Am F C G one chord per four bars",
+      "lyrics": "[Instrumental]",
+      "seconds": 60,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.music-loop",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "mode": "loop",
+      "crossfade": 2,
+      "format": "mp3",
+      "normalize": true
+     }
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/stem-tension.mp3"
+   }
+  },
+  {
+   "id": "music-stem-storm",
+   "note": "STEM 3 of 3 (js/stems.js, score.stems.files.storm): the full storm, a big cast, a rescue or a tornado. Same key/tempo/chord plan; 60 s looped, -16 LUFS.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. Full storm layer to play on top of calm and tension: huge low drum hits on every beat, distorted synth stabs, choir-like brass playing the motif two octaves up, thunderous, triumphant, seamless loop, Am F C G one chord per four bars",
+      "lyrics": "[Instrumental]",
+      "seconds": 60,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.music-loop",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "mode": "loop",
+      "crossfade": 2,
+      "format": "mp3",
+      "normalize": true
+     }
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/stem-storm.mp3"
+   }
+  },
+  {
+   "id": "music-sting-resolution",
+   "note": "6 s resolution sting (episode success), the same motif turned to A major and held, then the calm stem takes over (js/stems.js sting('resolution')). Not looped; -16 LUFS.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. A 6 second resolution sting: the motif resolving upward into a warm held A major chord with a soft bell and pad tail, relief, no drums, ends naturally",
+      "lyrics": "[Instrumental]",
+      "seconds": 6,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/sting-resolution.mp3"
+   }
+  },
+  {
+   "id": "music-sting-failure",
+   "note": "4 s failure sting (episode failed or time up), the same motif falling and left unfinished (js/stems.js sting('failure')). Not looped; -16 LUFS.",
+   "steps": [
+    {
+     "tool": "audio.music",
+     "params": {
+      "prompt": "Small Weather's theme: one 4-note motif A3 C4 E4 D4 (one note per beat, one bar), A minor, 120 BPM (a bar is exactly 2 s), instrumental. A 4 second failure sting: the motif falling downward in a minor key, a low dull tone, unresolved, quiet, ends naturally",
+      "lyrics": "[Instrumental]",
+      "seconds": 4,
+      "bpm": 120,
+      "key": "A minor"
+     },
+     "save": "music"
+    },
+    {
+     "tool": "audio.process",
+     "inputs": {
+      "audio": "$prev"
+     },
+     "params": {
+      "kind": "music",
+      "format": "mp3",
+      "normalize": true,
+      "trim": false
+     },
+     "save": "music"
+    }
+   ],
+   "files": {
+    "music": "audio/music/sting-failure.mp3"
+   }
   }
  ]
 }
