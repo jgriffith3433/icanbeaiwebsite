@@ -29,7 +29,21 @@ const state = {
   ui: null,
 };
 
+// textures/ui/index.json lists the painted webp that are really there (vite writes it from disk at build),
+// so a file that isn't in the repo is never requested (no 404s) and the SVG stand-in is used.
+let painted = null;
+async function loadIndex() {
+  try {
+    const r = await fetch(BASE + "index.json");
+    const j = r.ok ? await r.json() : null;
+    painted = new Set((j && j.files) || []);
+  } catch (e) {
+    painted = new Set();
+  }
+}
+
 function prefer(webp, svg) {
+  if (painted && !painted.has(webp)) return Promise.resolve(svg);
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(webp);
@@ -40,6 +54,7 @@ function prefer(webp, svg) {
 
 async function resolveKit() {
   let gen = 0;
+  await loadIndex();
   for (const id of VERBS) {
     const litSvg = `${BASE}verb-${id}-lit.svg`;
     const unlitSvg = `${BASE}verb-${id}-unlit.svg`;
