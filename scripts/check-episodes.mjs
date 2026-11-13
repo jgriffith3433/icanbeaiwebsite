@@ -306,3 +306,13 @@ if (problems.length) {
   process.exit(1);
 }
 console.log("check-episodes: ok");
+
+// progress for the title screen (progressOf)
+{
+  const { progressOf } = await import("../js/episodes.js");
+  const list = [{ id: "tut", tutorial: true, title: "T" }, { id: "a", chapter: 1, title: "A" }, { id: "b", chapter: 2, title: "B", tagline: "bt" }];
+  const p = progressOf(list, { a: { rank: "A", done: true } });
+  if (p.done !== 1 || p.total !== 2 || p.stars !== 2 || !p.next || p.next.id !== "b") { console.error("progressOf wrong", p); process.exit(1); }
+  if (progressOf(list, {}).next.id !== "a") { console.error("progressOf: fresh next"); process.exit(1); }
+  console.log("ok progressOf");
+}

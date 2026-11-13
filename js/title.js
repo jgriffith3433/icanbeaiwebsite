@@ -40,7 +40,7 @@ export function startTitle() {
   let autoTimer = 0;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
@@ -58,7 +58,10 @@ export function startTitle() {
 @keyframes t-in{to{opacity:1;transform:none}}
 @keyframes t-glint{0%,55%{background-position:140% 0}85%,100%{background-position:-40% 0}}
 .title-screen .daily{margin:14px 0 0;max-width:30em;color:#f0c27a;font:600 1rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.title-screen .daily[hidden],.title-screen .yday[hidden]{display:none}
+.title-screen .daily[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
+.title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:rgba(10,13,22,.62);color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .prog b{color:#f0c27a;letter-spacing:.12em;font-weight:700}
+.title-screen .nextgoal{margin:0;max-width:min(86vw,340px);color:#f0c27a;font:600 .95rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.9);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .yday{margin:4px 0 0;max-width:30em;color:rgba(246,241,232,.78);font:500 .88rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .actions{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;opacity:0;animation:t-in .9s ease 3.2s forwards}
 .title-screen .row{display:flex;flex-wrap:nowrap;justify-content:center;gap:10px;width:100%}
@@ -90,7 +93,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   el.hidden = true;
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", `${cfg.logoText.join(" ")}`);
-  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
+  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
   const logoEl = el.querySelector("#title-logo");
   logoEl.querySelector(".sr").textContent = cfg.logoText.join(" ");
   if (cfg.logo) {
@@ -115,6 +118,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   }
   const dailyEl = el.querySelector("#title-daily");
   const ydayEl = el.querySelector("#title-yday");
+  const progEl = el.querySelector("#title-prog");
+  const nextEl = el.querySelector("#title-next");
   const playBtn = el.querySelector("#title-play");
   const epBtn = el.querySelector("#title-episodes");
   const setBtn = el.querySelector("#title-settings");
@@ -167,6 +172,19 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     ydayEl.textContent = y;
     ydayEl.hidden = !y;
   }
+  /* Progress (js/episodes.js progress()): stars earned and episodes finished, and the next goal under Continue. */
+  function paintProgress() {
+    const p = day.episodes && day.episodes.progress ? day.episodes.progress() : null;
+    if (!p || !p.total) { progEl.hidden = true; nextEl.hidden = true; return; }
+    const filled = Math.min(5, Math.round((p.stars / Math.max(1, p.maxStars)) * 5));
+    progEl.innerHTML = `<b aria-hidden="true">${"★".repeat(filled)}${"☆".repeat(5 - filled)}</b> ${p.done} of ${p.total} episodes`;
+    progEl.setAttribute("aria-label", `${p.stars} of ${p.maxStars} stars, ${p.done} of ${p.total} episodes finished`);
+    progEl.hidden = false;
+    const started = p.done > 0 || !hasSave();
+    nextEl.textContent = p.next ? `${p.done > 0 ? "Next" : "First"}: ${p.next.title}` : "Every episode finished. Beat your ranks.";
+    nextEl.hidden = !(hasSave() || p.done > 0) && !started;
+  }
+  window.addEventListener("day:episode", () => { if (up) paintProgress(); });
   window.addEventListener("day:daily", () => { if (up) paintDaily(); });
   function emit(action, extra) {
     const detail = Object.assign({ action }, extra || {});
@@ -268,6 +286,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     paintMusic();
     paintClock();
     paintDaily();
+    paintProgress();
     clearInterval(clockTimer);
     clockTimer = setInterval(paintClock, 1000); // the clock text only: no fetches
     try { playBtn.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
@@ -373,6 +392,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
       seconds: up ? (performance.now() - shownAt) / 1000 : 0,
       music: musicWanted,
       daily: dailyEl.hidden ? "" : dailyEl.textContent,
+      progress: progEl.hidden ? "" : progEl.textContent,
+      next: nextEl.hidden ? "" : nextEl.textContent,
       yesterday: ydayEl.hidden ? "" : ydayEl.textContent,
       sound: soundOn(),
       crane: day.world && day.world() && day.world().titleCrane ? day.world().titleCrane() : null,
