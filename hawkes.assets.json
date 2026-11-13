@@ -3642,7 +3642,7 @@
   },
   {
    "id": "ui-verbs-lit",
-   "note": "UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
+   "note": "Baked (scripts/bake-ui-art.mjs, Gen job j_3d339920a1bf, asset a_505d24c21cdb2dd8): lit = the sheet's icons with the white ground keyed to alpha; unlit = the same desaturated and dimmed (verb-<id>-unlit.webp). The sheet came out as two rows, so the script crops each icon by box; fog was redone from a single-icon retake (job j_20c4a2787fd6, take 1: stacked wavy mist bands; the first retake j_b5b0f527b3a5 drew clouds with bolts and was rejected), baked from fog.png. UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
    "steps": [
     {
      "tool": "image.generate",
@@ -3694,7 +3694,7 @@
   },
   {
    "id": "ui-panel-frame",
-   "note": "UI art kit: 9-slice panel frame (Persona-bold angular corners, storm-navy + cyan). Stand-in: textures/ui/panel-frame.svg.",
+   "note": "Baked from Gen job j_ef682318ad41 (a_01405dc0fc5ee7bf) into a 152 px 9-slice atlas (corners 56 px, straight edge runs) by scripts/bake-ui-art.mjs. UI art kit: 9-slice panel frame (Persona-bold angular corners, storm-navy + cyan). Stand-in: textures/ui/panel-frame.svg.",
    "steps": [
     {
      "tool": "image.generate",
@@ -3720,7 +3720,7 @@
   },
   {
    "id": "ui-ranks",
-   "note": "UI art kit: S/A/B/C rank stamps in one sheet. Stand-ins: textures/ui/rank-S.svg etc.",
+   "note": "Baked from Gen job j_770ff9408a95 (a_6dd8dbb45af59363). UI art kit: S/A/B/C rank stamps in one sheet. Stand-ins: textures/ui/rank-S.svg etc.",
    "steps": [
     {
      "tool": "image.generate",
@@ -3746,7 +3746,7 @@
   },
   {
    "id": "ui-busts",
-   "note": "UI art kit: portrait busts of Birdie (yellow raincoat, straw hat), Dex (orange jacket, white helmet), Ines (violet coat, glasses) in one sheet. Stand-ins: textures/ui/bust-*.svg.",
+   "note": "Baked from Gen job j_417efd048c8a (a_3a0d79da6b63443a): the portrait window of each card (the sheet put a name caption under each, cut away); the 4th card's AI ring is textures/ui/pilot.webp. UI art kit: portrait busts of Birdie (yellow raincoat, straw hat), Dex (orange jacket, white helmet), Ines (violet coat, glasses) in one sheet. Stand-ins: textures/ui/bust-*.svg.",
    "steps": [
     {
      "tool": "image.generate",
@@ -8240,6 +8240,158 @@
    ],
    "files": {
     "audio": "audio/dialogue/dlg-he-1xjq77g.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1r6e40h",
+   "note": "Spoken line (grade:S), He: \"That's the one. Remember that sky.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "That's the one. Remember that sky.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1r6e40h.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1u9ka4x",
+   "note": "Spoken line (grade:S), He: \"Clean. The whole district felt that.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Clean. The whole district felt that.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1u9ka4x.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-c08rhq",
+   "note": "Spoken line (grade:A), He: \"Good calls, mostly. I'll take it.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Good calls, mostly. I'll take it.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-c08rhq.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1al95vs",
+   "note": "Spoken line (grade:A), He: \"Solid. The sky owes me nothing.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Solid. The sky owes me nothing.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1al95vs.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-15irvz2",
+   "note": "Spoken line (grade:B), He: \"Held together. Barely.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Held together. Barely.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-15irvz2.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1gt2sma",
+   "note": "Spoken line (grade:B), He: \"Could've been cleaner. Could've been worse.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Could've been cleaner. Could've been worse.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1gt2sma.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-c3zibw",
+   "note": "Spoken line (grade:C), He: \"Rough. The sky won that round.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Rough. The sky won that round.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-c3zibw.mp3"
+   }
+  },
+  {
+   "id": "dlg-he-1hffrmo",
+   "note": "Spoken line (grade:C), He: \"Okay. Next time I listen first.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "steps": [
+    {
+     "tool": "audio.voice",
+     "params": {
+      "provider": "elevenlabs",
+      "text": "Okay. Next time I listen first.",
+      "voice": "cjVigY5qzO86Huf0OWal",
+      "model": "eleven_v4"
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/dialogue/dlg-he-1hffrmo.mp3"
    }
   },
   {
