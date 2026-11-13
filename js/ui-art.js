@@ -82,6 +82,8 @@ async function resolveKit() {
   if (state.pilot.endsWith(".webp")) gen++;
   state.source = gen > 0 ? (gen >= 19 ? "gen" : "mixed") : "svg";
   document.documentElement.style.setProperty("--ui-frame", `url("${state.frame}")`);
+  // the painted atlas is 152 px with 56 px corners (scripts/bake-ui-art.mjs); the SVG stand-in is 128 px with 28
+  document.documentElement.style.setProperty("--ui-frame-slice", state.frame.endsWith(".webp") ? "56" : "28");
   document.documentElement.dataset.uiArt = state.source;
   try {
     window.dispatchEvent(new CustomEvent("day:ui-art", { detail: info() }));

@@ -3642,7 +3642,7 @@
   },
   {
    "id": "ui-verbs-lit",
-   "note": "UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
+   "note": "Baked (scripts/bake-ui-art.mjs, Gen job j_3d339920a1bf, asset a_505d24c21cdb2dd8): lit = the sheet's icons with the white ground keyed to alpha; unlit = the same desaturated and dimmed (verb-<id>-unlit.webp). The sheet came out as two rows, so the script crops each icon by box; fog was redone from a single-icon retake (job j_20c4a2787fd6, take 1: stacked wavy mist bands; the first retake j_b5b0f527b3a5 drew clouds with bolts and was rejected), baked from fog.png. UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
    "steps": [
     {
      "tool": "image.generate",
@@ -3694,7 +3694,7 @@
   },
   {
    "id": "ui-panel-frame",
-   "note": "UI art kit: 9-slice panel frame (Persona-bold angular corners, storm-navy + cyan). Stand-in: textures/ui/panel-frame.svg.",
+   "note": "Baked from Gen job j_ef682318ad41 (a_01405dc0fc5ee7bf) into a 152 px 9-slice atlas (corners 56 px, straight edge runs) by scripts/bake-ui-art.mjs. UI art kit: 9-slice panel frame (Persona-bold angular corners, storm-navy + cyan). Stand-in: textures/ui/panel-frame.svg.",
    "steps": [
     {
      "tool": "image.generate",
@@ -3720,7 +3720,7 @@
   },
   {
    "id": "ui-ranks",
-   "note": "UI art kit: S/A/B/C rank stamps in one sheet. Stand-ins: textures/ui/rank-S.svg etc.",
+   "note": "Baked from Gen job j_770ff9408a95 (a_6dd8dbb45af59363). UI art kit: S/A/B/C rank stamps in one sheet. Stand-ins: textures/ui/rank-S.svg etc.",
    "steps": [
     {
      "tool": "image.generate",
@@ -3746,7 +3746,7 @@
   },
   {
    "id": "ui-busts",
-   "note": "UI art kit: portrait busts of Birdie (yellow raincoat, straw hat), Dex (orange jacket, white helmet), Ines (violet coat, glasses) in one sheet. Stand-ins: textures/ui/bust-*.svg.",
+   "note": "Baked from Gen job j_417efd048c8a (a_3a0d79da6b63443a): the portrait window of each card (the sheet put a name caption under each, cut away); the 4th card's AI ring is textures/ui/pilot.webp. UI art kit: portrait busts of Birdie (yellow raincoat, straw hat), Dex (orange jacket, white helmet), Ines (violet coat, glasses) in one sheet. Stand-ins: textures/ui/bust-*.svg.",
    "steps": [
     {
      "tool": "image.generate",
