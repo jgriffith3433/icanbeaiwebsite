@@ -5513,14 +5513,41 @@ async function windFog(options, t) {
     try { window.day.look.quality("low"); } catch (e) { /* */ }
     C.touch(true);
   }
+  /* sound: the title's night-city ambience loops, Continue clicks, and the first Gust whooshes (js/titlesound.js) */
+  const TS = window.day.titlesound;
+  const T = window.day.title;
+  if (!TS || !T) t.problem("bug", "js/titlesound.js or the title isn't installed");
+  else {
+    t.scene("Title sound");
+    T.show("playtest");
+    await sleep(2200);
+    const ti = TS.info();
+    t.metric("titleAmbience", ti.ambience ? 1 : 0);
+    if (!ti.ambience) t.problem("bug", "No night-city ambience loop on the title screen");
+    else t.event("title-ambience", `looping night-city bed on the title (audio context ${ti.ctx})`);
+    const playB = document.querySelector("#title-play");
+    const clicks0 = TS.info().clicks;
+    if (playB) {
+      const r = playB.getBoundingClientRect();
+      touchOn(playB, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 11);
+      await sleep(120);
+      t.metric("titleClickSounds", TS.info().clicks - clicks0);
+      t.event("title-continue-click", `"${playB.textContent}" pressed; UI click ${TS.info().clicks > clicks0 ? "played" : "left to the sound kit (Sound already on)"}`);
+      touchOn(playB, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 11);
+      playB.click();
+      await sleep(600);
+    }
+  }
   const sound = $("sound");
-  if (sound) {
+  if (sound && sound.getAttribute("aria-pressed") !== "true") {
     const r = sound.getBoundingClientRect();
     sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: touch ? "touch" : "mouse" }));
     sound.click();
     await sleep(200);
   }
-  if (touch) await tapEl($("control")); else pressKey("Enter");
+  if (C.mode() !== "control") {
+    if (touch) await tapEl($("control")); else pressKey("Enter");
+  }
   await t.until(() => C.mode() === "control", 4000, "Take control");
   t.event("control-taken", touch ? "by touch, low quality" : "Enter");
   if (C.place) C.place(112, 24, -Math.PI / 2); // setup: on the plaza, a flag pole and the avenue's trees in view
@@ -5549,8 +5576,13 @@ async function windFog(options, t) {
   if (touch) await tapEl($("ability-fog")); else await holdVerb("c", 120);
   await t.until(() => wf.info().fog >= 0.3, 4000, "fog to gather").catch(() => {});
   const push0 = wf.info().fogPush;
+  const whooshes0 = (window.day.titlesound ? window.day.titlesound.info().whooshes : 0) + ((window.day.sfx && window.day.sfx.info().heard && window.day.sfx.info().heard["gust-whoosh"]) || 0);
   if (touch) await tapEl($("ability-wind")); else await holdVerb("v", 120);
   await sleep(2500);
+  const whooshes1 = (window.day.titlesound ? window.day.titlesound.info().whooshes : 0) + ((window.day.sfx && window.day.sfx.info().heard && window.day.sfx.info().heard["gust-whoosh"]) || 0);
+  t.metric("gustWhooshes", whooshes1 - whooshes0);
+  if (whooshes1 <= whooshes0) t.problem("bug", "The Gust made no wind whoosh");
+  else t.event("gust-whoosh", "a wind whoosh answered the Gust");
   const pushed = Math.round((wf.info().fogPush - push0) * 10) / 10;
   const openSec = Math.round((performance.now() - tOpen) / 100) / 10;
   t.metric("gustFogPushM", pushed);
@@ -10223,6 +10255,77 @@ async function titleScenario(options, t) {
   t.progress(1);
 }
 
+/* ---------------- first-minute: a stranger opens the page and touches nothing ---------------- */
+// Setup (named): every icanbe.* key cleared, the cold open armed, the title shown as on a fresh load. No Play click: the
+// title must hand him over by itself within 20 s, then ONE tap (E, or the Bolt button on a phone) throws the first bolt.
+// Reports seconds to gameplay / first input / first success and the words on screen over the first minute.
+async function firstMinute(options, t) {
+  t.scene("First minute");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const phone = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
+  if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  D.coldopen.arm();
+  D.title.show("load"); // as on a fresh page load: this arms the auto-start
+  const t0 = performance.now();
+  const secs = () => Math.round((performance.now() - t0) / 100) / 10;
+  t.event("first-minute-setup", `${innerWidth}x${innerHeight}, ${phone ? "touch" : "keyboard"}; title up, no input from here but the one cue`);
+  const words = new Set();
+  const sample = () => {
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const el = n.parentElement;
+      if (!el || /^(SCRIPT|STYLE|NOSCRIPT|TITLE)$/.test(el.tagName) || !(n.textContent || "").trim() || !hudVisible(el)) continue;
+      n.textContent.trim().split(/\s+/).filter((x) => /\w/.test(x)).forEach((x) => words.add(`${el.id || el.className}:${x}`));
+    }
+  };
+  const iv = setInterval(sample, 400);
+  const got = await t.until(() => D.control.mode() === "control", 20000, "him on the roof with no tap").then(() => true, () => false);
+  const gameplay = secs();
+  t.metric("secondsToGameplay", gameplay);
+  t.event("first-minute-gameplay", `${gameplay}s: ${got ? "he is the player's, title " + (D.title.showing() ? "STILL UP" : "gone") : "NOT started"}`);
+  if (!got) { clearInterval(iv); t.problem("blocker", "The page never put the player on the rooftop by itself within 20 s"); return; }
+  if (window.hawkesPlaytest && t.milestone) t.milestone("gameplay", "auto-started on the rooftop");
+  if (D.title.showing()) t.problem("bug", "The title is still up after the auto-start");
+  const cue = await t.until(() => D.coldopen.now().phase === "waiting", 8000, "the cue").then(() => true, () => false);
+  if (!cue) { clearInterval(iv); t.problem("blocker", "The cold open never showed its one cue"); return; }
+  await sleep(500);
+  const bolt = $("coldopen-bolt");
+  const tapT = secs();
+  if (phone || (bolt && !bolt.hidden)) {
+    const r = bolt.getBoundingClientRect();
+    if (r.width < 44 || r.height < 44) t.problem("bug", `The Bolt button is ${Math.round(r.width)}x${Math.round(r.height)} (44 px minimum)`);
+    touchOn(bolt, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+    await sleep(80);
+    touchOn(bolt, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+  } else {
+    keyDown("e");
+    await sleep(80);
+    keyUp("e");
+  }
+  t.milestone && t.milestone("first-input-accepted", "one tap");
+  const cast = await t.until(() => D.coldopen.now().cast != null, 3000, "the bolt").then(() => true, () => false);
+  const success = secs();
+  t.metric("secondsToFirstSuccess", success);
+  t.event("first-minute-bolt", `${cast ? "one short tap threw the bolt" : "the tap did NOT throw it"}; tapped at ${tapT}s, bolt at ${success}s`);
+  if (!cast) t.problem("blocker", "A single short tap (80 ms) didn't throw the first bolt");
+  if (cast && t.milestone) t.milestone("first-success", "first bolt");
+  if (gameplay > 20) t.problem("bug", `Gameplay began ${gameplay}s after the page showed (limit 20 s)`);
+  await sleep(Math.max(0, 60000 - (performance.now() - t0)));
+  clearInterval(iv);
+  sample();
+  const count = words.size;
+  t.metric("wordsMinuteOne", count);
+  t.event("first-minute-words", `${count} words on screen in the first minute`);
+  if (count > 40) t.problem("bug", `${count} words were on screen in the first minute (limit 40)`);
+  const sx = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+  if (sx > 1) t.problem("bug", `The page scrolls sideways by ${sx}px`);
+  checkHud(t, "first-minute");
+  t.progress(1);
+}
+
 /* ---------------- cold-start: a new player's first Play to the first bolt and the street's reaction ---------------- */
 
 /* ---------------- stem-score: one motif, three synced stems, intent-driven gains (js/stems.js) ----------------
@@ -11634,8 +11737,8 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "title-key-art", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
-      if (id !== "title" && id !== "cold-start" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
+      if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
@@ -11643,6 +11746,7 @@ installPlaytest({
       else if (id === "barks") await barksScenario(options, t);
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "cold-start") await coldStart(options, t);
+      else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "title-key-art") await titleKeyArt(options, t);
       else if (id === "street-teaches") await streetTeaches(options, t);
       else if (id === "opening") await openingScenario(options, t);
