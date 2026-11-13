@@ -6,7 +6,7 @@
 // and dimmed. The frame is rebuilt as a clean 9-slice atlas (corners + one straight run per edge, so the mid-edge
 // studs are never stretched): 152x152, corner 56 px (css `--ui-frame-slice`).
 import { spawnSync } from "node:child_process";
-import { mkdirSync, statSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -123,8 +123,13 @@ function whole(file) { const s = size(file); const i = decode(file, { x: 0, y: 0
 // ---- verbs: five regions on the sheet (it came out as two rows) ------------------------------------------------
 const verbs = whole("verbs.png");
 const VERB_BOXES = { bolt: [0, 10, 215, 330], rain: [255, 15, 370, 320], wind: [250, 420, 330, 235], fog: [555, 405, 340, 280], sunbreak: [880, 5, 330, 290] };
-for (const [id, [x, y, w, h]] of Object.entries(VERB_BOXES)) {
-  const c = cutBackground(crop(verbs, x, y, w, h), [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1], [w >> 1, 0], [w >> 1, h - 1]], id === "fog" ? 228 : 200, id === "fog");
+// fog.png (optional): a single-icon retake on white that replaces the sheet's fog (normal colour-to-alpha, not soft)
+const fogFile = existsSync(path.join(src, "fog.png")) ? whole("fog.png") : null;
+for (const [id, [bx, by, bw, bh]] of Object.entries(VERB_BOXES)) {
+  const one = id === "fog" && fogFile;
+  const img = one ? fogFile : crop(verbs, bx, by, bw, bh);
+  const { w, h } = img;
+  const c = cutBackground(img, [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1], [w >> 1, 0], [w >> 1, h - 1]], id === "fog" && !one ? 228 : 200, id === "fog" && !one);
   const sq = toSquare(c, 0.06);
   encode(sq, `${OUT}/verb-${id}-lit.webp`, { w: 128, h: 128 });
   encode(unlit(sq), `${OUT}/verb-${id}-unlit.webp`, { w: 128, h: 128 });
