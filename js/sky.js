@@ -311,6 +311,24 @@ export function installSky(world) {
     st.god.active = !!st.god.post;
   }
 
+  /* Warm the god-ray pass once, early (title screen / first seconds), then drop it. Its post and occluder shaders compile on the
+     first frame they run; built for the first time at a Sun break that was a ~1.5 s stall mid-play. Babylon caches the compiled
+     effects, so the real build later is cheap. Exposure 0 and the disc off: nothing shows while it warms. */
+  if (st.god.supported && st.quality !== "low") {
+    setTimeout(() => {
+      if (st.god.post || st.quality === "low" || !scene.activeCamera) return;
+      godRaysOn(true);
+      const warm = st.god.post;
+      if (!warm) return;
+      let n = 0;
+      const obs = scene.onAfterRenderObservable.add(() => {
+        if (++n < 12) return;
+        scene.onAfterRenderObservable.remove(obs);
+        if (st.god.post === warm && st.gap <= 0.04) godRaysOn(false);
+      });
+    }, 4000);
+  }
+
   /* ---- reflections of the sky ---- */
   function ensureProbe() {
     const size = st.quality === "low" ? 32 : 64;
