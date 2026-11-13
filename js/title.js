@@ -62,7 +62,7 @@ export function startTitle() {
 .title-screen .yday{margin:4px 0 0;max-width:30em;color:rgba(246,241,232,.78);font:500 .88rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .actions{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;opacity:0;animation:t-in .9s ease 3.2s forwards}
 .title-screen .row{display:flex;flex-wrap:nowrap;justify-content:center;gap:10px;width:100%}
-.title-screen button{appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:rgba(14,16,22,.58);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s,border-color .15s,transform .15s}
+.title-screen button{white-space:nowrap;appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:rgba(14,16,22,.58);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s,border-color .15s,transform .15s}
 .title-screen button:hover{background:rgba(126,200,255,.16);border-color:rgba(126,200,255,.6)}
 .title-screen button:active{transform:scale(.97)}
 .title-screen button:focus-visible{outline:2px solid #7ec8ff;outline-offset:3px}
@@ -79,7 +79,7 @@ export function startTitle() {
 .title-screen .clock i{display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:50%;background:#e2574c;box-shadow:0 0 10px #e2574c;vertical-align:1px;font-style:normal}
 .title-screen .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .control-hint,html.title-up #episodes,html.title-up #neighbors-btn,html.title-up .tutorial,html.title-up #episode-offer,html.title-up .public-toggle,html.title-up .version-tag{visibility:hidden}
-@media (max-width:700px){.title-screen .clock{display:none}.title-screen .hint{display:none}}
+@media (max-width:700px){.title-screen .row{gap:8px}.title-screen .row button{padding:10px 14px;white-space:nowrap;flex:1 1 auto;min-width:0;font-size:.95rem}.title-screen .clock{display:none}.title-screen .hint{display:none}}
 @media (prefers-reduced-motion:reduce){.title-screen .logo,.title-screen .actions{animation-duration:.01s;animation-delay:0s}.title-screen .logo .l2{animation:none;background-position:30% 0}}
 `;
   document.head.appendChild(style);
