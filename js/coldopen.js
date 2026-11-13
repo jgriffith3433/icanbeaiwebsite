@@ -239,6 +239,11 @@ export function startColdOpen() {
     timers = [];
     say.hidden = true;
     emit("end");
+    // she stays on the lawn until the street's first thanks (or 2 minutes), so the ring and her ask stay where she is
+    const free = () => { if (day.neighbors && day.neighbors.stand) day.neighbors.stand("birdie", null, null); window.removeEventListener("day:street", onStreet); };
+    const onStreet = (e) => { if (e && e.detail && e.detail.action === "thanks") free(); };
+    window.addEventListener("day:street", onStreet);
+    setTimeout(free, 120000);
   }
 
   /* ---- inputs: the hold's release (the press arrives through powers' gate) ---- */
@@ -259,6 +264,29 @@ export function startColdOpen() {
     emit("react", { kind: d.kind });
     later(() => birdie("look-up"), (cfg.reactDelay || 1) * 1000);
   });
+
+  /* ---- the glance: Birdie on the lawn, seen before any word ---- */
+  // A cut-away that starts on a neighbor where they stand (waving) and eases back to the camera's own pose over
+  // `secs`, so the end hands over with no snap. The player sees who is asking before anyone says anything.
+  let glancing = false;
+  function glance(id, secs, done) {
+    const w = day.world && day.world();
+    const N = day.neighbors;
+    const cam = w && w.camera;
+    const me = N && N.now && N.now().people.find((p) => p.id === id);
+    if (!w || !w.cineShot || !cam || !me || w.cineOn()) { if (done) done(false); return false; }
+    const g = cfg.glance || {};
+    const tg = cam.target;
+    if (N.gesture) N.gesture(id, "ask");
+    glancing = true;
+    w.cineShot({
+      secs, tx: [me.x, tg.x], ty: [(g.y == null ? 1.4 : g.y), tg.y], tz: [me.z, tg.z],
+      alpha: [g.alpha == null ? -1.45 : g.alpha, cam.alpha], beta: [g.beta || 1.28, cam.beta], radius: [g.radius || 9, cam.radius],
+    });
+    emit("glance", { id, x: me.x, z: me.z });
+    later(() => { try { w.cineShot(null); } catch (e) { /* */ } glancing = false; emit("glance-end", { id }); if (done) done(true); }, secs * 1000 + 60);
+    return true;
+  }
 
   /* ---- the sequence ---- */
   let fromTitle = false;
@@ -288,6 +316,14 @@ export function startColdOpen() {
     promptTxt.textContent = touchy() ? cfg.prompt.touch : cfg.prompt.keys;
     bolt.hidden = !touchy();
     emit("landed", { x: sp.x, z: sp.z });
+    // Birdie is out on the park lawn, in view of the roof, waving up at him: the camera finds her when the push-in is
+    // done (a cut-away that eases back to him), and he speaks only after that.
+    const B0 = cfg.birdie;
+    if (B0 && day.neighbors && day.neighbors.stand) day.neighbors.stand("birdie", B0.x, B0.z);
+    const pushMs = ((dive ? dive.secs : cfg.camera.secs) + 0.2) * 1000;
+    const gSecs = (cfg.glance && cfg.glance.secs) || 0;
+    const speakAt = pushMs + (gSecs ? gSecs * 1000 + 300 : 0);
+    if (gSecs) later(() => { if (on) glance("birdie", gSecs); }, pushMs);
     // the cell: far thunder as it arrives, then his line, then the prompt
     const W = window.weather;
     later(() => { if (W && W.triggerFlash) W.triggerFlash(90, -0.3); }, 700);
@@ -300,7 +336,7 @@ export function startColdOpen() {
       prompt.hidden = false;
       requestAnimationFrame(() => prompt.classList.add("on"));
       emit("prompt", { text: promptTxt.textContent });
-    }, (cfg.firstLine || 1.4) * 1000);
+    }, Math.max((cfg.firstLine || 1.4) * 1000, speakAt));
   }
   function tryTake(frames) {
     const C = day.control;
@@ -341,7 +377,9 @@ export function startColdOpen() {
       tryTake(0);
       return true;
     },
-    now: () => ({ on, phase, held: !!held, firstInput: firstInputAt ? (firstInputAt - t0) / 1000 : null, cast: castAt ? (castAt - t0) / 1000 : null, react: reactAt ? (reactAt - t0) / 1000 : null, log: log.slice() }),
+    glance: (id, secs) => glance(id || "birdie", secs || ((cfg.glance && cfg.glance.secs) || 2.6)),
+    glancing: () => glancing,
+    now: () => ({ on, phase, glancing, held: !!held, firstInput: firstInputAt ? (firstInputAt - t0) / 1000 : null, cast: castAt ? (castAt - t0) / 1000 : null, react: reactAt ? (reactAt - t0) / 1000 : null, log: log.slice() }),
   };
   day.coldopen = api;
   window.coldopen = api;

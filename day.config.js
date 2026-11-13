@@ -250,6 +250,8 @@ window.DAY_CONFIG = {
     camera: { alpha: 3.1416, beta: 1.22, radius: 5.6, from: 24, fov: 0.32, secs: 2.6 }, // lands behind him over his shoulder
     rod: { x: 50, z: 0.5, roofY: 3.3, height: 2.2 }, // the shop roof's lightning rod
     cell: { state: "rain", intensity: 0.75 }, // the cell nobody called (weather via "cell")
+    birdie: { x: -13, z: 22 }, // Birdie waits on the park lawn, in view of the roof: the player sees her before any word
+    glance: { secs: 2.6, alpha: -1.45, beta: 1.28, radius: 9, y: 1.4 }, // the camera finds her, then eases back to him
     holdSec: 0, // 0 = one tap throws it (first success in seconds); > 0 = how long the bolt is held first
     dive: { from: 9, secs: 1.0 }, // Play from the title: the title's last shot is this pose at radius 9; the camera dives in over this long
     firstLine: 0.8, // seconds after he lands before he speaks
