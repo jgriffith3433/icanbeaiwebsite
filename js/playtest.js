@@ -11792,6 +11792,11 @@ installPlaytest({
   isReady: () => !!(window.day && window.day.now().frame && !(window.__loading && window.__loading.state() === "loading")),
   async start(id, options, t) {
     const errFrom = consoleErrors.length;
+    // shader compile failures count as console errors even when Babylon's logger didn't reach console.error
+    try {
+      const eng = world() && world().scene && world().scene.getEngine();
+      if (eng && eng.onEffectErrorObservable) eng.onEffectErrorObservable.add((i) => consoleErrors.push(("Shader effect failed to compile: " + String((i && i.errors) || "")).slice(0, 200)));
+    } catch (e) { /* no engine */ }
     // control.js's place() (a setup teleport that snaps the camera) tells the feel sensor it was an intended cut through
     // window.hawkesPlaytest.cut; the contract's api has none (cut lives on `t`), so every placement counted as a camera snap.
     if (window.hawkesPlaytest && !window.hawkesPlaytest.cut) window.hawkesPlaytest.cut = (s) => t.cut(s);
