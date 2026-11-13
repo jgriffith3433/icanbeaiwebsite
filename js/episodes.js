@@ -299,6 +299,21 @@ export function nextEpisode(list, id) {
   return i >= 0 && i < chain.length - 1 ? chain[i + 1] : null;
 }
 
+/** Progress for the title screen: finished count, stars (S 3, A 2, anything else finished 1) and the next episode to play
+    (the first in the chain not finished yet, with its tagline), or null when every one is done. */
+export function progressOf(list, best) {
+  const chain = chainOf(list);
+  const star = (id) => {
+    const b = best && best[id];
+    if (!episodeDone(best, id)) return 0;
+    return b && b.rank === "S" ? 3 : b && b.rank === "A" ? 2 : 1;
+  };
+  const done = chain.filter((e) => episodeDone(best, e.id)).length;
+  const stars = chain.reduce((a, e) => a + star(e.id), 0);
+  const nxt = chain.find((e) => !episodeDone(best, e.id)) || null;
+  return { done, total: chain.length, stars, maxStars: chain.length * 3, next: nxt ? { id: nxt.id, title: nxt.title || nxt.id, tagline: nxt.tagline || "" } : null };
+}
+
 /** The Challenge is open once the episode has been cleared (every goal done) in the normal mode. */
 export function challengeOpen(best, id) {
   return !!(best && best[id] && best[id].cleared);
@@ -2721,6 +2736,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
 
   const api = {
     list: () => list.slice(),
+    progress: () => progressOf(list, loadBest(storageKey)),
     now: () =>
       active
         ? {
