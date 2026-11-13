@@ -58,6 +58,7 @@ export function startTitle() {
 @keyframes t-in{to{opacity:1;transform:none}}
 @keyframes t-glint{0%,55%{background-position:140% 0}85%,100%{background-position:-40% 0}}
 .title-screen .daily{margin:14px 0 0;max-width:30em;color:#f0c27a;font:600 1rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.title-screen.fresh .clock{display:none}
 .title-screen .daily[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
 .title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:rgba(10,13,22,.62);color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
 .title-screen .prog b{color:#f0c27a;letter-spacing:.12em;font-weight:700}
@@ -95,7 +96,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   el.setAttribute("aria-label", `${cfg.logoText.join(" ")}`);
   el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
   const logoEl = el.querySelector("#title-logo");
-  logoEl.querySelector(".sr").textContent = cfg.logoText.join(" ");
+  logoEl.setAttribute("aria-label", cfg.logoText.join(" ")); // not a text node: a hidden-by-clip line still counts as words on screen
   if (cfg.logo) {
     // Hawkes Gen's lockup (hawkes.assets.json "title-logo"); the type below is the stand-in until it is in the repo.
     const img = document.createElement("img");
@@ -184,8 +185,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     nextEl.textContent = p.next ? `${p.done > 0 ? "Next" : "First"}: ${p.next.title}` : "Every episode finished. Beat your ranks.";
     nextEl.hidden = !(hasSave() || p.done > 0) && !started;
   }
-  window.addEventListener("day:episode", () => { if (up) paintProgress(); });
-  window.addEventListener("day:daily", () => { if (up) paintDaily(); });
+  window.addEventListener("day:episode", () => { if (up && !el.classList.contains("fresh")) paintProgress(); });
+  window.addEventListener("day:daily", () => { if (up && !el.classList.contains("fresh")) paintDaily(); });
   function emit(action, extra) {
     const detail = Object.assign({ action }, extra || {});
     log.push(Object.assign({ t: performance.now() }, detail));
@@ -287,6 +288,13 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     paintClock();
     paintDaily();
     paintProgress();
+    // A stranger's first title is the name and the buttons: the day's request, progress, the clock and the key hint wait for a returning player.
+    const fresh = !!(day.coldopen && day.coldopen.pending && day.coldopen.pending());
+    if (fresh) {
+      dailyEl.hidden = true; ydayEl.hidden = true; progEl.hidden = true; nextEl.hidden = true;
+      el.querySelector(".hint").textContent = "";
+    }
+    el.classList.toggle("fresh", fresh);
     clearInterval(clockTimer);
     clockTimer = setInterval(paintClock, 1000); // the clock text only: no fetches
     try { playBtn.focus({ preventScroll: true }); } catch (e) { /* old browser */ }

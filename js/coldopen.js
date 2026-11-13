@@ -370,7 +370,8 @@ export function startColdOpen() {
       held = null;
       mark();
       if (day.tutorial && day.tutorial.skip) day.tutorial.skip(); // its card is up under the title for a new player
-      html.classList.add("cold-open");
+      html.classList.add("cold-open", "first-min");
+      setTimeout(() => html.classList.remove("first-min"), 56000);
       const W = window.weather;
       if (W && W.set) W.set(cfg.cell.state, cfg.cell.intensity, "cell"); // the storm nobody called
       emit("start", { via });

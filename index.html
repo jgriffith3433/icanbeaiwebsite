@@ -76,7 +76,7 @@
         <p class="kicker">I Can Be</p>
         <h2>Small Weather</h2>
         <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="4"><i id="loading-bar"></i></div>
-        <p class="msg" id="loading-msg">Loading his day…</p>
+        <p class="msg" id="loading-msg">Loading…</p>
         <button type="button" class="retry" id="loading-retry">Try again</button>
       </div>
     </div>
@@ -88,7 +88,7 @@
         var msg = document.getElementById("loading-msg"), retry = document.getElementById("loading-retry");
         var W = { scripts: 0.5, model: 0, frame: 0.25, title: 0.25 }, got = { scripts: 0, model: 0, frame: 0, title: 0 };
         var t0 = performance.now(), MIN_MS = 700, state = "loading", log = [], slowT = 0;
-        var TEXT = { scripts: "Loading the city…", model: "Loading Small Weather…", frame: "Lighting the street…", title: "Almost there…" };
+        var TEXT = { scripts: "Loading…", model: "Loading…", frame: "Loading…", title: "Loading…" }; /* one fixed line: each new line counts as more words on screen in the first minute */
         function emit(action, extra) {
           var d = { action: action, t: Math.round(performance.now() - t0), pct: pct() };
           if (extra) for (var k in extra) d[k] = extra[k];

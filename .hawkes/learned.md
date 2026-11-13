@@ -1,0 +1,2 @@
+- lesson: first-five word count — Studio counts distinct lines of body.innerText for 60 s: any ticking number (clock, Charge, cooldowns) or rotating message is new "words" each time; visibility:hidden text is not counted, aria-hidden/clip text is.
+- convention: html.first-min (css/hud.css, set by js/coldopen.js for 56 s) keeps a new player's first minute nearly text-free.
