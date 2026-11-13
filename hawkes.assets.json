@@ -3642,7 +3642,7 @@
   },
   {
    "id": "ui-verbs-lit",
-   "note": "Baked (scripts/bake-ui-art.mjs, Gen job j_3d339920a1bf, asset a_505d24c21cdb2dd8): lit = the sheet's icons with the white ground keyed to alpha; unlit = the same desaturated and dimmed (verb-<id>-unlit.webp). The sheet came out as two rows, so the script crops each icon by box; fog was redone (job j_b5b0f527b3a5). UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
+   "note": "Baked (scripts/bake-ui-art.mjs, Gen job j_3d339920a1bf, asset a_505d24c21cdb2dd8): lit = the sheet's icons with the white ground keyed to alpha; unlit = the same desaturated and dimmed (verb-<id>-unlit.webp). The sheet came out as two rows, so the script crops each icon by box; fog was redone from a single-icon retake (job j_20c4a2787fd6, take 1: stacked wavy mist bands; the first retake j_b5b0f527b3a5 drew clouds with bolts and was rejected), baked from fog.png. UI art kit: five lit weather verb icons in one sheet (Lightning, Rain, Wind, Fog, Sun). image.generate then image.remove-background; crop to textures/ui/verb-<id>-lit.webp ≤40 KB. Project org_eb0d5c82e8da8c2d.icanbe. Stand-ins: textures/ui/verb-*-lit.svg.",
    "steps": [
     {
      "tool": "image.generate",
