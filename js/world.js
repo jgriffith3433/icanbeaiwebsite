@@ -33,7 +33,8 @@
 
   function create(canvas, cfg, spots, rooms) {
     const engine = new B.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: false });
-    engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 1.5));
+    const coarse = typeof matchMedia === "function" && (matchMedia("(pointer:coarse)").matches || window.innerWidth <= 700);
+    engine.setHardwareScalingLevel(coarse ? 1.3 : 1 / Math.min(window.devicePixelRatio || 1, 1.5));
     // Plain uniforms, no uniform blocks: every light, the scene, mesh and material each take a vertex UBO, and with the plugins
     // (wind bend, window rain/interior) plus the SSAO prepass some GPUs (ANGLE/SwiftShader allow 14) refuse the shader and Babylon
     // retries the compile every frame. This must be set before the first material is made (they read it in their constructor).
