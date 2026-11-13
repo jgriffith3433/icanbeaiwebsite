@@ -106,6 +106,9 @@ export function dialogueLines(config) {
     if (!Array.isArray(pool)) return;
     pool.forEach((text) => add("He", text, `voice:${group}`));
   });
+  // The results ceremony (episodes.scoring.grade): his grade line per rank, two each for S, A, B, C.
+  const grade = (C.episodes && C.episodes.scoring && C.episodes.scoring.grade) || {};
+  Object.keys(grade).forEach((r) => (grade[r] || []).forEach((text) => add("He", text, `grade:${r}`)));
   // The cold open's lines ([who, text] pairs in coldopen.lines): his in Eric's voice, Birdie's in hers.
   const cold = (C.coldopen && C.coldopen.lines) || {};
   Object.keys(cold).forEach((k) => add(cold[k][0], cold[k][1], `coldopen:${k}`));

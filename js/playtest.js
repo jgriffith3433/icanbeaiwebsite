@@ -7742,6 +7742,114 @@ async function episodes(options, t) {
 // Everything else is real input: Enter, R / X / E, weather keys 2 then 1, the Episodes button and the Challenge row.
 // Events: rank-locked (Challenge shut before a clear), rank-card (rank, points, the four rows), rank-unlock,
 // rank-best (saved best rank and storage), rank-challenge (the Challenge running with a tighter timer), rank-challenge-card.
+/* Results ceremony and world goal markers: a goal's targets stand in the world (beam + ring + verb icon, readable from 30 m)
+   under one objective line without key letters; a score card dims and blurs the city, counts its stats up, slams the rank
+   stamp with a thud and has Small Weather say a grade line chosen by rank. Two runs of Morning: a clear and a let-go (S/A vs C). */
+async function resultsCeremony(options, t) {
+  t.scene("Beside the car");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  const Ep = window.episodes || window.day.episodes;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  if (!Ep || !C || !P) return t.problem("bug", "episodes, powers or Take control isn't installed");
+  const touch = !!(options && options.touch) || innerWidth <= 700;
+  try { localStorage.removeItem((window.DAY_CONFIG.episodes && window.DAY_CONFIG.episodes.storageKey) || "icanbe.episodes.best"); } catch (err) { /* ignore */ }
+  const outside = carSideMoment(window.day.today());
+  if (!outside) return t.problem("bug", "No moment outdoors to take control");
+  scrubTo(outside.start + Math.min(0.4, (outside.end - outside.start) / 3));
+  clickSpeed(1);
+  await sleep(600);
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control (Enter)");
+  const offer = $("episode-offer");
+  if (offer && !offer.hidden) { const no = offer.querySelector("button.decline"); if (no) no.click(); }
+  const refill = () => { if (P.abilities && P.abilities.reset) P.abilities.reset(100); };
+  const card = () => $("episode-score");
+
+  // 1. Markers and the objective line, in Part 1 (Rain on the park).
+  t.scene("World markers");
+  Ep.start("dry-park", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "dry-park", 5000, "Part 1 running");
+  refill();
+  await sleep(900);
+  const marks = Ep.marks();
+  const obj = document.querySelector("#episode-hud .objective");
+  const objText = obj && !obj.hidden ? obj.textContent : "";
+  t.event("marker-info", marks.map((m) => `${m.goal} ${m.verb} r${m.radius} h${m.height} ${m.dist}m ${m.ready ? "ready" : "not ready"} pulse ${m.pulse}`).join(" | ") || "none");
+  if (!marks.length) t.problem("bug", "The goal has no world marker");
+  else if (marks.some((m) => m.height < 30)) t.problem("bug", "A goal marker is too short to read from 30 m");
+  if (!objText) t.problem("bug", "No single objective line at the top");
+  else if (/\b(key|press)\b|\([A-Z]\)/i.test(objText)) t.problem("bug", `The objective line has key letters: "${objText}"`);
+  else t.event("objective-line", objText);
+  const list = document.querySelector("#episode-hud ul");
+  if (list && getComputedStyle(list).display !== "none") t.problem("bug", "The goal list still shows beside the objective line");
+  const ico = document.querySelector("#episode-hud .objective img");
+  t.event("objective-icon", ico ? "verb icon shown" : "no verb icon (stand-in kit?)");
+  C.letGo && C.letGo();
+  await sleep(400);
+  if (!card().hidden) card().querySelector("button.ok").click();
+  await sleep(300);
+
+  // 2. The ceremony, twice on Morning: a clear, then a let-go.
+  const grabCard = async (label) => {
+    await t.until(() => !card().hidden, 14000, "the score card");
+    const t0 = performance.now();
+    const seen = { dim: false };
+    await t.until(() => Ep.ceremony().stats >= 3 || Ep.ceremony().stamped, 5000, "three stats counted up");
+    const stats = Ep.ceremony().stats;
+    await t.until(() => Ep.ceremony().stamped, 5000, "the rank stamp");
+    const stampSecs = (performance.now() - t0) / 1000;
+    const cs = getComputedStyle(card());
+    seen.dim = /blur/.test(cs.backdropFilter || cs.webkitBackdropFilter || "") || card().classList.contains("ceremony");
+    await sleep(500);
+    const c = Ep.ceremony();
+    const grade = (card().querySelector(".gradeline") || {}).textContent || "";
+    t.event(label, `rank ${c.rank}, ${stats} stats counted, stamp after ${stampSecs.toFixed(1)} s, line ${grade}, focus ${c.focus}, buttons ${JSON.stringify(c.buttons)}`);
+    if (stats < 3) t.problem("bug", `Only ${stats} stats counted before the stamp`);
+    if (stampSecs > 3.2) t.problem("bug", `The stamp took ${stampSecs.toFixed(1)} s after the card opened`);
+    if (!seen.dim) t.problem("bug", "The card doesn't dim and blur the city");
+    if (!c.line || !grade) t.problem("bug", "No grade line after the stamp");
+    const voice = window.day.voice && window.day.voice.now ? window.day.voice.now() : null;
+    t.event(label + "-voice", voice && voice.last ? `${voice.last.group || ""}: ${voice.last.text || ""}` : "no voice state");
+    if (!/next|replay|ok/.test(String(c.focus))) t.problem("bug", `Keyboard focus isn't on Replay or Next (${c.focus})`);
+    c.buttons.forEach((b) => { if (touch && b.h < 56) t.problem("bug", `${b.name} is ${b.h}px tall, wanted 56`); });
+    if (touch) {
+      const p = c.panel;
+      if (p.top < 0 || p.bottom > p.vh || p.w > p.vw) t.problem("bug", `The score card doesn't fit ${p.vw}x${p.vh}: ${JSON.stringify(p)}`);
+      else t.event("card-fits", `${p.w}x${p.bottom - p.top} inside ${p.vw}x${p.vh}`);
+    }
+    return { rank: c.rank, line: c.line };
+  };
+  t.scene("Morning clear");
+  Ep.start("morning", "playtest");
+  await t.until(() => Ep.now() && Ep.now().id === "morning", 4000, "Morning running");
+  refill();
+  pressKey("r"); await sleep(500);
+  pressKey("x"); await sleep(500);
+  pressKey("e"); await sleep(700);
+  refill();
+  pressKey("2");
+  await t.until(() => Ep.now() && Ep.now().goals.some((g) => g.id === "clouds" && g.done), 9000, "clouds goal");
+  pressKey("1");
+  const a = await grabCard("ceremony-clear");
+  t.progress(0.6);
+  const replay = card().querySelector("button.replay");
+  if (touch) await tapEl(replay); else pressKey("Enter");
+  await sleep(600);
+  if (!card().hidden && !card().querySelector(".replay").hidden) { /* Enter on a focused Replay replays */ }
+  await t.until(() => Ep.now() && Ep.now().id === "morning", 6000, "Replay starting Morning again").catch(() => t.problem("bug", "Replay didn't start the episode"));
+  t.scene("Morning let go");
+  await sleep(1500);
+  C.letGo && C.letGo();
+  const b = await grabCard("ceremony-let-go");
+  if (a.rank === b.rank) t.problem("bug", `Both runs ranked ${a.rank}; the ranks should differ to hear two grade lines`);
+  else if (a.line === b.line) t.problem("bug", "Different ranks played the same grade line");
+  else t.event("grade-lines-differ", `${a.rank}: ${a.line} / ${b.rank}: ${b.line}`);
+  card().querySelector("button.ok").click();
+}
+
 async function scoreRanks(options, t) {
   t.scene("Beside the car");
   checkBasics(t);
@@ -11778,6 +11886,7 @@ installPlaytest({
     { id: "episodes", title: "Chapter episodes: offer or start Morning, Lunch, Hurricane drive and Night; complete morning goals (clouds→clear); forecast score card and localStorage best", seconds: 200, tags: ["episodes"], description: "Jumps the clock to each episode's chapter, takes control, accepts the offer (or starts via API), completes morning weather goals with keys 2 then 1, checks the score card and icanbe.episodes.best." },
     { id: "story-ending", title: "Part 3 ending scenes: three Part 3 runs reach Fair Weather, Heavy Weather and Overcast as distinct in-engine scenes (≤40 s, ≥2 voices each, no ending text card, rank stamp); after Fair Weather a same-day reload keeps the park green; on phone one caption + Skip", seconds: 960, tags: ["episodes", "story", "phone"], description: "Day bar outdoors and to 22:30 (setup), Enter/tap, parts started by API, Pressure refilled. Real keys or touch. Events ending-scene / ending-voice / ending-stamp / ending-park-reload / three-endings. Option {\"touch\":true} for 390x844." },
     { id: "episode-select", title: "Episode select: the score card's Replay and Next episode buttons work, the Episodes menu shows each best rank and locks later episodes until the one before is finished, and progress is kept in localStorage", seconds: 120, tags: ["episodes", "rank"], description: "Day bar beside the car (setup), Enter, Morning started by its API (setup), Pressure refilled (setup). Real keys: R, X, E, weather keys 2 and 1, then the card's Replay and Next buttons and the Episodes button. Events select-locked / select-card / select-replay / select-next / select-menu / select-storage." },
+    { id: "results-ceremony", title: "Results ceremony: goals stand in the world as beams with the verb icon under one objective line; the score card dims the city, counts stats up, slams the rank stamp and Small Weather speaks a grade line chosen by rank", seconds: 150, tags: ["episodes", "rank", "menus-ui"], description: "Day bar beside the car (setup), Enter, Part 1 and Morning started by their API (setup), Pressure refilled (setup). Real keys R, X, E, 2, 1; Replay by tap on a phone. Events marker-info / objective-line / ceremony-clear / ceremony-let-go / grade-lines-differ / card-fits." },
     { id: "score-ranks", title: "Score and Challenge: clearing Morning shows a card with a rank (S to C) and a four-row breakdown (people, time, damage avoided, ability variety), saves the best rank, and unlocks the Challenge (tighter timer), which keeps its own best", seconds: 120, tags: ["episodes", "rank"], description: "Day bar beside the car (setup), Enter, Morning started by its API (setup), Pressure refilled (setup). Real keys: R, X, E, then weather keys 2 and 1; the Episodes button and the Challenge row. Events rank-locked / rank-card / rank-unlock / rank-best / rank-storage / rank-open / rank-challenge / rank-challenge-card." },
     { id: "story-parts", title: "Story Parts 1 and 2 as episodes: rain on the park (not the market), sun break and the stalls; overusing rain floods the park and scars the card; Part 2 wind for the turbines, a gale in the plaza topples a stall; neighbor dialogue from the beat sheet", seconds: 420, tags: ["episodes", "story"], description: "Day bar to a moment outdoors (setup), Enter, the parts started by their API (setup) and Pressure refilled (setup). Real keys: WASD with Shift to the park, the plaza and the annex, R, X and V. Events story-list / story-menu / story-say / story-goal / story-strain / story-kick / story-wind / story-card (clean vs scarred)." },
     { id: "lunch-rescue", title: "Rooftop storm (lunch): a surprise storm strands people in the plaza, on the shop roof and in the avenue; helping them with Sun break, Lightning and Gale changes the score and the S-C rank; the twist turns the rain to fog; an ending line per rank", seconds: 300, tags: ["episodes", "story", "rank"], description: "Day bar to a moment outdoors (setup), Enter, the episode started by its API (setup), Pressure refilled (setup). Real keys: WASD with Shift to the plaza cafe, the shop and the avenue, X, E, V, Esc. Run 1 helps one person and lets go (low rank); run 2 plays all three set pieces. Events lunch-opening / lunch-piece / lunch-help / lunch-score / lunch-twist / lunch-sky / lunch-goal / lunch-card / lunch-rank / lunch-say." },
@@ -11881,6 +11990,7 @@ installPlaytest({
       else if (id === "turning-moments") await turningMoments(options, t);
       else if (id === "chapter-openers") await chapterOpeners(options, t);
       else if (id === "score-ranks") await scoreRanks(options, t);
+      else if (id === "results-ceremony") await resultsCeremony(options, t);
       else if (id === "episode-select") await episodeSelect(options, t);
       else if (id === "story-ending") await storyEnding(options, t);
       else if (id === "lunch-rescue") await lunchRescue(options, t);

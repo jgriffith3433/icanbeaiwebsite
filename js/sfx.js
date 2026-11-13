@@ -781,6 +781,15 @@
     rumble() { note("rumble"); noise({ type: "lowpass", freq: 120, dur: 0.9, vol: 0.25, attack: 0.05 }); },
     sparkle() { note("unlock"); if (sample("ui-unlock")) return; synthTag("ui"); notes([784, 988, 1175, 1568], 0.07, 0.07, "triangle", 0.7); },
     flourish(major) { note(major ? "fanfare" : "fanfare-minor"); if (sample("ui-rank")) return; synthTag("ui"); notes(major ? [523, 659, 784, 1047] : [523, 622, 784, 932], 0.13, 0.1, "triangle", 1.1); },
+    /* The rank stamp hitting the card: a low thump, a slap of noise and a short ring. */
+    stamp(major) {
+      note("stamp");
+      if (sample("ui-rank")) return;
+      synthTag("ui");
+      tone({ freq: 96, to: 38, dur: 0.5, vol: 0.3 });
+      noise({ type: "lowpass", freq: 900, to: 160, dur: 0.18, vol: 0.2, attack: 0.002 });
+      if (major) tone({ freq: 1320, dur: 0.6, vol: 0.04, wave: "triangle" });
+    },
     tick(grade) {
       note("cue-" + grade);
       if (grade === "perfect") notes([1320, 1760], 0.05, 0.08, "triangle", 0.4);
@@ -1160,6 +1169,8 @@
       case "piece": case "precision": case "rod": return S.blip();
       case "kick": case "strain": return S.rumble();
       case "unlock": return S.sparkle();
+      case "stamp": return S.stamp(d.rank === "S" || d.rank === "A");
+      case "stat-tick": return S.tick("good");
       case "score": return S.flourish(d.tutorial || d.cleared !== false);
       case "show-cue": return S.tick(d.grade === "perfect" || d.grade === "good" ? d.grade : "off");
       case "show-miss": case "show-off": return S.tick("off");
