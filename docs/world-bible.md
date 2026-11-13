@@ -290,6 +290,7 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 
 | # | Beat | Where / when | How it is lived (must have ≥1 of: gameplay, camera/prop event, sfx, voice) | Text allowed |
 |---|---|---|---|---|
+| 0 | **Birdie on the lawn** (opening) | Cold open, apt roof at dusk; Birdie stands on the park lawn at (-13, 22), in view of the roof (`coldopen.birdie`, `coldopen.glance`) | The page opens on the day already running; after the push-in the camera finds Birdie on the lawn, waving up (her `ask` gesture), then eases back to him with no snap; only then does he speak. She stays there for her rain call, so the ring and the walk to her are the first goal. | none before his line |
 | 1 | Title and first Play | every visit / first Play | Title skyline orbit + title bed; opening five beats on his model spoken (Eric) or Skip/cut — never a silent text wall | Skip label only |
 | 2 | You take over | on `day:control` take | Camera push to shoulder + one first-person line + control sting | none beyond the line if voiced |
 | 3 | Learn the weather | under control, first offer | Lock→unlock five abilities; real casts E/R/V/C/X; toast ≤1 line | prompt ≤1 line |

@@ -140,11 +140,21 @@ each of those is heard and that Sound off is silent. New player-facing beats get
   sheet from `AllTheCharacters/SmallWeather/anims/_reference.png` (image.edit), a textured mesh (mesh.textured, best
   of a few, judged on mesh.rig's turntables), then Gen's auto-rig (mesh.rig) with 14 clips. Gen entity
   `icanbe/small-weather` keeps the takes.
-- **The clips** are made here, not downloaded: `node scripts/small-weather-clips.mjs` writes
-  `art/small-weather/clips/*.glb` from PH Origins' ch33 hero's Mixamo rig (`phoriginswebsite/assets/models/ch33-hero.glb`
-  next to this repo) or from `models/small-weather.glb`: Idle, Walk, Run, Jump (push-off to the top) and Sitting Idle in place, and posed ones (fall,
-  float, cast with both arms up, a lightning throw, the day's type, phone, lie, side, recline, and hero beats lookup / windbolt / windrain / triumph / shelter / window), by bone directions
-  (`scripts/gltf-skeleton.mjs`). Hero beats also land in `models/clips/` and load at runtime onto his Mixamo bones. Upload a changed clip to the entity's `clip-src/<name>` slot and rig again.
+- **The clips** are made here, not downloaded, and written on HIS rest pose: `node scripts/small-weather-clips.mjs` writes
+  every clip to `art/small-weather/model-clips/*.glb` (the six hero beats also to `models/clips/`, which the page loads
+  on top of the model), then `node scripts/embed-clips.mjs` replaces the 14 animations inside `models/small-weather.glb`
+  (rotations for every bone, hips translation only, accessors rebuilt, hemisphere-aligned). Idle is **procedural** (8 s
+  seamless loop: breath, weight shift, a slow look, upright spine and neck); walk, run, jump and sit are the raw Mixamo
+  clips in `art/small-weather/clips/` (Gen's rig inputs: never rewritten) **retargeted by bone direction**
+  (`retarget()`: swing only, spine/neck/head by their delta from the source's own rest). The old clips copied ch33's
+  local rotations onto his rig, whose rest rotations differ (pelvis tipped back ~10 deg, neck ~28 deg forward, knees
+  bent, jump turned ~30 deg, cross-fades cancelling thigh quaternions: the "twisted idle"). `writeClipGlb` keeps every
+  bone in the rest pose's quaternion hemisphere (Babylon adds weighted quaternions when clips cross-fade). Fall, float,
+  cast, throw, the day's poses and the hero beats are posed by bone directions (`scripts/gltf-skeleton.mjs`) on top of
+  the new idle. `node scripts/check-clips.mjs` (npm test) fails on any pop, open loop, wrong hemisphere, collapsing
+  cross-fade, or a leaning/twisted idle, walk or run; `skin.pose()` (js/small-weather.js) reads the same on a live frame
+  for the `clip-poses` playtest (`{"touch":true}` for the phone). To change a clip: edit it in the script, run both
+  scripts, run `npm test`. Do not rebuild `art/small-weather/clips/` from the model (they are the Mixamo sources).
 - **Hero plant:** `js/small-weather.js` runs two-bone foot IK (Havok / `world.groundAt` raycasts) so boots sit on roof gravel, stairs and the ramp, with a pelvis offset on slopes, stride-matched walk/run (`WALK_STRIDE` / `RUN_STRIDE`), landing crouch on hard impacts, and a rim light that follows him. Playtest: `hero-move`.
 - **In the page:** `js/app.js` imports `js/small-weather.js` (its own chunk, with `@babylonjs/loaders`) once the page
   is up and calls `world.setSkin()`. The model is parented to the figure's `spin` node, so the day's placing, tilting

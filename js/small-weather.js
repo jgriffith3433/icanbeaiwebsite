@@ -28,7 +28,9 @@ export const SKIN_CLIPS = [
   "lookup", "windbolt", "windrain", "triumph", "shelter", "window",
 ];
 const LOOPS = ["idle", "walk", "run", "fall", "float", "sit", "type", "phone", "lie", "side", "recline", "shelter", "window"];
-const EXTRA_CLIPS = ["lookup", "windbolt", "windrain", "triumph", "shelter", "window"];
+/* cast, throw, fall and float also live inside small-weather.glb, but those baked copies had their arms rolled 70-160
+   degrees; the re-posed files in models/clips/ replace them (the baked group is dropped when its extra loads). */
+const EXTRA_CLIPS = ["lookup", "windbolt", "windrain", "triumph", "shelter", "window", "cast", "throw", "fall", "float"];
 /* Metres covered per loop of the clip with the stance foot planted, measured on models/small-weather.glb (stance foot
    speed at 1x times the loop length: walk 0.81 m/s over 1.067 s, run 1.63 m/s over 0.767 s). The playback speed is
    ground speed over this, so his boots keep pace with the ground. scripts/check-motion.mjs measures it again. */
@@ -86,9 +88,10 @@ async function loadExtraClipGroups(B, scene, extras) {
         m.isVisible = false;
         m.isPickable = false;
         m.setEnabled(false);
-        if (m.getBoundingInfo) {
-          m.getBoundingInfo = () => ({ boundingBox: { minimumWorld: { x: 0, y: 0, z: 0 }, maximumWorld: { x: 0, y: 0, z: 0 } }, boundingSphere: { centerWorld: { x: 0, y: 0, z: 0 }, radius: 0 } });
-        }
+        // A real, empty BoundingInfo (not a stub object with half the fields): every scene scan that reads
+        // boundingBox.extendSizeWorld / extendSize / minimum / center (the playtest sensor's `get scene`, meshBox in
+        // world.js) gets numbers instead of a TypeError.
+        if (m.setBoundingInfo) m.setBoundingInfo(new B.BoundingInfo(B.Vector3.Zero(), B.Vector3.Zero()));
       });
       c.addAllToScene();
       out.push({ group: g, container: c, name });
@@ -166,6 +169,11 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
 
   extraGroups.forEach(({ group }) => {
     retargetGroup(group, nodeByShort);
+    const baked = groups.findIndex((g) => g.name.toLowerCase() === group.name.toLowerCase());
+    if (baked >= 0) {
+      groups[baked].stop();
+      groups.splice(baked, 1);
+    }
     groups.push(group);
   });
 
@@ -184,7 +192,7 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     }
     const mat = m.material;
     if (!mat) return;
-    mat.maxSimultaneousLights = 10;
+    mat.maxSimultaneousLights = 6; // vertex UBO limit (14): see world.js mat()
     if ("usePhysicalLightFalloff" in mat) mat.usePhysicalLightFalloff = false;
     /* The GLB leaves metallicFactor at the glTF default of 1 and the scene has no environment map, so a fully
        metallic skin has nothing to reflect and draws solid black: make him cloth and skin, lit by the room. */
@@ -345,6 +353,10 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     clips: SKIN_CLIPS.filter((c) => named(c)),
     clip: () => clip,
     motion: () => Object.assign({}, motion, ik.stats()),
+    /* What his body is doing right now, in his own frame (+z forward, +x his left): how far the spine and neck lean
+       from upright, the pelvis and shoulder lines' yaw, how far the knees bend, the hands' gap. The clip-poses playtest
+       reads this on a real frame to flag a twisted torso, a hanging head or an arm through the body. */
+    pose: () => bodyPose(B, wrap, nodeByShort),
     /* clip, ground speed (m/s), dt; mine: the player has him (the lightning shows) */
     play(c, speed, dt, mine) {
       const ctx = readCtx();
@@ -451,6 +463,34 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       try { rim.dispose(); } catch (e) { /* */ }
       try { fill.dispose(); } catch (e) { /* */ }
     },
+  };
+}
+
+function bodyPose(B, wrap, byShort) {
+  const inv = wrap.getWorldMatrix().clone().invert();
+  const at = (n) => (byShort[n] ? B.Vector3.TransformCoordinates(byShort[n].getAbsolutePosition(), inv) : null);
+  const P = {};
+  ["Hips", "Neck", "Head", "LeftArm", "RightArm", "LeftHand", "RightHand", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg", "LeftFoot", "RightFoot"].forEach((n) => (P[n] = at(n)));
+  if (Object.values(P).some((v) => !v)) return null;
+  const d = (a, b) => P[b].subtract(P[a]);
+  const deg = (r) => (r * 180) / Math.PI;
+  const bend = (a, b, c) => {
+    const u = d(a, b);
+    const v = d(b, c);
+    return deg(Math.acos(Math.max(-1, Math.min(1, B.Vector3.Dot(u, v) / (u.length() * v.length() || 1)))));
+  };
+  const sp = d("Hips", "Head");
+  const nk = d("Neck", "Head");
+  const yaw = (a, b) => deg(Math.atan2(d(a, b).z, d(a, b).x));
+  return {
+    lean: deg(Math.atan2(sp.z, sp.y)),
+    neck: deg(Math.atan2(nk.z, nk.y)),
+    sideLean: deg(Math.atan2(sp.x, sp.y)),
+    hipYaw: yaw("RightUpLeg", "LeftUpLeg"),
+    shoulderYaw: yaw("RightArm", "LeftArm"),
+    kneeL: bend("LeftUpLeg", "LeftLeg", "LeftFoot"),
+    kneeR: bend("RightUpLeg", "RightLeg", "RightFoot"),
+    handsApart: P.LeftHand.x - P.RightHand.x,
   };
 }
 

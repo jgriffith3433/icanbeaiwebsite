@@ -50,9 +50,9 @@ const deckFrag = (march) => `
   float fbm(vec2 p) {
     float v = 0.5 * noise2(p);
     v += 0.28 * noise2(p * 2.07 + vec2(3.7, 1.9));
-    v += 0.14 * noise2(p * 4.3 + vec2(7.1, 5.3));
+    ${march ? "v += 0.14 * noise2(p * 4.3 + vec2(7.1, 5.3));" : ""}
     ${march ? "v += 0.08 * noise2(p * 8.9 + vec2(1.3, 9.2));" : ""}
-    return v;
+    return ${march ? "v" : "v * 1.22"}; // the phone's planes keep two octaves (the third and fourth are the raymarch's), rescaled so the cover reads the same
   }
   float dens(vec2 xz, float t) {
     vec2 p = xz * cC.x * 0.0032 + vec2(t * cC.y, t * cC.y * 0.42) + cC.w;
@@ -311,6 +311,24 @@ export function installSky(world) {
     st.god.active = !!st.god.post;
   }
 
+  /* Warm the god-ray pass once, early (title screen / first seconds), then drop it. Its post and occluder shaders compile on the
+     first frame they run; built for the first time at a Sun break that was a ~1.5 s stall mid-play. Babylon caches the compiled
+     effects, so the real build later is cheap. Exposure 0 and the disc off: nothing shows while it warms. */
+  if (st.god.supported && st.quality !== "low") {
+    setTimeout(() => {
+      if (st.god.post || st.quality === "low" || !scene.activeCamera) return;
+      godRaysOn(true);
+      const warm = st.god.post;
+      if (!warm) return;
+      let n = 0;
+      const obs = scene.onAfterRenderObservable.add(() => {
+        if (++n < 12) return;
+        scene.onAfterRenderObservable.remove(obs);
+        if (st.god.post === warm && st.gap <= 0.04) godRaysOn(false);
+      });
+    }, 4000);
+  }
+
   /* ---- reflections of the sky ---- */
   function ensureProbe() {
     const size = st.quality === "low" ? 32 : 64;
@@ -434,7 +452,7 @@ export function installSky(world) {
     if (st.ibl.probe) {
       st.ibl.probe.position.copyFrom(camPos);
       st.ibl.sinceRefresh += dt;
-      if (st.ibl.sinceRefresh > (st.quality === "low" ? 3 : 1) || (f > 0.9 && st.ibl.sinceRefresh > 0.25)) {
+      if (st.ibl.sinceRefresh > (st.quality === "low" ? 3 : 1) || (f > 0.9 && st.ibl.sinceRefresh > (st.quality === "low" ? 0.9 : 0.25))) {
         st.ibl.sinceRefresh = 0;
         st.ibl.probe.cubeTexture.refreshRate = B.RenderTargetTexture.REFRESHRATE_RENDER_ONCE;
         st.ibl.refreshes++;

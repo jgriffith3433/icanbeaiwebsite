@@ -119,10 +119,14 @@ function glass(u, v) {
   return { r: c.r, g: c.g, b: c.b, h: mullion ? 0.6 : 0.15 + n * 0.08 };
 }
 function roof(u, v) {
+  /* Flat tar membrane in broad strips: soft low-frequency mottling and a seam per strip. The old fine grain turned
+     into streaky "fur" on a roof seen at a grazing angle, so there is almost no height detail left. */
   const n = fbm(u + 1, v + 3);
-  const grain = noise(u, v, 12);
-  const c = lerpRgb(rgb(28, 32, 40), rgb(40, 46, 56), n * 0.65 + grain * 0.35);
-  return { r: c.r, g: c.g, b: c.b, h: 0.35 + n * 0.2 + grain * 0.1 };
+  const strip = wrap01(u * 4);
+  const seam = strip < 0.025 || strip > 0.985;
+  const c = lerpRgb(rgb(30, 35, 44), rgb(40, 46, 57), n * 0.8);
+  const k = seam ? 0.72 : 1;
+  return { r: c.r * k, g: c.g * k, b: c.b * k, h: seam ? 0.3 : 0.5 + n * 0.04 };
 }
 function park(u, v) {
   const n = fbm(u + 8, v);
@@ -172,7 +176,8 @@ function tileBox(mesh, tile) {
   const r = mesh.rotation;
   const plain = !mesh.rotationQuaternion && !mesh.parent && (!r || (!r.x && !r.y && !r.z));
   const o = plain ? mesh.position : { x: 0, y: 0, z: 0 };
-  const sc = plain && mesh.scaling ? mesh.scaling : { x: 1, y: 1, z: 1 };
+  // A scaled mesh keeps its scale in the UVs too, else its texture stretches along the scaled axis.
+  const sc = mesh.scaling || { x: 1, y: 1, z: 1 };
   for (let i = 0, k = 0; i < pos.length; i += 3, k += 2) {
     const x = pos[i] * sc.x + o.x;
     const y = pos[i + 1] * sc.y + o.y;
@@ -314,7 +319,7 @@ export function installLook(world) {
     concrete: pbr("concrete", maps.concrete, { roughness: 0.86, wet: true, coat: 0.38, bump: 0.32 }),
     brick: pbr("brick", maps.brick, { roughness: 0.88, bump: 0.65 }),
     glass: pbr("glass", maps.glass, { metallic: 0.35, roughness: 0.24, wet: true, coat: 0.45, bump: 0.2 }),
-    roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.35 }),
+    roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.12 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
@@ -356,7 +361,7 @@ export function installLook(world) {
     }, scene);
     slab.position.set(b.x, b.h - 0.02, b.z);
     slab.isPickable = false;
-    dress(slab, mats.roof, 2.8);
+    dress(slab, mats.roof, 4.2);
     ["ps", "pn", "pn1", "pn2", "pw", "pe"].forEach((suffix) => {
       const lip = scene.getMeshByName(b.id + suffix);
       if (lip) dress(lip, mats.roof, 2.0);
@@ -611,7 +616,8 @@ export function installLook(world) {
     // only a choice the player made is kept: the automatic picks must stay automatic on the next visit
     if (via === "click" || via === "api") { try { localStorage.setItem("icanbe.quality", quality); } catch (e) { /* private mode */ } }
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
-    engine.setHardwareScalingLevel(low ? 1 : 1 / Math.min(dpr, 1.5));
+    // phones (low) render below CSS resolution: fewer pixels to fill is what holds fps on a mid-range GPU
+    engine.setHardwareScalingLevel(low ? 1.3 : 1 / Math.min(dpr, 1.5));
     if (pipeline) {
       // Low (phones) keeps the tonemap, the grade and a half-res bloom; FXAA stays high-only (js/render-pipeline.js does the rest:
       // one 1024 shadow cascade, no SSAO, no aberration).
@@ -790,6 +796,25 @@ export function installLook(world) {
   applyQuality(quality);
   /* Quality scale for weaker devices: when nobody chose a level, a page that runs slowly for a few seconds drops
      itself to low once (never saved, never back up, so the picture can't flicker between the two). */
+  /* Boot probe: before the title shows (the loading card is still up), time ~30 frames once the first 8 (shader compiles) are past.
+     A page under 20 fps there drops itself to low at once, so the title opens on a picture that holds 30 fps. A playtest bot is
+     only moved when it is truly stuck (over 80 ms a frame), since its picture must not change otherwise. */
+  const bootProbe = { frames: 0, avgMs: 0, dropped: false, done: false };
+  {
+    let ms = 0, n = 0, skip = 0;
+    const probe = scene.onAfterRenderObservable.add(() => {
+      if (qualityPick.how !== "auto" || quality === "low") { bootProbe.done = true; scene.onAfterRenderObservable.remove(probe); return; }
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (++skip <= 8) return;
+      ms += Math.min(engine.getDeltaTime(), 250);
+      n++;
+      if (n < 30) return;
+      const bot = typeof navigator !== "undefined" && navigator.webdriver;
+      bootProbe.frames = n; bootProbe.avgMs = ms / n; bootProbe.done = true;
+      if (bootProbe.avgMs > (bot ? 80 : 50)) { bootProbe.dropped = true; applyQuality("low", "auto"); console.info(`[look] boot probe: ${bootProbe.avgMs.toFixed(0)} ms a frame, low quality before the title`); }
+      scene.onAfterRenderObservable.remove(probe);
+    });
+  }
   {
     let ms = 0, n = 0, warm = 0;
     const watch = scene.onAfterRenderObservable.add(() => {
@@ -823,6 +848,7 @@ export function installLook(world) {
       return {
         quality,
         qualityHow: qualityPick.how,
+        bootProbe,
         auto: autoQuality(),
         source,
         pbr: surfaces.length,

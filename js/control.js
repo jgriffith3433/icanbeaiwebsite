@@ -1425,6 +1425,9 @@ function install() {
       } else frameOutdoors({}, { x: s.x, z: s.z });
       lastRadius = null;
       camReset();
+      // A take with no frame since (cs.watch still holds the day camera's pose, maybe the office, 40 m away): the placement
+      // supersedes it, or the next frame's startBlend would snap the camera back there and blend in from it.
+      cs.watch = null;
       try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
       return r;
     },

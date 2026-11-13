@@ -2746,7 +2746,7 @@
   },
   {
    "id": "title-logo",
-   "note": "The title's logo lockup \"I Can Be AI\" (js/title.js, day.config.js title.logo): 4 takes of image.generate, the pick goes through image.remove-background, then baked to images/logo-icanbe-ai.png and title.logo set. Until then the title draws the lockup in type with the same lightning glint. Gen job j_b67c8eedbcff (project org_eb0d5c82e8da8c2d.icanbe).",
+   "note": "The title's logo lockup \"I Can Be AI\" (js/title.js, day.config.js title.logo): 4 takes of image.generate, the pick goes through image.remove-background, then baked to images/logo-icanbe-ai.webp and title.logo set. Until then the title draws the lockup in type with the same lightning glint. Gen job j_b67c8eedbcff (project org_eb0d5c82e8da8c2d.icanbe).",
    "steps": [
     {
      "tool": "image.generate",
@@ -2767,7 +2767,7 @@
     }
    ],
    "files": {
-    "logo": "images/logo-icanbe-ai.png"
+    "logo": "images/logo-icanbe-ai.webp"
    }
   },
   {
@@ -8243,14 +8243,14 @@
    }
   },
   {
-   "id": "dlg-he-ohbz70",
-   "note": "Spoken line (coldopen:he), He: \"That storm isn't mine. The rod on the shop roof is.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "id": "dlg-he-11qdggm",
+   "note": "Spoken line (coldopen:he), He: \"That storm isn't mine. That rod is.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "That storm isn't mine. The rod on the shop roof is.",
+      "text": "That storm isn't mine. That rod is.",
       "voice": "cjVigY5qzO86Huf0OWal",
       "model": "eleven_v4"
      },
@@ -8258,18 +8258,18 @@
     }
    ],
    "files": {
-    "audio": "audio/dialogue/dlg-he-ohbz70.mp3"
+    "audio": "audio/dialogue/dlg-he-11qdggm.mp3"
    }
   },
   {
-   "id": "dlg-birdie-na1dln",
-   "note": "Spoken line (coldopen:birdie), Birdie: \"Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain.\", Hawkes Gen audio.voice (ElevenLabs).",
+   "id": "dlg-birdie-1nzxnf0",
+   "note": "Spoken line (coldopen:birdie), Birdie: \"Small Weather! Send my tomatoes some rain.\", Hawkes Gen audio.voice (ElevenLabs).",
    "steps": [
     {
      "tool": "audio.voice",
      "params": {
       "provider": "elevenlabs",
-      "text": "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain.",
+      "text": "Small Weather! Send my tomatoes some rain.",
       "voice": "EXAVITQu4vr4xnSDxMaL",
       "model": "eleven_v4"
      },
@@ -8277,7 +8277,7 @@
     }
    ],
    "files": {
-    "audio": "audio/dialogue/dlg-birdie-na1dln.mp3"
+    "audio": "audio/dialogue/dlg-birdie-1nzxnf0.mp3"
    }
   },
   {

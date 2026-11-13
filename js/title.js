@@ -37,9 +37,10 @@ export function startTitle() {
   const html = document.documentElement;
 
   let quiet = false;
+  let autoTimer = 0;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
@@ -50,18 +51,22 @@ export function startTitle() {
 .title-screen .top,.title-screen .bottom{display:flex;flex-direction:column;align-items:center;width:100%}
 .title-screen .logo{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;line-height:.9;opacity:0;transform:translateY(-8px);animation:t-in 1.2s ease 2.4s forwards}
 .title-screen .logo img{display:block;width:min(82vw,560px);height:auto;filter:drop-shadow(0 6px 28px rgba(0,0,0,.6))}
-.title-screen .logo .l1{font:600 clamp(.95rem,3.4vw,1.5rem)/1 Outfit,system-ui,sans-serif;letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#7ec8ff;text-shadow:0 0 20px rgba(126,200,255,.65)}
-.title-screen .logo .l2{margin-top:6px;font:700 clamp(4.4rem,17vw,9rem)/.9 Fraunces,Georgia,serif;letter-spacing:.02em;color:transparent;background:linear-gradient(100deg,#dcefff 0%,#9fd2ff 38%,#fff 50%,#9fd2ff 62%,#6aa9ee 100%) 140% 0/260% 100% no-repeat;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 26px rgba(40,90,170,.7));animation:t-glint 5.2s ease-in-out 3.4s infinite}
-.title-screen .logo.zap img{filter:drop-shadow(0 0 26px rgba(160,210,255,.95)) brightness(1.35)}
-.title-screen .logo.zap .l2{filter:drop-shadow(0 0 30px rgba(170,215,255,.95)) brightness(1.4)}
+.title-screen .logo .l1{font:600 clamp(.95rem,3.4vw,1.5rem)/1 Fraunces,Georgia,serif;letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#f0c27a;text-shadow:0 0 20px rgba(240,194,122,.55)}
+.title-screen .logo .l2{margin-top:6px;font:700 clamp(4.4rem,17vw,9rem)/.9 Fraunces,Georgia,serif;letter-spacing:.02em;color:transparent;background:linear-gradient(100deg,#f6dcaa 0%,#f0c27a 38%,#fff6e2 50%,#f0c27a 62%,#d9a24f 100%) 140% 0/260% 100% no-repeat;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 26px rgba(120,70,10,.6));animation:t-glint 5.2s ease-in-out 3.4s infinite}
+.title-screen .logo.zap img{filter:drop-shadow(0 0 26px rgba(255,214,150,.95)) brightness(1.35)}
+.title-screen .logo.zap .l2{filter:drop-shadow(0 0 30px rgba(255,220,160,.95)) brightness(1.4)}
 @keyframes t-in{to{opacity:1;transform:none}}
 @keyframes t-glint{0%,55%{background-position:140% 0}85%,100%{background-position:-40% 0}}
 .title-screen .daily{margin:14px 0 0;max-width:30em;color:#f0c27a;font:600 1rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.title-screen .daily[hidden],.title-screen .yday[hidden]{display:none}
+.title-screen.fresh .clock{display:none}
+.title-screen .daily[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
+.title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:rgba(10,13,22,.62);color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .prog b{color:#f0c27a;letter-spacing:.12em;font-weight:700}
+.title-screen .nextgoal{margin:0;max-width:min(86vw,340px);color:#f0c27a;font:600 .95rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.9);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .yday{margin:4px 0 0;max-width:30em;color:rgba(246,241,232,.78);font:500 .88rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .actions{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;opacity:0;animation:t-in .9s ease 3.2s forwards}
 .title-screen .row{display:flex;flex-wrap:nowrap;justify-content:center;gap:10px;width:100%}
-.title-screen button{appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:rgba(14,16,22,.58);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s,border-color .15s,transform .15s}
+.title-screen button{white-space:nowrap;appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:rgba(14,16,22,.58);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s,border-color .15s,transform .15s}
 .title-screen button:hover{background:rgba(126,200,255,.16);border-color:rgba(126,200,255,.6)}
 .title-screen button:active{transform:scale(.97)}
 .title-screen button:focus-visible{outline:2px solid #7ec8ff;outline-offset:3px}
@@ -69,7 +74,8 @@ export function startTitle() {
 .title-screen button.play:hover{background:#f6d39b;transform:translateY(-1px)}
 .title-screen .row button{flex:0 1 auto}
 .title-screen button[aria-pressed="false"]{color:rgba(246,241,232,.6)}
-.title-screen .hint{font-size:.78rem;color:rgba(246,241,232,.55);min-height:1.1em}
+.title-screen .hint{font-size:.88rem;font-weight:600;letter-spacing:.04em;color:#f6f1e8;min-height:1.1em;padding:6px 14px;border-radius:999px;background:rgba(10,13,22,.62);text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .hint:empty{display:none}
 .title-screen .tset{width:min(92vw,360px);margin:0;padding:10px;border-radius:16px;background:rgba(10,13,22,.82);border:1px solid rgba(246,241,232,.22);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .title-screen .tset[hidden]{display:none}
 .title-screen .tset .settings-pop{position:static;margin:0;padding:0;align-items:stretch}
@@ -77,7 +83,7 @@ export function startTitle() {
 .title-screen .clock i{display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:50%;background:#e2574c;box-shadow:0 0 10px #e2574c;vertical-align:1px;font-style:normal}
 .title-screen .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .control-hint,html.title-up #episodes,html.title-up #neighbors-btn,html.title-up .tutorial,html.title-up #episode-offer,html.title-up .public-toggle,html.title-up .version-tag{visibility:hidden}
-@media (max-width:700px){.title-screen .clock{display:none}.title-screen .hint{display:none}}
+@media (max-width:700px){.title-screen .row{gap:8px}.title-screen .row button{padding:10px 14px;white-space:nowrap;flex:1 1 auto;min-width:0;font-size:.95rem}.title-screen .clock{display:none}.title-screen .hint{display:none}}
 @media (prefers-reduced-motion:reduce){.title-screen .logo,.title-screen .actions{animation-duration:.01s;animation-delay:0s}.title-screen .logo .l2{animation:none;background-position:30% 0}}
 `;
   document.head.appendChild(style);
@@ -88,9 +94,9 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   el.hidden = true;
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", `${cfg.logoText.join(" ")}`);
-  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
+  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
   const logoEl = el.querySelector("#title-logo");
-  logoEl.querySelector(".sr").textContent = cfg.logoText.join(" ");
+  logoEl.setAttribute("aria-label", cfg.logoText.join(" ")); // not a text node: a hidden-by-clip line still counts as words on screen
   if (cfg.logo) {
     // Hawkes Gen's lockup (hawkes.assets.json "title-logo"); the type below is the stand-in until it is in the repo.
     const img = document.createElement("img");
@@ -113,6 +119,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   }
   const dailyEl = el.querySelector("#title-daily");
   const ydayEl = el.querySelector("#title-yday");
+  const progEl = el.querySelector("#title-prog");
+  const nextEl = el.querySelector("#title-next");
   const playBtn = el.querySelector("#title-play");
   const epBtn = el.querySelector("#title-episodes");
   const setBtn = el.querySelector("#title-settings");
@@ -165,7 +173,20 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     ydayEl.textContent = y;
     ydayEl.hidden = !y;
   }
-  window.addEventListener("day:daily", () => { if (up) paintDaily(); });
+  /* Progress (js/episodes.js progress()): stars earned and episodes finished, and the next goal under Continue. */
+  function paintProgress() {
+    const p = day.episodes && day.episodes.progress ? day.episodes.progress() : null;
+    if (!p || !p.total) { progEl.hidden = true; nextEl.hidden = true; return; }
+    const filled = Math.min(5, Math.round((p.stars / Math.max(1, p.maxStars)) * 5));
+    progEl.innerHTML = `<b aria-hidden="true">${"★".repeat(filled)}${"☆".repeat(5 - filled)}</b> ${p.done} of ${p.total} episodes`;
+    progEl.setAttribute("aria-label", `${p.stars} of ${p.maxStars} stars, ${p.done} of ${p.total} episodes finished`);
+    progEl.hidden = false;
+    const started = p.done > 0 || !hasSave();
+    nextEl.textContent = p.next ? `${p.done > 0 ? "Next" : "First"}: ${p.next.title}` : "Every episode finished. Beat your ranks.";
+    nextEl.hidden = !(hasSave() || p.done > 0) && !started;
+  }
+  window.addEventListener("day:episode", () => { if (up && !el.classList.contains("fresh")) paintProgress(); });
+  window.addEventListener("day:daily", () => { if (up && !el.classList.contains("fresh")) paintDaily(); });
   function emit(action, extra) {
     const detail = Object.assign({ action }, extra || {});
     log.push(Object.assign({ t: performance.now() }, detail));
@@ -266,10 +287,22 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     paintMusic();
     paintClock();
     paintDaily();
+    paintProgress();
+    // A stranger's first title is the name and the buttons: the day's request, progress, the clock and the key hint wait for a returning player.
+    const fresh = !!(day.coldopen && day.coldopen.pending && day.coldopen.pending());
+    if (fresh) {
+      dailyEl.hidden = true; ydayEl.hidden = true; progEl.hidden = true; nextEl.hidden = true;
+      el.querySelector(".hint").textContent = "";
+    }
+    el.classList.toggle("fresh", fresh);
     clearInterval(clockTimer);
     clockTimer = setInterval(paintClock, 1000); // the clock text only: no fetches
     try { playBtn.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
     emit("show", { via: via || "load" });
+    clearTimeout(autoTimer);
+    if (!quiet && via === "load" && cfg.autoStart && cfg.autoStart.secs > 0 && day.coldopen && day.coldopen.pending()) {
+      autoTimer = setTimeout(() => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); }, cfg.autoStart.secs * 1000);
+    }
     return true;
   }
   function hide(action, via) {
@@ -292,10 +325,14 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
 
   function play(via) {
     if (!up) return false;
-    if (musicWanted) setSound(true);
+    clearTimeout(autoTimer);
+    const auto = via === "auto";
+    if (musicWanted && !auto) setSound(true); // no gesture yet on an auto-start: the browser would refuse
+    const craneDone = (performance.now() - shownAt) / 1000 >= ((cfg.crane && cfg.crane.secs) || 7);
     hide("play", via);
     // A new player's first Play is the cold open (js/coldopen.js): he is the player's in this same click, on the roof.
-    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via, { fromTitle: true })) return true;
+    // An auto-start cuts the crane short, so it takes the wide push-in instead of the dive from the crane's last pose.
+    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via, { fromTitle: !auto || craneDone })) return true;
     // A first Play opens with js/opening.js (skippable); it takes control when it ends.
     if (day.opening && day.opening.pending()) return day.opening.start(via) || true;
     // The page's own Take control button, so it counts as a button press. He can't be taken while driving:
@@ -310,6 +347,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   }
   function episodes(via) {
     if (!up) return false;
+    clearTimeout(autoTimer);
     if (musicWanted) setSound(true);
     hide("episodes", via);
     const menuBtn = document.getElementById("episodes");
@@ -346,6 +384,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     episodes,
     quiet() {
       quiet = true;
+      clearTimeout(autoTimer);
       if (up) {
         up = false;
         clearInterval(clockTimer);
@@ -361,6 +400,8 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
       seconds: up ? (performance.now() - shownAt) / 1000 : 0,
       music: musicWanted,
       daily: dailyEl.hidden ? "" : dailyEl.textContent,
+      progress: progEl.hidden ? "" : progEl.textContent,
+      next: nextEl.hidden ? "" : nextEl.textContent,
       yesterday: ydayEl.hidden ? "" : ydayEl.textContent,
       sound: soundOn(),
       crane: day.world && day.world() && day.world().titleCrane ? day.world().titleCrane() : null,

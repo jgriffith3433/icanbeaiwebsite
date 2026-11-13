@@ -209,7 +209,7 @@ window.DAY_CONFIG = {
     settings: "Settings",
     continue: "Continue", // Play's word when a save exists
     logoText: ["I Can Be", "AI"], // the lockup in type until the Gen-made logo (logo) is in the repo
-    logo: "images/logo-icanbe-ai.png", // Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
+    logo: "images/logo-icanbe-ai.webp", // Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
     // the key-art crane: ends on Small Weather on the apartment roof (the pose the cold open's camera starts from)
     crane: {
       secs: 7,
@@ -218,6 +218,7 @@ window.DAY_CONFIG = {
     },
     hero: { x: -21, y: 6.16, z: 0.5, yaw: 1.5708 },
     glintEvery: [2.6, 5.2], // seconds between the storm's glints in the clouds
+    autoStart: { secs: 2.4 }, // a new player (cold open pending) is on the roof this long after the title shows: no Play wall. 0/absent = off
     day: "Day",
     night: "Night",
   },
@@ -249,14 +250,16 @@ window.DAY_CONFIG = {
     camera: { alpha: 3.1416, beta: 1.22, radius: 5.6, from: 24, fov: 0.32, secs: 2.6 }, // lands behind him over his shoulder
     rod: { x: 50, z: 0.5, roofY: 3.3, height: 2.2 }, // the shop roof's lightning rod
     cell: { state: "rain", intensity: 0.75 }, // the cell nobody called (weather via "cell")
-    holdSec: 0.55, // how long the bolt is held before it goes
+    birdie: { x: -13, z: 22 }, // Birdie waits on the park lawn, in view of the roof: the player sees her before any word
+    glance: { secs: 2.6, alpha: -1.45, beta: 1.28, radius: 9, y: 1.4 }, // the camera finds her, then eases back to him
+    holdSec: 0, // 0 = one tap throws it (first success in seconds); > 0 = how long the bolt is held first
     dive: { from: 9, secs: 1.0 }, // Play from the title: the title's last shot is this pose at radius 9; the camera dives in over this long
     firstLine: 0.8, // seconds after he lands before he speaks
     reactDelay: 1.0, // seconds from the look-up to Birdie's call
-    prompt: { keys: "Hold E", touch: "Hold the bolt" },
+    prompt: { keys: "Press E", touch: "Tap" },
     lines: {
-      he: ["He", "That storm isn't mine. The rod on the shop roof is."],
-      birdie: ["Birdie", "Small Weather, up on the roof! If you're throwing weather, send my tomatoes some rain."],
+      he: ["He", "That storm isn't mine. That rod is."],
+      birdie: ["Birdie", "Small Weather! Send my tomatoes some rain."],
       after: ["He", "Rain. I can do that."],
     },
   },

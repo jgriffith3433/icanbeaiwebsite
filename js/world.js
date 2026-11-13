@@ -33,7 +33,12 @@
 
   function create(canvas, cfg, spots, rooms) {
     const engine = new B.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: false });
-    engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 1.5));
+    const coarse = typeof matchMedia === "function" && (matchMedia("(pointer:coarse)").matches || window.innerWidth <= 700);
+    engine.setHardwareScalingLevel(coarse ? 1.3 : 1 / Math.min(window.devicePixelRatio || 1, 1.5));
+    // Plain uniforms, no uniform blocks: every light, the scene, mesh and material each take a vertex UBO, and with the plugins
+    // (wind bend, window rain/interior) plus the SSAO prepass some GPUs (ANGLE/SwiftShader allow 14) refuse the shader and Babylon
+    // retries the compile every frame. This must be set before the first material is made (they read it in their constructor).
+    engine.disableUniformBuffers = true;
     const scene = new B.Scene(engine);
     scene.clearColor = new B.Color4(0.1, 0.12, 0.17, 1);
     scene.ambientColor = new B.Color3(0.14, 0.15, 0.18);
@@ -51,7 +56,7 @@
       m.diffuseColor = B.Color3.FromHexString(color);
       m.specularColor = new B.Color3(opt.spec || 0.04, opt.spec || 0.04, opt.spec || 0.04);
       m.ambientColor = m.diffuseColor.scale(0.32);
-      m.maxSimultaneousLights = 10;
+      m.maxSimultaneousLights = 6; // each light is a vertex UBO: 10 plus plugins and prepass passed the 14-UBO limit on some GPUs
       if (opt.alpha != null) m.alpha = opt.alpha;
       if (opt.emissive) m.emissiveColor = B.Color3.FromHexString(opt.emissive);
       if (!opt.unique) matCache[key] = m;

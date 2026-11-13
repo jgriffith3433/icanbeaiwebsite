@@ -36,12 +36,14 @@ import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beat
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
 import "./street.js"; // the street teaches: Rain, Sun, Fog and Wind each arrive on a neighbor's voiced ask (starts on the cold open)
 import "./coldopen.js"; // a new player's first Play: the roof at dusk, one prompt, the first bolt (before title.js calls it)
+import "./heroprompt.js"; // one in-world prompt over him until the first cast: "Hold V to call wind"
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
 import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build
 import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
 import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
+import "./titlesound.js"; // night-city ambience under the title, a click on its buttons, a whoosh on the first Gust (before title.js)
 import "./daily.js"; // today's request: one neighbour asks for one bit of weather, by the real date (before title.js shows it)
 import "./transition.js"; // storm-cloud wipe, prop fade-in, frame timing around every scene change (before title handoff)
 import "./title.js"; // the title screen: the skyline, Play and Episodes (opens first)
@@ -52,7 +54,10 @@ import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 /* The loading card (index.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
 const loading = window.__loading || { set() {}, done() {}, fail() {} };
 const ready = { model: false, frame: false, title: false, lights: false };
-const maybeDone = () => { if (ready.model && ready.frame && ready.title && ready.lights) loading.done(); };
+/* The card does NOT wait for his 3 MB model: on a phone over Slow 4G that download alone kept it up past 20 s. He is hidden
+   until the model is on (world.js), the card goes once the scripts, first frame, title and shader warm-up are in, and the
+   model streams in behind the title (ready.model is kept for the record). */
+const maybeDone = () => { if (ready.frame && ready.title) loading.done(); }; // the shader warm-up (ready.lights) is not a gate: it carries on behind the title
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
@@ -85,13 +90,12 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
   const go = () => {
     const t0 = Date.now();
     const lightsDone = (how) => { if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
-    const cap = setTimeout(() => lightsDone("the 2.5 s cap"), 2500); // a slow GL compiles for 8 s: the card must not sit at a full bar for that
-    w.warmLights(8000).catch(() => {}).finally(() => { clearTimeout(cap); lightsDone("the warm-up"); });
+    w.warmLights(8000).catch(() => {}).finally(() => lightsDone("the warm-up")); // runs behind the title; the card no longer waits for it (2.5 s of a 4x-CPU phone's budget)
   };
   window.__warmLights = () => (function afterFrame() {
     if (window.day.now && window.day.now().frame) go(); else requestAnimationFrame(afterFrame);
   })();
-  if (!(window.DAY_CONFIG && window.DAY_CONFIG.control && window.DAY_CONFIG.control.model)) window.__warmLights();
+  window.__warmLights(); // now, not after the model: the model's own skinned shader is warmed again when it arrives (wear().then)
 })();
 
 const skinWorld = control.model && window.day && window.day.world();

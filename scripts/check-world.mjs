@@ -350,7 +350,7 @@ if (modelPath) {
     ok(bytes.length < 3 * 1024 * 1024, `${modelPath} is ${(bytes.length / 1048576).toFixed(2)} MB (must be < 3 MB)`);
     const { loadSmallWeather, SKIN_CLIPS } = await import(new URL('js/small-weather.js', root).href);
     const extras = {};
-    for (const name of ['lookup', 'windbolt', 'windrain', 'triumph', 'shelter', 'window']) {
+    for (const name of ['lookup', 'windbolt', 'windrain', 'triumph', 'shelter', 'window', 'cast', 'throw', 'fall', 'float']) {
       const ep = new URL('models/clips/' + name + '.glb', root);
       if (fs.existsSync(ep)) {
         const b = fs.readFileSync(ep);
@@ -363,6 +363,10 @@ if (modelPath) {
     ok(!missing.length, `${modelPath} has no clip for ${missing.join(', ')}`);
     world.setSkin(skin);
     ok(skin.meshes.every((m) => world.scene.meshes.includes(m)) && skin.root.isEnabled(), 'his model is not in the scene, or hidden, once put on');
+    // The playtest's `get scene` (sensorScene) reads extendSizeWorld.y of every mesh with vertices: the hidden clip
+    // stand-ins once carried a stub bounding box without it, and every playtest start crashed on that TypeError.
+    const noBox = world.scene.meshes.filter((m) => m.getTotalVertices && m.getTotalVertices() && !(m.getBoundingInfo().boundingBox.extendSizeWorld && Number.isFinite(m.getBoundingInfo().boundingBox.extendSizeWorld.y)));
+    ok(noBox.length === 0, `meshes with no usable bounding box (the playtest's scene scan would throw): ${noBox.map((m) => m.name).join(', ')}`);
     ok(skin.glowMeshes.length === 0, `skinned mesh was added to GlowLayer (${skin.glowMeshes.length} glowMeshes)`);
     ok(world.person.getChildMeshes(false).filter((m) => m.isEnabled() && !skin.meshes.includes(m) && !/phone|cup|bag/.test(m.name)).length === 0, 'the box figure still shows under his model');
     for (const clip of ['idle', 'walk', 'run', 'jump', 'fall', 'float', 'cast', 'throw']) {

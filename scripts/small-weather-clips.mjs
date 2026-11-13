@@ -16,28 +16,26 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { skeletonFrom, sampleClip, blendPose, clonePose, fk, aim, turn, q, v3, writeClipGlb } from "./gltf-skeleton.mjs";
+import { skeletonFrom, restPose, sampleClip, blendPose, clonePose, fk, aim, turn, q, v3, writeClipGlb } from "./gltf-skeleton.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.join(here, "..", "art", "small-weather", "clips");
-// the PH Origins repo next to this one (or next to the worktree's parent folder), or a path as the first argument
-const SOURCE =
-  process.argv[2] ||
-  [path.join(here, "..", "models", "small-weather.glb")]
-    .concat(
-      [path.join(here, "..", ".."), path.join(here, "..", "..", "..")].map((d) =>
-        path.join(d, "phoriginswebsite", "assets", "models", "ch33-hero.glb")
-      )
-    )
-    .find((f) => fs.existsSync(f));
+/* The target is his own rigged model (its rest pose is what every clip must be written against); the Mixamo clips
+   (walk, run, jump, sit) come from the raw ch33 clip files kept in art/small-weather/clips (Gen's rig inputs, never
+   rewritten here). Output: models/clips/<name>.glb, then scripts/embed-clips.mjs puts them into models/small-weather.glb. */
+const DEST = path.join(here, "..", "models", "small-weather.glb");
+const SRC_DIR = path.join(here, "..", "art", "small-weather", "clips");
+const OUT_MODELS = path.join(here, "..", "models", "clips"); // the six hero beats the page loads on top of the model
+const OUT_BODY = path.join(here, "..", "art", "small-weather", "model-clips"); // every clip on his rest pose: scripts/embed-clips.mjs puts them in the GLB
+const HERO = new Set(["lookup", "windbolt", "windrain", "triumph", "shelter", "window", "cast", "throw", "fall", "float"]);
 const FPS = 30;
-const OUT_MODELS = path.join(here, "..", "models", "clips");
 const TAU = Math.PI * 2;
 const X = [1, 0, 0];
 const Y = [0, 1, 0];
+const Z = [0, 0, 1];
 
-const sk = skeletonFrom(SOURCE);
-const STAND = 0.99; // hips height standing, metres
+const sk = skeletonFrom(DEST);
+const REST = restPose(sk);
+const STAND = fk(sk, REST).P[0][1]; // his hips height standing, metres (his own rig, not the Mixamo one)
 
 /* hips in world metres -> the skeleton's local hips translation */
 function setHips(pose, pos) {
@@ -71,33 +69,112 @@ function frames(seconds, fn) {
   const n = Math.max(2, Math.round(seconds * FPS) + 1);
   return Array.from({ length: n }, (_, k) => fn(k / (n - 1), (k / (n - 1)) * seconds));
 }
-const clipOf = (...names) => names.find((n) => sk.clips[n]);
-const IDLE = clipOf("Idle", "idle");
-const WALK = clipOf("Walk", "walk");
-const RUN = clipOf("Run", "run");
-const SIT = clipOf("SitIdle", "sit");
-const JUMP = clipOf("Jump", "jump");
-const idleAt = (t) => sampleClip(sk, IDLE, t % sk.clips[IDLE].duration);
+/* ---- Mixamo clips retargeted by direction ------------------------------------------------------------------
+   The Mixamo clips were once copied bone by bone onto his rig. His rig's rest rotations differ from ch33's (pelvis,
+   spine, neck, arms), so every copied rotation landed offset: pelvis tipped back ~10 deg, neck ~28 deg forward, knees
+   bent, the jump turned ~30 deg. Now each bone is aimed where the source's bone points in that frame (swing only, so
+   no limb is ever twisted about its own length), plus the pelvis and shoulder yaw so the body still turns. */
+const srcSkels = {};
+const source = (name) => srcSkels[name] || (srcSkels[name] = skeletonFrom(path.join(SRC_DIR, name + ".glb")));
+const AIM_CHAIN = [
+  ["Hips", "Spine"], ["Spine", "Spine1"], ["Spine1", "Spine2"], ["Spine2", "Neck"], ["Neck", "Head"], ["Head", "HeadTop_End"],
+  ["LeftShoulder", "LeftArm"], ["LeftArm", "LeftForeArm"], ["LeftForeArm", "LeftHand"],
+  ["RightShoulder", "RightArm"], ["RightArm", "RightForeArm"], ["RightForeArm", "RightHand"],
+  ["LeftUpLeg", "LeftLeg"], ["LeftLeg", "LeftFoot"], ["LeftFoot", "LeftToeBase"], ["LeftToeBase", "LeftToe_End"],
+  ["RightUpLeg", "RightLeg"], ["RightLeg", "RightFoot"], ["RightFoot", "RightToeBase"], ["RightToeBase", "RightToe_End"],
+];
+const yawOf = (P, a, b) => {
+  const d = v3.sub(P[sk.byName[b]], P[sk.byName[a]]);
+  return Math.atan2(d[2], d[0]);
+};
+const wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
+function retarget(name, t) {
+  const src = source(name);
+  const clipName = Object.keys(src.clips)[0];
+  const S = fk(src, sampleClip(src, clipName, t)).P;
+  const sRest = fk(src, restPose(src)).P;
+  const sp = (n) => S[src.byName[n]];
+  const dir = (a, b) => v3.sub(sp(b), sp(a));
+  const yawSrc = (a, b) => Math.atan2(sp(b)[2] - sp(a)[2], sp(b)[0] - sp(a)[0]);
+  /* The spine, neck and head are moved by how far the source's bone swings from ITS rest, applied to his own rest
+     (ch33's neck leans forward 16 deg at rest, his stands upright: copying the absolute direction would hang his head
+     forward in every clip). Arms and legs take the source's absolute direction (T-pose vs A-pose, both straight legs). */
+  const TORSO = new Set(["Hips", "Spine", "Spine1", "Spine2", "Neck", "Head"]);
+  const dRest = fk(sk, REST).P;
+  const torsoDir = (bone, child) => {
+    if (!TORSO.has(bone)) return dir(bone, child);
+    const sr = v3.sub(sRest[src.byName[child]], sRest[src.byName[bone]]);
+    const dr = v3.sub(dRest[sk.byName[child]], dRest[sk.byName[bone]]);
+    return q.rot(q.fromTo(sr, dir(bone, child)), dr);
+  };
+  const p = clonePose(REST);
+  for (const [bone, child] of AIM_CHAIN) {
+    if (bone === "Hips" || bone === "Spine2") {
+      // aim, then turn about the vertical so the hip line / shoulder line yaw match the source
+      aim(sk, p, bone, child, torsoDir(bone, child));
+      const [la, lb] = bone === "Hips" ? ["RightUpLeg", "LeftUpLeg"] : ["RightArm", "LeftArm"];
+      const dd = wrap(yawOf(fk(sk, p).P, la, lb) - yawSrc(la, lb));
+      turn(sk, p, bone, Y, dd);
+      continue;
+    }
+    aim(sk, p, bone, child, torsoDir(bone, child));
+  }
+  const ratio = fk(sk, REST).P[0][1] / sRest[src.byName.Hips][1];
+  return { pose: p, hipsY: sp("Hips")[1] * ratio };
+}
+const mixamo = (name, seconds, y) =>
+  frames(seconds, (u, t) => {
+    const { pose, hipsY } = retarget(name, t % source(name).clips[Object.keys(source(name).clips)[0]].duration);
+    return inPlace(pose, y == null ? hipsY : y);
+  });
+const mixamoAt = (name, t) => retarget(name, t).pose;
+const dur = (name) => source(name).clips[Object.keys(source(name).clips)[0]].duration;
+const jumpAt = (t) => mixamoAt("jump", t);
+
+/* ---- his idle: upright, relaxed, a slow breath and a small weight shift -----------------------------------------
+   Written on his own rest pose (never copied from a mocap), so nothing is tipped, twisted or crossed: the spine and
+   neck stay upright, the arms hang with a soft bend, and the only motion is breath (4 s), a weight shift and a slow
+   look (8 s): the loop is 8 s and seamless. */
+const IDLE_SECONDS = 8;
+function idleAt(t) {
+  const p = clonePose(REST);
+  const b = (t / 4) * TAU;
+  const s = (t / IDLE_SECONDS) * TAU;
+  const breath = Math.sin(b);
+  turn(sk, p, "Spine", X, 0.008 * breath);
+  turn(sk, p, "Spine1", X, 0.012 * Math.sin(b - 0.3));
+  turn(sk, p, "Spine2", X, 0.016 * Math.sin(b - 0.6));
+  turn(sk, p, "Spine2", Z, -0.012 * Math.sin(s)); // the chest answers the hips' weight shift
+  turn(sk, p, "Hips", Z, 0.012 * Math.sin(s));
+  turn(sk, p, "Neck", X, -0.012 * Math.sin(b - 0.9));
+  turn(sk, p, "Head", Y, 0.07 * Math.sin(s + 0.8));
+  const sway = 0.012 * Math.sin(b - 0.5);
+  arms(p, [0.17, -0.98, 0.02 + sway], [0.13, -0.95, 0.24 + sway]);
+  return inPlace(p, STAND - 0.003 * (1 - breath) / 2);
+}
+/* a levelled head for the Mixamo clips: the neck's lean is what the retarget leaves (kept to the stride's own) */
 
 const CLIPS = {
-  /* Mixamo, in place */
-  idle: () => frames(sk.clips[IDLE].duration, (u, t) => inPlace(sampleClip(sk, IDLE, t))),
-  walk: () => frames(sk.clips[WALK].duration, (u, t) => inPlace(sampleClip(sk, WALK, t))),
-  run: () => frames(sk.clips[RUN].duration, (u, t) => inPlace(sampleClip(sk, RUN, t))),
-  sit: () => frames(sk.clips[SIT].duration, (u, t) => inPlace(sampleClip(sk, SIT, t))),
+  idle: () => frames(IDLE_SECONDS, (u, t) => idleAt(t)),
+  walk: () => mixamo("walk", dur("walk")),
+  run: () => mixamo("run", dur("run")),
+  sit: () => mixamo("sit", dur("sit")),
 
-  /* Mixamo's Jump from the push-off to the top, knees tucking (the game lifts him) */
+  /* the Jump from the push-off to the top, knees tucking (the game lifts him) */
   jump: () =>
     frames(0.5, (u) => {
-      const t = 0.72 + 0.33 * clamp01(u / 0.75);
-      return inPlace(sampleClip(sk, JUMP, t), STAND);
+      // the source jump turns the whole body ~30 deg at take-off: level the pelvis, and settle neck and chest toward upright
+      const p = mixamoAt("jump", u * dur("jump"));
+      const yaw = wrap(yawOf(fk(sk, p).P, "RightUpLeg", "LeftUpLeg"));
+      turn(sk, p, "Hips", Y, yaw);
+      return inPlace(blendPose(p, idleAt(0), 0.25), STAND);
     }),
 
   /* falling: arms up and waving for balance, legs pedalling; loops */
   fall: () =>
     frames(1.2, (u) => {
       const a = u * TAU;
-      const p = blendPose(sampleClip(sk, "Jump", 1.15), idleAt(0), 0.35);
+      const p = blendPose(jumpAt(dur("jump")), idleAt(0), 0.6);
       turn(sk, p, "Spine1", X, -0.12);
       turn(sk, p, "Head", X, -0.2);
       arms(p, [0.75, 0.55 + 0.15 * Math.sin(a), 0.1 * Math.cos(a)], [0.45, 0.85, 0.25 * Math.sin(a)], [-0.75, 0.55 + 0.15 * Math.sin(a + 2), 0.1 * Math.cos(a + 2)], [-0.45, 0.85, 0.25 * Math.sin(a + 2)]);
@@ -156,13 +233,13 @@ const CLIPS = {
   type: () =>
     frames(2, (u, t) => {
       const a = u * TAU;
-      const p = sampleClip(sk, "SitIdle", 0);
+      const p = mixamoAt("sit", 0);
       turn(sk, p, "Head", X, 0.15);
       arms(p, [0.25, -0.7, 0.6], [0.12, -0.08 + 0.04 * Math.sin(a * 6), 1], [-0.25, -0.7, 0.6], [-0.12, -0.08 + 0.04 * Math.sin(a * 6 + 1.3), 1]);
       return inPlace(p);
     }),
   phone: () =>
-    frames(4, (u, t) => {
+    frames(IDLE_SECONDS, (u, t) => {
       const p = idleAt(t);
       turn(sk, p, "Head", X, 0.38);
       arms(p, [0.25, -0.85, 0.35], [-0.35, 0.55, 0.75], [-0.25, -0.85, 0.35], [0.2, 0.5, 0.85]);
@@ -257,8 +334,9 @@ const CLIPS = {
   shelter: () =>
     frames(2.4, (u, t) => {
       const a = u * TAU;
-      const p = idleAt(t);
-      turn(sk, p, "Spine2", X, 0.18);
+      const p = idleAt(0);
+      turn(sk, p, "Spine2", X, 0.18 + 0.015 * Math.sin(a));
+      turn(sk, p, "Spine1", Z, 0.012 * Math.sin(a + 1));
       turn(sk, p, "Head", X, 0.35);
       arms(p, [0.35, -0.35 + 0.04 * Math.sin(a), 0.55], [0.2, 0.15, 0.85], [-0.35, -0.35 + 0.04 * Math.sin(a + 1), 0.55], [-0.2, 0.15, 0.85]);
       return inPlace(p, STAND + 0.01 * Math.sin(a));
@@ -266,11 +344,10 @@ const CLIPS = {
 
   /* Sit-at-the-window idle for autopilot evenings: perched, looking out */
   window: () => {
-    const sitName = sk.clips.SitIdle ? "SitIdle" : sk.clips.sit ? "sit" : "idle";
-    const dur = sk.clips[sitName].duration || 2;
+    const sitDur = dur("sit") || 2;
     return frames(4, (u, t) => {
       const a = u * TAU;
-      const p = sampleClip(sk, sitName, t % dur);
+      const p = mixamoAt("sit", t % sitDur);
       turn(sk, p, "Spine1", Y, 0.35 + 0.04 * Math.sin(a * 0.5));
       turn(sk, p, "Head", X, -0.1);
       turn(sk, p, "Head", Y, 0.45);
@@ -280,17 +357,14 @@ const CLIPS = {
   },
 };
 
-const HERO = new Set(["lookup", "windbolt", "windrain", "triumph", "shelter", "window"]);
-fs.mkdirSync(OUT, { recursive: true });
 fs.mkdirSync(OUT_MODELS, { recursive: true });
-const only = process.argv.slice(3);
+fs.mkdirSync(OUT_BODY, { recursive: true });
+const only = process.argv.slice(2);
 for (const [name, make] of Object.entries(CLIPS)) {
   if (only.length && !only.includes(name)) continue;
   const f = make();
-  const file = path.join(OUT, `${name}.glb`);
+  const file = path.join(OUT_BODY, `${name}.glb`);
   writeClipGlb(file, sk, name, f, FPS);
-  if (HERO.has(name)) {
-    fs.copyFileSync(file, path.join(OUT_MODELS, `${name}.glb`));
-  }
+  if (HERO.has(name)) fs.copyFileSync(file, path.join(OUT_MODELS, `${name}.glb`));
   console.log(`${name}: ${f.length} frames, ${(fs.statSync(file).size / 1024).toFixed(0)} KB`);
 }

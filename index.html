@@ -25,7 +25,7 @@
       #loading[hidden] { display: none; }
       #loading.leaving { opacity: 0; pointer-events: none; }
       #loading .card { box-sizing: border-box; width: min(100%, 380px); margin: auto; text-align: left; }
-      #loading .kicker { margin: 0; font: 600 .78rem/1 Outfit, system-ui, sans-serif; letter-spacing: .32em; text-transform: uppercase; color: #7ec8ff; text-shadow: 0 0 18px rgba(126,200,255,.55); }
+      #loading .kicker { margin: 0; font: 600 .78rem/1 Outfit, system-ui, sans-serif; letter-spacing: .32em; text-transform: uppercase; color: #f0c27a; text-shadow: 0 0 18px rgba(240,194,122,.5); }
       #loading h2 { margin: 10px 0 0; font: 600 clamp(2rem, 9vw, 3.2rem)/1 Fraunces, Georgia, serif; letter-spacing: -.01em; }
       #loading .bar { height: 6px; margin-top: 22px; border-radius: 999px; background: rgba(246,241,232,.14); overflow: hidden; }
       #loading .bar i { display: block; height: 100%; width: 4%; border-radius: inherit; background: #f0c27a; box-shadow: 0 0 12px rgba(240,194,122,.6); transition: width .3s ease; }
@@ -48,6 +48,7 @@
         try { forced = new URLSearchParams(location.search).get("view") === "public"; } catch (e) {}
         if (!local) root.classList.add("public", "preview-public");
         else if (forced) root.classList.add("preview-public", "view-forced");
+        try { if (new URLSearchParams(location.search).get("report") === "1") root.classList.add("show-report"); } catch (e) {}
       })();
     </script>
     <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
@@ -75,19 +76,19 @@
         <p class="kicker">I Can Be</p>
         <h2>Small Weather</h2>
         <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="4"><i id="loading-bar"></i></div>
-        <p class="msg" id="loading-msg">Loading his day…</p>
+        <p class="msg" id="loading-msg">Loading…</p>
         <button type="button" class="retry" id="loading-retry">Try again</button>
       </div>
     </div>
     <script>
       /* Loading progress from real events: the page's scripts (their load events), his model's bytes (js/app.js), the first
-         frame and the title (js/title.js). Parts weigh: scripts .25, model .55, first frame .1, title .1. No timers poll. */
+         frame and the title (js/title.js). Parts weigh: scripts .5, first frame .25, title .25 (his model streams in behind the title: not gated, so a phone on Slow 4G isn't held). No timers poll. */
       (function () {
         var html = document.documentElement, card = document.getElementById("loading"), bar = document.getElementById("loading-bar");
         var msg = document.getElementById("loading-msg"), retry = document.getElementById("loading-retry");
-        var W = { scripts: 0.25, model: 0.55, frame: 0.1, title: 0.1 }, got = { scripts: 0, model: 0, frame: 0, title: 0 };
+        var W = { scripts: 0.5, model: 0, frame: 0.25, title: 0.25 }, got = { scripts: 0, model: 0, frame: 0, title: 0 };
         var t0 = performance.now(), MIN_MS = 700, state = "loading", log = [], slowT = 0;
-        var TEXT = { scripts: "Loading the city…", model: "Loading Small Weather…", frame: "Lighting the street…", title: "Almost there…" };
+        var TEXT = { scripts: "Loading…", model: "Loading…", frame: "Loading…", title: "Loading…" }; /* one fixed line: each new line counts as more words on screen in the first minute */
         function emit(action, extra) {
           var d = { action: action, t: Math.round(performance.now() - t0), pct: pct() };
           if (extra) for (var k in extra) d[k] = extra[k];

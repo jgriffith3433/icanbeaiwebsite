@@ -324,17 +324,18 @@ export function startPowers(world, dayApi) {
     const t = a.ctx.currentTime;
     const o = a.ctx.createOscillator();
     const g = a.ctx.createGain();
-    o.type = ["sine", "triangle", "sawtooth"][v];
+    o.type = ["sine", "triangle", "triangle"][v];
     o.frequency.setValueAtTime(c.base * pitch * 0.5, t);
     o.frequency.exponentialRampToValueAtTime(c.base * pitch, t + 0.12);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.09, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.07, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    g.gain.setValueAtTime(0, t + 0.225);
     o.connect(g);
     g.connect(a.master);
     o.start(t);
     o.stop(t + 0.25);
-    burst(c.base * pitch * 2.2, 0.28 + v * 0.06, 0.2, ["lowpass", "bandpass", "highpass"][v]);
+    burst(c.base * pitch * 2.2, 0.28 + v * 0.06, 0.2, ["lowpass", "bandpass", "bandpass"][v]);
   }
   function castFx(id) {
     const c = CAST[id];
@@ -909,11 +910,24 @@ export function startPowers(world, dayApi) {
   function ensureAudio() {
     if (audio || (!window.AudioContext && !window.webkitAudioContext)) return audio;
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new Ctx();
+      // Share js/mix.js's context so these casts go through its compressor and limiter and the Effects slider;
+      // a private context straight to the speakers had no headroom control (the old bad-sounding casts).
+      const Mx = window.mix;
+      let ctx = null;
+      let dest = null;
+      if (Mx && Mx.ctx) {
+        try { if (Mx.unlock) Mx.unlock(); ctx = Mx.ctx(); const b = Mx.bus && Mx.bus("sfx"); dest = b && b.bus; } catch (e) { ctx = null; }
+      }
+      if (!ctx || !dest) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        ctx = new Ctx();
+        dest = ctx.createDynamicsCompressor();
+        dest.threshold.value = -8; dest.ratio.value = 12; dest.knee.value = 10; dest.attack.value = 0.003; dest.release.value = 0.2;
+        dest.connect(ctx.destination);
+      }
       const master = ctx.createGain();
-      master.gain.value = 0.8;
-      master.connect(ctx.destination);
+      master.gain.value = 0.7;
+      master.connect(dest);
       const len = ctx.sampleRate;
       const buf = ctx.createBuffer(1, len, ctx.sampleRate);
       const data = buf.getChannelData(0);
@@ -938,15 +952,19 @@ export function startPowers(world, dayApi) {
     src.buffer = a.buf;
     const filter = a.ctx.createBiquadFilter();
     filter.type = type || "lowpass";
-    filter.frequency.setValueAtTime(Math.max(30, freq), t);
+    // The noise buffer is normalised hot (x2.6, clamped), so the level is scaled down here; each play jitters
+    // pitch (filter) and level by up to ~8% so repeats never sound identical.
+    filter.frequency.setValueAtTime(Math.max(30, freq * (0.92 + Math.random() * 0.16)), t);
     const g = a.ctx.createGain();
+    const lvl = Math.min(0.3, Math.max(0.001, vol * 0.4)) * (0.92 + Math.random() * 0.16);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.001, vol), t + 0.025);
+    g.gain.exponentialRampToValueAtTime(lvl, t + 0.03);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.gain.setValueAtTime(0, t + dur + 0.005); // end on true zero: no click when the source stops
     src.connect(filter);
     filter.connect(g);
     g.connect(a.master);
-    src.start(t);
+    src.start(t, Math.random() * 0.5);
     src.stop(t + dur + 0.03);
   }
   /* Each weather call has its own procedural sound (no file): rain a hiss, gale a rising sweep, fog a low pad, sun a chime. */
@@ -1429,7 +1447,7 @@ html.touch-ui.in-control .side{display:none}
       if (!sampled && day && day.score && day.score.crack) {
         sampled = !!day.score.crack(th.dist < 22 ? "near" : "far", { dist: th.dist, delay: th.delay, flashAt: th.flashAt });
       }
-      burst(140, 1.35, sampled ? 0.28 : 0.85, "lowpass");
+      burst(140, 1.35, sampled ? 0.28 : 0.6, "lowpass");
       say("thunder", "world", "bolt");
     }
 

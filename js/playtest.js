@@ -319,6 +319,17 @@ async function checkFoundation(t) {
   if (!/^9\./.test(String(info.babylon))) t.problem("bug", `Babylon ${info.babylon} is running, not Babylon 9`);
   if (info.physics !== "havok") t.problem("bug", `Physics isn't on (${info.physics}${info.error ? `: ${info.error}` : ""})`);
   const w = world();
+  // The shader-compile loop (uniform block limit): no uniform buffers, and no effect that failed to compile.
+  const eng = w && w.scene && w.scene.getEngine();
+  if (eng) {
+    t.metric("uniformBuffers", eng.supportsUniformBuffers ? 1 : 0);
+    if (eng.supportsUniformBuffers) t.problem("bug", "The engine uses uniform buffers: lights, plugins and prepass can pass the GPU's 14 vertex UBO limit (shader compile loop)");
+    let failed = 0;
+    if (eng.onEffectErrorObservable) eng.onEffectErrorObservable.add(() => { failed++; });
+    await sleep(2500);
+    t.metric("effectErrors", failed);
+    if (failed) t.problem("bug", `${failed} shader effect(s) failed to compile in 2.5 s`);
+  }
   const fr = window.day.now().frame;
   if (info.physics === "havok" && w && fr && !fr.person.inCar) {
     const g = w.groundAt(fr.person.x, fr.person.z, 3);
@@ -2571,6 +2582,142 @@ async function model(options, t) {
   t.scene("Back on his day");
   t.event("model-back", `back on his day, his model plays "${skinNow() ? skinNow().clip() : "?"}"`);
   await sleep(1500);
+  t.progress(1);
+}
+
+/* ---------------- clip-poses: every clip he plays, at mid-clip, never twisted; cross-fades without a pop ---------------- */
+// Acceptance: idle at two different times is upright (spine and neck within a few degrees, pelvis and shoulders square,
+// hands apart); walk, run, jump, fall/float, cast and throw each hold a screenshot with no twisted limbs; switching idle
+// <-> walk <-> run shows no snap (the pose never jumps more than a stride's worth between two frames); the phone
+// (touch, 390x844, low quality) animates the same. The probe is skin.pose() (js/small-weather.js), read on real frames.
+async function clipPoses(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Clip poses (phone)" : "Clip poses");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model === "small-weather", 45000, "his model to load").catch(() => {});
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok").catch(() => {});
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const WX = window.day.weather;
+  if (!C || !skinNow() || !skinNow().pose) {
+    t.problem("blocker", "Small Weather's model isn't on for clip-poses");
+    return;
+  }
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    try { C.touch(true); } catch (e) { /* */ }
+  }
+  const day = window.day.today();
+  const outside = carSideMoment(day) || quietMoment(day);
+  scrubTo(outside.start + 0.2);
+  clickSpeed(1);
+  if (WX && WX.set) WX.set("rain", 0.2, "key"); // not clear: the idle must stay the plain idle (no look-up)
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  if (touch) {
+    const btn = document.getElementById("control-btn") || document.querySelector("#take-control,.take-control");
+    if (btn) {
+      await tapEl(btn);
+      btn.click();
+    } else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 5000, "Take control");
+  const sk = () => skinNow();
+  const bad = (what, m, lim) => {
+    const v = m[what.k];
+    if (Math.abs(v) > lim) t.problem("bug", `quality.animation: ${what.label} ${v.toFixed(0)} deg (limit ${lim}) while ${sk().clip()}`);
+  };
+  const holdAndCheck = async (label, clip, lims, ms) => {
+    t.scene(label);
+    await sleep(ms);
+    const m = sk().pose();
+    if (!m) return null;
+    t.event(`pose-${label.toLowerCase().replace(/\s+/g, "-")}`, `${sk().clip()}: lean ${m.lean.toFixed(0)}, neck ${m.neck.toFixed(0)}, hips yaw ${m.hipYaw.toFixed(0)}, shoulders yaw ${m.shoulderYaw.toFixed(0)}, knees ${m.kneeL.toFixed(0)}/${m.kneeR.toFixed(0)}, hands ${m.handsApart.toFixed(2)} m apart`);
+    if (clip && sk().clip() !== clip) t.problem("bug", `${label}: his model played ${sk().clip()}, not ${clip}`);
+    for (const [k, [label2, lim]] of Object.entries(lims)) bad({ k, label: label2 }, m, lim);
+    if (m.handsApart < 0.12) t.problem("bug", `quality.animation: ${label}: a hand is through the body (${m.handsApart.toFixed(2)} m apart)`);
+    return m;
+  };
+  const IDLE = { lean: ["spine lean", 8], neck: ["neck lean", 10], sideLean: ["sideways lean", 6], hipYaw: ["pelvis yaw", 8], shoulderYaw: ["shoulder yaw", 8], kneeL: ["left knee bend", 16], kneeR: ["right knee bend", 16] };
+  const MOVE = { lean: ["spine lean", 40], neck: ["neck lean", 45], sideLean: ["sideways lean", 12], hipYaw: ["pelvis yaw", 30], shoulderYaw: ["shoulder yaw", 45] };
+  t.progress(0.1);
+  // idle at two different times (a breath and a weight shift apart)
+  await holdAndCheck("Idle early", "idle", IDLE, 1500);
+  await holdAndCheck("Idle later", "idle", IDLE, 4000);
+  t.progress(0.25);
+
+  // switching idle -> walk -> run -> idle: the pose never jumps between two frames beyond what a stride moves
+  const jumps = { worst: 0, at: "" };
+  let prev = null;
+  const poseObs = window.setInterval(() => {
+    const m = sk() && sk().pose();
+    if (!m) return;
+    if (prev) {
+      const d = Math.max(Math.abs(m.lean - prev.lean), Math.abs(m.neck - prev.neck), Math.abs(m.hipYaw - prev.hipYaw), Math.abs(m.shoulderYaw - prev.shoulderYaw));
+      if (d > jumps.worst) jumps.worst = d;
+    }
+    prev = m;
+  }, 33);
+  t.scene("Walk");
+  keyDown("w");
+  await sleep(1400);
+  await holdAndCheck("Walk mid", "walk", MOVE, 600);
+  t.scene("Run");
+  keyDown("Shift", { shiftKey: true });
+  keyDown("w", { shiftKey: true });
+  await sleep(900);
+  await holdAndCheck("Run mid", "run", MOVE, 500);
+  keyUp("Shift");
+  await sleep(700);
+  keyUp("w");
+  await sleep(1200);
+  await holdAndCheck("Idle after run", "idle", IDLE, 600);
+  t.progress(0.5);
+
+  // jump (Space) and float (Space held while falling)
+  t.scene("Jump");
+  keyDown(" ");
+  await sleep(180);
+  await holdAndCheck("Jump mid", null, MOVE, 60);
+  await sleep(400);
+  t.scene("Float");
+  await holdAndCheck("Float mid", null, MOVE, 400);
+  keyUp(" ");
+  await sleep(1500);
+  t.progress(0.65);
+
+  // the casts: Lightning (E) wind-up, then Rain (R)
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  t.scene("Cast Lightning");
+  keyDown("e");
+  await sleep(420);
+  await holdAndCheck("Cast mid", null, MOVE, 100);
+  await sleep(500);
+  keyUp("e");
+  await sleep(1400);
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  t.scene("Cast Rain");
+  pressKey("r");
+  await sleep(380);
+  await holdAndCheck("Rain cast mid", null, MOVE, 100);
+  await sleep(1600);
+  window.clearInterval(poseObs);
+  t.metric("quality.clipPopDeg", Math.round(jumps.worst * 10) / 10);
+  t.event("clip-switching", `worst pose change between two 33 ms samples across idle -> walk -> run -> idle: ${jumps.worst.toFixed(1)} deg`);
+  if (jumps.worst > 22) t.problem("bug", `quality.animation: the pose snapped ${jumps.worst.toFixed(0)} deg between two frames switching clips`);
+  t.progress(0.85);
+
+  // his day's own clips: the world tilts and seats him, the clip is the limbs
+  t.scene("His day");
+  C.letGo && C.letGo();
+  const seen = await clipsDuring(async () => {
+    for (const hour of [7.2, 9.6, 12.4, 19.5, 22.6]) {
+      scrubTo(hour * 60);
+      await sleep(touch ? 1300 : 1100);
+      const m = sk() && sk().pose();
+      if (m && /^(sit|type|window)$/.test(sk().clip())) t.event("day-pose", `${sk().clip()}: neck ${m.neck.toFixed(0)}, hands ${m.handsApart.toFixed(2)} m apart`);
+    }
+  });
+  t.event("day-clips", `his day played ${seen.join(" → ")}`);
+  t.metric("clips.dayDistinct", seen.length);
   t.progress(1);
 }
 
@@ -5362,27 +5509,104 @@ async function windFog(options, t) {
   scrubTo(12.4 * 60); // setup: lunch, when the pavements are full
   clickSpeed(1);
   await sleep(1500);
+  /* story through play: the page opens on the day already running, and the first thing seen is Birdie on the park lawn
+     (her noon bench) waving up at the roof, before any text */
+  {
+    const CO = window.day.coldopen;
+    const N0 = window.day.neighbors && window.day.neighbors.now().people.find((p) => p.id === "birdie");
+    if (!CO || !CO.glance) t.problem("bug", "No opening glance at Birdie (js/coldopen.js glance)");
+    else if (!N0 || N0.inside) t.problem("bug", "Birdie is not out on the lawn at lunch");
+    else {
+      const shown = CO.glance("birdie", 2.6);
+      await sleep(1400);
+      const w0 = window.day.world();
+      t.metric("openingBirdieOnLawn", N0.z >= 20 ? 1 : 0);
+      t.event("opening-birdie", `${shown ? "the camera finds" : "NO glance at"} Birdie on the lawn (${Math.round(N0.x)}, ${Math.round(N0.z)}), the day running at ${window.day.now().frame && window.day.now().frame.time || "lunch"}, ${w0.cineOn() ? "cut-away on her" : "no cut-away"}, no text on screen`);
+      await t.until(() => !CO.glancing(), 4000, "the glance to end").catch(() => {});
+      await sleep(400);
+    }
+  }
   if (touch) {
     try { window.day.look.quality("low"); } catch (e) { /* */ }
     C.touch(true);
   }
+  /* sound: the title's night-city ambience loops, Continue clicks, and the first Gust whooshes (js/titlesound.js) */
+  const TS = window.day.titlesound;
+  const T = window.day.title;
+  if (!TS || !T) t.problem("bug", "js/titlesound.js or the title isn't installed");
+  else {
+    t.scene("Title sound");
+    T.show("playtest");
+    await sleep(2200);
+    const ti = TS.info();
+    t.metric("titleAmbience", ti.ambience ? 1 : 0);
+    if (!ti.ambience) t.problem("bug", "No night-city ambience loop on the title screen");
+    else t.event("title-ambience", `looping night-city bed on the title (audio context ${ti.ctx})`);
+    const playB = document.querySelector("#title-play");
+    const clicks0 = TS.info().clicks;
+    if (playB) {
+      const r = playB.getBoundingClientRect();
+      touchOn(playB, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 11);
+      await sleep(120);
+      t.metric("titleClickSounds", TS.info().clicks - clicks0);
+      t.event("title-continue-click", `"${playB.textContent}" pressed; UI click ${TS.info().clicks > clicks0 ? "played" : "left to the sound kit (Sound already on)"}`);
+      touchOn(playB, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 11);
+      playB.click();
+      await sleep(600);
+    }
+  }
   const sound = $("sound");
-  if (sound) {
+  if (sound && sound.getAttribute("aria-pressed") !== "true") {
     const r = sound.getBoundingClientRect();
     sound.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: touch ? "touch" : "mouse" }));
     sound.click();
     await sleep(200);
   }
-  if (touch) await tapEl($("control")); else pressKey("Enter");
+  if (C.mode() !== "control") {
+    if (touch) await tapEl($("control")); else pressKey("Enter");
+  }
   await t.until(() => C.mode() === "control", 4000, "Take control");
   t.event("control-taken", touch ? "by touch, low quality" : "Enter");
   if (C.place) C.place(112, 24, -Math.PI / 2); // setup: on the plaza, a flag pole and the avenue's trees in view
   await sleep(800);
+  /* clarity: one prompt floats over him ("Hold V to call wind"), no debug dot or error badge on the page */
+  const hp = window.day.heroprompt;
+  await t.until(() => hp && hp.now().shown, 5000, "the prompt over him").catch(() => {});
+  const pe = $("hero-prompt");
+  const pr = boxOf(pe);
+  if (!pr) t.problem("bug", "No in-world prompt over Small Weather after taking control");
+  else {
+    t.event("hero-prompt", `"${pe.textContent}" at ${Math.round(pr.left)},${Math.round(pr.top)} (${Math.round(pr.width)}x${Math.round(pr.height)})`);
+    if (pr.left < 0 || pr.right > innerWidth || pr.top < 0) t.problem("bug", "The prompt over him runs off the screen");
+  }
+  const dbg = document.querySelector("[data-hawkes-report]");
+  if (dbg && getComputedStyle(dbg).display !== "none") t.problem("bug", "The report-a-bug dot is visible on the player page");
+  else t.event("no-debug-ui", "no bug dot or error badge on screen");
   const quality = window.day.look.quality();
   t.metric("quality", quality === "low" ? 0 : 1);
   if (P.abilities && P.abilities.reset) P.abilities.reset(100);
   await t.until(() => P.now().pressure >= 40, 8000, "Charge").catch(() => {});
-  const calm = () => { const n = W.now(); return n.rain < 0.05 && n.fog < 0.015 && n.wind < 0.2; };
+
+  /* opening beat: within 10 s of control, a Gust visibly pushes the fog (Fog, then Wind, both real input) */
+  t.scene("Gust on the fog");
+  const tOpen = performance.now();
+  if (touch) await tapEl($("ability-fog")); else await holdVerb("c", 120);
+  await t.until(() => wf.info().fog >= 0.3, 4000, "fog to gather").catch(() => {});
+  const push0 = wf.info().fogPush;
+  const whooshes0 = (window.day.titlesound ? window.day.titlesound.info().whooshes : 0) + ((window.day.sfx && window.day.sfx.info().heard && window.day.sfx.info().heard["gust-whoosh"]) || 0);
+  if (touch) await tapEl($("ability-wind")); else await holdVerb("v", 120);
+  await sleep(2500);
+  const whooshes1 = (window.day.titlesound ? window.day.titlesound.info().whooshes : 0) + ((window.day.sfx && window.day.sfx.info().heard && window.day.sfx.info().heard["gust-whoosh"]) || 0);
+  t.metric("gustWhooshes", whooshes1 - whooshes0);
+  if (whooshes1 <= whooshes0) t.problem("bug", "The Gust made no wind whoosh");
+  else t.event("gust-whoosh", "a wind whoosh answered the Gust");
+  const pushed = Math.round((wf.info().fogPush - push0) * 10) / 10;
+  const openSec = Math.round((performance.now() - tOpen) / 100) / 10;
+  t.metric("gustFogPushM", pushed);
+  t.metric("gustFogSeconds", openSec);
+  if (pushed < 1.5 || openSec > 10) t.problem("bug", `The gust moved the fog ${pushed} m in ${openSec} s (want 1.5+ m within 10 s)`);
+  else t.event("gust-pushes-fog", `a gust slid the fog ${pushed} m downwind, ${openSec} s after control`);
+  const calm =() => { const n = W.now(); return n.rain < 0.05 && n.fog < 0.015 && n.wind < 0.2; };
   await t.until(calm, 8000, "a calm sky").catch(() => {});
   const base = wf.info();
   t.event("wind-baseline", `wind ${base.wind}, ${base.flags} flags, ${base.laundry} laundry, ${base.cloth} cloth, ${base.plugins} shader bends, ${base.slices} fog slices (${quality})`);
@@ -10048,6 +10272,77 @@ async function titleScenario(options, t) {
   t.progress(1);
 }
 
+/* ---------------- first-minute: a stranger opens the page and touches nothing ---------------- */
+// Setup (named): every icanbe.* key cleared, the cold open armed, the title shown as on a fresh load. No Play click: the
+// title must hand him over by itself within 20 s, then ONE tap (E, or the Bolt button on a phone) throws the first bolt.
+// Reports seconds to gameplay / first input / first success and the words on screen over the first minute.
+async function firstMinute(options, t) {
+  t.scene("First minute");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const phone = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
+  if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  D.coldopen.arm();
+  D.title.show("load"); // as on a fresh page load: this arms the auto-start
+  const t0 = performance.now();
+  const secs = () => Math.round((performance.now() - t0) / 100) / 10;
+  t.event("first-minute-setup", `${innerWidth}x${innerHeight}, ${phone ? "touch" : "keyboard"}; title up, no input from here but the one cue`);
+  const words = new Set();
+  const sample = () => {
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const el = n.parentElement;
+      if (!el || /^(SCRIPT|STYLE|NOSCRIPT|TITLE)$/.test(el.tagName) || !(n.textContent || "").trim() || !hudVisible(el)) continue;
+      n.textContent.trim().split(/\s+/).filter((x) => /\w/.test(x)).forEach((x) => words.add(`${el.id || el.className}:${x}`));
+    }
+  };
+  const iv = setInterval(sample, 400);
+  const got = await t.until(() => D.control.mode() === "control", 20000, "him on the roof with no tap").then(() => true, () => false);
+  const gameplay = secs();
+  t.metric("secondsToGameplay", gameplay);
+  t.event("first-minute-gameplay", `${gameplay}s: ${got ? "he is the player's, title " + (D.title.showing() ? "STILL UP" : "gone") : "NOT started"}`);
+  if (!got) { clearInterval(iv); t.problem("blocker", "The page never put the player on the rooftop by itself within 20 s"); return; }
+  if (window.hawkesPlaytest && t.milestone) t.milestone("gameplay", "auto-started on the rooftop");
+  if (D.title.showing()) t.problem("bug", "The title is still up after the auto-start");
+  const cue = await t.until(() => D.coldopen.now().phase === "waiting", 12000, "the cue").then(() => true, () => false);
+  if (!cue) { clearInterval(iv); t.problem("blocker", "The cold open never showed its one cue"); return; }
+  await sleep(500);
+  const bolt = $("coldopen-bolt");
+  const tapT = secs();
+  if (phone || (bolt && !bolt.hidden)) {
+    const r = bolt.getBoundingClientRect();
+    if (r.width < 44 || r.height < 44) t.problem("bug", `The Bolt button is ${Math.round(r.width)}x${Math.round(r.height)} (44 px minimum)`);
+    touchOn(bolt, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+    await sleep(80);
+    touchOn(bolt, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+  } else {
+    keyDown("e");
+    await sleep(80);
+    keyUp("e");
+  }
+  t.milestone && t.milestone("first-input-accepted", "one tap");
+  const cast = await t.until(() => D.coldopen.now().cast != null, 3000, "the bolt").then(() => true, () => false);
+  const success = secs();
+  t.metric("secondsToFirstSuccess", success);
+  t.event("first-minute-bolt", `${cast ? "one short tap threw the bolt" : "the tap did NOT throw it"}; tapped at ${tapT}s, bolt at ${success}s`);
+  if (!cast) t.problem("blocker", "A single short tap (80 ms) didn't throw the first bolt");
+  if (cast && t.milestone) t.milestone("first-success", "first bolt");
+  if (gameplay > 20) t.problem("bug", `Gameplay began ${gameplay}s after the page showed (limit 20 s)`);
+  await sleep(Math.max(0, 60000 - (performance.now() - t0)));
+  clearInterval(iv);
+  sample();
+  const count = words.size;
+  t.metric("wordsMinuteOne", count);
+  t.event("first-minute-words", `${count} words on screen in the first minute`);
+  if (count > 40) t.problem("bug", `${count} words were on screen in the first minute (limit 40)`);
+  const sx = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+  if (sx > 1) t.problem("bug", `The page scrolls sideways by ${sx}px`);
+  checkHud(t, "first-minute");
+  t.progress(1);
+}
+
 /* ---------------- cold-start: a new player's first Play to the first bolt and the street's reaction ---------------- */
 
 /* ---------------- stem-score: one motif, three synced stems, intent-driven gains (js/stems.js) ----------------
@@ -10142,6 +10437,45 @@ async function stemScore(options, t) {
   t.progress(1);
 }
 
+/* ---------------- title-progress: the title shows episode progress and Continue's next goal ----------------
+   Needs ?playtest=title-progress. Setup (named): icanbe.* cleared, a returning player's save (opening seen, "Clear the sky" finished at rank A).
+   Real input: a tap (touch) or click on Play. Events title-progress / title-next / title-progress-phone; metrics titleProgressStars, titleProgressTapMin. */
+async function titleProgress(options, t) {
+  t.scene("Title progress");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day;
+  if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  window.localStorage.setItem("icanbe.opening", "seen");
+  window.localStorage.setItem("icanbe.episodes.best", JSON.stringify({ morning: { pct: 80, rank: "A", cleared: true, done: true, when: Date.now() } }));
+  D.title.show("playtest");
+  await sleep(4200);
+  const tn = D.title.now();
+  t.event("title-progress", `"${tn.progress}" ${innerWidth}x${innerHeight}`);
+  if (!tn.progress) t.problem("bug", "The title shows no episode progress (stars or episodes finished)");
+  t.event("title-next", `Play "${tn.continueLabel}", goal "${tn.next}"`);
+  if (tn.continueLabel !== "Continue") t.problem("bug", "A returning player's Play isn't Continue");
+  if (!/^Next: \S/.test(tn.next)) t.problem("bug", "Continue has no named next goal under it");
+  const prog = $("title-prog"), nx = $("title-next"), play = $("title-play"), el = $("title");
+  const bp = prog && boxOf(prog), bn = nx && boxOf(nx), bb = play && boxOf(play);
+  if (!bp || !bn || !bb) t.problem("bug", "The progress line, next goal or Play isn't visible on the title");
+  else {
+    t.event("title-progress-phone", `progress ${Math.round(bp.top)}..${Math.round(bp.bottom)}, next ${Math.round(bn.top)}..${Math.round(bn.bottom)}, Play ${Math.round(bb.width)}x${Math.round(bb.height)}, scrollW ${document.documentElement.scrollWidth} of ${innerWidth}`);
+    if (bn.bottom > bb.top + 2) t.problem("bug", "The next goal overlaps Play");
+    if (bp.right > innerWidth || bp.left < 0 || bn.right > innerWidth || bn.left < 0) t.problem("bug", "The progress or next-goal line runs off the screen");
+    if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The title scrolls sideways");
+    const small = [...el.querySelectorAll("button")].map((b) => ({ b, r: boxOf(b) })).filter((x) => x.r && (x.r.height < 44 || x.r.width < 44));
+    t.metric("titleProgressSmallTargets", small.length);
+    if (small.length) t.problem("bug", `${small.length} title control(s) under 44 px`);
+  }
+  t.metric("titleProgressStars", (tn.progress.match(/★/g) || []).length);
+  const touch = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
+  if (touch) await tapEl(play); else play.click();
+  await t.until(() => !D.title.showing(), 8000, "the title to close on Play").catch(() => {});
+  t.event("title-progress-play", `title closed: ${!D.title.showing()}`);
+  t.progress(1);
+}
+
 /* ---------------- title-key-art: the crane, the logo, the storm, Play dives into the cold open ----------------
    Needs ?playtest=title-key-art. Setup (named): every icanbe.* key cleared, the cold open armed, the title up. Real input: a tap (touch) or click
    on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleSecondsToControl, titleBlackFrames,
@@ -10169,6 +10503,14 @@ async function titleKeyArt(options, t) {
   t.metric("titleButtons", buttons.length);
   t.event("title-buttons", buttons.map((b) => b.textContent.trim()).join(" | ") + (tn.daily ? ` + ${tn.daily}` : ""));
   if (buttons.length > 4) t.problem("bug", `The title shows ${buttons.length} buttons (4 at most)`);
+  const mb = $("title-music"), mbb = mb && boxOf(mb);
+  if (mbb) {
+    const lh = parseFloat(getComputedStyle(mb).lineHeight) || 20;
+    t.metric("titleMusicPillH", Math.round(mbb.height));
+    t.event("title-pill", `"${mb.textContent.trim()}" ${Math.round(mbb.width)}x${Math.round(mbb.height)}, scrollW ${document.documentElement.scrollWidth} of ${innerWidth}`);
+    if (mbb.height > Math.max(lh * 2 + 8, 70)) t.problem("bug", "The title's Music pill wraps to two lines");
+    if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The title scrolls sideways");
+  }
   const pb = boxOf(play), lb = boxOf(logo);
   if (!pb || !lb) t.problem("blocker", "No Play button or logo on the title");
   else {
@@ -10432,7 +10774,7 @@ async function streetTeaches(options, t) {
   const locked = () => ["rain", "sunbreak", "fog", "wind"].filter((id) => A.isLocked(id));
   if (locked().length !== 4) t.problem("bug", `After Play the four verbs should be locked, but locked are: ${locked().join(", ") || "none"}`);
   const eps = $("episode-offer");
-  await t.until(() => D.coldopen.now().phase === "waiting", 8000, "the cold open's prompt").catch(() => {});
+  await t.until(() => D.coldopen.now().phase === "waiting", 12000, "the cold open's prompt").catch(() => {});
   await sleep(600);
   if (phone) {
     const b = $("coldopen-bolt");
@@ -10977,7 +11319,10 @@ function sensorScene() {
     // The ground plane is flat (no height), so the size test below skips it: with it unpickable the floor ray found
     // nothing under him in the street, and any float or fall of 2 s off a roof read as "fell out of the world".
     if (m.name === "ground") { m.isPickable = true; n++; continue; }
-    const e = m.getBoundingInfo().boundingBox.extendSizeWorld;
+    // a mesh that is mid-build or disposed can have no bounding info or box yet: skip it rather than throw "reading 'y'"
+    let e = null;
+    try { e = m.getBoundingInfo && m.getBoundingInfo() && m.getBoundingInfo().boundingBox && m.getBoundingInfo().boundingBox.extendSizeWorld; } catch (err) { e = null; }
+    if (!e) continue;
     if (e.y * 2 >= 2 && (e.x > 1 || e.z > 1)) { m.isPickable = true; n++; }
   }
   window.__feelPickable = n;
@@ -11372,6 +11717,7 @@ installPlaytest({
     { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "street-teaches", title: "The street teaches: after the cold open's bolt, Rain, Sun break, Fog and Wind each unlock on a neighbor's voiced ask (Birdie, Dex, Ines) with a cue on the target, a glow, a vibrate and a voiced thanks, and no text card", seconds: 330, tags: ["first-minute", "phone", "voice", "neighbors", "abilities"], description: "Load with ?playtest=street-teaches. Setup: every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate recorded. Real input: Play, the bolt's hold, then keys (taps on the thumb arc and the stick on a phone) to answer each neighbor in turn. Events street-ask / -unlock / -arc / -cast / -thanks / -done / -practice; metrics secondsToRain, secondsToSun, secondsToFog, secondsToWind, secondsToAllFive. Run at 1280x720 and 390x844 touch." },
+    { id: "title-progress", title: "Title progress: the title shows stars and episodes finished, and Continue names the next goal (Next: Part 1: Dry); fits 390x844 with 44 px targets and no sideways scroll", seconds: 25, tags: ["title", "retention", "phone"], description: "Load with ?playtest=title-progress. Setup: icanbe.* cleared, a returning save (opening seen, Clear the sky finished at rank A). Real input: a click (a tap on a phone) on Continue. Events title-progress / title-next / title-progress-phone / title-progress-play; metrics titleProgressStars, titleProgressSmallTargets. Run at 1280x720 and 390x844 touch." },
     { id: "title-key-art", title: "Title key art: a slow crane over the district at the real time of day lands on Small Weather on the apartment roof under a forming storm with glints every few seconds, the logo lockup on top (Play 56 px+, logo and him above the fold at 390x844), at most 4 buttons; Play dives into the cold open with no cut, no black frame and control within 1 s", seconds: 45, tags: ["title", "first-minute", "phone", "audio"], description: "Load with ?playtest=title-key-art. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleButtons, titleSecondsToControl, titleBlackFrames. Run at 1280x720 and 390x844 touch." },
     { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, holds the bolt at the shop roof's rod within 30 s, and the street looks up and Birdie calls up in her voice, with under 25 words on screen before the first cast", seconds: 60, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (E held; the Bolt button held on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
@@ -11392,6 +11738,7 @@ installPlaytest({
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
+    { id: "clip-poses", title: "Clip poses: idle at two times, walk, run, jump, float, Lightning and Rain casts and his day's clips each read upright and untwisted at mid-clip; switching clips never snaps the pose; the phone (390x844) the same", seconds: 70, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=clip-poses ({\"touch\":true} for 390x844). Takes control outside, stands (idle early, idle later), W, Shift+W, back to idle, Space jump and hold to float, E then R casts, then his day (sit, type, window). Each scene is a screenshot at mid-clip; skin.pose() reads spine/neck lean, pelvis/shoulder yaw, knees and hand gap on the frame and files quality.animation problems; metric quality.clipPopDeg is the worst pose change between two 33 ms samples." },
     { id: "hero-move", title: "Hero move: feet plant on the apt stairs and ramp (slide under 5 cm, float under 3 cm), Lightning and Rain show distinct wind-up clips, idle under a clear sky looks up; on phone IK and clips run on low quality at ≥30 fps", seconds: 150, tags: ["model", "control", "feel", "phone", "quality"], description: "Load with ?playtest=hero-move ({\"touch\":true} for 390x844). Setup: day bar outside, clear sky, full Charge, control.place at the apt ramp. Real WASD up the ramp and across the roof, E then R for wind-ups, stand still 20 s for look-up. Events foot-plant / windups-distinct / lookup-ok / phone-fps-ok; metrics quality.footSlideM, quality.footFloatM, phone.fpsAvg." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
     { id: "storm-ride", title: "Storm-riding: hold Space in the air to glide with wind trails; a Gust updraft lifts him from the street to rooftop height; glide apt roof to shop roof without touching the ground", seconds: 240, tags: ["control", "powers"], description: "Day bar beside the car. Storm weather (4), real keys for glide, G for updraft, climb apt then glide to shop." },
@@ -11445,6 +11792,11 @@ installPlaytest({
   isReady: () => !!(window.day && window.day.now().frame && !(window.__loading && window.__loading.state() === "loading")),
   async start(id, options, t) {
     const errFrom = consoleErrors.length;
+    // shader compile failures count as console errors even when Babylon's logger didn't reach console.error
+    try {
+      const eng = world() && world().scene && world().scene.getEngine();
+      if (eng && eng.onEffectErrorObservable) eng.onEffectErrorObservable.add((i) => consoleErrors.push(("Shader effect failed to compile: " + String((i && i.errors) || "")).slice(0, 200)));
+    } catch (e) { /* no engine */ }
     // control.js's place() (a setup teleport that snaps the camera) tells the feel sensor it was an intended cut through
     // window.hawkesPlaytest.cut; the contract's api has none (cut lives on `t`), so every placement counted as a camera snap.
     if (window.hawkesPlaytest && !window.hawkesPlaytest.cut) window.hawkesPlaytest.cut = (s) => t.cut(s);
@@ -11455,8 +11807,8 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "title-key-art", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
-      if (id !== "title" && id !== "cold-start" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
+      if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "title-progress" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
@@ -11464,7 +11816,9 @@ installPlaytest({
       else if (id === "barks") await barksScenario(options, t);
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "cold-start") await coldStart(options, t);
+      else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "title-key-art") await titleKeyArt(options, t);
+      else if (id === "title-progress") await titleProgress(options, t);
       else if (id === "street-teaches") await streetTeaches(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
@@ -11479,6 +11833,7 @@ installPlaytest({
       else if (id === "storm-ride") await stormRide(options, t);
       else if (id === "model") await model(options, t);
       else if (id === "hero-move") await heroMove(options, t);
+      else if (id === "clip-poses") await clipPoses(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "render-grade") await renderGrade(options, t);
