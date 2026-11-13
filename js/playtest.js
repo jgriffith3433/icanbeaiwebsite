@@ -5509,6 +5509,23 @@ async function windFog(options, t) {
   scrubTo(12.4 * 60); // setup: lunch, when the pavements are full
   clickSpeed(1);
   await sleep(1500);
+  /* story through play: the page opens on the day already running, and the first thing seen is Birdie on the park lawn
+     (her noon bench) waving up at the roof, before any text */
+  {
+    const CO = window.day.coldopen;
+    const N0 = window.day.neighbors && window.day.neighbors.now().people.find((p) => p.id === "birdie");
+    if (!CO || !CO.glance) t.problem("bug", "No opening glance at Birdie (js/coldopen.js glance)");
+    else if (!N0 || N0.inside) t.problem("bug", "Birdie is not out on the lawn at lunch");
+    else {
+      const shown = CO.glance("birdie", 2.6);
+      await sleep(1400);
+      const w0 = window.day.world();
+      t.metric("openingBirdieOnLawn", N0.z >= 20 ? 1 : 0);
+      t.event("opening-birdie", `${shown ? "the camera finds" : "NO glance at"} Birdie on the lawn (${Math.round(N0.x)}, ${Math.round(N0.z)}), the day running at ${window.day.now().frame && window.day.now().frame.time || "lunch"}, ${w0.cineOn() ? "cut-away on her" : "no cut-away"}, no text on screen`);
+      await t.until(() => !CO.glancing(), 4000, "the glance to end").catch(() => {});
+      await sleep(400);
+    }
+  }
   if (touch) {
     try { window.day.look.quality("low"); } catch (e) { /* */ }
     C.touch(true);
@@ -10289,7 +10306,7 @@ async function firstMinute(options, t) {
   if (!got) { clearInterval(iv); t.problem("blocker", "The page never put the player on the rooftop by itself within 20 s"); return; }
   if (window.hawkesPlaytest && t.milestone) t.milestone("gameplay", "auto-started on the rooftop");
   if (D.title.showing()) t.problem("bug", "The title is still up after the auto-start");
-  const cue = await t.until(() => D.coldopen.now().phase === "waiting", 8000, "the cue").then(() => true, () => false);
+  const cue = await t.until(() => D.coldopen.now().phase === "waiting", 12000, "the cue").then(() => true, () => false);
   if (!cue) { clearInterval(iv); t.problem("blocker", "The cold open never showed its one cue"); return; }
   await sleep(500);
   const bolt = $("coldopen-bolt");
@@ -10757,7 +10774,7 @@ async function streetTeaches(options, t) {
   const locked = () => ["rain", "sunbreak", "fog", "wind"].filter((id) => A.isLocked(id));
   if (locked().length !== 4) t.problem("bug", `After Play the four verbs should be locked, but locked are: ${locked().join(", ") || "none"}`);
   const eps = $("episode-offer");
-  await t.until(() => D.coldopen.now().phase === "waiting", 8000, "the cold open's prompt").catch(() => {});
+  await t.until(() => D.coldopen.now().phase === "waiting", 12000, "the cold open's prompt").catch(() => {});
   await sleep(600);
   if (phone) {
     const b = $("coldopen-bolt");
