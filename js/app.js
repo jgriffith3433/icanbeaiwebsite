@@ -57,7 +57,7 @@ const ready = { model: false, frame: false, title: false, lights: false };
 /* The card does NOT wait for his 3 MB model: on a phone over Slow 4G that download alone kept it up past 20 s. He is hidden
    until the model is on (world.js), the card goes once the scripts, first frame, title and shader warm-up are in, and the
    model streams in behind the title (ready.model is kept for the record). */
-const maybeDone = () => { if (ready.frame && ready.title && ready.lights) loading.done(); };
+const maybeDone = () => { if (ready.frame && ready.title) loading.done(); }; // the shader warm-up (ready.lights) is not a gate: it carries on behind the title
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
@@ -90,8 +90,7 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
   const go = () => {
     const t0 = Date.now();
     const lightsDone = (how) => { if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
-    const cap = setTimeout(() => lightsDone("the 2.5 s cap"), 2500); // a slow GL compiles for 8 s: the card must not sit at a full bar for that
-    w.warmLights(8000).catch(() => {}).finally(() => { clearTimeout(cap); lightsDone("the warm-up"); });
+    w.warmLights(8000).catch(() => {}).finally(() => lightsDone("the warm-up")); // runs behind the title; the card no longer waits for it (2.5 s of a 4x-CPU phone's budget)
   };
   window.__warmLights = () => (function afterFrame() {
     if (window.day.now && window.day.now().frame) go(); else requestAnimationFrame(afterFrame);
