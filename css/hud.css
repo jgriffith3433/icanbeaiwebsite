@@ -274,6 +274,15 @@ html.cold-open .hud, html.cold-open .side, html.cold-open .hud-left, html.cold-o
 html.cold-open .control-btn, html.cold-open .control-hint, html.cold-open .public-toggle, html.cold-open .version-tag,
 html.cold-open .update-pill, html.cold-open .quality-btn, html.cold-open .voices-btn, html.cold-open .tutorial, html.cold-open .nb-btn,
 html.cold-open .ep-btn, html.cold-open .power-reticle, html.cold-open .pressure, html.cold-open #weather-btn, html.cold-open .mo-line, html.cold-open .nb-layer { visibility: hidden; }
+/* ---------- the first minute (js/coldopen.js): a new stranger reads almost nothing ----------
+   html.first-min stays on for ~56 s from the cold open's start (teach by doing: at most 40 words on screen in the first
+   minute). It keeps the ability bar's icons but hides the status card, tools, side panel, clocks, Charge/cooldown numbers,
+   the control hint and the episode offer; they come in afterwards. */
+html.first-min .hud, html.first-min .side, html.first-min .hud-left, html.first-min .control-btn, html.first-min .control-hint,
+html.first-min .public-toggle, html.first-min .version-tag, html.first-min .privacy-tag, html.first-min .update-pill,
+html.first-min .quality-btn, html.first-min .voices-btn, html.first-min .tutorial, html.first-min .nb-btn, html.first-min .ep-btn,
+html.first-min .pressure, html.first-min #weather-btn, html.first-min #episode-offer, html.first-min #episodes,
+html.first-min .abilitybar .et, html.first-min .abilitybar .cd, html.first-min .abilitybar .c { visibility: hidden; }
 .co-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); z-index: 37; }
 .co-bolt { position: fixed; right: var(--safe-r); bottom: calc(var(--safe-b) + 124px); z-index: 37; }
 .co-say { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); z-index: 37; }
