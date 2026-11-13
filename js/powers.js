@@ -1626,6 +1626,8 @@ html.touch-ui.in-control .side{display:none}
     abilities: abil,
     /** The opening's hooks: aim every bolt at {x,y,z} (null = back to the reticle); gate(fn(name, via) -> bool) (null = open). */
     aimAt(pt) { aimOverride = pt ? { x: pt.x, y: pt.y, z: pt.z } : null; return aimOverride; },
+    /* A one-off camera shake from outside (the results card's stamp): eased noise like a cast's, never over 0.28 s. */
+    kick(amount) { shake = Math.max(shake, Math.min(0.03, amount || 0)); return shake; },
     hitstop(sec) { hitstop = Math.max(hitstop, sec || 0); return hitstop; },
     gate(fn) { gateFn = typeof fn === "function" ? fn : null; return !!gateFn; },
     hold(on) {

@@ -387,7 +387,34 @@ html.touch-ui .ep-hud{width:min(420px,calc(100vw - 24px))}
 .ep-hud .prompt .g-ico{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
 .ep-hud h3{margin:0 0 4px;font-size:0.95rem;letter-spacing:.02em;font-family:Fraunces,Georgia,serif}
 .ep-hud .tag{margin:0 0 8px;color:rgba(231,238,248,.7);font-weight:500}
-.ep-hud ul{margin:0;padding:0;list-style:none}
+.ep-hud ul{display:none;margin:0;padding:0;list-style:none}
+.ep-hud .objective{display:flex;gap:8px;align-items:center;margin:2px 0 0;font:700 .95rem/1.25 Outfit,system-ui,sans-serif;color:#f6f1e8}
+.ep-hud .objective[hidden]{display:none}
+.ep-hud .objective .g-ico{flex:0 0 26px;width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(126,200,255,.6))}
+/* the results ceremony: dim + blur of the city, stats counting up, the stamp slamming */
+.ep-score.ceremony{background:rgba(6,8,14,var(--cer-dim,.72));-webkit-backdrop-filter:blur(var(--cer-blur,8px));backdrop-filter:blur(var(--cer-blur,8px));animation:cerIn .3s ease-out}
+@keyframes cerIn{from{background:rgba(6,8,14,0);-webkit-backdrop-filter:blur(0);backdrop-filter:blur(0)}}
+.ep-score.ceremony .breakdown li{transition:opacity .15s,transform .15s}
+.ep-score.ceremony .breakdown li.pend{opacity:0;transform:translateX(-14px)}
+.ep-score.ceremony .breakdown li.tick em{color:#ffe08a}
+.ep-score.ceremony:not(.stamped) .rank{opacity:0;transform:scale(3.2)}
+.ep-score.ceremony .rank.slam{animation:cerSlam .34s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes cerSlam{0%{opacity:0;transform:scale(3.2) rotate(-8deg)}60%{opacity:1;transform:scale(.92) rotate(1deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+.ep-score.ceremony.stamped .ep-panel{animation:cerJolt .3s linear}
+@keyframes cerJolt{0%,100%{transform:none}20%{transform:translate(4px,-5px)}45%{transform:translate(-4px,3px)}70%{transform:translate(2px,-2px)}}
+.ep-score .gradeline{margin:2px 0 8px;text-align:center;font:600 1.02rem/1.3 Outfit,system-ui,sans-serif;color:#f6f1e8;font-style:italic}
+.ep-score .beststamp{float:right;margin:-54px 4px 0 0;width:44px;text-align:center;font:800 1.7rem/1 Outfit,system-ui,sans-serif;opacity:.85}
+.ep-score .beststamp small{display:block;font:600 .55rem Outfit,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:rgba(246,241,232,.6)}
+.ep-score .beststamp img{width:34px;height:34px;object-fit:contain}
+.ep-score .ep-panel{max-height:calc(100dvh - 24px);overflow:auto}
+html.touch-ui .ep-score{align-items:flex-end;padding-bottom:max(14px,env(safe-area-inset-bottom))}
+html.touch-ui .ep-score .actions{flex-wrap:nowrap}
+html.touch-ui .ep-score .actions button{flex:1 1 0;min-height:56px;min-width:56px;font-size:1rem}
+html.touch-ui .ep-score .ep-panel{padding:14px 16px 12px}
+html.touch-ui .ep-score .ep-panel .rank{font-size:3rem}
+html.touch-ui .ep-score .forecast,html.touch-ui .ep-score .rankdetail{margin-bottom:4px}
+.ep-score .actions button:focus-visible{outline:3px solid #9fd4ff;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.ep-score.ceremony,.ep-score.ceremony .rank.slam,.ep-score.ceremony.stamped .ep-panel{animation:none}}
 .ep-hud li{display:flex;gap:8px;align-items:flex-start;margin:4px 0;color:rgba(231,238,248,.88)}
 .ep-hud li.done{color:#8dceb0;text-decoration:line-through}
 .ep-hud li i{flex:0 0 14px;font-style:normal}
@@ -501,7 +528,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   hud.id = "episode-hud";
   hud.className = "ep-hud";
   hud.hidden = true;
-  hud.innerHTML = `<div class="ep-card"><h3></h3><p class="tag"></p><ul></ul><div class="timer" hidden></div><div class="strain" hidden></div><div class="rankline" hidden></div><div class="pieceline" hidden></div><div class="cue" hidden></div><p class="prompt" hidden></p><button type="button" class="skip" hidden>Skip</button></div>`;
+  hud.innerHTML = `<div class="ep-card"><h3></h3><p class="tag"></p><p class="objective" hidden></p><ul></ul><div class="timer" hidden></div><div class="strain" hidden></div><div class="rankline" hidden></div><div class="pieceline" hidden></div><div class="cue" hidden></div><p class="prompt" hidden></p><button type="button" class="skip" hidden>Skip</button></div>`;
 
   const offer = document.createElement("div");
   offer.id = "episode-offer";
@@ -513,7 +540,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   scoreEl.id = "episode-score";
   scoreEl.className = "ep-score";
   scoreEl.hidden = true;
-  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="rank" hidden></p><p class="rankdetail" hidden></p><ul class="breakdown" hidden></ul><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><p class="unlockline" hidden></p><div class="actions"><button type="button" class="primary next">Next episode</button><button type="button" class="replay">Replay</button><button type="button" class="ok">OK</button></div><p class="nextline" hidden></p></div>`;
+  scoreEl.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="rank" hidden></p><div class="beststamp" hidden></div><p class="gradeline" hidden></p><p class="rankdetail" hidden></p><ul class="breakdown" hidden></ul><p class="forecast"></p><p class="detail"></p><p class="strainline" hidden></p><p class="bestline"></p><p class="unlockline" hidden></p><div class="actions"><button type="button" class="primary next">Next episode</button><button type="button" class="replay">Replay</button><button type="button" class="ok">OK</button></div><p class="nextline" hidden></p></div>`;
 
   const endEl = document.createElement("div");
   endEl.id = "ending-card";
@@ -565,6 +592,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   const hudTitle = hud.querySelector("h3");
   const hudTag = hud.querySelector(".tag");
   const hudList = hud.querySelector("ul");
+  const hudObjective = hud.querySelector(".objective");
   const hudTimer = hud.querySelector(".timer");
   const hudCue = hud.querySelector(".cue");
   hudCue.innerHTML = `<b class="cn"></b><i class="bar"><b></b></i><span class="cj"></span>`;
@@ -587,6 +615,8 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   const scoreBest = scoreEl.querySelector(".bestline");
   const scoreStrain = scoreEl.querySelector(".strainline");
   const scoreRank = scoreEl.querySelector(".rank");
+  const scoreGrade = scoreEl.querySelector(".gradeline");
+  const scoreBestStamp = scoreEl.querySelector(".beststamp");
   const scoreRankDetail = scoreEl.querySelector(".rankdetail");
   const scoreBreak = scoreEl.querySelector(".breakdown");
   const scoreUnlock = scoreEl.querySelector(".unlockline");
@@ -969,6 +999,27 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     return run.goals.find((g) => !g.done) || null;
   }
 
+  /* The one objective line: the goal he is on now, its verb's icon, no key letters (the list above it is hidden). */
+  function paintObjective(art) {
+    const g = active && !active.ep.tutorial ? active.goals.find((x) => !x.done && !x.failed && afterMet(x, active)) : null;
+    hudObjective.hidden = !g;
+    hudObjective.textContent = "";
+    if (!g) return;
+    const verb = art && art.goalVerb ? art.goalVerb(g, active.ep.pieces) : g.power || null;
+    if (verb && art && art.verbIcon) {
+      const ico = document.createElement("img");
+      ico.className = "g-ico";
+      ico.alt = "";
+      ico.src = art.verbIcon(verb, true);
+      hudObjective.appendChild(ico);
+    }
+    let text = g.label || g.id;
+    if (art && art.stripKeyLetters) text = art.stripKeyLetters(text);
+    const need = g.count | 0;
+    if (need > 1) text += ` (${Math.min(need, g.progress | 0)}/${need})`;
+    else if (g.seconds) text += ` (${Math.min(g.seconds, Math.floor(g.progress || 0))}/${g.seconds} s)`;
+    hudObjective.append(document.createTextNode(text));
+  }
   function paintHud() {
     if (!active) {
       hud.hidden = true;
@@ -1007,6 +1058,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       li.append(markEl, label);
       hudList.appendChild(li);
     });
+    paintObjective(art);
     if (active.ep.timer && !active.show) {
       hudTimer.hidden = false;
       const sec = Math.max(0, Math.ceil(active.left));
@@ -2209,6 +2261,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     scoreUnlock.textContent = unlocked ? (scoring.unlockLine || "Challenge unlocked. Find it in the Episodes menu.") : "";
     paintScoreButtons(why);
     scoreEl.hidden = false;
+    startCeremony(card, run.ep.id, b && b.rank);
     if (run.ep.finale && run.ep.finale.closing && run.show && run.show.started && (why === "clear" || why === "time")) {
       pendingClosing = { rank: card.rank, points: card.points, hits: run.show.hits, of: run.show.cues.length, perfect: run.show.perfect, best: run.show.best, max: sb.max, closing: run.ep.finale.closing };
       closeAuto = run.ep.finale.closeAfter != null ? run.ep.finale.closeAfter : 9;
@@ -2277,6 +2330,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   }
   function hideScore() {
     scoreEl.hidden = true;
+    cerClear();
     closeAuto = 0;
     if (pendingEnding) {
       const pe = pendingEnding;
@@ -2658,6 +2712,209 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     }
   }
 
+  /* ---- world markers: every target of the goal he is on stands in the world as a soft beam, a ring and the verb's icon ---- */
+  const MK = { nodes: new Map(), mat: null, tex: {}, last: [], t: 0 };
+  const MK_BEAM_H = 46; // tall enough to read from 30 m and over the rooftops
+  function markMat() {
+    if (MK.mat) return MK.mat;
+    const m = new B.StandardMaterial("ep-mark", world.scene);
+    m.disableLighting = true;
+    m.emissiveColor = new B.Color3(0.45, 0.85, 1);
+    m.alpha = 0.22;
+    m.backFaceCulling = false;
+    m.fogEnabled = false;
+    m.disableDepthWrite = true;
+    return (MK.mat = m);
+  }
+  function iconMat(url) {
+    if (MK.tex[url]) return MK.tex[url];
+    const t = new B.Texture(url, world.scene);
+    t.hasAlpha = true;
+    const m = new B.StandardMaterial("ep-mark-ico", world.scene);
+    m.disableLighting = true;
+    m.emissiveTexture = t;
+    m.opacityTexture = t;
+    m.emissiveColor = new B.Color3(1, 1, 1);
+    m.backFaceCulling = false;
+    m.fogEnabled = false;
+    return (MK.tex[url] = m);
+  }
+  /* Where each unmet, unlocked goal's targets are: zone rect centres, reach spots, the stranded in the current piece, the plaza for the show. */
+  function goalTargets(run) {
+    const out = [];
+    const zones = run.ep.zones || {};
+    const art = window.uiArt || (window.day && window.day.uiArt);
+    run.goals.forEach((g) => {
+      if (g.done || g.failed || !afterMet(g, run)) return;
+      const verb = art && art.goalVerb ? art.goalVerb(g, run.ep.pieces) : g.power || null;
+      const at = (key, x, z, r, y) => out.push({ key: g.id + ":" + key, goal: g.id, verb, x, z, r: Math.max(2.2, Math.min(12, r)), y: y || 0 });
+      if (g.kind === "help" && run.rescue && run.rescue.def && run.rescue.def.id === g.piece) {
+        run.rescue.people.forEach((p, i) => { if (!p.helped) at("p" + i, p.x, p.z, 2.4, p.y); });
+      } else if (g.kind === "reach") {
+        let x = g.x, z = g.z;
+        if (g.spot) { const s = spotOf(g.spot); if (s) { x = s.x; z = s.z; } }
+        if (x != null) at("reach", x, z, g.r != null ? g.r : 5);
+      } else if (g.zone && zones[g.zone] && zones[g.zone].rect) {
+        const r = zones[g.zone].rect;
+        at("zone", (r[0] + r[2]) / 2, (r[1] + r[3]) / 2, Math.max(r[2] - r[0], r[3] - r[1]) / 2);
+      } else if ((g.kind === "show-hits" || g.kind === "show-variety" || g.kind === "show-end") && zones.plaza && zones.plaza.rect) {
+        const r = zones.plaza.rect;
+        at("show", (r[0] + r[2]) / 2, (r[1] + r[3]) / 2, 9);
+      }
+    });
+    return out;
+  }
+  function dropMark(n) {
+    ["ring", "beam", "icon"].forEach((k) => { try { n[k].dispose(); } catch (e) { /* gone */ } });
+  }
+  function markTick(dt) {
+    if (!B || !world || !world.scene) return;
+    const want = active && !momentOn() ? goalTargets(active) : [];
+    MK.t += dt;
+    const keys = new Set(want.map((w) => w.key));
+    MK.nodes.forEach((n, k) => { if (!keys.has(k)) { dropMark(n); MK.nodes.delete(k); } });
+    const A = abil();
+    const pos = playerPos();
+    const art = window.uiArt || (window.day && window.day.uiArt);
+    MK.last = want.map((w) => {
+      let n = MK.nodes.get(w.key);
+      const y = Math.max(w.y || 0, world.surfaceAt ? world.surfaceAt(w.x, w.z) : 0);
+      if (!n) {
+        const mat = markMat();
+        const ring = B.MeshBuilder.CreateTorus("ep-mark-ring", { diameter: 2, thickness: 0.08, tessellation: 40 }, world.scene);
+        const beam = B.MeshBuilder.CreateCylinder("ep-mark-beam", { diameter: 1, height: MK_BEAM_H, tessellation: 14, subdivisions: 1 }, world.scene);
+        const icon = B.MeshBuilder.CreatePlane("ep-mark-icon", { size: 3.4 }, world.scene);
+        icon.billboardMode = B.Mesh.BILLBOARDMODE_ALL;
+        [ring, beam, icon].forEach((m) => { m.isPickable = false; m.alphaIndex = 20; });
+        ring.material = beam.material = mat.clone("ep-mark-" + w.key);
+        beam.material.alpha = 0.2;
+        icon.material = null;
+        n = { ring, beam, icon, ico: null };
+        MK.nodes.set(w.key, n);
+      }
+      const url = w.verb && art && art.verbIcon ? art.verbIcon(w.verb, true) : null;
+      if (url && n.ico !== url) { try { n.icon.material = iconMat(url); n.ico = url; } catch (e) { /* no icon */ } }
+      n.icon.setEnabled(!!(url && n.icon.material));
+      const ab = w.verb && A && A.get ? A.get(w.verb === "sun" ? "sunbreak" : w.verb) : null;
+      const ready = !ab || (ab.ready !== false && !ab.locked);
+      const k = ready ? 0.5 + 0.5 * Math.sin(MK.t * 6) : 0;
+      const sc = w.r * (1 + 0.1 * k);
+      n.ring.position.set(w.x, y + 0.08, w.z);
+      n.ring.scaling.set(sc / 1, 1, sc / 1);
+      n.ring.rotation.x = 0;
+      n.beam.position.set(w.x, y + MK_BEAM_H / 2, w.z);
+      n.beam.scaling.set(Math.min(w.r, 3) * 0.9, 1, Math.min(w.r, 3) * 0.9);
+      n.beam.material.alpha = ready ? 0.2 + 0.2 * k : 0.14;
+      n.ring.material.alpha = ready ? 0.55 + 0.4 * k : 0.35;
+      n.icon.position.set(w.x, y + 11 + 0.4 * Math.sin(MK.t * 2 + w.x), w.z);
+      n.icon.scaling.setAll(ready ? 1 + 0.15 * k : 0.9);
+      return { goal: w.goal, verb: w.verb, x: w.x, z: w.z, y, radius: w.r, height: MK_BEAM_H, iconY: 11, ready, pulse: +k.toFixed(2), dist: pos ? +Math.hypot(pos.x - w.x, pos.z - w.z).toFixed(1) : null };
+    });
+  }
+
+  /* ---- the results ceremony: dim and blur the city, count the stats up one by one with ticks, slam the rank stamp (thud,
+     camera shake), and Small Weather says the grade. Numbers in `episodes.scoring.ceremony`, lines in `scoring.grade`. ---- */
+  const CER = Object.assign({ dim: 0.72, blurPx: 8, rowGap: 0.42, rowSecs: 0.36, stampAt: 0.5, shake: 0.02, bestScale: 0.42 }, scoring.ceremony || {});
+  const gradeLines = scoring.grade || {};
+  const lastGrade = {};
+  let cer = null; // { rows, stamped, rank, timers, count }
+  function cerClear() {
+    if (cer) cer.timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
+    cer = null;
+    scoreEl.classList.remove("ceremony", "stamped");
+    scoreRank.classList.remove("slam");
+  }
+  function primaryButton() {
+    return [scoreNext, scoreReplay, scoreOk].find((b) => !b.hidden && !b.disabled) || scoreOk;
+  }
+  function cerRow(li, i) {
+    li.classList.remove("pend");
+    li.classList.add("tick");
+    setTimeout(() => li.classList.remove("tick"), 220);
+    const em = li.querySelector("em");
+    const bar = li.querySelector("b");
+    const [pts, max] = String(em.dataset.final || em.textContent).split("/").map(Number);
+    bar.style.width = li.dataset.fill;
+    cer.shown++;
+    emit("stat-tick", { row: li.dataset.part, index: i, points: pts });
+    const t0 = performance.now();
+    const iv = setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / (CER.rowSecs * 1000));
+      em.textContent = `${Math.round(pts * k)}/${max}`;
+      if (k >= 1) clearInterval(iv);
+    }, 40);
+    cer.timers.push(iv);
+  }
+  function cerSlam() {
+    if (!cer || cer.stamped) return;
+    cer.stamped = true;
+    const rank = cer.rank;
+    scoreEl.classList.add("stamped");
+    scoreRank.classList.add("slam");
+    emit("stamp", { rank, id: cer.id, thud: true, stats: cer.shown });
+    try { if (day.powers && day.powers.kick) day.powers.kick(CER.shake); if (day.powers && day.powers.hitstop) day.powers.hitstop(0.05); } catch (e) { /* no powers */ }
+    const pool = gradeLines[rank] || [];
+    if (pool.length) {
+      const pick = pool.filter((t) => t !== lastGrade[rank]);
+      const text = (pick.length ? pick : pool)[Math.floor(Math.random() * (pick.length || pool.length))];
+      lastGrade[rank] = text;
+      scoreGrade.hidden = false;
+      scoreGrade.textContent = `“${text}”`;
+      cer.line = text;
+      storyEvent("say", { who: "He", text, grade: rank });
+      emit("grade-line", { rank, text, id: cer.id });
+    }
+    if (cer.best) {
+      scoreBestStamp.hidden = false;
+      const art = window.uiArt || (window.day && window.day.uiArt);
+      scoreBestStamp.innerHTML = `<small>${L.best}</small>` + (art && art.rankStamp ? `<img alt="${cer.best}" src="${art.rankStamp(cer.best)}">` : `<b>${cer.best}</b>`);
+    }
+    const btn = primaryButton();
+    btn.classList.add("primary");
+    try { btn.focus({ preventScroll: true }); } catch (e) { /* hidden */ }
+  }
+  function cerSkip() {
+    if (!cer || cer.stamped) return;
+    cer.timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
+    [...scoreBreak.children].forEach((li, i) => {
+      if (li.classList.contains("pend")) { li.classList.remove("pend"); cer.shown++; emit("stat-tick", { row: li.dataset.part, index: i, skipped: true }); }
+      const em = li.querySelector("em");
+      em.textContent = em.dataset.final;
+      li.querySelector("b").style.width = li.dataset.fill;
+    });
+    cerSlam();
+  }
+  function startCeremony(card, id, bestRank) {
+    cerClear();
+    const lis = [...scoreBreak.children];
+    lis.forEach((li) => {
+      const bar = li.querySelector("b");
+      const em = li.querySelector("em");
+      li.dataset.fill = bar.style.width;
+      em.dataset.final = em.textContent;
+      bar.style.width = "0%";
+      em.textContent = `0/${em.textContent.split("/")[1]}`;
+      li.classList.add("pend");
+    });
+    scoreGrade.hidden = true;
+    scoreBestStamp.hidden = true;
+    scoreEl.style.setProperty("--cer-dim", String(CER.dim));
+    scoreEl.style.setProperty("--cer-blur", CER.blurPx + "px");
+    scoreEl.classList.add("ceremony");
+    cer = { rank: card.rank || "C", id, best: bestRank || null, shown: 0, stamped: false, timers: [], line: null };
+    lis.forEach((li, i) => cer.timers.push(setTimeout(() => cerRow(li, i), (0.25 + i * CER.rowGap) * 1000)));
+    cer.timers.push(setTimeout(cerSlam, (0.25 + lis.length * CER.rowGap + CER.stampAt) * 1000));
+    // the buttons are usable from the first frame; Enter or a tap on the card skips to the stamp, then Enter presses the focused one
+    try { primaryButton().focus({ preventScroll: true }); } catch (e) { /* hidden */ }
+  }
+  document.addEventListener("keydown", (e) => {
+    if (scoreEl.hidden || (e.key !== "Enter" && e.key !== " ")) return;
+    if (cer && !cer.stamped) { e.preventDefault(); e.stopPropagation(); cerSkip(); return; }
+    const f = document.activeElement;
+    if (e.key === "Enter" && !(f && scoreEl.contains(f) && f.tagName === "BUTTON")) { e.preventDefault(); e.stopPropagation(); primaryButton().click(); }
+  }, true);
+  scoreEl.addEventListener("pointerdown", (e) => { if (cer && !cer.stamped && !e.target.closest("button")) cerSkip(); });
+
   /* ---- tick (through world.update wrap) ---- */
   let lastWall = performance.now();
   function tick() {
@@ -2669,6 +2926,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       if (sayLeft <= 0) nextSay();
     }
     animateStory(dt);
+    try { markTick(dt); } catch (err) { console.error("[episodes] marks", err); }
     if (closeAuto > 0) {
       closeAuto -= dt;
       if (closeAuto <= 0 && !scoreEl.hidden && pendingClosing) hideScore();
@@ -2771,6 +3029,9 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       };
     },
     stage: () => (stage ? stage.info() : null),
+    marks: () => MK.last.slice(),
+    ceremony: () => ({ on: !!cer, stamped: !!(cer && cer.stamped), stats: cer ? cer.shown : 0, rank: cer ? cer.rank : null, line: cer ? cer.line : null, rows: scoreBreak.children.length, shown: !scoreEl.hidden, buttons: [scoreNext, scoreReplay].filter((b) => !b.hidden).map((b) => { const r = b.getBoundingClientRect(); return { name: b.className, h: Math.round(r.height), w: Math.round(r.width), bottom: Math.round(r.bottom) }; }), focus: (document.activeElement && document.activeElement.className) || "", panel: (() => { const r = (scoreEl.querySelector(".ep-panel") || scoreEl).getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), w: Math.round(r.width), vw: window.innerWidth, vh: window.innerHeight }; })() }),
+    gradeLines: () => JSON.parse(JSON.stringify(gradeLines)),
     closing: () => ({ shown: !closeEl.hidden, rank: closeEl.dataset.rank || null, ending: closeEl.dataset.ending || null, pending: !!pendingClosing, fared: [...closeEl.querySelectorAll(".fared li")].map((li) => li.dataset.need + ":" + li.className), neighbors: [...closeEl.querySelectorAll(".neighbors li")].map((li) => li.dataset.neighbor) }),
     credits: () => ({
       shown: !creditsEl.hidden,

@@ -1423,6 +1423,15 @@ window.DAY_CONFIG = {
       ],
       names: { people: "People helped", time: "Time left", damage: "Damage avoided", variety: "Ability variety" },
       unlockLine: "Challenge unlocked. Find it in the Episodes menu.",
+      /* The results ceremony (js/episodes.js "the results ceremony"): stats count up one by one, the rank stamp slams,
+         and Small Weather says one of these for the grade (He lines, first person, his DoD voice: audio/dialogue). */
+      ceremony: { dim: 0.72, blurPx: 8, rowGap: 0.42, rowSecs: 0.36, stampAt: 0.5, shake: 0.55, bestScale: 0.42 },
+      grade: {
+        S: ["That's the one. Remember that sky.", "Clean. The whole district felt that."],
+        A: ["Good calls, mostly. I'll take it.", "Solid. The sky owes me nothing."],
+        B: ["Held together. Barely.", "Could've been cleaner. Could've been worse."],
+        C: ["Rough. The sky won that round.", "Okay. Next time I listen first."],
+      },
     },
     /* The Challenge (unlocks after the first clear of an episode): timer x `timer`, Sky budget + `budget`, and
        each episode's own `challenge.extra` people in its set pieces. Best rank is kept apart, as `<id>#challenge`. */
