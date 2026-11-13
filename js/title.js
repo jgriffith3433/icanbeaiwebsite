@@ -37,6 +37,7 @@ export function startTitle() {
   const html = document.documentElement;
 
   let quiet = false;
+  let autoTimer = 0;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
     if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches") quiet = true;
@@ -69,7 +70,8 @@ export function startTitle() {
 .title-screen button.play:hover{background:#f6d39b;transform:translateY(-1px)}
 .title-screen .row button{flex:0 1 auto}
 .title-screen button[aria-pressed="false"]{color:rgba(246,241,232,.6)}
-.title-screen .hint{font-size:.78rem;color:rgba(246,241,232,.55);min-height:1.1em}
+.title-screen .hint{font-size:.88rem;font-weight:600;letter-spacing:.04em;color:#f6f1e8;min-height:1.1em;padding:6px 14px;border-radius:999px;background:rgba(10,13,22,.62);text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .hint:empty{display:none}
 .title-screen .tset{width:min(92vw,360px);margin:0;padding:10px;border-radius:16px;background:rgba(10,13,22,.82);border:1px solid rgba(246,241,232,.22);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .title-screen .tset[hidden]{display:none}
 .title-screen .tset .settings-pop{position:static;margin:0;padding:0;align-items:stretch}
@@ -270,6 +272,10 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     clockTimer = setInterval(paintClock, 1000); // the clock text only: no fetches
     try { playBtn.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
     emit("show", { via: via || "load" });
+    clearTimeout(autoTimer);
+    if (!quiet && via === "load" && cfg.autoStart && cfg.autoStart.secs > 0 && day.coldopen && day.coldopen.pending()) {
+      autoTimer = setTimeout(() => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); }, cfg.autoStart.secs * 1000);
+    }
     return true;
   }
   function hide(action, via) {
@@ -292,10 +298,14 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
 
   function play(via) {
     if (!up) return false;
-    if (musicWanted) setSound(true);
+    clearTimeout(autoTimer);
+    const auto = via === "auto";
+    if (musicWanted && !auto) setSound(true); // no gesture yet on an auto-start: the browser would refuse
+    const craneDone = (performance.now() - shownAt) / 1000 >= ((cfg.crane && cfg.crane.secs) || 7);
     hide("play", via);
     // A new player's first Play is the cold open (js/coldopen.js): he is the player's in this same click, on the roof.
-    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via, { fromTitle: true })) return true;
+    // An auto-start cuts the crane short, so it takes the wide push-in instead of the dive from the crane's last pose.
+    if (day.coldopen && day.coldopen.pending() && day.coldopen.start(via, { fromTitle: !auto || craneDone })) return true;
     // A first Play opens with js/opening.js (skippable); it takes control when it ends.
     if (day.opening && day.opening.pending()) return day.opening.start(via) || true;
     // The page's own Take control button, so it counts as a button press. He can't be taken while driving:
@@ -310,6 +320,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   }
   function episodes(via) {
     if (!up) return false;
+    clearTimeout(autoTimer);
     if (musicWanted) setSound(true);
     hide("episodes", via);
     const menuBtn = document.getElementById("episodes");
@@ -346,6 +357,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     episodes,
     quiet() {
       quiet = true;
+      clearTimeout(autoTimer);
       if (up) {
         up = false;
         clearInterval(clockTimer);
