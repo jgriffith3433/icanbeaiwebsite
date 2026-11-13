@@ -119,10 +119,14 @@ function glass(u, v) {
   return { r: c.r, g: c.g, b: c.b, h: mullion ? 0.6 : 0.15 + n * 0.08 };
 }
 function roof(u, v) {
+  /* Flat tar membrane in broad strips: soft low-frequency mottling and a seam per strip. The old fine grain turned
+     into streaky "fur" on a roof seen at a grazing angle, so there is almost no height detail left. */
   const n = fbm(u + 1, v + 3);
-  const grain = noise(u, v, 12);
-  const c = lerpRgb(rgb(28, 32, 40), rgb(40, 46, 56), n * 0.65 + grain * 0.35);
-  return { r: c.r, g: c.g, b: c.b, h: 0.35 + n * 0.2 + grain * 0.1 };
+  const strip = wrap01(u * 4);
+  const seam = strip < 0.025 || strip > 0.985;
+  const c = lerpRgb(rgb(30, 35, 44), rgb(40, 46, 57), n * 0.8);
+  const k = seam ? 0.72 : 1;
+  return { r: c.r * k, g: c.g * k, b: c.b * k, h: seam ? 0.3 : 0.5 + n * 0.04 };
 }
 function park(u, v) {
   const n = fbm(u + 8, v);
@@ -172,7 +176,8 @@ function tileBox(mesh, tile) {
   const r = mesh.rotation;
   const plain = !mesh.rotationQuaternion && !mesh.parent && (!r || (!r.x && !r.y && !r.z));
   const o = plain ? mesh.position : { x: 0, y: 0, z: 0 };
-  const sc = plain && mesh.scaling ? mesh.scaling : { x: 1, y: 1, z: 1 };
+  // A scaled mesh keeps its scale in the UVs too, else its texture stretches along the scaled axis.
+  const sc = mesh.scaling || { x: 1, y: 1, z: 1 };
   for (let i = 0, k = 0; i < pos.length; i += 3, k += 2) {
     const x = pos[i] * sc.x + o.x;
     const y = pos[i + 1] * sc.y + o.y;
@@ -314,7 +319,7 @@ export function installLook(world) {
     concrete: pbr("concrete", maps.concrete, { roughness: 0.86, wet: true, coat: 0.38, bump: 0.32 }),
     brick: pbr("brick", maps.brick, { roughness: 0.88, bump: 0.65 }),
     glass: pbr("glass", maps.glass, { metallic: 0.35, roughness: 0.24, wet: true, coat: 0.45, bump: 0.2 }),
-    roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.35 }),
+    roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.12 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
@@ -356,7 +361,7 @@ export function installLook(world) {
     }, scene);
     slab.position.set(b.x, b.h - 0.02, b.z);
     slab.isPickable = false;
-    dress(slab, mats.roof, 2.8);
+    dress(slab, mats.roof, 4.2);
     ["ps", "pn", "pn1", "pn2", "pw", "pe"].forEach((suffix) => {
       const lip = scene.getMeshByName(b.id + suffix);
       if (lip) dress(lip, mats.roof, 2.0);

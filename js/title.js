@@ -51,10 +51,10 @@ export function startTitle() {
 .title-screen .top,.title-screen .bottom{display:flex;flex-direction:column;align-items:center;width:100%}
 .title-screen .logo{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;line-height:.9;opacity:0;transform:translateY(-8px);animation:t-in 1.2s ease 2.4s forwards}
 .title-screen .logo img{display:block;width:min(82vw,560px);height:auto;filter:drop-shadow(0 6px 28px rgba(0,0,0,.6))}
-.title-screen .logo .l1{font:600 clamp(.95rem,3.4vw,1.5rem)/1 Outfit,system-ui,sans-serif;letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#7ec8ff;text-shadow:0 0 20px rgba(126,200,255,.65)}
-.title-screen .logo .l2{margin-top:6px;font:700 clamp(4.4rem,17vw,9rem)/.9 Fraunces,Georgia,serif;letter-spacing:.02em;color:transparent;background:linear-gradient(100deg,#dcefff 0%,#9fd2ff 38%,#fff 50%,#9fd2ff 62%,#6aa9ee 100%) 140% 0/260% 100% no-repeat;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 26px rgba(40,90,170,.7));animation:t-glint 5.2s ease-in-out 3.4s infinite}
-.title-screen .logo.zap img{filter:drop-shadow(0 0 26px rgba(160,210,255,.95)) brightness(1.35)}
-.title-screen .logo.zap .l2{filter:drop-shadow(0 0 30px rgba(170,215,255,.95)) brightness(1.4)}
+.title-screen .logo .l1{font:600 clamp(.95rem,3.4vw,1.5rem)/1 Fraunces,Georgia,serif;letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#f0c27a;text-shadow:0 0 20px rgba(240,194,122,.55)}
+.title-screen .logo .l2{margin-top:6px;font:700 clamp(4.4rem,17vw,9rem)/.9 Fraunces,Georgia,serif;letter-spacing:.02em;color:transparent;background:linear-gradient(100deg,#f6dcaa 0%,#f0c27a 38%,#fff6e2 50%,#f0c27a 62%,#d9a24f 100%) 140% 0/260% 100% no-repeat;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 26px rgba(120,70,10,.6));animation:t-glint 5.2s ease-in-out 3.4s infinite}
+.title-screen .logo.zap img{filter:drop-shadow(0 0 26px rgba(255,214,150,.95)) brightness(1.35)}
+.title-screen .logo.zap .l2{filter:drop-shadow(0 0 30px rgba(255,220,160,.95)) brightness(1.4)}
 @keyframes t-in{to{opacity:1;transform:none}}
 @keyframes t-glint{0%,55%{background-position:140% 0}85%,100%{background-position:-40% 0}}
 .title-screen .daily{margin:14px 0 0;max-width:30em;color:#f0c27a;font:600 1rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
