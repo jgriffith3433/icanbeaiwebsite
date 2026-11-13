@@ -10464,6 +10464,14 @@ async function titleKeyArt(options, t) {
   t.metric("titleButtons", buttons.length);
   t.event("title-buttons", buttons.map((b) => b.textContent.trim()).join(" | ") + (tn.daily ? ` + ${tn.daily}` : ""));
   if (buttons.length > 4) t.problem("bug", `The title shows ${buttons.length} buttons (4 at most)`);
+  const mb = $("title-music"), mbb = mb && boxOf(mb);
+  if (mbb) {
+    const lh = parseFloat(getComputedStyle(mb).lineHeight) || 20;
+    t.metric("titleMusicPillH", Math.round(mbb.height));
+    t.event("title-pill", `"${mb.textContent.trim()}" ${Math.round(mbb.width)}x${Math.round(mbb.height)}, scrollW ${document.documentElement.scrollWidth} of ${innerWidth}`);
+    if (mbb.height > Math.max(lh * 2 + 8, 70)) t.problem("bug", "The title's Music pill wraps to two lines");
+    if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The title scrolls sideways");
+  }
   const pb = boxOf(play), lb = boxOf(logo);
   if (!pb || !lb) t.problem("blocker", "No Play button or logo on the title");
   else {
