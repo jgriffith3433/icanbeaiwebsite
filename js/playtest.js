@@ -10420,6 +10420,45 @@ async function stemScore(options, t) {
   t.progress(1);
 }
 
+/* ---------------- title-progress: the title shows episode progress and Continue's next goal ----------------
+   Needs ?playtest=title-progress. Setup (named): icanbe.* cleared, a returning player's save (opening seen, "Clear the sky" finished at rank A).
+   Real input: a tap (touch) or click on Play. Events title-progress / title-next / title-progress-phone; metrics titleProgressStars, titleProgressTapMin. */
+async function titleProgress(options, t) {
+  t.scene("Title progress");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day;
+  if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  window.localStorage.setItem("icanbe.opening", "seen");
+  window.localStorage.setItem("icanbe.episodes.best", JSON.stringify({ morning: { pct: 80, rank: "A", cleared: true, done: true, when: Date.now() } }));
+  D.title.show("playtest");
+  await sleep(4200);
+  const tn = D.title.now();
+  t.event("title-progress", `"${tn.progress}" ${innerWidth}x${innerHeight}`);
+  if (!tn.progress) t.problem("bug", "The title shows no episode progress (stars or episodes finished)");
+  t.event("title-next", `Play "${tn.continueLabel}", goal "${tn.next}"`);
+  if (tn.continueLabel !== "Continue") t.problem("bug", "A returning player's Play isn't Continue");
+  if (!/^Next: \S/.test(tn.next)) t.problem("bug", "Continue has no named next goal under it");
+  const prog = $("title-prog"), nx = $("title-next"), play = $("title-play"), el = $("title");
+  const bp = prog && boxOf(prog), bn = nx && boxOf(nx), bb = play && boxOf(play);
+  if (!bp || !bn || !bb) t.problem("bug", "The progress line, next goal or Play isn't visible on the title");
+  else {
+    t.event("title-progress-phone", `progress ${Math.round(bp.top)}..${Math.round(bp.bottom)}, next ${Math.round(bn.top)}..${Math.round(bn.bottom)}, Play ${Math.round(bb.width)}x${Math.round(bb.height)}, scrollW ${document.documentElement.scrollWidth} of ${innerWidth}`);
+    if (bn.bottom > bb.top + 2) t.problem("bug", "The next goal overlaps Play");
+    if (bp.right > innerWidth || bp.left < 0 || bn.right > innerWidth || bn.left < 0) t.problem("bug", "The progress or next-goal line runs off the screen");
+    if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The title scrolls sideways");
+    const small = [...el.querySelectorAll("button")].map((b) => ({ b, r: boxOf(b) })).filter((x) => x.r && (x.r.height < 44 || x.r.width < 44));
+    t.metric("titleProgressSmallTargets", small.length);
+    if (small.length) t.problem("bug", `${small.length} title control(s) under 44 px`);
+  }
+  t.metric("titleProgressStars", (tn.progress.match(/★/g) || []).length);
+  const touch = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
+  if (touch) await tapEl(play); else play.click();
+  await t.until(() => !D.title.showing(), 8000, "the title to close on Play").catch(() => {});
+  t.event("title-progress-play", `title closed: ${!D.title.showing()}`);
+  t.progress(1);
+}
+
 /* ---------------- title-key-art: the crane, the logo, the storm, Play dives into the cold open ----------------
    Needs ?playtest=title-key-art. Setup (named): every icanbe.* key cleared, the cold open armed, the title up. Real input: a tap (touch) or click
    on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleSecondsToControl, titleBlackFrames,
@@ -11661,6 +11700,7 @@ installPlaytest({
     { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
     { id: "street-teaches", title: "The street teaches: after the cold open's bolt, Rain, Sun break, Fog and Wind each unlock on a neighbor's voiced ask (Birdie, Dex, Ines) with a cue on the target, a glow, a vibrate and a voiced thanks, and no text card", seconds: 330, tags: ["first-minute", "phone", "voice", "neighbors", "abilities"], description: "Load with ?playtest=street-teaches. Setup: every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate recorded. Real input: Play, the bolt's hold, then keys (taps on the thumb arc and the stick on a phone) to answer each neighbor in turn. Events street-ask / -unlock / -arc / -cast / -thanks / -done / -practice; metrics secondsToRain, secondsToSun, secondsToFog, secondsToWind, secondsToAllFive. Run at 1280x720 and 390x844 touch." },
+    { id: "title-progress", title: "Title progress: the title shows stars and episodes finished, and Continue names the next goal (Next: Part 1: Dry); fits 390x844 with 44 px targets and no sideways scroll", seconds: 25, tags: ["title", "retention", "phone"], description: "Load with ?playtest=title-progress. Setup: icanbe.* cleared, a returning save (opening seen, Clear the sky finished at rank A). Real input: a click (a tap on a phone) on Continue. Events title-progress / title-next / title-progress-phone / title-progress-play; metrics titleProgressStars, titleProgressSmallTargets. Run at 1280x720 and 390x844 touch." },
     { id: "title-key-art", title: "Title key art: a slow crane over the district at the real time of day lands on Small Weather on the apartment roof under a forming storm with glints every few seconds, the logo lockup on top (Play 56 px+, logo and him above the fold at 390x844), at most 4 buttons; Play dives into the cold open with no cut, no black frame and control within 1 s", seconds: 45, tags: ["title", "first-minute", "phone", "audio"], description: "Load with ?playtest=title-key-art. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleButtons, titleSecondsToControl, titleBlackFrames. Run at 1280x720 and 390x844 touch." },
     { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, holds the bolt at the shop roof's rod within 30 s, and the street looks up and Birdie calls up in her voice, with under 25 words on screen before the first cast", seconds: 60, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (E held; the Bolt button held on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
@@ -11745,8 +11785,8 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
-      if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
+      if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "title-progress" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
@@ -11756,6 +11796,7 @@ installPlaytest({
       else if (id === "cold-start") await coldStart(options, t);
       else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "title-key-art") await titleKeyArt(options, t);
+      else if (id === "title-progress") await titleProgress(options, t);
       else if (id === "street-teaches") await streetTeaches(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
