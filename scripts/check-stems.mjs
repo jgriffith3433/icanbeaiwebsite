@@ -29,5 +29,10 @@ const rec = JSON.parse(fs.readFileSync(new URL("../hawkes.assets.json", import.m
 for (const id of ["music-stem-calm", "music-stem-tension", "music-stem-storm", "music-sting-resolution", "music-sting-failure"]) ok(rec.includes(id), `recipe ${id}`);
 // a file named in the config must exist (a 404 is a console error)
 for (const m of cfgSrc.matchAll(/stems:\s*\{[\s\S]*?files:\s*\{([^}]*)\}/g)) for (const f of m[1].matchAll(/"(audio\/[^"]+)"/g)) ok(fs.existsSync(new URL("../" + f[1], import.meta.url)), `file ${f[1]} exists`);
+const stemsSrc = fs.readFileSync(new URL("../js/stems.js", import.meta.url), "utf8");
+ok(/fetch\(url,\s*\{\s*priority:\s*"low"\s*\}\)/.test(stemsSrc), "stems fetch with low priority");
+ok(!/window\.addEventListener\("day:control",\s*\(\)\s*=>\s*\{\s*S\.firstInput\s*=\s*true/.test(stemsSrc), "day:control does not start stem fetches before the first cast");
+const scoreSrc = fs.readFileSync(new URL("../js/score.js", import.meta.url), "utf8");
+ok(!/loadUrl\(c\.sting\)\.then/.test(scoreSrc), "sting() does not fetch take-control.mp3 on take control");
 if (bad) process.exit(1);
 console.log("stems ok");

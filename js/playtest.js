@@ -10863,12 +10863,16 @@ function audioReport() {
   const D = window.day;
   const A = D.audio && D.audio.info ? D.audio.info() : null;
   const S = D.score && D.score.now ? D.score.now() : null;
+  const ST = D.stems && D.stems.now ? D.stems.now() : null;
   const X = D.sfx && D.sfx.info ? D.sfx.info() : null;
   const btn = $("sound");
   const amb = {};
   if (S) Object.keys(S.amb || {}).forEach((k) => { if ((S.amb[k] || 0) > 0.01) amb[k] = S.amb[k]; });
   const music = {};
   if (S) Object.keys(S.music || {}).forEach((k) => { if ((S.music[k] || 0) > 0.01) music[k] = S.music[k]; });
+  if (ST && ST.stems && ST.layers) {
+    Object.keys(ST.layers).forEach((k) => { if ((ST.layers[k].gain || 0) > 0.01) music["stem-" + k] = ST.layers[k].gain; });
+  }
   return {
     on: !!btn && btn.getAttribute("aria-pressed") === "true",
     unlocked: !!(A && A.unlocked) || !!(S && S.unlocked),
@@ -11095,6 +11099,21 @@ async function audioCheck(options, t) {
   t.progress(0.25);
 
   // The cold open (if it ran): he is on the roof with Rain armed; one real tap (the Rain button by touch, R on a keyboard) is the first cast
+  let musicMeasured = false;
+  async function checkMusicAfterCast() {
+    if (musicMeasured) return;
+    musicMeasured = true;
+    const tCast = performance.now();
+    const okMusic = await t.until(() => {
+      const r = audioReport();
+      return Object.keys(r.music).length > 0 && (r.buses.music || 0) > 0;
+    }, 5000, "music after the first cast").then(() => true).catch(() => false);
+    const secs = Math.round(((performance.now() - tCast) / 1000) * 100) / 100;
+    const r = audioReport();
+    t.metric("audioMusicAfterCastS", okMusic ? secs : -1);
+    t.event("audio-music-after-cast", okMusic ? `music audible ${secs}s after the first cast: ${JSON.stringify(r.music)} (bus ${(r.buses.music || 0).toFixed(2)})` : `NO music within 5 s of the first cast (${JSON.stringify(r.music)})`);
+    if (!okMusic) t.problem("bug", "Music wasn't audible within 5 s of the first cast");
+  }
   if (cold) {
     if (D.title && D.title.showing() && D.title.play) D.title.play("tap");
     await t.until(() => D.coldopen.now().phase === "waiting" || D.coldopen.now().cast != null, 20000, "the cold open's prompt").catch(() => {});
@@ -11105,6 +11124,7 @@ async function audioCheck(options, t) {
       await t.until(() => D.coldopen.now().cast != null, 3000, "the first Rain").catch(() => {});
       if (D.coldopen.now().cast != null) t.milestone && t.milestone("first-success", "first Rain");
     }
+    await checkMusicAfterCast();
     t.event("audio-cold-open", `cold open ${D.coldopen.now().phase}, first input ${D.coldopen.now().firstInput}s, cast ${D.coldopen.now().cast}s`);
     if (D.coldopen.now().cast == null) t.problem("bug", "The first tap on the roof didn't cast Rain");
     await t.until(() => !D.coldopen.now().on, 25000, "the story line and the cold open's end").catch(() => {});
@@ -11146,6 +11166,7 @@ async function audioCheck(options, t) {
   const onStrike = (e) => strikes.push((e && e.detail) || {});
   window.addEventListener("day:strike", onStrike);
   const okBolt = P.command("bolt", touch ? "touch" : "key");
+  await checkMusicAfterCast();
   const reacted = await t.until(() => { const c = crowdNow(); return (c.flinching || 0) > 0 || (c.lookingUp || 0) > 0 || (c.reacting || 0) > 0; }, 3000, "a pedestrian's reaction").then(() => true).catch(() => false);
   window.removeEventListener("day:strike", onStrike);
   if (P.aimAt) P.aimAt(null);
@@ -11316,7 +11337,15 @@ async function stemScore(options, t) {
   else if (mt.notes !== mc.notes || mt.notes.split(" ").length !== 4) t.problem("bug", "The title's and the cold open's motifs aren't the same four notes");
   t.progress(0.25);
 
-  // the first input has happened (the Play click): the stems stream and start together
+  // the Play click goes straight to the roof; stems start on the first day:power cast
+  await t.until(() => D.coldopen.now().phase === "waiting" || D.coldopen.now().cast != null, 15000, "the cold open's prompt").catch(() => {});
+  const preCast = D.stems.now();
+  t.event("stem-before-cast", `stems before first cast: ${preCast.stems}, streaming ${preCast.streaming}, bytes ${preCast.bytes}`);
+  if (preCast.stems !== 0 || preCast.bytes !== 0) t.problem("bug", `Stems started before the first cast (${preCast.stems} stems, ${preCast.bytes} bytes)`);
+  if (D.coldopen.now().phase === "waiting") {
+    const rb = $("coldopen-bolt");
+    if (phone && rb && !rb.hidden) await tapEl(rb); else pressKey("r");
+  }
   const ready = await t.until(() => D.stems.now().stems === 3, 20000, "three stems").then(() => true).catch(() => false);
   const S = D.stems.now();
   const spent = mb() - mbBefore;
@@ -11502,7 +11531,7 @@ async function titleKeyArt(options, t) {
 // Reports seconds to first input / first cast / first city reaction / Birdie's voice, words on screen before the first cast,
 // what else is visible before it (a phone: only the stick, Jump and Bolt), and the other criteria as problems.
 async function coldStart(options, t) {
-  t.scene("Cold start");
+  t.scene("Loading");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
   // the title holds the auto-started cold open until the shader warm-up (js/app.js, once his model is on) is over, so this setup
@@ -11522,6 +11551,7 @@ async function coldStart(options, t) {
   // measure it from that moment (letting go of it and walking back to re-run it by Play is what stalled in "returning").
   const auto = !!(D.coldopen && D.coldopen.now().on && D.control.mode() === "control");
   if (!auto) {
+    t.scene("Title");
     if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
     // setup: a new player (no icanbe.* keys), the title up, the cold open armed
     Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
@@ -11602,6 +11632,8 @@ async function coldStart(options, t) {
   t.event("cold-start-play", auto ? "auto-started (no click)" : phone ? "tapped Play" : "clicked Play");
   const gotControl = await waitFor(() => T.control != null, 4000);
   if (!gotControl) { t.problem("blocker", `Play didn't hand him over (control mode ${D.control.mode()})`); return; }
+  t.scene("Cold start");
+  if (t.milestone) t.milestone("gameplay", "on the roof");
   t.event("cold-start-control", `he is the player's ${T.control}s after Play; title ${D.title.showing() ? "STILL UP" : "closed"}`);
   if (D.title.showing()) t.problem("bug", "The title is still up after Play");
   if (D.tutorial && D.tutorial.blocking && D.tutorial.blocking()) t.problem("bug", "The first-visit card shows during the cold open");
@@ -11659,6 +11691,17 @@ async function coldStart(options, t) {
   // follow the cue (Rain: "Press R for rain" / the Rain button tap): no card is clicked anywhere before it
   const dim = Array.from(document.querySelectorAll(".ep-offer:not([hidden]),.tutorial:not([hidden]),#day-end:not([hidden])")).filter((e) => e.offsetParent !== null);
   if (dim.length) t.problem("bug", "A card is up before the first cast: " + dim.map((e) => e.id || e.className).join(", "));
+  {
+    const preAudio = performance.getEntriesByType("resource")
+      .map((r) => (r.name || "").split("/").pop().split("?")[0])
+      .filter((n) => /^(stem-|take-control\.mp3)/i.test(n));
+    const stNow = D.stems && D.stems.now ? D.stems.now() : { stems: 0, bytes: 0 };
+    t.metric("preGameplayStemOrStingAssets", preAudio.length);
+    t.event("cold-start-pre-cast-audio", `before first cast: stems ${stNow.stems} (${stNow.bytes} B), stem/sting assets fetched: ${preAudio.join(", ") || "none"}`);
+    if (preAudio.length > 0 || stNow.stems > 0) {
+      t.problem("bug", `Stems or take-control.mp3 fetched before the first cast: ${preAudio.join(", ") || stNow.stems + " stems"}`);
+    }
+  }
   t.event("cold-start-no-card", "no card to click: the first cast follows the prompt on the roof");
   if (phone) {
     const b = $("coldopen-bolt");
