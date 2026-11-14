@@ -40,7 +40,7 @@ export function startTitle() {
   let autoTimer = 0;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "phone-touch") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
@@ -300,8 +300,10 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     try { playBtn.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
     emit("show", { via: via || "load" });
     clearTimeout(autoTimer);
-    if (!quiet && via === "load" && cfg.autoStart && cfg.autoStart.secs > 0 && day.coldopen && day.coldopen.pending()) {
-      autoTimer = setTimeout(() => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); }, cfg.autoStart.secs * 1000);
+    // On a phone a cold session goes straight to the roof (no title wall): `autoStart.phoneSecs`.
+    const autoSecs = cfg.autoStart ? (touchy() && cfg.autoStart.phoneSecs != null ? cfg.autoStart.phoneSecs : cfg.autoStart.secs) : 0;
+    if (!quiet && via === "load" && autoSecs > 0 && day.coldopen && day.coldopen.pending()) {
+      autoTimer = setTimeout(() => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); }, autoSecs * 1000);
     }
     return true;
   }
@@ -356,8 +358,19 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     return true;
   }
 
-  playBtn.addEventListener("click", () => play("click"));
-  epBtn.addEventListener("click", () => episodes("click"));
+  // A touch acts on pointerup (the click after the same tap is swallowed), so a tap takes the roof at once.
+  let tapAt = 0;
+  const onTap = (btnEl, fn, via) => {
+    btnEl.style.touchAction = "manipulation";
+    btnEl.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+      tapAt = performance.now();
+      fn("touch");
+    });
+    btnEl.addEventListener("click", () => { if (performance.now() - tapAt > 800) fn(via); });
+  };
+  onTap(playBtn, play, "click");
+  onTap(epBtn, episodes, "click");
   musicBtn.addEventListener("click", () => {
     musicWanted = !(musicBtn.getAttribute("aria-pressed") === "true");
     setSound(musicWanted); // a click: the browser lets the title music start right here

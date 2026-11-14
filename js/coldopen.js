@@ -22,7 +22,7 @@ export function startColdOpen() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "cold-start" && id !== "title-key-art") quiet = true;
+    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "phone-touch") quiet = true;
     // a cold bot (the first-five run, no ?playtest) plays it like a stranger; a runner's start(id) quiets the title first, which cancels the auto-start
   } catch (e) { /* no location */ }
 
