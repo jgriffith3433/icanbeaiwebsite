@@ -152,6 +152,7 @@ export function createWeather(opt) {
   let targetIntensity = 1;
   let level = 1;
   let manual = false;
+  let cell = false; // the title/cold-open storm cell: holds the sky without setting `manual`, so ability reactions wait for the player's cast
   let wasHeld = false;
   let holdLeft = 0;
   let powerLeft = 0; // an ability's own weather: lasts ABILITY_HOLD_SEC from its last call, in control or not
@@ -187,7 +188,7 @@ export function createWeather(opt) {
       steamHold = 0;
       steam = 0;
       roofWet = L.wet;
-      puddleLevel = L.rain > 0.15 ? L.wet : 0;
+      puddleLevel = manual && L.rain > 0.15 ? L.wet : 0;
       wasRainWet = L.rain > 0.25 || L.wet > 0.5;
       snowCover = L.snow > 0.5 ? 1 : 0;
     } else {
@@ -198,8 +199,8 @@ export function createWeather(opt) {
       if (roofWet < 0.01) roofWet = 0;
       if (roofWet > 0.25 && (L.rain > 0.2 || L.wet > 0.45)) wasRainWet = true;
 
-      const pGoal = raining ? Math.min(1, Math.max(L.wet, L.rain)) : 0;
-      const pTau = pGoal > puddleLevel ? 1.15 : sunny ? 1.05 : 1.8;
+      const pGoal = manual && raining ? Math.min(1, Math.max(L.wet, L.rain)) : 0;
+      const pTau = pGoal > puddleLevel ? 0.45 : sunny ? 1.05 : 1.8;
       puddleLevel += (pGoal - puddleLevel) * (1 - Math.exp(-dtPos / pTau));
       if (puddleLevel < 0.01) puddleLevel = 0;
 
@@ -283,10 +284,18 @@ export function createWeather(opt) {
     target = state;
     targetIntensity = intensity == null || !Number.isFinite(intensity) ? 1 : Math.max(0, Math.min(1, intensity));
     sunFlag = false;
-    if (via !== "forecast") {
+    if (via === "cell") {
+      manual = false;
+      cell = state !== lastForecast.state;
+      holdLeft = 0;
+      powerLeft = 0;
+      if (opt.onSet) opt.onSet({ state, intensity: targetIntensity, via });
+    } else if (via !== "forecast") {
       manual = true;
+      cell = false;
       holdLeft = 0;
       powerLeft = via === "power" ? holdSec * (state === "rain" ? 2.4 : 1) : 0; // a Rain cast stays long enough to soak the street
+      if (via === "power" && (state === "rain" || state === "storm")) puddleLevel = Math.min(puddleLevel, 0.05);
       if (opt.onSet) opt.onSet({ state, intensity: targetIntensity, via: via || "set" });
     }
     return true;
@@ -298,6 +307,7 @@ export function createWeather(opt) {
       // Keep what he left behind for a while, then hand it back to the forecast.
       if (manual) holdLeft = holdSec;
       else holdLeft = 0;
+      cell = false;
     }
     wasHeld = held;
     lastForecast = forecastAt(dateKey, minutes, opt.forecast);
@@ -316,7 +326,7 @@ export function createWeather(opt) {
         if (opt.onDrift) opt.onDrift({ from: target, to: lastForecast.state });
       }
     }
-    if (!manual) {
+    if (!manual && !cell) {
       target = lastForecast.state;
       targetIntensity = lastForecast.intensity;
       holdLeft = 0;
@@ -332,6 +342,7 @@ export function createWeather(opt) {
       if (!warming) return false;
       warming = null;
       manual = false;
+      cell = false;
       powerLeft = 0;
       holdLeft = 0;
       sunFlag = false;
@@ -340,7 +351,7 @@ export function createWeather(opt) {
       step(0, true);
       return true;
     }
-    if (manual && !warming) return false;
+    if ((manual || cell) && !warming) return false;
     if (!STATES.includes(spec.state)) return false;
     warming = spec;
     manual = true;
@@ -1306,7 +1317,8 @@ export function startWeather(world, dayApi) {
     windT += dt;
     const wNow = weather.now();
     const isAbility = !!wNow.manual;
-    abilityK = snap ? (isAbility ? 1 : 0) : abilityK + ((isAbility ? 1 : 0) - abilityK) * (1 - Math.exp(-Math.max(0, dt) / 1.2));
+    const abTau = isAbility ? 0.45 : 1.2;
+    abilityK = snap ? (isAbility ? 1 : 0) : abilityK + ((isAbility ? 1 : 0) - abilityK) * (1 - Math.exp(-Math.max(0, dt) / abTau));
     if (Math.abs(abilityK - (isAbility ? 1 : 0)) < 0.004) abilityK = isAbility ? 1 : 0;
     const wetR = L.wet * abilityK;
     const surfaceWet = Math.max(L.wet, wNow.roofWet || 0);

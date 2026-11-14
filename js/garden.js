@@ -23,7 +23,7 @@ export function staggerK(k, i, n, spread) {
 
 export const POTS = [-20.1, -19.3, -18.5, -17.7].map((x) => ({ x, z: 9.15 }));
 export const RANGE = 45;
-export const REVIVE_SECS = 2.4;
+export const REVIVE_SECS = 0.9;
 const KEY = "icanbe.garden";
 
 export function installGarden(day, world) {
@@ -133,17 +133,36 @@ export function installGarden(day, world) {
   const near = () => { const h = hero(); return !!h && Math.hypot(h.x - POTS[0].x, h.z - POTS[0].z) < RANGE; };
   let was = false;
   let seenT = 0;
+  let pendingFrame = false;
+  const triggerRevive = () => {
+    if (st.goal >= 1) return;
+    st.goal = 1;
+    st.castAt = performance.now();
+    emit("revive", { from: +st.k.toFixed(2) });
+    try { day.sfx && day.sfx.play && day.sfx.play("chimeUp"); } catch (e) { /* no sound */ }
+    // the camera swings to the stoop so the player watches them lift (the cast's own eased framing)
+    try {
+      const framed = day.control && day.control.frame && day.control.frame(POTS[1].x, POTS[1].z);
+      if (!framed) pendingFrame = true;
+    } catch (e) { /* no control */ }
+  };
+  window.addEventListener("day:power", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "denied") return;
+    const p = d.power || d.action;
+    if ((p === "rain" || p === "storm") && near()) triggerRevive();
+  });
+  window.addEventListener("day:coldopen", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "start") { st.goal = 0; st.k = 0; st.revived = false; st.rest = 0; was = false; pendingFrame = false; apply(); }
+  });
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
     const w = (window.weather && window.weather.now && window.weather.now()) || {};
     const raining = !!w.manual && (w.state === "rain" || w.state === "storm");
-    if (raining && !was && near()) {
-      st.goal = 1;
-      st.castAt = performance.now();
-      emit("revive", { from: +st.k.toFixed(2) });
-      try { day.sfx && day.sfx.play && day.sfx.play("chimeUp"); } catch (e) { /* no sound */ }
-      // the camera swings to the stoop so the player watches them lift (the cast's own eased framing)
-      try { day.control && day.control.frame && day.control.frame(POTS[1].x, POTS[1].z); } catch (e) { /* no control */ }
+    if (raining && !was && near()) triggerRevive();
+    if (pendingFrame) {
+      try { if (day.control && day.control.frame && day.control.frame(POTS[1].x, POTS[1].z)) pendingFrame = false; } catch (e) { pendingFrame = false; }
     }
     was = raining;
     if (!st.seen && hero() && near()) { seenT += dt; if (seenT > 1) { st.seen = true; emit("seen", { k: +st.k.toFixed(2) }); } }

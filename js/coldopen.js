@@ -189,12 +189,16 @@ export function startColdOpen() {
     bolt.classList.remove("held");
     const P = window.powers || day.powers;
     if (!P) return;
+    if (P.aimAt) {
+      if (verb === "rain") P.aimAt({ x: -19.3, y: 0.4, z: 9.15 });
+      else P.aimAt({ x: cfg.rod.x, y: cfg.rod.roofY + cfg.rod.height, z: cfg.rod.z });
+    }
+    phase = "cast";
+    castAt = performance.now();
     passing = true;
     let ok = false;
     try { ok = P.command(verb, via === "touch" ? "touch" : via); } finally { passing = false; }
-    if (!ok) { held = null; return; }
-    phase = "cast";
-    castAt = performance.now();
+    if (!ok) { phase = "waiting"; castAt = 0; held = null; return; }
     P.hitstop(0.14);
     if (day.cityscape && day.cityscape.flicker) day.cityscape.flicker(1.8);
     prompt.classList.remove("on");
@@ -270,7 +274,7 @@ export function startColdOpen() {
   bolt.addEventListener("contextmenu", (e) => e.preventDefault());
   window.addEventListener("day:crowd", (e) => {
     const d = (e && e.detail) || {};
-    if (!on || d.action !== "reaction" || d.kind !== "lookup") return;
+    if (!on || phase !== "cast" || d.action !== "reaction" || (d.kind !== "lookup" && d.kind !== "rain")) return;
     reactAt = performance.now();
     emit("react", { kind: d.kind });
     later(() => birdie("look-up"), (cfg.reactDelay || 1) * 1000);

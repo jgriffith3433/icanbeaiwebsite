@@ -11720,6 +11720,16 @@ async function coldStart(options, t) {
     }
   }
   t.event("cold-start-no-card", "no card to click: the first cast follows the prompt on the roof");
+  const sl = () => (D.slice && D.slice.now ? D.slice.now() : {});
+  const base = { lawn: sl().lawnShown || 0, pond: sl().pond || 0.78 };
+  const g0 = D.garden && D.garden.now ? D.garden.now() : null;
+  const wPre = W && W.now ? W.now() : {};
+  const cPre = D.crowd && D.crowd.info ? D.crowd.info() : {};
+  t.event("cold-start-pre-cast", `before cast: manual ${!!wPre.manual}, lawn ${base.lawn}, pond ${base.pond}, garden k ${g0 ? g0.k : "?"}, crowd reaction ${cPre.reaction || "none"}`);
+  if (wPre.manual) t.problem("bug", "The cold-open storm cell marked weather manual before the player cast");
+  if (base.lawn > 0.05) t.problem("bug", `The lawn darkened before the first Rain cast (${base.lawn})`);
+  if (g0 && (g0.k > 0.05 || g0.goal > 0)) t.problem("bug", `Birdie's garden started reviving before the first Rain cast (k ${g0.k}, goal ${g0.goal})`);
+  if (cPre.reaction === "rain") t.problem("bug", "The crowd reacted to rain before the player cast");
   if (phone) {
     const b = $("coldopen-bolt");
     const r = b.getBoundingClientRect();
@@ -11734,6 +11744,38 @@ async function coldStart(options, t) {
   const cast = await waitFor(() => T.bolt != null, 4000);
   if (!cast) { t.problem("blocker", `Pressing the prompted rain never cast it (${cueText})`); return; }
   t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
+  // the street answers within 2 s: the lawn darkens, the pond spreads, Birdie's pots lift and go green, people run for cover
+  {
+    const t0 = performance.now();
+    let lawnAt = null, gardenAt = null, run = 0;
+    await waitFor(() => {
+      const elS = (performance.now() - t0) / 1000;
+      const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
+      run = Math.max(run, c.running || 0, c.reacting || 0);
+      const s = sl();
+      if (lawnAt == null && (s.lawnShown || 0) - base.lawn > 0.5 && (s.pond || 0) - base.pond > 0.1) lawnAt = elS;
+      if (gardenAt == null && D.garden && D.garden.now().k > 0.9) gardenAt = elS;
+      return lawnAt != null && (gardenAt != null || !D.garden) && (run > 0 || !(c.people > 0));
+    }, 2000);
+    const el = (performance.now() - t0) / 1000;
+    const s = sl();
+    const lawnD = (s.lawnShown || 0) - base.lawn, pondD = (s.pond || 0) - base.pond;
+    const lawnS = lawnAt != null ? lawnAt : el;
+    t.event("cold-start-rain-reaction", `${lawnS.toFixed(2)}s after the cast: lawn +${lawnD.toFixed(2)} (${base.lawn} -> ${s.lawnShown}), pond +${pondD.toFixed(2)}, ${run} people running for cover`);
+    t.metric("rainLawnDarkenS", +lawnS.toFixed(2));
+    if (lawnD <= 0.5) t.problem("bug", `The lawn didn't darken within 2 s of Rain (+${lawnD.toFixed(2)})`);
+    if (pondD <= 0.1) t.problem("bug", `The pond didn't spread within 2 s of Rain (+${pondD.toFixed(2)})`);
+    const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
+    if (c.people > 0 && run === 0) t.problem("bug", "No pedestrian ran for cover within 2 s of Rain");
+    if (D.garden) {
+      const g1 = D.garden.now();
+      const gS = gardenAt != null ? gardenAt : el;
+      t.event("cold-start-garden", `${gS.toFixed(2)}s after the cast: her ${g1.plants} pots and ${g1.tufts} lawn tufts: freshness ${g0.k} -> ${g1.k}, leaf droop ${g0.droop} -> ${g1.droop} rad, revived ${g1.revived}`);
+      t.metric("gardenRevived", g1.k);
+      t.metric("gardenReviveS", +gS.toFixed(2));
+      if (g1.k < 0.9 || gS > 2) t.problem("bug", `Birdie's wilting pots didn't revive within 2 s of the rain (freshness ${g1.k} at ${gS.toFixed(2)}s)`);
+    } else t.problem("bug", "No garden: Birdie's wilting pots are missing (js/garden.js)");
+  }
   {
     // after the first cast the late chunk arrives; a tap on Episodes then (loaded or still loading) opens the menu, never nothing
     const tl = performance.now();
@@ -11769,37 +11811,6 @@ async function coldStart(options, t) {
     const x1 = window.day.sfx && window.day.sfx.info ? window.day.sfx.info() : null;
     if (x0 && x1) t.event("cold-start-sound-step", `plays ${JSON.stringify(x0.plays != null ? x0.plays : "?")} -> ${JSON.stringify(x1.plays != null ? x1.plays : "?")}`);
   }
-  // the street answers within 2 s: the lawn darkens, the pond spreads, people run for cover
-  {
-    const t0 = performance.now();
-    const sl = () => (D.slice && D.slice.now ? D.slice.now() : {});
-    const base = { lawn: sl().lawnShown || 0, pond: sl().pond || 0.78 };
-    let run = 0;
-    await waitFor(() => {
-      const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
-      run = Math.max(run, c.running || 0, c.reacting || 0);
-      const s = sl();
-      return (s.lawnShown || 0) - base.lawn > 0.5 && (s.pond || 0) - base.pond > 0.1 && (run > 0 || !(c.people > 0));
-    }, 2000);
-    const el = (performance.now() - t0) / 1000;
-    const s = sl();
-    const lawnD = (s.lawnShown || 0) - base.lawn, pondD = (s.pond || 0) - base.pond;
-    t.event("cold-start-rain-reaction", `${el.toFixed(2)}s after the cast: lawn +${lawnD.toFixed(2)}, pond +${pondD.toFixed(2)}, ${run} people running for cover`);
-    t.metric("rainLawnDarkenS", +el.toFixed(2));
-    if (lawnD <= 0.5) t.problem("bug", `The lawn didn't darken within 2 s of Rain (+${lawnD.toFixed(2)})`);
-    if (pondD <= 0.1) t.problem("bug", `The pond didn't spread within 2 s of Rain (+${pondD.toFixed(2)})`);
-    const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
-    if (c.people > 0 && run === 0) t.problem("bug", "No pedestrian ran for cover within 2 s of Rain");
-  }
-  // Birdie's ask as action: the pots she is worried about lift and go green in front of him, before any thanks is spoken
-  if (D.garden) {
-    const g0 = D.garden.now();
-    await waitFor(() => D.garden.now().k > 0.9, 4000);
-    const g1 = D.garden.now();
-    t.event("cold-start-garden", `her ${g1.plants} pots and ${g1.tufts} lawn tufts: freshness ${g0.k} -> ${g1.k}, leaf droop ${g0.droop} -> ${g1.droop} rad, revived ${g1.revived}`);
-    t.metric("gardenRevived", g1.k);
-    if (g1.k < 0.9) t.problem("bug", `Birdie's wilting pots didn't revive after the rain (freshness ${g1.k})`);
-  } else t.problem("bug", "No garden: Birdie's wilting pots are missing (js/garden.js)");
   t.metric("secondsToFirstInput", T.input);
   t.metric("secondsToFirstCast", T.bolt);
   if (T.input == null || T.input > 3) t.problem("bug", `The first input was accepted ${T.input}s after Play (the limit is 3 s)`);
