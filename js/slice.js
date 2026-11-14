@@ -63,6 +63,47 @@ export function installSlice(day, world) {
   lawn.visibility = 0.74;
   /* `k` (0..1) is how fresh the water is (js/memory.js fades it over three real days); `quiet` = a restore, no event. */
   const blendM = mat("slice-blend", "#a88938", 0.14);
+  /* Grass detail on the overlay. The overlay covers the park ground at 74-88% opacity, so with plain colours it hid the
+     ground's own grass and the whole lawn read as one flat fill (playtest, art: "flat green lawn, no grass or ground
+     detail"). A tiling grey detail map (soft patches, mid clumps, a blade speckle) is multiplied into the straw, blend and
+     damp colours, so the lawn keeps its texture whatever else loads (it needs no file). */
+  const detail = (() => {
+    const N = 128;
+    const hash = (x, y, sd) => {
+      let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(sd, 1442695041);
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+    };
+    const vnoise = (u, v, cells, sd) => {
+      const x = u * cells, y = v * cells;
+      const x0 = Math.floor(x), y0 = Math.floor(y);
+      const fx = x - x0, fy = y - y0;
+      const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+      const g = (i, j) => hash((((x0 + i) % cells) + cells) % cells, (((y0 + j) % cells) + cells) % cells, sd);
+      const a = g(0, 0) + (g(1, 0) - g(0, 0)) * sx;
+      const b = g(0, 1) + (g(1, 1) - g(0, 1)) * sx;
+      return a + (b - a) * sy;
+    };
+    const data = new Uint8Array(N * N * 4);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const u = x / N, v = y / N;
+        const t = 0.5 * vnoise(u, v, 4, 1) + 0.3 * vnoise(u, v, 16, 2) + 0.2 * vnoise(u, v, 64, 3);
+        const k = Math.max(0.5, Math.min(1, 0.62 + 0.55 * t + 0.14 * (hash(x, y, 4) - 0.5)));
+        const i = (y * N + x) * 4;
+        data[i] = data[i + 1] = data[i + 2] = Math.round(k * 255);
+        data[i + 3] = 255;
+      }
+    }
+    const tex = new B.RawTexture(data, N, N, B.Engine.TEXTUREFORMAT_RGBA, scene, true, false, B.Texture.TRILINEAR_SAMPLINGMODE);
+    tex.wrapU = tex.wrapV = B.Texture.WRAP_ADDRESSMODE;
+    tex.uScale = 62 / 3; // the overlay is 62 x 46 m: one repeat per 3 m
+    tex.vScale = 46 / 3;
+    tex.name = "slice-lawn-detail";
+    return tex;
+  })();
+  strawM.diffuseTexture = dampM.diffuseTexture = blendM.diffuseTexture = detail;
+  st.lawnDetail = true;
   const strawC = B.Color3.FromHexString("#a88938");
   const dampC = B.Color3.FromHexString("#2cb850");
   const waterLowC = B.Color3.FromHexString("#1a3f54");
