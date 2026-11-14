@@ -184,6 +184,10 @@ export function startPowers(world, dayApi) {
       lastWhy = "locked";
       return false;
     }
+    if (id === "tornado" && abil.isLocked("tornado")) { // day one's reward (js/dayone.js)
+      lastWhy = "locked";
+      return false;
+    }
     if (id === "storm" && abil.isLocked("bolt")) {
       lastWhy = "locked";
       return false;
@@ -1524,7 +1528,7 @@ html.touch-ui.in-control .side{display:none}
           cloudTarget = Math.max(cloudTarget, 1.4 + 10 * Math.min(1, windCharge / full));
         }
         // Full charge → Tornado only (no Gale tax on the way). Mid-hold Gale fires on release.
-        if (windResolved !== "tornado" && windCharge >= (cfg.windFull || 1.35)) {
+        if (windResolved !== "tornado" && !abil.isLocked("tornado") && windCharge >= (cfg.windFull || 1.35)) {
           windResolved = "tornado";
           const via = padState.windHold ? "gamepad" : touchWind ? "touch" : "key";
           if (!command("tornado", via)) refuseBar("tornado");
