@@ -2669,6 +2669,137 @@ async function model(options, t) {
   t.progress(1);
 }
 
+/* ---------------- idle-pose: the default state holds a clean pose for 10 s and after every other clip ---------------- */
+// Acceptance: standing still for 10 s his hands hang at his sides in FRONT of the hip line (never behind his back), the
+// boots are flat and straight (pitch near the rest pose's, no roll), nothing pops; after a walk, a run, a jump and a
+// Lightning and a Rain cast he is back in the same pose within 2 s. A screenshot of the default state, on the roof with
+// control (desktop, and {"touch":true} at 390x844). The numbers come from skin.pose() on real frames.
+async function idlePose(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Idle pose (phone)" : "Idle pose");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model === "small-weather", 45000, "his model to load").catch(() => {});
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok").catch(() => {});
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const WX = window.day.weather;
+  if (!C || !skinNow() || !skinNow().pose) {
+    t.problem("blocker", "Small Weather's model isn't on for idle-pose");
+    return;
+  }
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    try { C.touch(true); } catch (e) { /* */ }
+  }
+  const day = window.day.today();
+  const outside = carSideMoment(day) || quietMoment(day);
+  scrubTo(outside.start + 0.2);
+  clickSpeed(1);
+  if (WX && WX.set) WX.set("rain", 0.2, "key"); // not clear: the idle must stay the plain idle (no look-up)
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  if (touch) {
+    const btn = document.getElementById("control-btn") || document.querySelector("#take-control,.take-control");
+    if (btn) {
+      await tapEl(btn);
+      btn.click();
+    } else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 5000, "Take control");
+  const sk = () => skinNow();
+  const read = () => {
+    const m = sk() && sk().pose();
+    if (!m) return null;
+    return {
+      fwd: Math.min(m.handFwdL, m.handFwdR),
+      out: Math.min(m.handOutL, m.handOutR),
+      pitch: [Math.min(m.bootPitchL, m.bootPitchR), Math.max(m.bootPitchL, m.bootPitchR)],
+      roll: Math.max(Math.abs(m.bootRollL), Math.abs(m.bootRollR)),
+      lean: m.lean,
+      neck: m.neck,
+      m,
+    };
+  };
+  const judge = (label, r, pose) => {
+    if (!r) return;
+    t.event(`idle-pose-${label.toLowerCase().replace(/\s+/g, "-")}`, `${sk().clip()}: hands ${r.fwd.toFixed(2)} m in front of the hips, ${r.out.toFixed(2)} m out, boots pitch ${r.pitch.map((v) => v.toFixed(0)).join("..")} roll ${r.roll.toFixed(0)}`);
+    if (pose && sk().clip() !== "idle") t.problem("bug", `${label}: his model played ${sk().clip()}, not idle`);
+    if (r.fwd < 0.03) t.problem("bug", `quality.animation: ${label}: a hand is ${r.fwd.toFixed(2)} m from the hip line, behind his back`);
+    if (r.out < 0.2) t.problem("bug", `quality.animation: ${label}: a hand is only ${r.out.toFixed(2)} m from his midline`);
+    if (r.pitch[0] < -24 || r.pitch[1] > -6) t.problem("bug", `quality.animation: ${label}: boots are not flat (pitch ${r.pitch.map((v) => v.toFixed(0)).join("..")} deg)`);
+    if (r.roll > 8) t.problem("bug", `quality.animation: ${label}: a boot is turned ${r.roll.toFixed(0)} deg off straight ahead (twisted)`);
+  };
+  t.progress(0.1);
+
+  // the default state: 10 s standing, sampled every 100 ms (a screenshot at the start and the end)
+  await sleep(1200);
+  t.scene("Idle default");
+  const lim = { fwd: 9, out: 9, pitch: [99, -99], roll: 0 };
+  let prev = null;
+  let pop = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < 10000) {
+    const r = read();
+    if (r) {
+      lim.fwd = Math.min(lim.fwd, r.fwd);
+      lim.out = Math.min(lim.out, r.out);
+      lim.pitch = [Math.min(lim.pitch[0], r.pitch[0]), Math.max(lim.pitch[1], r.pitch[1])];
+      lim.roll = Math.max(lim.roll, r.roll);
+      if (prev) pop = Math.max(pop, Math.abs(r.lean - prev.lean), Math.abs(r.neck - prev.neck), Math.abs(r.m.hipYaw - prev.m.hipYaw), Math.abs(r.m.shoulderYaw - prev.m.shoulderYaw));
+      prev = r;
+    }
+    await sleep(100);
+  }
+  judge("Idle 10 s", lim, true);
+  t.metric("idle.handFwdMinM", Math.round(lim.fwd * 100) / 100);
+  t.metric("idle.bootPitchMin", Math.round(lim.pitch[0]));
+  t.metric("idle.bootPitchMax", Math.round(lim.pitch[1]));
+  t.metric("idle.bootRollMaxDeg", Math.round(lim.roll * 10) / 10);
+  t.metric("idle.popDeg", Math.round(pop * 10) / 10);
+  if (pop > 6) t.problem("bug", `quality.animation: the idle popped ${pop.toFixed(1)} deg between two 100 ms samples`);
+  t.scene("Idle after 10 s");
+  await sleep(300);
+  t.progress(0.4);
+
+  // back to idle from a walk, a run, a jump, and two weather calls
+  const back = async (label, act) => {
+    await act();
+    await sleep(2000);
+    t.scene(label);
+    judge(label, read(), true);
+  };
+  await back("Idle after walk", async () => {
+    keyDown("w");
+    await sleep(1400);
+    keyUp("w");
+  });
+  await back("Idle after run", async () => {
+    keyDown("Shift", { shiftKey: true });
+    keyDown("w", { shiftKey: true });
+    await sleep(1000);
+    keyUp("Shift");
+    keyUp("w");
+  });
+  await back("Idle after jump", async () => {
+    keyDown(" ");
+    await sleep(160);
+    keyUp(" ");
+    await sleep(900);
+  });
+  t.progress(0.7);
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await back("Idle after Lightning", async () => {
+    keyDown("e");
+    await sleep(900);
+    keyUp("e");
+    await sleep(500);
+  });
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await back("Idle after Rain", async () => {
+    pressKey("r");
+    await sleep(1200);
+  });
+  t.progress(1);
+}
+
 /* ---------------- clip-poses: every clip he plays, at mid-clip, never twisted; cross-fades without a pop ---------------- */
 // Acceptance: idle at two different times is upright (spine and neck within a few degrees, pelvis and shoulders square,
 // hands apart); walk, run, jump, fall/float, cast and throw each hold a screenshot with no twisted limbs; switching idle
@@ -12458,6 +12589,7 @@ installPlaytest({
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
+    { id: "idle-pose", title: "Idle pose: in the default state his hands hang at his sides (not behind his back), boots flat and straight for 10 s with no pop, and he returns to that pose after a walk, a run, a jump and Lightning and Rain casts; the phone (390x844) the same", seconds: 45, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=idle-pose ({\"touch\":true} for 390x844). Takes control outside, stands 10 s (screenshots at the start and the end), then walk, run, jump, E and R, each followed by 2 s of idle and a screenshot. skin.pose() reads each hand's distance in front of the hip line and each boot's pitch and roll; metrics idle.handFwdMinM, idle.bootPitchMin/Max, idle.bootRollMaxDeg, idle.popDeg." },
     { id: "clip-poses", title: "Clip poses: idle at two times, walk, run, jump, float, Lightning and Rain casts and his day's clips each read upright and untwisted at mid-clip; switching clips never snaps the pose; the phone (390x844) the same", seconds: 70, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=clip-poses ({\"touch\":true} for 390x844). Takes control outside, stands (idle early, idle later), W, Shift+W, back to idle, Space jump and hold to float, E then R casts, then his day (sit, type, window). Each scene is a screenshot at mid-clip; skin.pose() reads spine/neck lean, pelvis/shoulder yaw, knees and hand gap on the frame and files quality.animation problems; metric quality.clipPopDeg is the worst pose change between two 33 ms samples." },
     { id: "hero-move", title: "Hero move: feet plant on the apt stairs and ramp (slide under 5 cm, float under 3 cm), Lightning and Rain show distinct wind-up clips, idle under a clear sky looks up; on phone IK and clips run on low quality at ≥30 fps", seconds: 150, tags: ["model", "control", "feel", "phone", "quality"], description: "Load with ?playtest=hero-move ({\"touch\":true} for 390x844). Setup: day bar outside, clear sky, full Charge, control.place at the apt ramp. Real WASD up the ramp and across the roof, E then R for wind-ups, stand still 20 s for look-up. Events foot-plant / windups-distinct / lookup-ok / phone-fps-ok; metrics quality.footSlideM, quality.footFloatM, phone.fpsAvg." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
@@ -12562,6 +12694,7 @@ installPlaytest({
       else if (id === "model") await model(options, t);
       else if (id === "hero-move") await heroMove(options, t);
       else if (id === "clip-poses") await clipPoses(options, t);
+      else if (id === "idle-pose") await idlePose(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "render-grade") await renderGrade(options, t);

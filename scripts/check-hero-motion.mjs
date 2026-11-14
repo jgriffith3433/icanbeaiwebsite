@@ -30,6 +30,8 @@ ok(/id:\s*"hero-move"/.test(play) && /async function heroMove/.test(play), "play
 
 ok(/id:\s*"clip-poses"/.test(play) && /async function clipPoses/.test(play) && /pose: \(\) => bodyPose/.test(sw), "playtest scenario clip-poses registered and skin.pose() exists");
 
+ok(/id:\s*"idle-pose"/.test(play) && /async function idlePose/.test(play) && /handFwdL/.test(sw), "playtest scenario idle-pose registered and skin.pose() reads hands and boots");
+
 const metrics = JSON.parse(fs.readFileSync(path.join(root, "docs/metrics.json"), "utf8"));
 ok(metrics.feel?.coyoteMs >= 80 && metrics.feel?.jumpBufferMs >= 80, "docs/metrics.json feel floors");
 ok(metrics.motion?.footSlideLimitM === 0.05, "foot slide limit 5 cm");
