@@ -530,6 +530,7 @@ const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown
 const KEY_CODES = { w: 'KeyW', a: 'KeyA', s: 'KeyS', d: 'KeyD', arrowup: 'ArrowUp', arrowdown: 'ArrowDown', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight' };
 function watchMovementKeys(win) {
   const down = new Set();
+  const pointers = new Set();
   let touch = 0;
   // e.code, or the key's name for synthetic events that only set key (a playtest's own key presses).
   const codeOf = (e) => e.code || KEY_CODES[String(e.key ?? '').toLowerCase()] || '';
@@ -537,17 +538,24 @@ function watchMovementKeys(win) {
   const ku = (e) => down.delete(codeOf(e));
   const ts = () => { touch++; };
   const te = () => { touch = Math.max(0, touch - 1); };
-  const blur = () => { down.clear(); touch = 0; };
+  const pd = (e) => { if (e && e.pointerType === 'touch') pointers.add(e.pointerId ?? 0); };
+  const pu = (e) => { if (e && e.pointerType === 'touch') pointers.delete(e.pointerId ?? 0); };
+  const blur = () => { down.clear(); pointers.clear(); touch = 0; };
   win.addEventListener?.('keydown', kd, true);
   win.addEventListener?.('keyup', ku, true);
   win.addEventListener?.('touchstart', ts, true);
   win.addEventListener?.('touchend', te, true);
+  win.addEventListener?.('pointerdown', pd, true);
+  win.addEventListener?.('pointerup', pu, true);
+  win.addEventListener?.('pointercancel', pu, true);
   win.addEventListener?.('blur', blur);
   return {
-    held: () => (down.size || touch ? 1 : 0),
+    held: () => (down.size || touch || pointers.size ? 1 : 0),
     stop() {
       win.removeEventListener?.('keydown', kd, true); win.removeEventListener?.('keyup', ku, true);
       win.removeEventListener?.('touchstart', ts, true); win.removeEventListener?.('touchend', te, true);
+      win.removeEventListener?.('pointerdown', pd, true); win.removeEventListener?.('pointerup', pu, true);
+      win.removeEventListener?.('pointercancel', pu, true);
       win.removeEventListener?.('blur', blur);
     },
   };

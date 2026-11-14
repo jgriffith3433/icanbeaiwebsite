@@ -1473,12 +1473,15 @@ function install() {
     stick.y = dy;
     knob.style.transform = `translate(${dx * STICK_R}px, ${dy * STICK_R}px)`;
   }
-  function stickEnd(e) {
-    if (e.pointerId !== stick.id) return;
+  function resetStick() {
     stick.id = null;
     stick.x = stick.y = 0;
     knob.style.transform = "";
     stickEl.classList.remove("held");
+  }
+  function stickEnd(e) {
+    if (e.pointerId !== stick.id) return;
+    resetStick();
   }
   stickEl.addEventListener("pointerdown", (e) => {
     if (cs.cast && cs.cast.glance && performance.now() - (cs.cast.startedAt || 0) > 25) {
@@ -1572,7 +1575,10 @@ function install() {
     mode = "control";
     since = 0;
     keys.clear();
+    resetStick();
+    jumpUp();
     jumps = 0;
+    lastInput = 0;
     cameraTake();
     frameOutdoors(fr, at);
     refreshAmbientUpdrafts();
@@ -1589,7 +1595,9 @@ function install() {
     since = 0;
     catchUpAt = 0;
     keys.clear();
-    stick.x = stick.y = 0;
+    resetStick();
+    jumpUp();
+    lastInput = 0;
     pushEnd();
     day.note(L.letGo);
     mark("let-go", { via });
@@ -1598,6 +1606,7 @@ function install() {
   }
   function backOnDay(how) {
     mode = "schedule";
+    lastInput = 0;
     mover.stop();
     if (avatar !== world.avatar) {
       avatar.show(false);
@@ -1614,6 +1623,7 @@ function install() {
   // Game seconds he has really been simulated as the player's (each control step's dt, which main.js caps at 0.1 s a
   // frame): the clock a playtest measures a climb in, so a slow browser doesn't read as a stuck one.
   let simT = 0;
+  let lastInput = 0; // 0..1 live movement input magnitude (keys, gamepad stick, or touch stick) for the feel sensor
   let animOverride = null; // a staged beat (js/wakeup.js) names the clip he plays while it holds him
   const pilotFrame = (fr, dt) => {
     lastFrame = fr;
@@ -1623,7 +1633,10 @@ function install() {
       syncUi();
     }
     const gp = readGamepad();
-    if (mode === "schedule") return null;
+    if (mode === "schedule") {
+      lastInput = 0;
+      return null;
+    }
     since += dt;
     let text;
     if (mode === "control") {
@@ -1633,12 +1646,14 @@ function install() {
         refreshAmbientUpdrafts();
       }
       const inp = holdIn ? { x: 0, z: 0, sprint: false, jump: 0, hold: false } : readInput(gp);
+      lastInput = Math.min(1, Math.hypot(inp.x || 0, inp.z || 0));
       if (push.on && (inp.jump || inp.x || inp.z)) pushEnd();
       mover.step(dt, inp);
       simT += dt;
       tickGlideFx(dt);
       text = steeringLines[Math.floor(since / 9) % steeringLines.length];
     } else {
+      lastInput = 0;
       const target = { x: fr.person.x, z: fr.person.z, room: fr.room, inCar: fr.person.inCar };
       const r = catchUpAt ? "too-far" : mover.walkBack(dt, target);
       if (r === "arrived") {
@@ -1718,7 +1733,7 @@ function install() {
   day.control = {
     mode: () => mode,
     state: () => ({
-      mode, x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: s.anim, grounded: s.grounded, jumps: s.jumps,
+      mode, x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, input: Math.round(lastInput * 100) / 100, anim: s.anim, grounded: s.grounded, jumps: s.jumps,
       flights: s.flights, lastFlight: s.lastFlight, floating: s.floating, gliding: s.gliding, softLand: s.softLand,
       lift: s.lift, trails: trailCount, whooshAt, physics: mover.hasPhysics(), touch: touchMode(),
       route: mover.route() ? mover.route().path.length : 0,
