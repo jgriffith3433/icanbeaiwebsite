@@ -356,47 +356,75 @@ export function installRenderPipeline(world) {
   }
 
   /* what casts: his proxy (world.js adds it), the neighbours, the crowd, rooftop props and (high) the block shells
-     and facade chunks; what receives: the props and the city's facades. Rescanned now and then (people and the
-     model arrive after the first frame). */
+     and facade chunks; what receives: the props and the city's facades. New arrivals join through scene add events (see drainPending). */
   const groups = { player: 0, neighbours: 0, crowd: 0, props: 0, buildings: 0, other: 0 };
+  function isNeighbourPart(m) {
+    for (let p = m.parent; p; p = p.parent) if (/^neighbor-/.test(p.name || "")) return true;
+    return false;
+  }
+  /* what one mesh is: "props" | "crowd" | "buildings" | "neighbours" | "player" | null, and whether it takes shadows */
+  function classify(m, low) {
+    const n = m.name || "";
+    if (PROP_CASTERS.test(n)) return { group: "props", recv: true };
+    if (n === "props-flat" || n === "props-glow") return { group: null, recv: true };
+    if (!low && CROWD_CASTERS.test(n)) return { group: "crowd", recv: false };
+    if (!low && (/^block-/.test(n) || /^city-(brick|concrete|glass|stone)-/.test(n))) return { group: "buildings", recv: true };
+    if (/^city-/.test(n) && n !== "city-skyline" && n !== "city-beacons" && n !== "city-base") return { group: null, recv: true };
+    if (n === "playerShadowProxy") return { group: "player", recv: false };
+    if (m.getTotalVertices && m.getTotalVertices() > 0 && isNeighbourPart(m)) return { group: "neighbours", recv: true };
+    return null;
+  }
+  function register(m, low, g, list) {
+    if (!m || registered.has(m) || !m.getTotalVertices) return false;
+    const c = classify(m, low);
+    if (!c) return false;
+    if (c.group) {
+      registered.add(m);
+      if (!list.includes(m)) g.addShadowCaster(m, false);
+      groups[c.group]++;
+    }
+    if (c.recv) m.receiveShadows = true;
+    return true;
+  }
+  /* the first pass (and a quality change): everything that is there now, before the loading warm-up compiles it */
   function scanCasters(low) {
     const g = stage.shadows;
     const sm = g && g.getShadowMap && g.getShadowMap();
     if (!sm) return;
     const list = sm.renderList;
-    const add = (m, group) => {
-      if (!m || registered.has(m) || !m.getTotalVertices) return;
-      registered.add(m);
-      if (!list.includes(m)) g.addShadowCaster(m, false);
-      groups[group]++;
+    scene.meshes.forEach((m) => register(m, low, g, list));
+  }
+  /* anything that arrives later (people, props, the model, neighbours) is queued by the scene's own add events, no
+     polling: its shadow-depth and lit shaders compile first, and only then does it join the shadow map. */
+  const pending = [];
+  let compiling = false;
+  scene.onNewMeshAddedObservable.add((m) => { if (m && m.getTotalVertices) pending.push(m); });
+  function drainPending() {
+    if (compiling || !pending.length) return;
+    const g = stage.shadows;
+    const sm = g && g.getShadowMap && g.getShadowMap();
+    if (!sm) return;
+    const low = state.quality === "low";
+    const batch = pending.splice(0, pending.length).filter((m) => !m.isDisposed() && !registered.has(m) && classify(m, low));
+    if (!batch.length) return;
+    const add = () => {
+      const list = sm.renderList;
+      batch.forEach((m) => { if (!m.isDisposed()) register(m, low, g, list); });
     };
-    scene.meshes.forEach((m) => {
-      const n = m.name || "";
-      if (PROP_CASTERS.test(n)) { add(m, "props"); m.receiveShadows = true; }
-      else if (n === "props-flat" || n === "props-glow") m.receiveShadows = true;
-      else if (!low && CROWD_CASTERS.test(n)) add(m, "crowd");
-      else if (!low && (/^block-/.test(n) || /^city-(brick|concrete|glass|stone)-/.test(n))) { add(m, "buildings"); m.receiveShadows = true; }
-      else if (/^city-/.test(n) && n !== "city-skyline" && n !== "city-beacons" && n !== "city-base") m.receiveShadows = true;
-    });
-    scene.transformNodes.forEach((t) => {
-      if (!/^neighbor-/.test(t.name || "") || registered.has(t)) return;
-      const kids = t.getChildMeshes(false);
-      if (!kids.length) return;
-      registered.add(t);
-      kids.forEach((m) => {
-        if (m.getTotalVertices && m.getTotalVertices() > 0) {
-          if (!list.includes(m)) g.addShadowCaster(m, false);
-          registered.add(m);
-          m.receiveShadows = true;
-          groups.neighbours++;
-        }
-      });
-    });
-    const proxy = scene.getMeshByName("playerShadowProxy");
-    if (proxy && !registered.has(proxy)) {
-      registered.add(proxy);
-      if (!list.includes(proxy)) g.addShadowCaster(proxy, false);
-      groups.player++;
+    if (nullEngine || !g.forceCompilationAsync) { add(); return; }
+    compiling = true;
+    // compile the depth shader for these meshes on a scratch list, then add them; the lit materials compile with them
+    const real = sm.renderList;
+    const done = () => { compiling = false; add(); };
+    try {
+      sm.renderList = batch.filter((m) => m.getTotalVertices() > 0);
+      const jobs = [g.forceCompilationAsync().catch(() => {})];
+      batch.forEach((m) => { if (m.material && m.material.forceCompilationAsync) jobs.push(m.material.forceCompilationAsync(m).catch(() => {})); });
+      sm.renderList = real;
+      Promise.all(jobs).then(done, done);
+    } catch (e) {
+      sm.renderList = real;
+      done();
     }
   }
 
@@ -500,7 +528,6 @@ export function installRenderPipeline(world) {
   const moonCol = new B.Color3(0.56, 0.66, 0.95);
   const tmpDir = new B.Vector3();
 
-  let lastScan = 0;
   let lastLow = lowNow();
   let lastClock = null;
   let jumpUntil = 0;
@@ -547,10 +574,7 @@ export function installRenderPipeline(world) {
       }
     } else state.moon = 0;
 
-    if (now - lastScan > 2000) {
-      lastScan = now;
-      scanCasters(low);
-    }
+    drainPending();
   });
 
   applyQuality(lastLow);
