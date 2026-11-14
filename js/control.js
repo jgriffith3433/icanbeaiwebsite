@@ -112,10 +112,15 @@ export function createMover(world, cfg) {
     p.plugin.raycast(new B.Vector3(x, fromY, z), new B.Vector3(x, -1, z), ray, cc ? { ignoreBody: cc._body } : undefined);
     return ray.hasHit ? ray.hitPoint.y : guessFloor(x, z);
   }
+  /* The footprint probed for room to stand: the centre, a ring at half the radius and 12 points just outside it, so a couch
+     arm, a table leg or a shelf's edge between four compass points can't hide (the stand-up once put his legs in the couch). */
+  const CLEAR_PTS = [[0, 0]];
+  for (let i = 0; i < 8; i++) CLEAR_PTS.push([Math.sin((i / 8) * TAU) * R * 0.5, Math.cos((i / 8) * TAU) * R * 0.5]);
+  for (let i = 0; i < 12; i++) CLEAR_PTS.push([Math.sin((i / 12) * TAU) * (R + 0.12), Math.cos((i / 12) * TAU) * (R + 0.12)]);
   /* Room to stand: nothing knee-high where his capsule would be. */
   function clear(x, z) {
     if (!physics()) return true;
-    return [[0, 0], [R, 0], [-R, 0], [0, R], [0, -R]].every(([dx, dz]) => floorAt(x + dx, z + dz, 2.3) < 0.3);
+    return CLEAR_PTS.every(([dx, dz]) => floorAt(x + dx, z + dz, 2.3) < 0.3);
   }
   function freeSpotNear(x, z) {
     if (clear(x, z)) return { x, z };
