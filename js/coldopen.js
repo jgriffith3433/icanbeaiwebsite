@@ -360,6 +360,9 @@ export function startColdOpen() {
     later(() => { if (W && W.triggerFlash) W.triggerFlash(90, -0.3); }, 700);
     later(() => {
       // No story line before the first cast: the frame is him, the rod and one prompt (clarity, critic cold-start).
+      // The Bolt button is up from the landing, so a tap during the push-in already cast Rain: the prompt must not come
+      // back (with the button gone) or drag the phase back to "waiting".
+      if (!on || phase !== "landing") return;
       emit("line", { text: "", silent: true });
       phase = "waiting";
       prompt.hidden = false;
