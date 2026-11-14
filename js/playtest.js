@@ -11909,10 +11909,45 @@ async function birdieWaits(t, label) {
   await sleep(600);
 }
 
-async function phoneTouch(options, t) {
+/* Evidence for the audio probe's longest silence (it counts buffer-source starts only): the time of every source start and of every
+   scenario step (events, progress), then the longest gap between two starts and the step it fell in, as events and metrics
+   (audio.longestGapS, audio.longestGapAtS, audio.longestGapStep, audio.gapSources). Shows whether a gap is at boot or mid-play. */
+async function withAudioGapEvidence(t, fn) {
+  const starts = [];
+  const steps = [{ at: performance.now(), name: "scenario start" }];
+  const proto = typeof AudioBufferSourceNode !== "undefined" ? AudioBufferSourceNode.prototype : null;
+  const origStart = proto && proto.start;
+  if (origStart) proto.start = function (...a) { starts.push(performance.now()); return origStart.apply(this, a); };
+  const origEvent = t.event, origProgress = t.progress;
+  t.event = function (type, detail) { steps.push({ at: performance.now(), name: String(type) }); return origEvent.call(t, type, detail); };
+  t.progress = function (p) { steps.push({ at: performance.now(), name: "progress " + p }); return origProgress.call(t, p); };
+  try { await fn(); }
+  finally {
+    if (origStart) proto.start = origStart;
+    t.event = origEvent; t.progress = origProgress;
+    const end = performance.now();
+    const marks = [steps[0].at, ...starts, end].sort((a, b) => a - b);
+    let best = { gap: 0, from: marks[0] };
+    for (let i = 1; i < marks.length; i++) if (marks[i] - marks[i - 1] > best.gap) best = { gap: marks[i] - marks[i - 1], from: marks[i - 1] };
+    let step = steps[0].name;
+    for (const s of steps) if (s.at <= best.from + best.gap / 2) step = s.name;
+    const r1 = (v) => Math.round(v) / 1000;
+    t.metric("audio.longestGapS", r1(best.gap));
+    t.metric("audio.longestGapAtS", r1(best.from - steps[0].at));
+    t.metric("audio.gapSources", starts.length);
+    t.event("audio-longest-gap", `longest gap between sound starts ${r1(best.gap)} s, from ${r1(best.from - steps[0].at)} s into the run, in step "${step}" (${starts.length} starts, ${steps.length} steps)`);
+  }
+}
+
+function phoneTouch(options, t) { return withAudioGapEvidence(t, () => phoneTouchRun(options, t)); }
+
+async function phoneTouchRun(options, t) {
   const land = innerWidth > innerHeight;
-  t.scene(land ? "Phone touch (landscape)" : "Phone touch (portrait)");
+  const playScene = land ? "Phone touch (landscape)" : "Phone touch (portrait)";
+  // Until the first frame the game really is on its loading screen: say so to the audio probe, then the play scene.
+  t.scene(window.day.now().frame ? playScene : "Loading");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
+  t.scene(playScene);
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
   const D = window.day;
   const C = D.control;

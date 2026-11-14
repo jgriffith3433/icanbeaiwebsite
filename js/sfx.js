@@ -1337,10 +1337,23 @@ import { pickRate } from "./variety.js";
   }
   /* A render frame can stall for many seconds (shader compiles, a software-GL machine, a background tab), and the fill above
      runs in the frame loop, so it stalled too (18 s of silence in cold-start). A plain 1 s timer (no network) covers that. */
+  let lastFillTick = clockMs();
   const fillTimer = setInterval(() => {
-    try { if (ctx() && clockMs() - lastHeardMs > 4800) playFill(hour() % 24); } catch (err) { /* ambience only */ }
+    try {
+      const nowMs = clockMs();
+      // A tick more than 2 s after the last one means the thread was blocked (a shader compile, a long task on a throttled phone): the
+      // bed may have kept looping but nothing new started, so play a fill at once instead of waiting for the next 4.8 s window.
+      const late = nowMs - lastFillTick > 2000;
+      lastFillTick = nowMs;
+      if (ctx() && (late || nowMs - lastHeardMs > 4800)) playFill(hour() % 24);
+    } catch (err) { /* ambience only */ }
   }, 1000);
   if (fillTimer && fillTimer.unref) fillTimer.unref(); // Node checks must be able to exit
+  /* A fill right after a stretch that blocked the thread: the first rendered frame (the boot's compiles are behind it) and the end of the
+     shader warm-up (`day:warm` idle, js/app.js), so no block is followed by silence. A fill only starts a sound when Sound is on. */
+  const fillAfterBlock = () => { try { if (ctx()) playFill(hour() % 24); } catch (err) { /* ambience only */ } };
+  try { if (scene.onAfterRenderObservable && scene.onAfterRenderObservable.addOnce) scene.onAfterRenderObservable.addOnce(fillAfterBlock); } catch (err) { /* none */ }
+  window.addEventListener("day:warm", (e) => { if (e && e.detail && e.detail.idle) fillAfterBlock(); });
   function watchCity(dt) {
     if (!ctx()) return; // ambience only with the Sound button on
     const h = hour() % 24;
