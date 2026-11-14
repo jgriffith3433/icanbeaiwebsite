@@ -2326,6 +2326,33 @@ async function tapEl(el) {
   await sleep(90);
   touchOn(el, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
 }
+/** Takes him the way a player does (the Take control button by touch, Enter on a keyboard) and waits on the `day:control` event.
+ *  If he is in bed or driving, the clock goes to dusk first (named setup shortcut). Returns true once he is the player's;
+ *  otherwise records a problem naming why. */
+async function ensureControl(t, touch, label) {
+  const D = window.day;
+  const C = D.control;
+  if (C.mode() === "control") return true;
+  let tookEvent = false;
+  const onCtl = (e) => { if (e.detail && e.detail.action === "take") tookEvent = true; };
+  window.addEventListener("day:control", onCtl);
+  let why = "";
+  for (let k = 0; k < 4 && C.mode() !== "control"; k++) {
+    try { if (D.title && D.title.showing && D.title.showing() && D.title.quiet) D.title.quiet(); } catch (e) { /* ok */ }
+    const tk = $("control");
+    if (k > 0 && D.jump) { D.jump("19:00"); await sleep(500); }
+    if (C.mode() === "returning") { await t.until(() => C.mode() !== "returning", 8000, "him walking back").catch(() => {}); continue; }
+    why = !tk ? "no Take control button" : tk.disabled ? "Take control is disabled (he is driving)" : "";
+    if (touch && tk && !tk.disabled) await tapEl(tk); else pressKey("Enter");
+    await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  }
+  if (C.mode() === "control") await t.until(() => tookEvent, 1000, "the control event").catch(() => {});
+  window.removeEventListener("day:control", onCtl);
+  const ok = C.mode() === "control";
+  t.event("audio-take-control", `${label}: ${ok ? "he is the player's" + (tookEvent ? " (day:control take heard)" : "") : "NOT taken: " + (why || "mode " + C.mode())}`);
+  if (!ok) t.problem("bug", `${label}: Take control never handed him over (${why || "mode " + C.mode()}), so casts would be refused`);
+  return ok;
+}
 /** Measures how far and how fast he goes while `act` runs: { path, peak } (metres, metres per second). */
 async function measure(act) {
   const C = window.day.control;
@@ -11375,6 +11402,7 @@ async function audioCheck(options, t) {
   const strikes = [];
   const onStrike = (e) => strikes.push((e && e.detail) || {});
   window.addEventListener("day:strike", onStrike);
+  await ensureControl(t, touch, "before the first bolt");
   const okBolt = P.command("bolt", touch ? "touch" : "key");
   await checkMusicAfterCast();
   const reacted = await t.until(() => { const c = crowdNow(); return (c.flinching || 0) > 0 || (c.lookingUp || 0) > 0 || (c.reacting || 0) > 0; }, 3000, "a pedestrian's reaction").then(() => true).catch(() => false);
@@ -11391,6 +11419,7 @@ async function audioCheck(options, t) {
   const sliceNow = () => { const x = D.slice && D.slice.now ? D.slice.now() : {}; return { lawn: x.lawn, lawnShown: x.lawnShown, pond: x.pond }; };
   const lawnBefore = sliceNow();
   t.event("lawn-before-rain", JSON.stringify(Object.assign({ tally: D.memory && D.memory.tally ? D.memory.tally().changed : 0 }, lawnBefore)));
+  await ensureControl(t, touch, "before the first rain");
   const okRain = P.command("rain", touch ? "touch" : "key");
   const lawnGreen = await t.until(() => { const x = sliceNow(); return x.lawn === "damp" && x.lawnShown > 0.5; }, 9000, "the lawn greening").then(() => true).catch(() => false);
   await sleep(300);
@@ -11414,13 +11443,18 @@ async function audioCheck(options, t) {
   const seen = {};
   for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"], ["gale", "gale"], ["fog", "fog"], ["sunbreak", "sunbreak"]]) {
     refill();
+    await ensureControl(t, touch, `before ${name}`);
     const n0 = D.sfx.info().casts.length;
     const ok = P.command(id, touch ? "touch" : "key");
+    const bl = P.now && P.now().blocked;
     await t.until(() => D.sfx.info().casts.some((c, i) => i >= n0 - 0 && c.power === name), 2500, `the ${name} cast sound`).catch(() => {});
     const c = D.sfx.info().casts.filter((x) => x.power === name).pop();
     seen[name] = c || null;
-    if (!ok) t.problem("bug", `${name}: the cast command was refused`);
-    t.event("audio-cast-" + name, c ? `${name}: ${c.source}${c.file ? " " + c.file : ""}` : `${name}: no cast sound (command ${ok ? "accepted" : "refused"})`);
+    if (!ok) {
+      const reason = C.mode() !== "control" ? `he is not the player's (mode ${C.mode()})` : bl && bl.reason ? `ability ${bl.reason}` : "gated";
+      t.problem("bug", `${name}: the cast command was refused (${reason})`);
+    }
+    t.event("audio-cast-" + name, c ? `${name}: ${c.source}${c.file ? " " + c.file : ""}` : `${name}: no cast sound (command ${ok ? "accepted" : "refused: " + (C.mode() !== "control" ? "not in control, mode " + C.mode() : "ability or gate")})`);
     if (!c) t.problem("bug", `${name} played no cast sound`);
     else if (c.source !== "file") t.problem("warning", `${name}'s cast sound was the synth stand-in, not a clip (the clip hadn't decoded yet)`);
     await sleep(900);
