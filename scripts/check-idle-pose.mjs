@@ -144,7 +144,7 @@ const castNow = { cast: null };
 window.day = { control: { state: () => fake }, weather: { now: () => sky }, powers: { now: () => castNow } };
 const ids = [...new Set([...Object.keys(POWER_POSE), ...VERB_IDS])];
 const cases = [];
-for (const c of SKIN_CLIPS) if (!SEATED.has(c)) for (const secs of [0.3, 3]) cases.push({ name: c, clip: c, secs });
+for (const c of SKIN_CLIPS) if (!SEATED.has(c) && (!process.env.ONLY || c === process.env.ONLY)) for (const secs of [0.3, 3]) cases.push({ name: c, clip: c, secs });
 for (const id of ids) cases.push({ name: `power ${id}`, clip: powerPose(id), secs: 1.2, id });
 for (const k of cases) {
   for (const weather of ["clear", "wind"]) {
@@ -159,27 +159,32 @@ for (const k of cases) {
     castNow.cast = null;
     fake.grounded = true;
     frames("idle", 0, 60); // the 2 s the clip gets to settle
-    let worst = 0, handZ = 9, bootBad = "", prevS = null, pop = 0, fidget = 0;
+    let worst = 0, handZ = 9, bootBad = "", prevS = null, pop = 0, held = 0, since = 0, lastClip = "", run = 0, longest = 0;
     frames("idle", 0, 300, () => {
       const s = read();
       const c = skin.clip();
-      if (c !== "idle") fidget++; // shelter in the rain, a look at a clear sky: his own idle variants, each tested on its own
-      if (c === "idle") {
-        worst = Math.max(worst, dist(s, ref));
+      since = c === lastClip ? since + 1 : 0; // a cross-fade is a fast move on purpose: pops are read once a clip has settled in
+      lastClip = c;
+      held = Math.max(held, skin.held ? skin.held() : 0);
+      run = c === "idle" ? 0 : run + 1;
+      longest = Math.max(longest, run); // shelter in the rain, a look at a clear sky: his own idle variants, each tested on its own
+      if (c === "idle" || c === "lookup") {
+        if (c === "idle") worst = Math.max(worst, dist(s, ref));
         handZ = Math.min(handZ, sideOf(s, "Left").z, sideOf(s, "Right").z);
         for (const b of [s.L, s.R]) if (Math.abs(b.roll) > 6 || b.pitch > -8 || b.pitch < -22) bootBad = `${b.pitch.toFixed(0)} deg pitch, ${b.roll.toFixed(0)} roll`;
-        if (prevS) pop = Math.max(pop, dist(prevS, s));
+        /* the look at the sky moves the head fast on purpose: pops are read on idle only */
+        if (c === "idle" && prevS && since > 15) { const dd = dist(prevS, s); if (dd > 0.03 && process.env.POPS) console.error("pop", k.name, k.secs, weather, c, since, (dd * 100).toFixed(1)); pop = Math.max(pop, dd); }
       }
-      prevS = c === "idle" ? s : null;
+      prevS = c === "idle" || c === "lookup" ? s : null;
     });
     const tag = `${k.name} x ${k.secs} s, ${weather} sky, then 10 s still`;
     ok(worst < 0.06, `${tag}: idle is ${(worst * 100).toFixed(1)} cm from the clean pose`);
     ok(handZ > 0.05, `${tag}: a hand is ${handZ.toFixed(2)} m in front of the hips`);
     ok(!bootBad, `${tag}: boots ${bootBad}`);
     ok(pop < 0.03, `${tag}: a bone jumps ${(pop * 100).toFixed(1)} cm between two frames`);
-    /* sheltering in the rain and looking up are held for as long as he stands in that weather; a look at a clear sky is a
-       few seconds long and goes back to idle (it never stays held). */
-    if (weather === "clear") ok(fidget < 200, `${tag}: still not idle for ${(fidget / 30).toFixed(1)} s of the 10`);
+    /* his one fidget (the look at the sky) is a 7 s clip: still in something other than idle after 7.5 s means a clip was held */
+    ok(longest < 225, `${tag}: not idle for ${(longest / 30).toFixed(1)} s in a row (a clip stuck on its last frame)`);
+    ok(held < 0.3, `${tag}: a clip is held on its last frame for ${held.toFixed(1)} s (a pose that never clears)`);
   }
 }
 window.day = undefined;

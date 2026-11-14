@@ -21,6 +21,7 @@
    ========================================================================== */
 import "@babylonjs/loaders/glTF/index.js"; // registers the .glb loader
 import { clipAvatar } from "./avatar.js";
+import { powerPose } from "./power-poses.js";
 
 export const SKIN_CLIPS = [
   "idle", "walk", "run", "jump", "fall", "float", "cast", "throw",
@@ -324,11 +325,8 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     if (want === "cast") {
       const pow = window.day && window.day.powers && window.day.powers.now ? window.day.powers.now() : null;
       const last = pow && pow.cast && (pow.cast.power || pow.cast.id);
-      if (last === "lightning" || last === "storm" || last === "bolt") return named("windbolt") ? "windbolt" : "cast";
-      if (last === "rain" || last === "fog" || last === "sun" || last === "gale" || last === "gust" || last === "tornado" || last === "wind") {
-        return named("windrain") ? "windrain" : "cast";
-      }
-      return "cast";
+      const posed = last ? powerPose(last) : "cast";
+      return posed !== "cast" && named(posed) ? posed : "cast";
     }
     if (want === "idle" && st && st.mode === "control" && st.grounded && st.speed < 0.15) {
       const raining = wx && (wx.rain > 0.25 || wx.state === "rain" || wx.state === "storm");
@@ -354,6 +352,8 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     boltMeshes: bolts.meshes,
     clips: SKIN_CLIPS.filter((c) => named(c)),
     clip: () => clip,
+    /* seconds the current one-shot has sat on its last frame (0 while it plays or a loop runs): a pose that is held, not played */
+    held: () => player.heldSeconds(),
     motion: () => Object.assign({}, motion, ik.stats()),
     /* What his body is doing right now, in his own frame (+z forward, +x his left): how far the spine and neck lean
        from upright, the pelvis and shoulder lines' yaw, how far the knees bend, the hands' gap. The clip-poses playtest
@@ -389,6 +389,9 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       if (c === "idle" && ctx.wx && ctx.wx.state === "clear" && (ctx.wx.rain || 0) < 0.05) idleClear += dt;
       else if (c !== "lookup") idleClear = Math.max(0, idleClear - dt * 0.5);
 
+      /* His own fidget (a look at the sky) plays once: when it has played out he is back to idle for a good while, not held
+         on its last frame for as long as the sky stays clear. */
+      if (clip === "lookup" && player.ended("lookup")) idleClear = -12;
       let want = pickHeroClip(named(c) ? c : "idle", Object.assign(ctx, { mine }));
       // Force lookup once idleClear crosses the threshold
       if (want === "idle" && idleClear >= 4 && named("lookup") && mine) want = "lookup";
