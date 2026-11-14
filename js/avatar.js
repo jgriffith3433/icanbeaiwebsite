@@ -122,7 +122,11 @@ export function clipAvatar(root, animationGroups, opts = {}) {
         const fps = (gr) => gr.targetedAnimations[0]?.animation.framePerSecond || 30;
         const lw = (w.to - w.from) / fps(w), lr = (r.to - r.from) / fps(r);
         const stride = strideOf.walk + (strideOf.run - strideOf.walk) * runShare;
-        const rate = Math.max(0.3 / lw, Math.min(3.6 / Math.min(lw, lr), speed / stride)); // cycles per second
+        /* Never more than MAX_STEP of a cycle in one frame: at a run (4.5 cycles/s) a slow phone frame (10-15 fps) jumps most of a
+           cycle, the boots land back near where they were (a wheel turning backwards, or not at all) and read as planted while the
+           body travels 5.6 m/s. Past the cap the stride plays at the frame rate's pace and keeps visibly stepping. */
+        const MAX_STEP = 0.28;
+        const rate = Math.max(0.3 / lw, Math.min(3.6 / Math.min(lw, lr), speed / stride, dt > 0 ? MAX_STEP / dt : 99)); // cycles per second
         phase = (phase + rate * dt) % 1;
         [[w, lw], [r, lr]].forEach(([gr, l]) => {
           if (!gr.isPlaying) gr.start(true, 1, gr.from, gr.to);
