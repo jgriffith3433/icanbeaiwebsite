@@ -11975,8 +11975,12 @@ async function birdieWaits(t, label) {
   const slice = () => (D.slice && D.slice.now && D.slice.now()) || {};
   const before = slice().lawnK;
   if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  // The cold open's own first cast was Rain (the prompt reads "Birdie needs rain"), and the street counts it as her answer:
+  // then the lawn change is read from the street's log against the dry lawn it recorded, with no second tap.
+  const answeredByFirst = !!(D.street && D.street.now().log.some((e) => e.action === "answered" && e.who === "birdie"));
   const rain = $("ability-rain");
-  if (rain && hudVisible(rain)) await tapEl(rain);
+  if (answeredByFirst) t.event("birdie-rain-cast", `${label}: the cold open's first Rain answered Birdie`);
+  else if (rain && hudVisible(rain)) await tapEl(rain);
   else { t.problem("bug", `${label}: no Rain button to tap for Birdie`); return; }
   const findLawn = () => (D.street && D.street.now().log.find((e) => e.action === "lawn-change")) || null;
   await t.until(() => !!findLawn(), 12000, "the lawn to change after the cast").catch(() => {});
@@ -11985,7 +11989,8 @@ async function birdieWaits(t, label) {
   t.metric("birdie.lawnBefore", before == null ? -1 : before);
   t.metric("birdie.lawnAfter", after == null ? -1 : after);
   t.event("birdie-lawn", `${label}: after the Rain tap the lawn went ${before} -> ${after}, street ${lawn ? "logged lawn-change (" + lawn.from + " -> " + lawn.to + ")" : "logged NO lawn change"}, Birdie ${N.waiting("birdie") ? "still waiting" : "stopped waiting (thanked)"}`);
-  if (!(after != null && (before == null || after > before + 0.4))) t.problem("bug", `${label}: the lawn did not change after Rain (${before} -> ${after})`);
+  const changed = answeredByFirst ? !!(lawn && lawn.changed) : (after != null && (before == null || after > before + 0.4));
+  if (!changed) t.problem("bug", `${label}: the lawn did not change after Rain (${before} -> ${after})`);
   if (N.waiting("birdie")) t.problem("bug", `${label}: Birdie kept waiting after her rain came`);
   await sleep(600);
 }

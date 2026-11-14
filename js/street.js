@@ -220,7 +220,7 @@ html.street-wait .abilitybar .ab.locked:not(.st-teaser){display:none}
   }
   function open(s, spokenAlready) {
     phase = "open";
-    if (s.id === "rain") lawnBefore = lawnK(); // the dry lawn, before the cast
+    if (s.id === "rain") lawnBefore = coldRain && lawnDry != null ? lawnDry : lawnK(); // the dry lawn, before the cast
     openFor = 0;
     nagged = false;
     placeCue(s);
@@ -262,9 +262,14 @@ html.street-wait .abilitybar .ab.locked:not(.st-teaser){display:none}
     emit("answered", { verb: s.unlock, power, who: s.who, lawn: lawnBefore });
     return true;
   }
+  // The cold open's prompt is "Birdie needs rain": his first cast IS Rain. Birdie's call comes a few seconds after it, so
+  // that cast answers her (a second Rain tap, with the lawn already green, would leave her waiting for nothing).
+  let coldRain = false;
+  let lawnDry = null;
   window.addEventListener("day:power", (e) => {
     const d = (e && e.detail) || {};
     if (d.action === "denied") return;
+    if (arming && n < 0 && root.coldopen && day.coldopen && day.coldopen.active && day.coldopen.active() && (d.power || d.action) === "rain") coldRain = true;
     answer(d.power || d.action);
   });
 
@@ -336,6 +341,7 @@ html.street-wait .abilitybar .ab.locked:not(.st-teaser){display:none}
     emit("begin", {});
     // the cold open spoke Birdie's call: Rain opens with it
     open(stages[0], true);
+    if (coldRain) { coldRain = false; answer("rain"); } // his first cast already was her Rain
     return true;
   }
   let arming = false;
@@ -369,6 +375,8 @@ html.street-wait .abilitybar .ab.locked:not(.st-teaser){display:none}
     if (d.action === "start") {
       // a new player's cold open: the four verbs are locked from the first frame (the bolt is the one he has)
       arming = true;
+      coldRain = false;
+      lawnDry = lawnK();
       if (n < 0) { lockIds(0); html.classList.add("street-wait"); }
     } else if (d.action === "birdie") begin();
     else if ((d.action === "end" || d.action === "failed") && n < 0) {
