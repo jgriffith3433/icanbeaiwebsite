@@ -10916,8 +10916,52 @@ async function audioCheck(options, t) {
 
   // take him (Enter, or the button by touch) and cast the five
   if (touch) { const tk = $("control") || document.querySelector("#take-control,[data-take]"); if (tk) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
-  await t.until(() => C.mode() === "control", 6000, "Take control").catch(() => {});
+  await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  // He may be driving (Take control is disabled in the car) or in bed: the same fallback the cold open uses, the clock to dusk
+  // where he is on foot (named setup shortcut), then the real button / Enter again.
+  for (let k = 0; k < 3 && C.mode() !== "control"; k++) {
+    if (D.jump) D.jump("19:00");
+    await sleep(500);
+    if (touch) { const tk = $("control"); if (tk && !tk.disabled) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+    await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  }
+  if (C.mode() !== "control") t.problem("bug", "Take control never handed him over, so no cast could be tried");
+  t.progress(0.3);
+
+  // The first cast, on the roof: every verb open, he stands on the apartment roof, a bolt lands on the street beside a
+  // pedestrian and rain follows. Each must be accepted, the strike must show on the street, and a pedestrian must react.
+  try { if (P.gate) P.gate(null); if (P.aimAt) P.aimAt(null); if (D.street && D.street.stop) D.street.stop("check"); } catch (e) { /* ok */ }
+  try { ["bolt", "rain", "wind", "fog", "sunbreak"].forEach((id) => P.abilities.unlock && P.abilities.unlock(id)); } catch (e) { /* ok */ }
+  if (C.place) C.place(-21, 0.5, 1.5708, {});
+  await sleep(400);
   const refill = () => { try { P.abilities && P.abilities.reset && P.abilities.reset(100); } catch (e) { /* ok */ } };
+  refill();
+  const crowdNow = () => (D.crowd && D.crowd.info ? D.crowd.info() : {});
+  const ppl = D.crowd && D.crowd.positions ? D.crowd.positions().people : [];
+  const me0 = C.state();
+  const near = ppl.map((p) => ({ p, d: Math.hypot(p.x - me0.x, p.z - me0.z) })).filter((q) => q.d > 6).sort((a, b) => a.d - b.d)[0];
+  if (near && P.aimAt) P.aimAt({ x: near.p.x, y: 0, z: near.p.z });
+  const strikes = [];
+  const onStrike = (e) => strikes.push((e && e.detail) || {});
+  window.addEventListener("day:strike", onStrike);
+  const okBolt = P.command("bolt", touch ? "touch" : "key");
+  const reacted = await t.until(() => { const c = crowdNow(); return (c.flinching || 0) > 0 || (c.lookingUp || 0) > 0 || (c.reacting || 0) > 0; }, 3000, "a pedestrian's reaction").then(() => true).catch(() => false);
+  window.removeEventListener("day:strike", onStrike);
+  if (P.aimAt) P.aimAt(null);
+  const st = P.now && P.now().strike;
+  t.event("first-cast-bolt", `Lightning ${okBolt ? "accepted" : "REFUSED"}; ${strikes.length} strike events; street hit ${st ? JSON.stringify({ x: Math.round(st.x), z: Math.round(st.z) }) : "none"}`);
+  t.event("first-cast-reaction", reacted ? `a pedestrian reacted: ${JSON.stringify({ flinching: crowdNow().flinching, lookingUp: crowdNow().lookingUp, reacting: crowdNow().reacting })}` : "no pedestrian reacted");
+  if (!okBolt) t.problem("bug", "The first Lightning cast on the roof was refused");
+  else if (!strikes.length && !st) t.problem("bug", "The first Lightning cast left no visible strike on the street");
+  if (okBolt && !reacted) t.problem("bug", "No pedestrian reacted to the first bolt");
+  await sleep(700);
+  refill();
+  const okRain = P.command("rain", touch ? "touch" : "key");
+  const rainOn = await t.until(() => { const w = window.weather && window.weather.now ? window.weather.now() : {}; return w.state === "rain" || (w.rain || 0) > 0.2; }, 3000, "rain").then(() => true).catch(() => false);
+  t.event("first-cast-rain", `Rain ${okRain ? "accepted" : "REFUSED"}; sky ${rainOn ? "rains" : "did not change"}; crowd reaction ${crowdNow().reaction || "none"}`);
+  if (!okRain) t.problem("bug", "The first Rain cast on the roof was refused");
+  t.metric("firstCastAccepted", okBolt && okRain ? 1 : 0);
+  await sleep(700);
   const seen = {};
   for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"], ["gale", "gale"], ["fog", "fog"], ["sunbreak", "sunbreak"]]) {
     refill();
