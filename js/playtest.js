@@ -11786,6 +11786,12 @@ async function coldStart(options, t) {
 
   if (!auto) { if (phone) await tapEl(playBtn); else await clickEl(playBtn); }
   t.event("cold-start-play", auto ? "auto-started (no click)" : phone ? "tapped Play" : "clicked Play");
+  setTimeout(() => {
+    const L = D.look && D.look.info ? D.look.info() : null;
+    const sf = D.look && D.look.surfaces ? D.look.surfaces.info() : null;
+    const m = D.look && D.look.mats;
+    t.event("cold-start-ground", `quality ${L ? L.quality : "?"}; asphalt albedo ${m && m.asphalt.albedoTexture ? m.asphalt.albedoTexture.name : "none"}, lawn albedo ${m && m.ground.albedoTexture ? m.ground.albedoTexture.name : "none"}; low ground maps ${sf && sf.low ? sf.low.join("+") : "none"}`);
+  }, 4000);
   const gotControl = await waitFor(() => T.control != null, 4000);
   if (!gotControl) { t.problem("blocker", `Play didn't hand him over (control mode ${D.control.mode()})`); return; }
   t.scene("Cold start");
