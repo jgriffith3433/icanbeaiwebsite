@@ -40,7 +40,7 @@ export function startTitle() {
   let autoTimer = 0;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "phone-touch") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");

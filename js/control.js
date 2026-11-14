@@ -539,6 +539,7 @@ function install() {
     rain: { rad: 0.5, beta: 0.04, align: 0.9 },
     fog: { rad: 0.5, beta: 0, align: 0.9 },
     sunbreak: { rad: 0.7, beta: 0.1, align: 0.9 },
+    look: { rad: 1.6, beta: 0.1, align: 0.95 }, // a tap on an ask's marker (day.control.frame)
   }, CAM.cast || {});
   const TAU2 = Math.PI * 2;
   const wrapPi = (a) => ((((a + Math.PI) % TAU2) + TAU2) % TAU2) - Math.PI;
@@ -1424,6 +1425,12 @@ function install() {
       vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
     }),
     move: mover.move,
+    /** Swing the camera so the point (x, z) is ahead of him (a tap on a neighbor's ask marker): the cast's own eased framing. */
+    frame: (x, z, y) => {
+      if (mode !== "control" || cine()) return false;
+      cs.cast = { t: 0, power: "look", x, y: y == null ? s.y : y, z, run: 0, best: 0, frames: 0, framedFrames: 0 };
+      return true;
+    },
     /** Game seconds simulated while he's the player's (sum of the control steps' dt). */
     simTime: () => simT,
     /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */

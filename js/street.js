@@ -37,7 +37,7 @@ export function startStreet() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches") quiet = true; // other scenarios never meet the lesson
+    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches" && id !== "ask-markers") quiet = true; // other scenarios never meet the lesson
     else if (!id && navigator.webdriver) quiet = true;
   } catch (e) { /* no location */ }
 
@@ -351,6 +351,13 @@ html.street-wait .abilitybar .ab.locked{display:none}
     stop,
     answer,
     reset,
+    /** The ask that is open now (for the world markers): who, verb, where they stand (or their window). */
+    open: () => {
+      if (phase !== "open" || n < 0 || n >= stages.length) return null;
+      const s = stages[n];
+      const t = target(s);
+      return { who: s.who, verb: s.unlock, answer: s.answer, x: t.x, z: t.z, inside: t.inside, id: "street-" + s.id };
+    },
     cueAt: () => (cue && cue.at ? { x: cue.at.x, z: cue.at.z } : null),
   };
   day.street = api;

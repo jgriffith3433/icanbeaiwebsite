@@ -77,6 +77,7 @@ function install() {
   const fresh = () => people.forEach((p) => (st[p.id] = { stage: 0, doneBeats: [], bubble: null, bubbleUntil: 0, thanksAt: 0, askOpen: false, remembered: false, arcOpen: false, arcAsk: false, arcThanksAt: 0, arcLinesAt: 0, arcLineI: 0 }));
   fresh();
   let dayScore = 0;
+  let lastH = null;
   const events = [];
   function emit(action, detail) {
     events.push(Object.assign({ action, t: performance.now() }, detail));
@@ -555,6 +556,7 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       dayKey = fr.key;
     }
     const h = hourOf(fr.minutes);
+    lastH = h;
     const here = hero();
     const w = eng.getRenderWidth();
     const hh = eng.getRenderHeight();
@@ -783,6 +785,14 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       animStats.samples = 0;
     },
     events: () => events.slice(),
+    /** Asks that are up right now for the world markers (js/asks.js): in their window, not answered or missed, not today's request. */
+    asks: () => (lastH == null ? [] : people.map((p) => {
+      const s = st[p.id];
+      const beat = (p.beats || [])[s.stage];
+      if (!beat || beat.kind !== "ask" || !inWindow(lastH, beat.from, beat.to)) return null;
+      if (day.daily && day.daily.owns && day.daily.owns(p.id)) return null;
+      return { who: p.id, id: beat.id, verb: beat.ability, x: p.__pos.x, z: p.__pos.z, inside: !!p.__pos.inside, scale: p.scale || 1 };
+    }).filter(Boolean)),
     /** Have them play a gesture (ask, thanks, surprise) toward him: js/daily.js's request and thanks. */
     gesture: (id, kind) => {
       const p = people.find((q) => q.id === id);

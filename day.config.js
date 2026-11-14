@@ -2500,6 +2500,19 @@ window.DAY_CONFIG = {
        (a follow-up ask that the next verb answers; Ines: Fog, then a Wind gust to clear it). `spot` is where the cue
        stands when they are inside. Birdie's call is the cold open's own line (coldopen.lines.birdie) and unlocks Rain.
        Voice clips: Hawkes Gen audio.voice in their voices (scripts/sync-dialogue.mjs lists them). */
+    /* ASK MARKERS (js/asks.js): what a neighbor wants is seen in the world, not read. A plumbob marker (a 48 px tap target)
+       floats over the one who asks; the verb's icon (the UI kit's, the same one on the bar) hangs over the PLACE it is for,
+       on a stem and a ground ring that sit on the surface. `places` is [who][verb] -> where it is for. Tapping the marker
+       takes control if he's on his day and swings the camera to the ask (`day.control.frame`). Answered or missed, they go. */
+    askMarks: {
+      iconHeight: 6.5, // m over the ground
+      markHeight: 0.85, // m over the asker's head
+      places: {
+        birdie: { rain: { x: -6, z: 33, r: 7, name: "the park lawn" }, fog: { x: -21, z: 9.5, r: 5, name: "her pots" }, wind: { x: -6, z: 33, r: 7, name: "the park lawn" } },
+        dex: { sunbreak: { x: 46, z: 9.8, r: 5, name: "the shop stoop" } },
+        quill: { fog: { x: 154, z: 9.8, r: 6, name: "the annex" }, wind: { x: 154, z: 9.8, r: 6, name: "the annex" }, bolt: { x: 154, z: 14, r: 5, name: "the annex" } },
+      },
+    },
     teach: {
       storageKey: "icanbe.street",
       gap: 4.5, // s from a thanks to the next neighbor's call
