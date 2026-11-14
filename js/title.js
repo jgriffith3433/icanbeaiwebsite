@@ -190,7 +190,11 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     paintLeft();
     paintTally();
     const t = d && d.line ? d.line() : "";
-    const y = d && d.yesterdayLine ? d.yesterdayLine() : "";
+    let y = d && d.yesterdayLine ? d.yesterdayLine() : "";
+    try {
+      const tl = day.memory && day.memory.tally ? day.memory.tally() : null;
+      if (tl && tl.summary) y = tl.summary; // what the storm changed stays on the title: the return hook
+    } catch (e) { /* memory not up */ }
     dailyEl.textContent = t;
     dailyEl.hidden = !t;
     ydayEl.textContent = y;
@@ -211,6 +215,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   window.addEventListener("day:episode", () => { if (up && !el.classList.contains("fresh")) paintProgress(); });
   window.addEventListener("day:memory", () => { if (up) paintTally(); });
   window.addEventListener("day:daily", () => { if (up && !el.classList.contains("fresh")) paintDaily(); });
+  window.addEventListener("day:memory", () => { if (up && !el.classList.contains("fresh")) paintDaily(); });
   function emit(action, extra) {
     const detail = Object.assign({ action }, extra || {});
     log.push(Object.assign({ t: performance.now() }, detail));
