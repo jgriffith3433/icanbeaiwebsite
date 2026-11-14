@@ -504,7 +504,13 @@ export function startScore(dayApi) {
     urls.add(c.sting);
     if (c.whoosh) urls.add(c.whoosh);
     Object.keys(c.ambience).forEach((k) => c.ambience[k] && urls.add(c.ambience[k]));
-    await Promise.all([...urls].map(loadUrl));
+    // Secondary beds must not compete with the first minute's bundle, shaders and models on a slow link: wait for the
+    // page to settle (and idle), then fetch two at a time, the weather-critical ones (rain, wind) first.
+    await new Promise((ok) => setTimeout(ok, 8000));
+    await new Promise((ok) => (typeof requestIdleCallback === "function" ? requestIdleCallback(ok, { timeout: 4000 }) : setTimeout(ok, 0)));
+    const queue = [...urls].sort((x, y) => (/rain|wind/.test(x) ? 0 : 1) - (/rain|wind/.test(y) ? 0 : 1));
+    const lane = async () => { while (queue.length) await loadUrl(queue.shift()); };
+    await Promise.all([lane(), lane()]);
     live.samples = BEDS.some((b) => !!buffers[c.music[b]]) || AMB_LOOPS.some((k) => !!buffers[c.ambience[k]]);
     return live.samples;
   }
