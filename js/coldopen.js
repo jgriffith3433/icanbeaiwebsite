@@ -218,11 +218,11 @@ export function startColdOpen() {
     const V = day.voice;
     const N = day.neighbors && day.neighbors.now && day.neighbors.now();
     const me = N && N.people && N.people.find((p) => p.id === "birdie");
+    // The story is the one line she calls (voiced, one caption); his reply is no second caption: the street's lesson
+    // answers it by play (Rain is open now), so the first minute stays under the 40-word limit.
     const afterLine = () => {
-      const A = cfg.lines.after;
-      if (V && V.say) V.say("opening", { text: A[1], force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "opening" });
-      emit("after", { text: A[1] });
-      later(finish, 3400); // her call opened Rain: the bolt's gate comes off once he has answered her
+      emit("after", { text: "" });
+      later(finish, 600); // her call opened Rain: the bolt's gate comes off once she has spoken
     };
     // Birdie calls from her pots (js/voice.js: her voice, from where she stands, one caption with her name on it, never
     // over his line); the street's lesson (js/street.js) starts on this event: her call is Rain's ask.
