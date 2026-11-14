@@ -188,6 +188,9 @@ window.DAY_CONFIG = {
        walk, run, jump, fall, float, cast, throw, and the day's sit, type, phone, lie, side,
        recline. null = the box-built figure. */
     model: "models/small-weather.glb",
+    /* The phone / low-quality copy (npm run model:phone, scripts/make-phone-model.mjs: meshopt, WebP, <= 900 KB). js/app.js
+       fetches it when look.quality() is low at boot, else `model`. null = always the full one. */
+    modelPhone: "models/small-weather.phone.glb",
   },
 
   /* ------------------------------------------------------------------------

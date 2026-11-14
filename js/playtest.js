@@ -12160,6 +12160,11 @@ async function coldStart(options, t) {
   t.scene("Cold start");
   if (t.milestone) t.milestone("gameplay", "on the roof");
   { const stopHero = watchHero(t, "cold start"); t.onEnd ? t.onEnd(stopHero) : setTimeout(stopHero, 90000); }
+  { const ei = D.engineInfo ? D.engineInfo() : {}; let bytes = 0; try { const e = performance.getEntriesByType("resource").find((r) => /small-weather[^/]*\.glb/.test(r.name)); bytes = e ? e.transferSize || e.encodedBodySize || 0 : 0; } catch (e) { /* no timing */ }
+    const hero = D.world && D.world().heroDrawn ? D.world().heroDrawn() : "?";
+    t.event("cold-start-model", `model file ${ei.modelFile || "?"} (${bytes ? Math.round(bytes / 1024) + " KB transferred" : "size unknown"}), state ${ei.model}, drawn as ${hero}, quality ${D.look && D.look.quality ? D.look.quality() : "?"}`);
+    if (phone && ei.modelFile && !/phone/.test(ei.modelFile)) t.problem("bug", `The phone loaded the full model (${ei.modelFile}), not the compressed copy`);
+    if (phone && bytes && bytes > 900 * 1024) t.problem("bug", `The phone's model download was ${Math.round(bytes / 1024)} KB, over 900 KB`); }
   t.event("cold-start-control", `he is the player's ${T.control}s after Play; title ${D.title.showing() ? "STILL UP" : "closed"}`);
   if (D.title.showing()) t.problem("bug", "The title is still up after Play");
   if (D.tutorial && D.tutorial.blocking && D.tutorial.blocking()) t.problem("bug", "The first-visit card shows during the cold open");
