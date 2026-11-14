@@ -89,14 +89,13 @@ export function installSlice(day, world) {
     if (!quiet) emit("lawn", { state: st.lawn });
   };
   let cur = 0;
-  /* The wet layer: a Rain cast darkens the lawn and spreads the pond within WET_SECS (1.6 s), wherever he stands, and it dries
-     off over WET_DRY s once the player's rain is gone. It sits on top of the slower lawn above (the shown value is the larger). */
-  const WET_SECS = 1.6;
-  const WET_DRY = 24;
-  const WET_LEVEL = 0.85;
-  let wet = 0;
-  let wetOn = false;
-  let wetAt = 0;
+  /* The wet layer: a Rain cast darkens the lawn and spreads the pond within DRENCH_SECS (1.6 s), wherever he stands, and it dries
+     off over DRENCH_DRY s once the player's rain is gone. It sits on top of the slower lawn above (the shown value is the larger). */
+  const DRENCH_SECS = 1.6;
+  const DRENCH_DRY = 24;
+  const DRENCH_LEVEL = 0.85;
+  let drench = 0;
+  let drenchOn = false;
   const mudM = mat("slice-mud", "#5a4a30");
   mudM.alpha = 1;
   const pondMud = B.MeshBuilder.CreateCylinder("slice-pond-mud", { diameter: 10, height: 0.004, tessellation: 40 }, scene);
