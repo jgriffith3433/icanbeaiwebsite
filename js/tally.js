@@ -27,12 +27,12 @@ export function startTally() {
   let last = null;
   const log = [];
   const inControl = () => !!(day.control && day.control.mode && day.control.mode() === "control");
-  const rowsNow = () => { const t = day.memory && day.memory.tally ? day.memory.tally() : null; return t ? t.rows : []; };
+  const rowsNow = () => { const t = day.memory && day.memory.tally ? day.memory.tally() : null; return t && Array.isArray(t.rows) ? t.rows : []; };
   const sync = () => { seen = new Set(rowsNow().map((r) => r.id + ":" + r.n)); ready = true; };
 
   function show(power) {
     const t = day.memory && day.memory.tally ? day.memory.tally() : null;
-    if (!t) return;
+    if (!t || !Array.isArray(t.rows)) return;
     const fresh = t.rows.filter((r) => !seen.has(r.id + ":" + r.n));
     t.rows.forEach((r) => seen.add(r.id + ":" + r.n));
     if (!fresh.length || !inControl()) return;
