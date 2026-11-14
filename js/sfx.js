@@ -330,7 +330,7 @@
           if (m) (power.files[m[1]] = power.files[m[1]] || []).push(f);
         });
         power.index = true;
-        if (soundOn() && ctx()) loadPowerKinds(POWER_EAGER);
+        if (soundOn() && ctx()) loadPowerKinds(ALL_POWER_KINDS);
       });
   }
   function loadPowerKinds(kinds) {
@@ -508,6 +508,47 @@
         .then((buf) => new Promise((ok, no) => a.c.decodeAudioData(buf, ok, no)))
         .then((b) => { castBufs[k] = b; }).catch(() => {});
     });
+  }
+  /* ---------------- pre-decode and the quiet loop under idle moments ----------------
+     `preDecode()` runs at the first gesture with Sound on: the crack, whoosh, gale loop, sun shimmer, thunder body and rumble
+     from the power bank and the rain/fog clips are fetched and decoded before any cast, so every verb answers with its own
+     recording the first time (not a synth stand-in). `roomTone()` is a looping, very quiet low-passed noise bed on the
+     ambience bus (-40 dB-ish, pitch-shifted slow breathing) so no idle stretch is dead air. */
+  const ALL_POWER_KINDS = POWER_EAGER.concat(["gale-loop", "sun-shimmer", "body", "rumble"]);
+  function preDecode() {
+    if (!soundOn()) return;
+    powerIndex();
+    if (ctx()) { loadPowerKinds(ALL_POWER_KINDS); loadCastClips(); roomTone(); }
+  }
+  let tone0 = null;
+  function roomTone() {
+    if (tone0 || !audio) return;
+    const a = audio;
+    try {
+      const len = Math.floor(a.c.sampleRate * 6);
+      const buf = a.c.createBuffer(1, len, a.c.sampleRate);
+      const d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
+      const fade = Math.floor(a.c.sampleRate * 0.5); // seamless seam: the tail fades into the head's level
+      for (let i = 0; i < fade; i++) { const k = i / fade; d[len - 1 - i] = d[len - 1 - i] * k + d[fade - 1 - i] * (1 - k); }
+      const src = a.c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      try { src.__hawkesSampleId = "room-tone"; src.__hawkesBus = "ambience"; } catch (e) { /* */ }
+      const lp = a.c.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 420;
+      const g = a.c.createGain();
+      g.gain.setValueAtTime(0.0001, a.c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.03, a.c.currentTime + 2.5);
+      const Mix = mixApi();
+      const ab = Mix && Mix.bus && Mix.bus("ambience");
+      src.connect(lp); lp.connect(g);
+      g.connect((ab && ab.bus) || a.master);
+      src.start();
+      tone0 = { src, g };
+    } catch (e) { tone0 = null; }
   }
   /** One clip shaped as a cast: swell in, hold, fade out over `dur`, optional low-pass and rate. */
   function playCastClip(k, o) {
@@ -1296,16 +1337,12 @@
   if (typeof document !== "undefined" && document.getElementById) {
     const soundBtn = document.getElementById("sound");
     if (soundBtn && typeof soundBtn.addEventListener === "function") {
-      soundBtn.addEventListener("click", () => { if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER); loadCastClips(); } } });
+      soundBtn.addEventListener("click", () => preDecode());
     }
   }
   if (typeof window.addEventListener === "function") {
-    window.addEventListener("pointerdown", () => {
-      if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER); loadCastClips(); } }
-    }, true);
-    ["keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, () => {
-      if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER.concat(["gale-loop", "sun-shimmer", "body", "rumble"])); loadCastClips(); } }
-    }, { capture: true, passive: true }));
+    window.addEventListener("pointerdown", () => preDecode(), true);
+    ["keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, () => preDecode(), { capture: true, passive: true }));
   }
   window.addEventListener("day:episode", (e) => {
     const d = e.detail || {};
@@ -1441,6 +1478,8 @@
       },
       plays: bank.plays.slice(),
       casts: casts.slice(),
+      roomTone: !!tone0,
+      decoded: { power: Object.keys(power.buffers).filter((k) => (power.buffers[k] || []).length), cast: Object.keys(castBufs).filter((k) => castBufs[k]) },
       castClips: { rain: !!castBufs.rain, fog: !!castBufs.fog },
     }),
     sample,
