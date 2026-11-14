@@ -51,7 +51,7 @@ export function createMover(world, cfg) {
   const E = window.DayEngine;
   const M = Object.assign({}, MOVE_DEFAULTS, cfg.control && cfg.control.move);
   const H = 1.7; // capsule height
-  const R = 0.28; // and radius
+  const R = 0.36; // and radius: wide enough that his shoulders and swinging arms stay off furniture (0.28 let them sink into the dresser/TV and armchair)
   const STEP_DOWN = 0.45; // the deepest drop he steps down without leaving the ground (stairs, ramps, kerbs)
   const walkBackSpeed = Math.max(((cfg.person && cfg.person.walkSpeed) || 1.25) * 1.6, 1.6);
   const GRAV = new B.Vector3(0, -M.gravity, 0);
