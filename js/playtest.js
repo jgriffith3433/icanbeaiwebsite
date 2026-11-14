@@ -11540,7 +11540,7 @@ async function wakeHimRun(options, t) {
   const D = window.day;
   const C = D.control;
   const P = window.powers || D.powers;
-  try { localStorage.setItem("icanbe.opening", "wake-him"); localStorage.setItem("icanbe.tutorial", "wake-him"); localStorage.setItem("icanbe.firstrain", "done"); localStorage.setItem("icanbe.street", JSON.stringify({ done: true })); } catch (e) { /* private mode */ }
+  try { localStorage.setItem("icanbe.opening", "wake-him"); localStorage.setItem("icanbe.tutorial", "wake-him"); localStorage.setItem("icanbe.firstrain", "done"); localStorage.removeItem("icanbe.dayone"); localStorage.setItem("icanbe.street", JSON.stringify({ done: true })); } catch (e) { /* private mode */ }
   if (D.tutorial && D.tutorial.skip) D.tutorial.skip();
   if (D.title && D.title.quiet) D.title.quiet();
   if (phone && !C.state().touch) C.touch(true);
@@ -11660,6 +11660,38 @@ async function wakeHimRun(options, t) {
       if (!(sl.lawnShown >= 0.9)) t.problem("bug", `The lawn had not greened within 2 s of the first cast (${sl.lawnShown})`);
       if (!sl.firstCast) t.problem("bug", "The pond did not ripple where the first cast hit");
       if (!cheer || cheer.ms > 2000) t.problem("bug", "Birdie did not look up and cheer within 2 s of the first cast");
+    }
+  }
+  // day one's card (js/dayone.js): three outcomes, Tornado locked until "Start day two" is pressed (by touch on a phone)
+  if (first && D.dayone) {
+    const lockedBefore = D.dayone.now().locked;
+    const hold = D.powers && D.powers.abilities ? D.powers.abilities.isLocked("tornado") : null;
+    await t.until(() => { const c = $("day-one"); return !!c && !c.hidden && c.classList.contains("on"); }, 9000, "day one's card").catch(() => {});
+    await sleep(1500);
+    const card = $("day-one");
+    const shown = !!card && !card.hidden;
+    const rows = shown ? [...card.querySelectorAll("#day-one-outcomes li")].map((li) => li.textContent.trim().replace(/\s+/g, " ")) : [];
+    const sb = $("day-one-start");
+    const sr = sb ? sb.getBoundingClientRect() : null;
+    const cr = shown ? card.querySelector(".card").getBoundingClientRect() : null;
+    const inside = !!cr && cr.left >= 0 && cr.right <= innerWidth && cr.top >= 0 && cr.bottom <= innerHeight;
+    t.event("day-one-card", `${shown ? "shown" : "NOT shown"} ${((performance.now() - first.at) / 1000).toFixed(1)}s after the first cast: ${rows.length} outcomes (${rows.join(" | ")}), Tornado ${lockedBefore ? "locked" : "OPEN"} before, button ${sr ? Math.round(sr.width) + "x" + Math.round(sr.height) : "none"}, card ${inside ? "on screen" : "OFF SCREEN"}, scrollX ${document.documentElement.scrollWidth - innerWidth}`);
+    t.metric("dayone.outcomes", rows.length);
+    t.metric("dayone.buttonMinPx", sr ? Math.round(Math.min(sr.width, sr.height)) : 0);
+    if (!shown) t.problem("bug", "No day-one card appeared after the first cast");
+    else {
+      if (rows.length !== 3) t.problem("bug", `The day-one card shows ${rows.length} outcomes, not three`);
+      if (!inside) t.problem("bug", "The day-one card runs off the screen");
+      if (!sr || sr.width < 44 || sr.height < 44) t.problem("bug", "The Start day two button is under 44 px");
+      if (!lockedBefore || hold === false) t.problem("bug", "The next ability (Tornado) was not held back until the card");
+      if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The day-one card makes the page scroll sideways");
+      if (phone) await tapEl(sb); else sb.click();
+      await sleep(500);
+      const after = D.dayone.now();
+      const open = D.powers && D.powers.abilities ? !D.powers.abilities.isLocked("tornado") : false;
+      t.event("day-one-start", `Start day two pressed: card ${after.up ? "STILL UP" : "closed"}, Tornado ${open ? "unlocked" : "STILL LOCKED"}, saved ${after.done ? "yes" : "no"}`);
+      t.metric("dayone.unlocked", open ? 1 : 0);
+      if (after.up || !open) t.problem("bug", "Start day two did not close the card and unlock Tornado");
     }
   }
   await sleep(1500);
@@ -14780,7 +14812,7 @@ installPlaytest({
     },
   },
   scenarios: [
-    { id: "charge-log-pause", title: "Charge vs Body Energy, Live log has no future rows, pause/scrub say Paused and hold the clock, resume continues in order", seconds: 70, tags: ["hud", "smoke"], description: "Load with ?playtest=charge-log-pause. Real input: Esc, Space, day bar scrub, Play/10x, Enter. Events live-log-clean / paused-status / paused-clock / coming-up / resumed / log-order / charge-bar / body-energy. Run at 1280x720 and 390x844." },
+    { id: "charge-log-pause", title: "Charge vs Body Energy, Live log has no future rows, pause/scrub say Paused and hold the clock, resume continues in order", seconds: 70, tags: ["hud", "smoke"], description: "After the first cast a day-one card shows three outcomes and Tornado unlocks on Start day two (events day-one-card / day-one-start; metrics dayone.outcomes, dayone.buttonMinPx, dayone.unlocked). Load with ?playtest=charge-log-pause. Real input: Esc, Space, day bar scrub, Play/10x, Enter. Events live-log-clean / paused-status / paused-clock / coming-up / resumed / log-order / charge-bar / body-energy. Run at 1280x720 and 390x844." },
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "chapter-openers", title: "Chapter openers: each of the five chapters (The Sky, The Neighbours, The Long Drought, Storm Chasers, The Night Show) opens on a voiced in-engine scene of 20 s or less: the title in the sky (clouds or a billboard), a camera move clear of geometry, the motif, a He and Pilot exchange, one caption line, Skip in thumb reach, no text card", seconds: 300, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=chapter-openers ({\"touch\":true} for the phone run). Setup: earlier episodes marked finished, chapter-seen flags cleared. Real input: the Episodes button and each chapter's first row, Esc, a tap on Skip. Events chapter-<n>-start / -layout / -end, chapter-summary; metrics chapterMaxSeconds, chapterCameraInsideFrames, chapterLines, chapterSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
