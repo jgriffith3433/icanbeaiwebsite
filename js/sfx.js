@@ -1233,14 +1233,18 @@
     g.connect(out(a, 0, "ui"));
     src.start(a.c.currentTime);
   }
-  let lastPress = 0;
-  const pressable = (el) => el && el.closest && el.closest("button, [role=button], .ability, a[href], #sound, #time-btn");
+  /* Everything the UI probe counts as a control (hawkes-ui.js CONTROL) plus the game's own: the ability slots and the cold open's
+     big Rain/Bolt button are divs/buttons the old list could miss. One handler call per event (capture on document), so there is
+     no time debounce: a second press 40 ms after the first (two fingers, a tap during a hold) must answer too. */
+  const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, #sound, #time-btn";
+  const pressable = (el) => el && el.closest && el.closest(PRESSABLE);
+  let lastPressEv = null;
   if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
-    if (!pressable(e.target) || !soundOn()) return;
-    const t = performance.now();
-    if (t - lastPress < 60) return;
-    lastPress = t;
-    if (!sample("ui-press", { gain: 0.8, bus: "ui" })) { synthTag("ui"); uiClick(); }
+    if (e === lastPressEv || !pressable(e.target) || !soundOn()) return;
+    lastPressEv = e;
+    let played = false;
+    try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
+    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* no audio yet */ } }
     note("ui-press");
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
