@@ -1830,6 +1830,23 @@ async function modelBlocked(options, t) {
 }
 
 /* ---------------- warm-start: the longest frame after loading, each power's first-use cost, shader compile errors ---------------- */
+/** What the street did within about a second of a cast: the crowd's own numbers for Gale / Gust and Fog (logged for the review). */
+function streetReact(t, id) {
+  const D = window.day;
+  const c = D.crowd && D.crowd.info ? D.crowd.info() : null;
+  const wf = D.windfog && D.windfog.info ? D.windfog.info() : null;
+  if (!c) return;
+  if (id === "gale" || id === "gust") {
+    t.metric(`street.${id}.lean`, c.galeAmt || 0);
+    t.event(`street-${id}`, `pedestrians leaning ${Math.round((c.galeAmt || 0) * 100)}%, ${c.hats} hands on hats; trees/awnings bend ${wf && wf.wind != null ? wf.wind : "?"}`);
+    if (!(c.galeAmt > 0.2)) t.problem("bug", `The street did not react to the ${id} within a second (lean ${c.galeAmt || 0})`);
+  } else if (id === "fog") {
+    const halos = wf && wf.haloOn;
+    t.metric("street.fog.coat", c.fogAmt || 0);
+    t.event("street-fog", `pedestrians slowed and pulling coats ${Math.round((c.fogAmt || 0) * 100)}%, car speed ${Number((c.carSpeed || 0).toFixed(2))}, lamp halos ${halos ? "on" : "off"}, headlights ${c.lights ? "on" : "off"}`);
+    if (!(c.fogAmt > 0.2)) t.problem("bug", `The street did not react to Fog within a second (coat ${c.fogAmt || 0})`);
+  }
+}
 async function warmStart(options, t) {
   const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
   t.scene("First seconds after the loading bar");
@@ -1874,10 +1891,29 @@ async function warmStart(options, t) {
     worstCast = Math.max(worstCast, w);
     t.metric(`firstCastWorstMs.${id}`, Math.round(w));
     heroCheck(t, `after ${id}`);
+    streetReact(t, id);
     if (w > (touch ? 150 : 100)) t.problem("bug", `The first ${id} cast cost a ${Math.round(w)} ms frame (limit ${touch ? 150 : 100})`);
     else t.event(`first-cast-${id}`, `worst frame ${Math.round(w)} ms`);
   }
   t.metric("firstCastWorstMs", Math.round(worstCast));
+  // Gale: hold Wind (a real hold on the button, by touch on a phone); the street must lean, grab hats and turn within 1 s
+  {
+    if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+    await sleep(300);
+    const btn = $("ability-wind");
+    const a = performance.now();
+    if (touch && btn) {
+      const r = btn.getBoundingClientRect();
+      touchOn(btn, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+      await sleep(1100);
+      touchOn(btn, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+    } else await holdVerb("v", 1100);
+    await sleep(900);
+    const w = worstIn(a, performance.now());
+    t.metric("firstCastWorstMs.gale", Math.round(w));
+    streetReact(t, "gale");
+    if (w > (touch ? 150 : 100)) t.problem("bug", `The Gale cast cost a ${Math.round(w)} ms frame (limit ${touch ? 150 : 100})`);
+  }
   // the first 30 s as a whole, then (phone) 60 s
   const total = touch ? 60000 : 30000;
   // the switch to snow near 24 s (a named setup shortcut: the forecast does it on snowy days): its flakes and roof caps must already be warm
