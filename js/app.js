@@ -39,6 +39,7 @@ import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let 
 import "./street.js"; // the street teaches: Rain, Sun, Fog and Wind each arrive on a neighbor's voiced ask (starts on the cold open)
 import "./coldopen.js"; // a new player's first Play: the roof at dusk, one prompt, the first bolt (before title.js calls it)
 import "./wakeup.js"; // taking control while he sleeps: a stretch, then the roof at night, ready to cast (after coldopen)
+import "./firstcast.js"; // the first cast pays off within 2 s: lawn, pond, Birdie looks up and cheers (after slice, neighbors)
 import "./firstrain.js"; // clarity: one glowing Rain icon and a "Tap the street" arrow until the first Rain; the other four verbs wait
 import "./heroprompt.js"; // one in-world prompt over him until the first cast: "Hold V to call wind"
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
