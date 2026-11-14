@@ -1519,7 +1519,7 @@ import { pickRate } from "./variety.js";
   /* Everything the UI probe counts as a control (hawkes-ui.js CONTROL) plus the game's own: the ability slots and the cold open's
      big Rain/Bolt button are divs/buttons the old list could miss. One handler call per event (capture on document), so there is
      no time debounce: a second press 40 ms after the first (two fingers, a tap during a hold) must answer too. */
-  const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, #charge, .charge, #sound, #time-btn";
+  const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, .stick, #stick, #charge, .charge, #sound, #time-btn";
   const pressable = (el) => el && el.closest && el.closest(PRESSABLE);
   let lastPressEv = null;
   if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
