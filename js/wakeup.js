@@ -97,6 +97,17 @@ export function startWake() {
       C.anim(st.clip);
       later(() => { if (phase === "ready" && C.anim) C.anim(null); }, (st.secs || 0.9) * 1000);
     }
+    // Birdie is out on the lawn, looking up at the roof and waving, a rain cloud in a thought bubble over her: the ask told without a word.
+    // The first cast (js/firstcast.js) waters the straw lawn; her wait and the bubble end with it.
+    try {
+      const N = day.neighbors, b = cfg.birdie;
+      if (N && b) {
+        N.stand("birdie", b.x, b.z);
+        N.wait("birdie", true, "wake");
+        N.think("birdie", true, "rain");
+        emit("birdie", { x: b.x, z: b.z });
+      }
+    } catch (e) { /* neighbours are optional */ }
     if (W && W.triggerFlash && sk.flashAgainSecs) later(() => { try { W.triggerFlash((sk.flash || [90])[0], (sk.flash || [0, -0.3])[1]); } catch (e) { /* */ } }, sk.flashAgainSecs * 1000);
   }
 
@@ -115,6 +126,9 @@ export function startWake() {
 
   window.addEventListener("day:control", (e) => {
     const d = (e && e.detail) || {};
+    if (d.action === "let-go" || d.action === "back") {
+      try { if (day.neighbors && day.neighbors.stand && cfg.birdie) { day.neighbors.think("birdie", false); day.neighbors.wait("birdie", false); day.neighbors.stand("birdie", null); } } catch (e2) { /* */ }
+    }
     if (d.action === "take") {
       if (quiet || (phase !== "idle" && phase !== "ready")) return;
       if (day.coldopen && day.coldopen.active && day.coldopen.active()) return;
@@ -128,6 +142,12 @@ export function startWake() {
       const fr = day.now && day.now().frame;
       phase = "idle";
       emit("back", { how: d.how, pose: fr && fr.person ? fr.person.pose : null, asleep: asleep(fr), mode: day.now().mode });
+    }
+  });
+
+  window.addEventListener("day:firstcast", (e) => {
+    if (e && e.detail && e.detail.action === "done" && phase === "ready") {
+      try { day.neighbors.wait("birdie", false); day.neighbors.stand("birdie", null); } catch (e2) { /* */ }
     }
   });
 

@@ -162,6 +162,9 @@ function install() {
 .nb-bubble:after{content:"";position:absolute;left:50%;bottom:-7px;margin-left:-7px;border:7px solid transparent;border-bottom:0;border-top-color:#f6f1e8}
 .nb-bubble[hidden]{display:none}
 .nb-bubble.ask{border:2px solid var(--nb,#f0c27a)}
+.nb-bubble.thought{padding:6px 12px;border-radius:26px;background:#eef4fb}
+.nb-bubble.thought:after{left:56%;bottom:-13px;margin-left:0;width:9px;height:9px;border:0;border-radius:50%;background:#eef4fb;box-shadow:-7px 8px 0 -2px #eef4fb}
+.nb-bubble.thought svg{display:block;width:44px;height:36px}
 .nb-bubble small{display:block;margin-top:4px;color:#6a5a2a;font-weight:700}
 .nb-plus{position:absolute;transform:translate(-50%,-100%);color:#f0c27a;font:800 1.15rem Outfit,system-ui,sans-serif;text-shadow:0 2px 6px #000;animation:nbPlus 2.2s ease-out forwards}
 @keyframes nbPlus{from{opacity:1;margin-top:0}to{opacity:0;margin-top:-70px}}
@@ -924,6 +927,8 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       if (on === false) {
         if (p.__wait) emit("wait-end", { id, secs: +(p.__wait.lookSecs).toFixed(1), waves: p.__wait.waves });
         p.__wait = null;
+        const sb = st[id] && st[id].bubble;
+        if (sb && sb.kind === "thought") st[id].bubble = null;
         return true;
       }
       if (!p.__wait) {
@@ -933,6 +938,19 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       return true;
     },
     waiting: (id) => !!(people.find((q) => q.id === id) || {}).__wait,
+    /** A thought bubble over them showing a picture, no words (a rain cloud): the wake moment's silent ask. on=false clears it. */
+    think: (id, on, kind) => {
+      const p = people.find((q) => q.id === id);
+      const s = p && st[p.id];
+      if (!s) return false;
+      if (on === false) { if (s.bubble && s.bubble.kind === "thought") s.bubble = null; return true; }
+      if (s.bubble && s.bubble.kind !== "thought") return false;
+      const rain = '<svg viewBox="0 0 44 36" aria-label="rain"><path d="M12 22a7 7 0 0 1 1-13.9A9 9 0 0 1 30 7a7.5 7.5 0 0 1 2 15z" fill="#7d93ad"/><g stroke="#2f7fd6" stroke-width="2.4" stroke-linecap="round"><path d="M13 27l-2 5M22 27l-2 5M31 27l-2 5"/></g></svg>';
+      s.bubble = { id: "think-" + (kind || "rain"), kind: "thought", text: rain, spoken: false };
+      s.bubbleUntil = Infinity;
+      emit("think", { id, kind: kind || "rain" });
+      return true;
+    },
     /** Hold them at a spot for a staged scene (ending / finale). null clears the hold. */
     stand: (id, x, z) => {
       const p = people.find((q) => q.id === id);

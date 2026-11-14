@@ -442,3 +442,6 @@ Birdie's ask is shown before it is spoken. Four planters on the apt stoop (x -20
 ## Street barks (js/npcbarks.js, `neighbors.barks` in day.config.js)
 
 The street talks back. Birdie, Dex and Ines each say one short line when Small Weather comes within 6 m (a pass bark: Birdie's tomato talk, Dex's parcel with no return address, Ines's sky keeping time) and a fitting one when he casts within 8 m (Birdie's "Look at them drink" for Rain, Dex's "Dry as a bone" for Sun break, Ines's "Look at that blue" for Lightning). Every line is an existing voiced clip; no line repeats within 3 minutes, a quiet pool stays quiet, and the music ducks under them (speakAs).
+
+## Story beat: Birdie's silent ask (wake-him)
+Waking him at night puts him on the apt roof; Birdie is out on the straw park lawn (-13, 22), looking up and waving, a rain cloud in a thought bubble over her (no words). His first cast waters the lawn in 1.4 s, the bubble goes and she cheers. Told by action: wave, picture, rain, green lawn. Birdie: wants her tomatoes watered; arc: sulking to thankful; moment: this one; words: warm, patient, dry.
