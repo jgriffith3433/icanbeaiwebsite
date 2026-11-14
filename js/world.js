@@ -2292,6 +2292,10 @@
         me.top.diffuseColor.copyFrom(C(outfit.top));
         me.bottom.diffuseColor.copyFrom(C(outfit.bottom));
         me.shoes.diffuseColor.copyFrom(C(outfit.feet || P.shoes || "#241f1c"));
+        /* the stand-in is lit from inside a little: navy and charcoal under a dusk sky read as one black blob (phone-touch, 57 s) */
+        me.top.emissiveColor.copyFrom(me.top.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.1, 0.15, 0.26));
+        me.bottom.emissiveColor.copyFrom(me.bottom.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.07, 0.09, 0.14));
+        me.shoes.emissiveColor.copyFrom(me.shoes.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.05, 0.06, 0.09));
       }
       if (player) {
         // placed and posed by the player's controller
