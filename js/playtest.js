@@ -11093,7 +11093,13 @@ async function coldStart(options, t) {
   t.event("cold-start-cue", `prompt "${cueText}" at ${T.prompt}s; also visible: ${other.join(", ") || "nothing else"}`);
   if (words.length > 25) t.problem("bug", `${words.length} words are on screen before the first cast (the limit is 25)`);
   if (other.length) t.problem("bug", `${phone ? "On a phone only the stick, Jump and Bolt may show before the first cast" : "No HUD may show before the first cast"}; also visible: ${other.join(", ")}`);
-  if (!promptEl || !hudVisible(promptEl)) t.problem("bug", "The prompt isn't visible");
+  // the hint fades while a story card / caption shows and returns once it is gone; it never sits over card text
+  const cards = () => [".voice-caption", "#coldopen-say", "#episode-say", ".mo-line"].map((q) => document.querySelector(q)).filter((e) => e && !e.hidden && hudVisible(e) && !e.classList.contains("leaving"));
+  const hintClear = await waitFor(() => promptEl && !cards().length && +getComputedStyle(promptEl).opacity > 0.9, 8000);
+  const overlap = cards().some((c) => { const a = c.getBoundingClientRect(), b2 = promptEl.getBoundingClientRect(); return +getComputedStyle(promptEl).opacity > 0.1 && a.left < b2.right && a.right > b2.left && a.top < b2.bottom && a.bottom > b2.top; });
+  if (overlap) t.problem("bug", "The R hint overlaps a story card's text");
+  else t.event("hint-clear-of-cards", "the rain hint is faded or clear of the story card text");
+  if (!hintClear || !promptEl || !hudVisible(promptEl)) t.problem("bug", "The prompt isn't visible");
   if (phone) {
     const b = $("coldopen-bolt");
     const r = b && b.getBoundingClientRect();

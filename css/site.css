@@ -892,6 +892,5 @@ html.touch-ui .weather-wheel button { width: 64px; height: 64px; min-width: 44px
 .update-pill[hidden], html.in-control .update-pill, html.title-up .update-pill { display: none; }
 
 /* Studio's beta tools (the "report a bug" dot and the "Error reported" toast, injected into beta pages) are not part of
-   the game: the live site (html.live, icanbe.ai) never shows them; beta does, and ?debug or ?report=1 brings them back on live. Add ?report=1 to a beta URL to bring them back. */
-html.live:not(.show-report) [data-hawkes-report],
-html.view-forced:not(.show-report) [data-hawkes-report] { display: none !important; }
+   the game: no shipped page (live or beta) shows them; ?debug or ?report=1 brings them back on live. Add ?report=1 to a beta URL to bring them back. */
+html:not(.show-report) [data-hawkes-report] { display: none !important; }
