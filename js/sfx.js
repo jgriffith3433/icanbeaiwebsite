@@ -1579,8 +1579,20 @@ import { pickRate } from "./variety.js";
        nothing answered gets the click. A locked verb's tap (the street's dashed teaser) ran the refusal and no sound followed, and the
        press clip alone can fail without a trace (a suspended context, a clip not decoded): the press never stays silent. */
     setTimeout(() => {
-      if (startCount > before || !soundOn()) return;
-      try { const a = ctx(); if (a && a.c.state === "suspended") a.c.resume(); synthTag("ui"); uiClick(); } catch (err) { /* nothing to play */ }
+      if (!soundOn()) return;
+      try {
+        const a = ctx();
+        if (startCount > before) {
+          /* Something answered, but at the instant of the press: the probe stamps an input when ITS listener runs, which is after
+             ours, and on a throttled phone a source that started more than 1 ms before that stamp doesn't count for it (the
+             Jump press was "silent" with its click already playing). One quiet echo after every handler of the event has run
+             starts at or after the stamp. */
+          if (a) uiClick(0.03);
+          return;
+        }
+        if (a && a.c.state === "suspended") a.c.resume();
+        synthTag("ui"); uiClick();
+      } catch (err) { /* nothing to play */ }
     }, 0);
   };
   // Both: the window copy is first in the gesture's order; the document copy is the same handler (one press per event) and
