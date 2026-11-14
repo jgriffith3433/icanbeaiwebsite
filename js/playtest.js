@@ -12975,6 +12975,13 @@ async function coldStart(options, t) {
   t.event("cold-start-words", `${words.length} words on screen before the first cast: "${words.join(" ")}"`);
   t.event("cold-start-cue", `prompt "${cueText}" at ${T.prompt}s; also visible: ${other.join(", ") || "nothing else"}`);
   if (words.length > 25) t.problem("bug", `${words.length} words are on screen before the first cast (the limit is 25)`);
+  // clarity: the goal is on screen ("Birdie needs rain") and a phone never reads a key hint
+  { const goalTxt = ($("coldopen-goal") && $("coldopen-goal").textContent || "").trim();
+    const keyHint = /\b(press|hold)\s+[A-Z]\b/i.test(cueText.replace(goalTxt, ""));
+    t.event("cold-start-goal", `goal "${goalTxt}"; key hint ${keyHint ? "SHOWN" : "none"}${phone ? " (phone)" : ""}`);
+    t.metric("coldGoalShown", goalTxt ? 1 : 0);
+    if (!goalTxt) t.problem("bug", "The cold open shows no goal line (Birdie needs rain)");
+    if (phone && keyHint) t.problem("bug", `A key hint shows on a phone: "${cueText}"`); }
   if (other.length) t.problem("bug", `${phone ? "On a phone only the stick, Jump and Bolt may show before the first cast" : "No HUD may show before the first cast"}; also visible: ${other.join(", ")}`);
   // the hint fades while a story card / caption shows and returns once it is gone; it never sits over card text
   const cards = () => [".voice-caption", "#coldopen-say", "#episode-say", ".mo-line"].map((q) => document.querySelector(q)).filter((e) => e && !e.hidden && hudVisible(e) && !e.classList.contains("leaving"));

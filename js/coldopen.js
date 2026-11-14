@@ -32,6 +32,8 @@ export function startColdOpen() {
   style.textContent = `
 .co-prompt{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 22px 12px;border-radius:999px;background:rgba(10,13,22,.72);border:1px solid rgba(126,200,255,.5);backdrop-filter:blur(8px);color:#f6f1e8;font:600 1.15rem/1 Fraunces,Georgia,serif;text-shadow:0 2px 12px rgba(0,0,0,.55);pointer-events:none;opacity:0;transition:opacity .4s ease}
 .co-prompt.on{opacity:1}
+.co-prompt .goal{font:700 .7rem/1 Outfit,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#f0c27a}
+.co-prompt .goal:empty{display:none}
 .co-prompt[hidden]{display:none}
 .co-prompt .bar{width:96px;height:4px;border-radius:2px;background:rgba(246,241,232,.22);overflow:hidden}
 .co-prompt .bar i{display:block;height:100%;width:0;background:#7ec8ff;box-shadow:0 0 10px #7ec8ff}
@@ -49,7 +51,7 @@ export function startColdOpen() {
   prompt.id = "coldopen-prompt";
   prompt.hidden = true;
   prompt.setAttribute("role", "status");
-  prompt.innerHTML = `<span class="txt"></span><span class="bar"><i></i></span>`;
+  prompt.innerHTML = `<span class="goal" id="coldopen-goal"></span><span class="txt"></span><span class="bar"><i></i></span>`;
   const bolt = document.createElement("button");
   bolt.type = "button";
   bolt.className = "co-bolt";
@@ -66,6 +68,7 @@ export function startColdOpen() {
   document.body.append(prompt, bolt, say);
   const promptTxt = prompt.querySelector(".txt");
   const promptBar = prompt.querySelector(".bar i");
+  const promptGoal = prompt.querySelector(".goal");
 
   let on = false; // from Play until the first bolt's moment is over
   let phase = "idle"; // idle | landing | waiting | cast | done
@@ -80,7 +83,10 @@ export function startColdOpen() {
   let timers = [];
   const log = [];
 
-  const touchy = () => html.classList.contains("touch-ui") || (day.control && day.control.state && day.control.state().touch);
+  // Touch is decided from the device itself as well as the HUD class (control.js sets that one lazily), so a phone never
+  // sees a key hint ("Press R for rain") however early the prompt is built.
+  const touchy = () => html.classList.contains("touch-ui") || !!(day.control && day.control.state && day.control.state().touch)
+    || /[?&]touch=1\b/.test(location.search) || (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) || window.innerWidth <= 700;
   const later = (fn, ms) => { const h = setTimeout(() => { timers = timers.filter((x) => x !== h); fn(); }, ms); timers.push(h); return h; };
   function emit(action, extra) {
     const detail = Object.assign({ action, t: Math.round((performance.now() - t0) / 10) / 100 }, extra || {});
@@ -339,6 +345,7 @@ export function startColdOpen() {
     if (meshes) obs = meshes.scene.onBeforeRenderObservable.add(frame);
     phase = "landing";
     promptTxt.textContent = touchy() ? cfg.prompt.touch : cfg.prompt.keys;
+    promptGoal.textContent = cfg.prompt.goal || "";
     bolt.hidden = !touchy();
     emit("landed", { x: sp.x, z: sp.z });
     // Birdie is out on the park lawn, in view of the roof, waving up at him: the camera finds her when the push-in is
