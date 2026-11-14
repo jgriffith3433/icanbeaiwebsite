@@ -821,7 +821,37 @@ export function startPowers(world, dayApi) {
     if (!fn) return false;
     if (mode() !== "control") return pressWatching(name, via || "key");
     if (gateFn && !gateFn(name, via || "key")) return false;
-    return fn(via || "key");
+    return windUp(name, via || "key", fn);
+  }
+
+  /* The wind-up: a cast made standing still turns him to face the aim (a step when it is over 90 deg: js/control.js `face`)
+     and plays the raise-the-hands pose before the effect fires, 0.12-0.22 s after the press, so the first visible effect
+     stays under 300 ms. On the move, in the air, or a power already pending, it goes at once. */
+  const WINDUP_MIN = 0.12;
+  const WINDUP_MAX = 0.22;
+  let pendingCast = null;
+  function windUp(name, via, fn) {
+    const st = day.control && day.control.state ? day.control.state() : null;
+    const still = st && st.grounded && (st.speed || 0) < 0.8;
+    if (!still || pendingCast || !day.control.face || aimOverride) return fn(via);
+    const aim = groundAim();
+    const p = who();
+    let wait = WINDUP_MIN;
+    if (aim && Math.hypot(aim.x - p.x, aim.z - p.z) > 0.8) {
+      const t = day.control.face(Math.atan2(aim.x - p.x, aim.z - p.z));
+      if (t) wait = Math.min(WINDUP_MAX, Math.max(WINDUP_MIN, t.dur * 0.75));
+    }
+    pendingCast = { name, via, fn, left: wait, total: wait };
+    return true;
+  }
+  function tickWindUp(dt) {
+    if (!pendingCast) return;
+    const c = pendingCast;
+    c.left -= dt;
+    if (c.left > 0) return;
+    pendingCast = null;
+    if (mode() !== "control") return;
+    if (!c.fn(c.via)) refuseBar(c.name);
   }
 
   /* A power pressed while only watching is never refused: the first press takes control (the Take control button's own
@@ -1476,6 +1506,7 @@ html.touch-ui.in-control .side{display:none}
       rainPs.emitRate = localStorm ? (globalRain > 0.72 ? 60 : 900) : 0;
     }
 
+    tickWindUp(dt);
     castFor = Math.max(0, castFor - dt);
     throwFor = Math.max(0, throwFor - dt);
     flash = Math.max(0, flash - dt * 3.1);
@@ -1643,6 +1674,7 @@ html.touch-ui.in-control .side{display:none}
   function pose() {
     if (mode() !== "control") return null;
     if (throwFor > 0) return "throw";
+    if (pendingCast) return powerPose(pendingCast.name);
     // Distinct wind-ups: Lightning/Storm gather vs Rain/Fog/Sun/Wind gather (js/small-weather.js clips).
     const boltHand = !!(keyBolt || touchBolt || padBolt || wantStorm || (charge > 0 && !windCharge));
     const weatherHand = !!(keyWind || touchWind || padWind || windCharge > 0);

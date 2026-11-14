@@ -11533,6 +11533,26 @@ async function phoneTouch(options, t) {
     ["sunbreak", (a) => a.some((e) => e.power === "sunbreak" || e.power === "sun")],
   ];
   let ok = 0;
+  // his heading while he winds up and turns: never over 720 deg/s (a turn is 600 deg/s at most)
+  let yawMax = 0;
+  let yawPrev = null;
+  let yawLast = performance.now();
+  let yawOn = true;
+  const yawLoop = () => {
+    if (!yawOn) return;
+    const st = D.control && D.control.state ? D.control.state() : null;
+    const now = performance.now();
+    if (st && Number.isFinite(st.yaw)) {
+      if (yawPrev != null && now - yawLast > 4) {
+        const d = Math.abs(((st.yaw - yawPrev + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI);
+        yawMax = Math.max(yawMax, (d * 180 / Math.PI) / ((now - yawLast) / 1000));
+      }
+      yawPrev = st.yaw;
+      yawLast = now;
+    }
+    requestAnimationFrame(yawLoop);
+  };
+  requestAnimationFrame(yawLoop);
   for (const [id, match] of verbs) {
     const el = $("ability-" + id);
     if (!el || !hudVisible(el)) { t.problem("bug", `No visible #ability-${id} button on the phone`); continue; }
@@ -11547,13 +11567,19 @@ async function phoneTouch(options, t) {
     window.removeEventListener("day:power", h);
     const cast = got.filter((g) => g.action !== "denied");
     const fx = !!match(cast) && cast.length > 0;
-    t.event("phone-cast-" + id, `${fx ? "cast" : "NO CAST"} ${Math.round(performance.now() - tc)} ms after the tap; ${cast.map((g) => g.power).join(",") || "nothing"}`);
+    const castMs = Math.round(performance.now() - tc);
+    t.event("phone-cast-" + id, `${fx ? "cast" : "NO CAST"} ${castMs} ms after the tap; ${cast.map((g) => g.power).join(",") || "nothing"}`);
+    t.metric("phone.castMs." + id, castMs);
+    if (fx && castMs > 300) t.problem("bug", `A tap on ${id} took ${castMs} ms to its first effect (wind-up included; limit 300)`);
     if (fx) ok++; else t.problem("bug", `A tap on ${id} didn't cast it (events: ${got.map((g) => g.power + ":" + g.action).join(", ") || "none"})`);
     await sleep(1800); // the effect on screen: the recording shows the sky, bolt, rain, wind or sun
     el.dispatchEvent(new PointerEvent("pointerup", { pointerId: 9, pointerType: "touch", bubbles: true })); // release any hold
     await settleToIdle(t, "phone-" + id);
     checkHud(t, "phone cast " + id);
   }
+  yawOn = false;
+  t.metric("phone.heroYawDegPerSec", Math.round(yawMax));
+  if (yawMax > 720) t.problem("bug", `His heading turned ${Math.round(yawMax)} deg/s during the casts (limit 720)`);
   t.metric("phone.castsWithEffect", ok);
   if (ok < 5) t.problem("bug", `Only ${ok} of 5 abilities cast by touch`);
   // frame rate over the casts (low quality on a phone)

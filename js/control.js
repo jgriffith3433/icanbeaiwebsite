@@ -22,6 +22,18 @@ const dampAngle = (cur, target, dt, speed) => {
   return cur + d * (1 - Math.exp(-speed * dt));
 };
 
+/* A turn never exceeds this (deg/s): a reversal of the stick used to swing his heading ~1900 deg/s in one frame. */
+export const TURN_MAX_DEG = 600;
+const wrapAng = (d) => ((((d + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
+const turnToward = (cur, target, dt, speed, maxDeg) => {
+  const d = wrapAng(target - cur);
+  const step = d * (1 - Math.exp(-speed * dt));
+  const cap = (maxDeg * Math.PI / 180) * dt;
+  return cur + Math.max(-cap, Math.min(cap, step));
+};
+/* The turn-in-place before a cast: 600 deg/s, so 90 deg takes 0.15 s and 180 deg 0.3 s. */
+export const turnSeconds = (deg) => Math.min(0.3, Math.max(0.15, Math.abs(deg) / TURN_MAX_DEG));
+
 export const MOVE_DEFAULTS = {
   walk: 2.4,
   sprint: 5.6,
@@ -125,6 +137,7 @@ export function createMover(world, cfg) {
     s.z = p.z;
     s.y = floorAt(p.x, p.z, from != null ? from : 2.3);
     s.yaw = yaw;
+    s.face = null;
     s.vx = s.vy = s.vz = 0;
     s.grounded = true;
     s.jumpsLeft = M.airJumps;
@@ -294,7 +307,16 @@ export function createMover(world, cfg) {
     let speed = 0;
     for (let i = 0; i < n; i++) speed += sub(dt / n, input, i === 0 ? input.jump || 0 : 0) / n;
     s.speed = damp(s.speed, speed, dt, 10);
-    if (Math.hypot(input.x || 0, input.z || 0) > 0.1) s.yaw = dampAngle(s.yaw, Math.atan2(input.x, input.z), dt, 12);
+    if (Math.hypot(input.x || 0, input.z || 0) > 0.1) {
+      s.yaw = turnToward(s.yaw, Math.atan2(input.x, input.z), dt, 12, TURN_MAX_DEG);
+      s.face = null;
+    } else if (s.face) {
+      // turn in place toward the cast (linear: the rate is the cap, never a snap)
+      const f = s.face;
+      f.t = Math.min(f.dur, f.t + dt);
+      s.yaw = f.from + f.d * (f.t / f.dur);
+      if (f.t >= f.dur) s.face = null;
+    }
     s.anim = pickAnim(s.speed);
     return s;
   }
@@ -325,7 +347,7 @@ export function createMover(world, cfg) {
       const go = Math.min(d, left);
       s.x += (dx / d) * go;
       s.z += (dz / d) * go;
-      s.yaw = dampAngle(s.yaw, Math.atan2(dx, dz), dt, 10);
+      s.yaw = turnToward(s.yaw, Math.atan2(dx, dz), dt, 10, TURN_MAX_DEG);
       left -= go;
       moved += go;
       if (go >= d - 1e-6) route.i++;
@@ -348,6 +370,15 @@ export function createMover(world, cfg) {
     move: M,
     start,
     step,
+    /* Turn in place to face `yaw` (a cast's aim): linear at TURN_MAX_DEG, 0.15-0.3 s. Returns { deg, dur, step } (step: over 90 deg). */
+    face(yaw) {
+      const d = wrapAng(yaw - s.yaw);
+      const deg = Math.abs(d) * 180 / Math.PI;
+      if (deg < 4) { s.face = null; return { deg, dur: 0, step: false }; }
+      const dur = turnSeconds(deg);
+      s.face = { from: s.yaw, d, t: 0, dur, step: deg > 90 };
+      return { deg, dur, step: deg > 90 };
+    },
     walkBack,
     walkBackSpeed,
     route: () => route,
@@ -1625,8 +1656,10 @@ function install() {
     // standing pose sliding along the ground reads as gliding feet).
     const wantPose = day.powers && day.powers.pose ? day.powers.pose() : null;
     const posed = wantPose && s.grounded && s.speed < 0.8 ? wantPose : null;
-    const shownAnim = posed || (animOverride && mode === "control" ? animOverride : null) || s.anim;
-    avatar.play(shownAnim, posed ? 1 : s.speed, dt);
+    // a turn of more than 90 deg is a step: he walks round (his feet move) instead of spinning on the spot
+    const stepping = s.face && s.face.step && s.grounded && s.speed < 0.8;
+    const shownAnim = (stepping ? "walk" : null) || posed || (animOverride && mode === "control" ? animOverride : null) || s.anim;
+    avatar.play(shownAnim, posed && !stepping ? 1 : stepping ? 1.6 : s.speed, dt);
     cameraFollow(dt, { x: gp.lx, y: gp.ly });
     return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: shownAnim, text };
   };
@@ -1738,6 +1771,8 @@ function install() {
     push: (spec) => pushStart(spec),
     hold: (on) => { holdIn = !!on; return holdIn; },
     /** A staged beat shows this clip instead of his movement clip (null clears it). */
+    /** Turn in place toward a world yaw (js/powers.js before a cast). */
+    face: (yaw) => (mode === "control" ? mover.face(yaw) : null),
     anim: (name) => { animOverride = name || null; return animOverride; },
     pushing: () => push.on,
     letGo: () => letGo("console"),
