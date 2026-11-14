@@ -1840,6 +1840,19 @@ function streetReact(t, id) {
     t.metric(`street.${id}.lean`, c.galeAmt || 0);
     t.event(`street-${id}`, `pedestrians leaning ${Math.round((c.galeAmt || 0) * 100)}%, ${c.hats} hands on hats; trees/awnings bend ${wf && wf.wind != null ? wf.wind : "?"}`);
     if (!(c.galeAmt > 0.2)) t.problem("bug", `The street did not react to the ${id} within a second (lean ${c.galeAmt || 0})`);
+  } else if (id === "sunbreak") {
+    const A = D.aftermath && D.aftermath.info ? D.aftermath.info() : null;
+    const out = (A && (A.umbrellasClosed || 0)) + 0;
+    t.metric("street.sunbreak.steam", A ? A.steam || 0 : 0);
+    t.event("street-sunbreak", `sun break on the street: aftermath ${A && A.on ? "on" : "off"}${A && A.dry ? " (dry)" : ""}, steam ${A ? Number((A.steam || 0).toFixed(2)) : "?"}, ${A ? A.birdsLanded || 0 : 0} birds landed, umbrellas folded ${out}, puddles ${((window.weather && window.weather.now && window.weather.now().puddleLevel) || 0).toFixed(2)} shrinking, shops open ${A ? A.shopsOut || 0 : 0}`);
+    if (!(A && A.on)) t.problem("bug", "The street did not answer the Sun break within a second (no steam, birds or people stepping out)");
+  } else if (id === "bolt") {
+    const R = D.streetreact && D.streetreact.info ? D.streetreact.info() : {};
+    const flick = window.__flickerSeenMs != null ? window.__flickerSeenMs : -1;
+    t.metric("street.bolt.flickerMs", Math.round(flick));
+    t.event("street-bolt", `bolt on the street: lamps and windows flickered ${flick >= 0 ? Math.round(flick) + " ms after the cast" : "never"}, ${c.flinching || 0} pedestrians flinching, ${c.lookingUp || 0} looking up, car alarm ${R.alarms ? "sounding at " + (R.last ? Math.round(R.last.x) + "," + Math.round(R.last.z) : "?") : "silent"}`);
+    if (flick < 0 || flick > 1000) t.problem("bug", `Lamps and windows did not flicker within 1 s of the Lightning (${flick < 0 ? "never" : Math.round(flick) + " ms"})`);
+    if (!R.alarms) t.problem("bug", "No car alarm went off after the Lightning");
   } else if (id === "fog") {
     const halos = wf && wf.haloOn;
     t.metric("street.fog.coat", c.fogAmt || 0);
@@ -1885,8 +1898,13 @@ async function warmStart(options, t) {
     await t.until(() => P.now().energy + 0.05 >= cost, 20000, `Charge for ${id}`).catch(() => {});
     await sleep(400);
     const a = performance.now();
+    window.__flickerSeenMs = null;
+    const fobs = id === "bolt" ? scene.onBeforeRenderObservable.add(() => {
+      if (window.__flickerSeenMs == null && window.day.cityscape && window.day.cityscape.flickering && window.day.cityscape.flickering()) window.__flickerSeenMs = performance.now() - a;
+    }) : null;
     if (touch) await tapEl($("ability-" + slotId)); else pressKey(key);
     await sleep(1400);
+    if (fobs) scene.onBeforeRenderObservable.remove(fobs);
     const w = worstIn(a, performance.now());
     worstCast = Math.max(worstCast, w);
     t.metric(`firstCastWorstMs.${id}`, Math.round(w));

@@ -26,6 +26,7 @@ import "./sky.js"; // the sky: painted panoramas by the clock, a cloud deck, Sun
 import "./backdrop.js"; // the far city: a baked skyline silhouette ring tinted by the hour, never fogged, every quality (after sky)
 import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyline curtains, window runnels, drips, lens drops, height fog (after weather)
 import "./aftermath.js"; // Sun break after rain: steam, rainbow at 42°, dripping gutters, pigeons home, umbrellas fold (after rain + sky)
+import "./streetreact.js"; // Lightning sets off a car alarm near the bolt (after crowd + aftermath)
 import "./ui-art.js"; // UI art kit: verb icons, frames, ranks, busts, fonts (before powers paints the bar)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
 import "./barks.js"; // Small Weather's needs and weather reactions in the log, once each per day (docs/voice-style.md)
