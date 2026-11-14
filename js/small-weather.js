@@ -272,6 +272,7 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
   let idleOff = false;
   let heldClip = "";
   let traceFeet = null;
+  const traceWin = []; // [dt, boot speed] over the last TRACE_WIN seconds
   let landT = 0;
   let landDepth = 0;
   let seenJump = null;
@@ -392,7 +393,19 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       let footSpeed = null;
       if (feet.every(Boolean)) {
         const now = feet.map((f) => { const p = f.getAbsolutePosition(); return { x: p.x - root.x, z: p.z - root.z }; });
-        if (traceFeet && dt > 0) footSpeed = (Math.hypot(now[0].x - traceFeet[0].x, now[0].z - traceFeet[0].z) + Math.hypot(now[1].x - traceFeet[1].x, now[1].z - traceFeet[1].z)) / 2 / dt;
+        if (traceFeet && dt > 0) {
+          const inst = (Math.hypot(now[0].x - traceFeet[0].x, now[0].z - traceFeet[0].z) + Math.hypot(now[1].x - traceFeet[1].x, now[1].z - traceFeet[1].z)) / 2 / dt;
+          /* One frame's reading dips whenever the two boots pass each other (each is mid-swing or mid-stance for that instant),
+             which at 20-30 fps on a phone fell under the slide ratio for whole frames of a clean run. The boots' pace is read
+             over a quarter of a cycle-ish window (0.25 s, time-weighted); a planted foot while he moves still reads near 0. */
+          traceWin.push([dt, Math.min(inst, 12)]);
+          let tw = 0, ts = 0;
+          for (let i = traceWin.length - 1; i >= 0; i--) {
+            tw += traceWin[i][0]; ts += traceWin[i][0] * traceWin[i][1];
+            if (tw >= 0.25) { traceWin.splice(0, i); break; }
+          }
+          footSpeed = ts / tw;
+        }
         traceFeet = now;
       }
       let tpose = sum < 0.5;
