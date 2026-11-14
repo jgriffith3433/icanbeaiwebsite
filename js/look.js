@@ -626,14 +626,16 @@ export function installLook(world) {
   let scaleClock = 0;
   scene.onBeforeRenderObservable.add(() => {
     const now = performance.now();
-    if (now - scaleClock < 1000) return;
+    if (now - scaleClock < 500) return;
     scaleClock = now;
     if (quality !== "low") return;
     const fps = engine.getFps();
     if (!fps || document.hidden) return;
     let next = scaleLow;
-    if (fps < 28) next = Math.min(3, scaleLow + 0.25);
-    else if (fps > 44) next = Math.max(2, scaleLow - 0.25);
+    // measured frame time: under 30 fps steps up fast (0.5), a phone that cannot hold 24 goes to 3.5; eases back only when comfortable
+    if (fps < 24) next = Math.min(3.5, scaleLow + 0.5);
+    else if (fps < 30) next = Math.min(3.5, scaleLow + 0.25);
+    else if (fps > 48) next = Math.max(2, scaleLow - 0.25);
     if (next !== scaleLow) { scaleLow = next; engine.setHardwareScalingLevel(scaleLow); }
   });
 
@@ -648,7 +650,7 @@ export function installLook(world) {
     if (pipeline) {
       // Low (phones) keeps the tonemap, the grade and a half-res bloom; FXAA stays high-only (js/render-pipeline.js does the rest:
       // one 1024 shadow cascade, no SSAO, no aberration).
-      pipeline.bloomEnabled = true;
+      pipeline.bloomEnabled = !low; // phone: no bloom pass (emissive lamps and signs stay lit in the material)
       pipeline.bloomKernel = low ? 16 : 24;
       pipeline.bloomScale = low ? 0.35 : 0.5;
       pipeline.samples = 1;

@@ -58,7 +58,7 @@ const CELL = 64; // px per bay/floor in the 512 px texture
 const SHOP_W = 12; // shopfront texture: 4 shops of 3 m
 const SHOP_H = 3.2;
 const LAMP_DYNAMIC_HIGH = 8;
-const LAMP_DYNAMIC_LOW = 4;
+const LAMP_DYNAMIC_LOW = 2; // phone: two real lamp lights, the rest are emissive pools
 
 const STYLES = [
   { id: "brick", wall: "#5d4240", wall2: "#4a3436", pane: "#16202e", sill: "#8a7f74", w: 36, h: 44, lit: 0.55, warm: 0.7, role: "home" },

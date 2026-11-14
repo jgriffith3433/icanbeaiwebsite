@@ -909,7 +909,7 @@ export function installCrowd(world) {
 
     // frame-time guard: thin the crowd when frames run long, bring it back slowly
     ema = lerp(ema, dtReal * 1000, 0.05);
-    const floor = quality === "low" ? 0.6 : 0.5;
+    const floor = quality === "low" ? 0.3 : 0.5; // a phone may thin the crowd to 30% of its (already 0.4x) budget before it drops frames
     if (ema > 40) { slow += dtReal; fast = 0; } else if (ema < 22) { fast += dtReal; slow = 0; } else { slow = 0; fast = 0; }
     if (slow > 3) { guard = Math.max(floor, guard * 0.85); slow = 0; }
     if (fast > 10) { guard = Math.min(1, guard * 1.1); fast = 0; }

@@ -69,7 +69,7 @@ if (world.look && world.look.quality) {
   const prev = world.look.quality();
   world.look.quality("low");
   const low = api.info().dynamicLights.cap;
-  if (low > 4) fails.push(`low quality dynamic light cap ${low} > 4`);
+  if (low > 2) fails.push(`low quality dynamic light cap ${low} > 2`);
   world.look.quality(prev);
 }
 

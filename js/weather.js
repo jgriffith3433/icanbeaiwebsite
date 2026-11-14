@@ -504,6 +504,7 @@ export function startWeather(world, dayApi) {
   let streetProbeOn = false;
   let streetProbeAcc = 1;
   let streetProbeReady = false;
+  const streetProbePos = new B.Vector3(Number.NaN, 0.4, 0);
   function fillStreetProbeList() {
     if (!streetProbe) return;
     streetProbe.renderList.length = 0;
@@ -1438,7 +1439,8 @@ export function startWeather(world, dayApi) {
               if (roadMat.environmentIntensity != null) {
                 roadMat.environmentIntensity = wantProbe ? Math.max(0.85, roadMat.__dryEnv == null ? 0.85 : roadMat.__dryEnv) : 0;
               }
-              streetProbe.refreshRate = wantProbe ? 12 : -1;
+              streetProbe.refreshRate = wantProbe ? 0 : -1; // 0 = render once: a static cube, not six faces of the city every 12 frames
+              if (wantProbe) streetProbePos.copyFromFloats(Number.NaN, 0, 0);
             }
             if (wantProbe) {
               streetProbeAcc += 0.3;
@@ -1447,7 +1449,13 @@ export function startWeather(world, dayApi) {
                 const cam = scene.activeCamera;
                 if (cam) {
                   const p = cam.globalPosition || cam.position;
-                  streetProbe.position.set(p.x, 0.4, p.z);
+                  // re-render the cube only after he has walked 40 m from where it was taken
+                  const dx = p.x - streetProbePos.x, dz = p.z - streetProbePos.z;
+                  if (!(dx * dx + dz * dz < 1600)) {
+                    streetProbePos.copyFromFloats(p.x, 0.4, p.z);
+                    streetProbe.position.copyFrom(streetProbePos);
+                    streetProbe.refreshRate = 0;
+                  }
                 }
               }
             }
