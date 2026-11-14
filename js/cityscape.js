@@ -750,9 +750,10 @@ export function installCityscape(w) {
   headM.disableLighting = false;
   const poolTex = canvasTexture("cs-pool", 128, 128, (g, W, H) => {
     const grd = g.createRadialGradient(W / 2, H / 2, 2, W / 2, H / 2, W / 2);
-    grd.addColorStop(0, "rgba(255,230,170,0.95)");
-    grd.addColorStop(0.45, "rgba(255,200,120,0.4)");
-    grd.addColorStop(1, "rgba(255,190,110,0)");
+    grd.addColorStop(0, "rgba(255,232,175,1)");
+    grd.addColorStop(0.3, "rgba(255,206,130,0.62)");
+    grd.addColorStop(0.65, "rgba(255,190,110,0.2)");
+    grd.addColorStop(1, "rgba(255,180,100,0)");
     g.clearRect(0, 0, W, H);
     g.fillStyle = grd;
     g.fillRect(0, 0, W, H);
@@ -764,6 +765,7 @@ export function installCityscape(w) {
   poolM.emissiveTexture = poolTex;
   poolM.emissiveColor = new B.Color3(0, 0, 0);
   poolM.disableLighting = true;
+  poolM.diffuseColor = new B.Color3(0, 0, 0); // disableLighting draws the diffuse map at full: dusk fades diffuseColor + emissive together, the mesh stays enabled so its shader compiles at boot, not at dusk
   poolM.alphaMode = B.Engine.ALPHA_ADD;
   poolM.backFaceCulling = false;
   poolM.zOffset = -2;
@@ -778,7 +780,7 @@ export function installCityscape(w) {
   headMesh.bakeCurrentTransformIntoVertices();
   headMesh.material = headM;
   headMesh.isPickable = false;
-  const poolMesh = B.MeshBuilder.CreateGround("cs-pool", { width: 9, height: 9 }, scene);
+  const poolMesh = B.MeshBuilder.CreateGround("cs-pool", { width: 11, height: 11 }, scene);
   poolMesh.position.y = 0.062;
   poolMesh.bakeCurrentTransformIntoVertices();
   poolMesh.material = poolM;
@@ -947,9 +949,9 @@ export function installCityscape(w) {
     skyMat.emissiveColor.set(windows * 1.3 + scene.fogColor.r * fillK, windows * 1.3 + scene.fogColor.g * fillK, windows * 1.3 + scene.fogColor.b * fillK);
     skyMat.ambientColor.set(1.2, 1.25, 1.35);
     headM.emissiveColor.set(lamps * 1.5, lamps * 1.35, lamps * 1.05);
-    poolM.emissiveColor.set(lamps * 0.85, lamps * 0.85, lamps * 0.85);
+    poolM.emissiveColor.set(lamps * 0.8, lamps * 0.8, lamps * 0.8);
+    poolM.diffuseColor.set(lamps * 0.55, lamps * 0.55, lamps * 0.55);
     poolM.alpha = 1;
-    poolMesh.setEnabled(lamps > 0.02);
     beaconMat.emissiveColor.set(w.night * 1.3 + w.dusk * 0.7, 0, 0);
     fogV.copyFrom(scene.fogColor);
     const dayK = Math.max(0, 1 - windows);
@@ -968,7 +970,8 @@ export function installCityscape(w) {
     const k = Math.random() < 0.45 ? 0.12 : 1;
     const l = lit.lamps;
     headM.emissiveColor.set(l * 1.5 * k, l * 1.35 * k, l * 1.05 * k);
-    poolM.emissiveColor.set(l * 0.85 * k, l * 0.85 * k, l * 0.85 * k);
+    poolM.emissiveColor.set(l * 0.8 * k, l * 0.8 * k, l * 0.8 * k);
+    poolM.diffuseColor.set(l * 0.55 * k, l * 0.55 * k, l * 0.55 * k);
     lampLights.forEach((L) => { if (L.intensity > 0) L.intensity = 0.55 * l * k; });
     const winK = (lit.windows > 0.02 ? 1.15 : 0) * (Math.random() < 0.4 ? 0.15 : 1);
     facadeMats.forEach((m) => m.emissiveColor.set(winK, winK, winK));
@@ -1017,6 +1020,8 @@ export function installCityscape(w) {
         skylineTowers: ring,
         crossings,
         lamps: lampSpots.length,
+        poolGlow: poolM.emissiveColor.r + poolM.diffuseColor.r,
+        poolsDrawn: poolMesh.isEnabled(),
         lit: { ...lit },
         windows: { ...windowStats, interior: interiorOk },
         dynamicLights: { active: lampDynActive, cap: lampDynCap(), max: LAMP_DYNAMIC_HIGH },
