@@ -329,7 +329,18 @@ export function createMover(world, cfg) {
     const here = E.roomAt(world.rooms, s.x, s.z);
     const far = Math.hypot(target.x - s.x, target.z - s.z);
     const sameBuilding = here && target.room && world.rooms[here] && world.rooms[target.room] && world.rooms[here].building === world.rooms[target.room].building;
-    route = { path: E.route(world.rooms, { x: s.x, z: s.z, room: here }, target), i: 1, room: target.room, catchUp: !!target.inCar || (!sameBuilding && far > 40) };
+    let path = E.route(world.rooms, { x: s.x, z: s.z, room: here }, target);
+    // On a walkable roof he goes down the block's own stair, not straight off the parapet (the wake-him cut puts him on the apt roof).
+    const blocks = (window.DAY_CONFIG && window.DAY_CONFIG.city && window.DAY_CONFIG.city.blocks) || [];
+    const roof = !here && blocks.find((b) => b.stair && Math.abs(s.x - b.x) <= b.w / 2 && Math.abs(s.z - b.z) <= b.d / 2 && s.y > b.h - 1);
+    if (roof) {
+      const st = roof.stair;
+      const top = { x: st.x1 - 0.3, z: st.z };
+      const foot = { x: st.x0, z: st.z };
+      const rest = E.route(world.rooms, { x: foot.x, z: foot.z, room: world.rooms.yard ? "yard" : null }, target);
+      path = [{ x: s.x, z: s.z }, top, foot].concat(rest.slice(1));
+    }
+    route = { path, i: 1, room: target.room, catchUp: !!target.inCar || (!sameBuilding && far > 40) };
   }
   function walkBack(dt, target) {
     if (!route || route.room !== target.room) planBack(target);
@@ -358,6 +369,7 @@ export function createMover(world, cfg) {
     // down off whatever he was standing on, gently; never up onto furniture (the ray starts inside it)
     let floor = floorAt(s.x, s.z, s.y + 0.35);
     if (floor > s.y + 0.3) floor = s.y;
+    if (s.y > floor + 0.01 && s.y - floor <= STEP_DOWN) s.y = floor; // a stair or ramp is stepped down, not fallen
     s.vy = s.y > floor + 0.01 ? Math.max(-M.maxFall, s.vy - M.gravity * dt) : 0;
     s.y = Math.max(floor, s.y + s.vy * dt);
     s.grounded = s.y <= floor + 0.01;
