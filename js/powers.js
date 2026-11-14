@@ -837,6 +837,13 @@ export function startPowers(world, dayApi) {
     const st = day.control && day.control.state ? day.control.state() : null;
     const still = st && st.grounded && (st.speed || 0) < 0.8;
     if (!still || pendingCast || !day.control.face || aimOverride) return fn(via);
+    if (name === "rain" || name === "fog" || name === "sunbreak") {
+      // sky casts don't need his hands up first: the sky answers on the press frame, he still turns toward the aim as it lands
+      const a = groundAim();
+      const q = who();
+      if (a && Math.hypot(a.x - q.x, a.z - q.z) > 0.8) day.control.face(Math.atan2(a.x - q.x, a.z - q.z));
+      return fn(via);
+    }
     const aim = groundAim();
     const p = who();
     let wait = WINDUP_MIN;
