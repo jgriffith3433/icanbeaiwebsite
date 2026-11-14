@@ -1845,7 +1845,7 @@ async function neighborAwareness(t, touch, label, whoId, quiet) {
   const who = whoId || "birdie";
   const sp = C.state();
   const dirx = Math.sin(sp.yaw || 0), dirz = Math.cos(sp.yaw || 0);
-  const tx = sp.x + dirx * 12, tz = sp.z + dirz * 12;
+  let tx = sp.x + dirx * 12, tz = sp.z + dirz * 12;
   N.stand(who, tx, tz);
   await sleep(300);
   const first = (pred) => N.events().filter(pred);
@@ -1856,8 +1856,28 @@ async function neighborAwareness(t, touch, label, whoId, quiet) {
   let down = false, crossAt = 0, held = null;
   const dist = () => { const s = C.state(); return Math.hypot(s.x - tx, s.z - tz); };
   const t1 = performance.now();
+  // He may be standing indoors (a Let go / Take control cycle leaves him beside the couch), where "12 m ahead" is
+  // through a wall: the stick would be held into it for the whole walk. If the walk makes no headway for 1.2 s, let the
+  // stick go and stand him out on the street (named setup shortcut, as the other scenarios do) and aim at a fresh neighbour.
+  let mark = { t: performance.now(), d: dist() }, moved = false;
   while (dist() > 5 && performance.now() - t1 < 14000) {
     const s = C.state();
+    if (!moved && performance.now() - mark.t > 1200) {
+      if (mark.d - dist() < 0.5) {
+        if (sr && down) { touchOn(stickEl, "pointerup", cx, cy); down = false; }
+        if (held) { held.split("").forEach((c) => keyUp(c)); held = null; }
+        if (C.place) {
+          t.cut();
+          C.place(-21, 0.5, 1.5708, {});
+          const s2 = C.state();
+          tx = s2.x + Math.sin(s2.yaw || 0) * 12; tz = s2.z + Math.cos(s2.yaw || 0) * 12;
+          N.stand(who, tx, tz);
+          t.event("awareness-reposition", `${label}: no headway (indoors?), stood him on the street`);
+          await sleep(600);
+        }
+        moved = true;
+      } else { moved = true; }
+    }
     const cam = scene.activeCamera;
     const f = cam.getForwardRay().direction;
     const camA = Math.atan2(f.x, f.z);
