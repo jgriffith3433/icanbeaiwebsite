@@ -13292,6 +13292,21 @@ installPlaytest({
       const C = feelControl();
       return C ? !!C.state().grounded : false;
     },
+    // The animation over time (hawkes-feel.js `trace`): his clip, the blend weights, the boots' own speed, a T-pose, and whether
+    // the player is asking for the state (a cast in the last 2 s, a wind-up or hold, a landing, a one-shot still playing).
+    trace: (dt) => {
+      const C = feelControl();
+      const sk = skinNow();
+      if (!C || !sk || !sk.trace) return null;
+      const st = C.state();
+      const tr = sk.trace(dt);
+      let action = false;
+      try {
+        const pw = window.day.powers && window.day.powers.now();
+        action = !!(pw && (pw.windup || (pw.cast && pw.cast.age != null && pw.cast.age < 2.2)));
+      } catch (e) { /* none */ }
+      return { ...tr, grounded: !!st.grounded, bodySpeed: st.speed || 0, action, tpose: tr.tpose && !action };
+    },
     // the walk cycle runs at his ground speed; "idle" while the body moves is the foot sliding the sensor looks for
     animSpeed: () => {
       const C = feelControl();
@@ -13401,6 +13416,13 @@ installPlaytest({
     // control.js's place() (a setup teleport that snaps the camera) tells the feel sensor it was an intended cut through
     // window.hawkesPlaytest.cut; the contract's api has none (cut lives on `t`), so every placement counted as a camera snap.
     if (window.hawkesPlaytest && !window.hawkesPlaytest.cut) window.hawkesPlaytest.cut = (s) => t.cut(s);
+    // Playtest option {"forceIdleOff":true}: after a cast his idle clip stays off, so the animation trace must catch the held pose
+    // (anim.stuckStateSeconds over 3 fails the run). It is applied as soon as his model is on him and again on each cast.
+    if (options && options.forceIdleOff) {
+      const arm = () => { const k = skinNow(); if (k && k.forceIdleOff) k.forceIdleOff(true); };
+      arm();
+      setInterval(arm, 500); // the skin arrives late and can be replaced; a bot's tab only, never polling a server
+    }
     // Most scenarios still use keys 1–7 for forecast weather; Sky studio is off for players by default.
     // Powers / five-verbs turn it off again to assert the gate.
     try {

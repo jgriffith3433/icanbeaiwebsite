@@ -58,6 +58,12 @@ export function clipAvatar(root, animationGroups, opts = {}) {
     /* a one-shot (cast, lookup, triumph...) has reached its last frame and is being held there */
     ended: (clip) => !loops.has(clip) && !!groups[clip] && groups[clip] === current && heldFor > 0,
     heldSeconds: () => heldFor,
+    /* each clip's blend weight now, by clip name (the playtest's animation trace) */
+    weights() {
+      const o = {};
+      Object.keys(groups).forEach((c) => { o[c] = Math.round((weights.get(groups[c]) || 0) * 1000) / 1000; });
+      return o;
+    },
     play(clip, speed, dt) {
       const g = pick(clip);
       if (g && g !== current) {

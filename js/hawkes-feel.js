@@ -14,6 +14,10 @@
 //   hitch            a frame takes far longer than the frames around it
 //   foot-sliding     the feet animate at one speed while the body moves at another (needs animSpeed)
 //   slope-slide      after landing, the player slides off with no input (a bad slope landing; needs grounded)
+//   stuck-state      a non-idle animation state held over 3 s with no input and no action (needs `trace`)
+//   t-pose           the skeleton reads as a T-pose / bind pose for 3 frames in a row (needs `trace`)
+//   anim-slide       the feet barely move (under 30% of body speed) while the body moves, for 0.5 s (needs `trace`)
+//   blend-pop        a clip's blend weight jumps over 0.5 in one frame (needs `trace`)
 //
 // Each flag: { id, kind, severity: 'bug'|'polish', t, pos: [x,y,z], cam: {pos, yaw, pitch}, seed, scene, value, detail, count }.
 // Flags go to the run (event 'feel' + a problem) and are pushed to the runner the moment they happen through
@@ -46,6 +50,12 @@ export const FEEL_DEFAULTS = {
   landSeconds: 0.6,
   mergeMeters: 3,          // the same kind within this distance and mergeSeconds counts as one flag
   mergeSeconds: 5,
+  animSlideRatio: 0.3,     // trace: feet move under this share of the body's speed...
+  animSlideMinSpeed: 0.5,  // ...while the body moves at least this fast (m/s), on the ground...
+  animSlideSeconds: 0.5,   // ...for this long: anim.footSlideSeconds counts it, anim-slide flags it
+  stuckStateSeconds: 3,    // trace: a non-idle state held this long with no input or action
+  blendPopWeight: 0.5,     // trace: a clip weight changes by more than this in one frame (frames under 0.1 s)
+  tposeFrames: 3,          // trace: this many T-pose frames in a row raise a t-pose flag
   maxFlags: 200,
   rayEvery: 4,             // physics rays every Nth frame
 };
@@ -54,6 +64,7 @@ const SEVERITY = {
   'below-ground': 'bug', 'fell-out': 'bug', 'inside-geometry': 'bug', stuck: 'bug',
   'camera-snap': 'polish', 'camera-jump': 'polish', 'camera-blocked': 'polish',
   'collision-pop': 'polish', jitter: 'polish', hitch: 'polish', 'foot-sliding': 'polish', 'slope-slide': 'polish',
+  'stuck-state': 'bug', 't-pose': 'bug', 'anim-slide': 'polish', 'blend-pop': 'polish',
 };
 
 const WORDS = {
@@ -69,6 +80,10 @@ const WORDS = {
   hitch: 'frame hitch',
   'foot-sliding': 'feet slide (animation and movement disagree)',
   'slope-slide': 'player slides off a slope after landing',
+  'stuck-state': 'animation stuck in a non-idle state with no input',
+  't-pose': 'skeleton in a T-pose',
+  'anim-slide': 'feet barely move while the body moves',
+  'blend-pop': 'animation blend weight popped',
 };
 
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -97,6 +112,13 @@ const yawPitch = (f) => {
  *   input?: 0..1        (movement input held, e.g. 1 while W is down),
  *   grounded?: bool     (the controller says the player stands on something),
  *   animSpeed?: m/s     (how fast the walk/run animation moves the feet: 0 idle),
+ *   anim?: {                (the animation trace, one per frame while the character is the player's; see `trace`)
+ *     state: string         the clip playing now ('idle', 'walk', 'cast'...),
+ *     weights?: { [clip]: 0..1 }   each clip's blend weight,
+ *     grounded?: bool, bodySpeed?: m/s, footSpeed?: m/s   (feet's speed relative to the body: how fast the cycle moves them),
+ *     action?: bool         (a power or other deliberate action is in progress: a held cast pose is expected),
+ *     tpose?: bool          (the skeleton reads as a T-pose / bind pose)
+ *   }
  *   floorBelow?: bool   (a ray down from the player hit something), surfaceAbove?: number (height of the surface
  *                        above the player, or null), cameraBlocked?: bool, inside?: bool   (undefined: not measured this frame)
  * }
@@ -124,6 +146,9 @@ export function createFeelCore({ emit = () => {}, seed = 0, scene = () => undefi
   let sceneName;                 // the scene the last sample was in, and when it began (seconds)
   let sceneT = 0;
   let lastInput = 0;
+  // The animation trace (sample.anim): what the quality rubric's rule 5 measures over time.
+  const a = { frames: 0, footSlide: 0, slideRun: 0, stuckRun: 0, stuckMax: 0, tpose: 0, tposeRun: 0, pops: 0, tracks: false, states: {} };
+  let prevWeights = null;
 
   function median() {
     if (!dts.length) return 1 / 60;
@@ -199,6 +224,40 @@ export function createFeelCore({ emit = () => {}, seed = 0, scene = () => undefi
         if (s.t - blockedSince >= th.blockedSeconds) raise('camera-blocked', s, s.t - blockedSince);
       } else blockedSince = null;
     }
+
+    // Animation over time (needs the game's trace): feet against body, a state that never ends, a T-pose, weight pops.
+    if (s.anim && s.player && dt > 0 && dt < 0.5) {
+      const an = s.anim;
+      a.tracks = true;
+      a.frames++;
+      const st = String(an.state ?? '');
+      a.states[st] = (a.states[st] || 0) + dt;
+      const grounded = an.grounded ?? s.grounded;
+      const body = an.bodySpeed ?? (prev?.player ? flat(prev.player, s.player) / dt : 0);
+      if (an.footSpeed != null && grounded !== false && body >= th.animSlideMinSpeed && an.footSpeed < body * th.animSlideRatio) {
+        a.footSlide += dt; a.slideRun += dt;
+        if (a.slideRun >= th.animSlideSeconds) raise('anim-slide', s, body, `body moves ${r2(body)} m/s, feet ${r2(an.footSpeed)} m/s (${st})`);
+      } else a.slideRun = 0;
+      // A non-idle state with nothing asking for it. In the air (fall, float) the state is the body's, not a stuck pose.
+      if (st && st !== 'idle' && grounded !== false && (s.input ?? 0) < 0.5 && !an.action) {
+        a.stuckRun += dt;
+        if (a.stuckRun > a.stuckMax) a.stuckMax = a.stuckRun;
+        if (a.stuckRun >= th.stuckStateSeconds) raise('stuck-state', s, a.stuckRun, `"${st}" held ${r2(a.stuckRun)} s with no input or action`);
+      } else a.stuckRun = 0;
+      if (an.tpose) {
+        a.tpose++; a.tposeRun++;
+        if (a.tposeRun >= th.tposeFrames) raise('t-pose', s, a.tposeRun, `T-pose for ${a.tposeRun} frames (${st})`);
+      } else a.tposeRun = 0;
+      if (an.weights) {
+        if (prevWeights && dt <= 0.1) {
+          for (const k of Object.keys(an.weights)) {
+            const d = Math.abs((an.weights[k] || 0) - (prevWeights[k] || 0));
+            if (d > th.blendPopWeight) { a.pops++; raise('blend-pop', s, d, `"${k}" weight moved ${r2(d)} in one frame`); }
+          }
+        }
+        prevWeights = { ...an.weights };
+      }
+    } else if (!s.anim) { a.slideRun = a.stuckRun = a.tposeRun = 0; prevWeights = null; }
 
     // Player.
     if (s.player) {
@@ -297,6 +356,13 @@ export function createFeelCore({ emit = () => {}, seed = 0, scene = () => undefi
       if (m.maxCamDegPerSec > 0) out['feel.maxCameraDegPerSec'] = Math.round(m.maxCamDegPerSec);
       if (prev?.cam) out['feel.cameraClipSeconds'] = r2(m.camClipSeconds);
       if (m.insideSeconds > 0) out['feel.insideSeconds'] = r2(m.insideSeconds);
+      if (a.tracks) {
+        out['anim.frames'] = a.frames;
+        out['anim.footSlideSeconds'] = r2(a.footSlide);
+        out['anim.stuckStateSeconds'] = r2(a.stuckMax);
+        out['anim.tposeFrames'] = a.tpose;
+        out['anim.blendPops'] = a.pops;
+      }
       if (m.latencies.length) {
         const l = m.latencies.slice().sort((a, b) => a - b);
         out['feel.inputLatencyMs'] = Math.round(l[Math.floor(l.length / 2)]);
@@ -304,6 +370,8 @@ export function createFeelCore({ emit = () => {}, seed = 0, scene = () => undefi
       }
       return out;
     },
+    /** Seconds per animation state seen in the trace (for the run's log). */
+    animStates: () => Object.fromEntries(Object.entries(a.states).map(([k, v]) => [k, r2(v)])),
     thresholds: th,
   };
 }
@@ -343,7 +411,7 @@ function isPartOf(mesh, root) {
 /**
  * Starts the sensor on a Babylon.js scene. Returns { stop(), cut(), flags() }.
  * opts: { scene?, player?, camera?, input?: () => 0..1, active?: () => bool, inside?: () => bool, grounded?: () => bool,
- *         animSpeed?: () => m/s the feet animate at, isSolid?: (mesh) => bool,
+ *         animSpeed?: () => m/s the feet animate at, trace?: (dt, sample) => anim (the animation trace), isSolid?: (mesh) => bool,
  *         headHeight = 1.5, thresholds, seed, sceneName: () => string, emit(flag) }
  */
 export function startBabylonFeel(opts = {}) {
@@ -398,6 +466,8 @@ export function startBabylonFeel(opts = {}) {
     if (p) s.player = p;
     if (opts.inside) { try { s.inside = !!opts.inside(); } catch {} }
     if (opts.grounded) { try { s.grounded = !!opts.grounded(); } catch {} }
+    // opts.trace(dt, sample): the animation state, weights, feet and body speed this frame (see createFeelCore's `anim`).
+    if (opts.trace) { try { const a = opts.trace(dt, s); if (a) s.anim = a; } catch {} }
     if (opts.animSpeed) { try { const a = Number(opts.animSpeed()); if (Number.isFinite(a)) s.animSpeed = a; } catch {} }
     if (p && B?.Vector3 && frame % (opts.thresholds?.rayEvery ?? FEEL_DEFAULTS.rayEvery) === 0) {
       const pred = solid(playerNode);
