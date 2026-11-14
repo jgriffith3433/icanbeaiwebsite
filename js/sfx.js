@@ -1510,6 +1510,21 @@ import { pickRate } from "./variety.js";
   window.addEventListener("day:control", foleyStart);
   setTimeout(foleyStart, 2500);
 
+  /* Scene changes answer in sound: the storm wipe (a clock jump, an episode start, the wake-him setup) and the wake moment each
+     play a short noise whoosh (a buffer source, so the audio probe hears it) at their start and end, and a street fill once the
+     cover has lifted. The wipe's shader warm-up can hold the main thread for seconds; with nothing started either side of it
+     wake-him read 16.95 s of silence in play. */
+  const sceneWhoosh = (to, vol) => { try { synthTag("city"); noise({ type: "bandpass", freq: to ? 300 : 900, to: to ? 1100 : 260, q: 0.7, dur: 0.9, vol, attack: 0.12 }); } catch (err) { /* ambience only */ } };
+  window.addEventListener("day:transition", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "start") sceneWhoosh(true, 0.05);
+    else if (d.action === "end") { sceneWhoosh(false, 0.05); setTimeout(() => { try { if (ctx()) playFill(hour() % 24); } catch (err) { /* */ } }, 700); }
+  });
+  window.addEventListener("day:wake", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "start" || d.action === "ready") { sceneWhoosh(d.action === "start", 0.06); setTimeout(() => { try { if (ctx()) playFill(hour() % 24); } catch (err) { /* */ } }, 600); }
+  });
+
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
     // Each watcher on its own: one that throws every frame must not take the city's ambience down with it.
