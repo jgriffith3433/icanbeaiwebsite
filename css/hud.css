@@ -284,6 +284,10 @@ html.title-up #weather-btn, html.title-up .ep-hud, html.title-up .mo-line, html.
 html.ep-menu-up .voice-caption, html.ep-menu-up .abilitybar, html.ep-menu-up .powerpad, html.ep-menu-up .touchpad, html.ep-menu-up .pressure,
 html.ep-menu-up #weather-btn, html.ep-menu-up .control-hint, html.ep-menu-up .tutorial, html.ep-menu-up .ep-hud, html.ep-menu-up .mo-line,
 html.ep-menu-up .ep-say, html.ep-menu-up .ep-toast, html.ep-menu-up .nb-layer, html.ep-menu-up .update-pill { visibility: hidden; }
+/* clarity: on his day (asleep, at work, walking back) the only thing to do is "Take control". The verb icons, Charge ring, pad and
+   stick belong to play and stay hidden until control is taken, so they never cover or compete with that one prompt. */
+html:not(.in-control) .abilitybar, html:not(.in-control) .powerpad, html:not(.in-control) .touchpad,
+html:not(.in-control) .pressure, html:not(.in-control) .control-hint { visibility: hidden; }
 /* the wake stretch (js/wakeup.js) is a beat of its own: no verb bar, pad or Charge until he is on the roof and ready */
 html.waking .abilitybar, html.waking .powerpad, html.waking .touchpad, html.waking .pressure, html.waking .control-hint { visibility: hidden; }
 
