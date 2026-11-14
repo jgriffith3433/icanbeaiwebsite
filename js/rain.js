@@ -24,7 +24,7 @@
 
 export const RAIN_BUDGET = {
   high: { hits: 150, spawn: 120, drips: 40, curtains: 3, lens: 56, streaks: 9000 },
-  low: { hits: 44, spawn: 34, drips: 12, curtains: 2, lens: 0, streaks: 4000 }, // phone: at most 4000 streak particles, no lens drops
+  low: { hits: 28, spawn: 22, drips: 8, curtains: 2, lens: 0, streaks: 2500 }, // phone: at most 2500 streak particles, no lens drops
 };
 export const REACH = 15; // metres around the camera where drops land
 export const CURTAIN_R = [56, 84, 118];

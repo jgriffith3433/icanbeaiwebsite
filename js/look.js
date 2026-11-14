@@ -617,7 +617,7 @@ export function installLook(world) {
     if (via === "click" || via === "api") { try { localStorage.setItem("icanbe.quality", quality); } catch (e) { /* private mode */ } }
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     // phones (low) render below CSS resolution: fewer pixels to fill is what holds fps on a mid-range GPU
-    engine.setHardwareScalingLevel(low ? 1.3 : 1 / Math.min(dpr, 1.5));
+    engine.setHardwareScalingLevel(low ? 1.6 : 1 / Math.min(dpr, 1.5));
     if (pipeline) {
       // Low (phones) keeps the tonemap, the grade and a half-res bloom; FXAA stays high-only (js/render-pipeline.js does the rest:
       // one 1024 shadow cascade, no SSAO, no aberration).
