@@ -20,6 +20,9 @@
    day.config.js `control.model` is the GLB's path; null = the box figure.
    ========================================================================== */
 import "@babylonjs/loaders/glTF/index.js"; // registers the .glb loader
+import { MeshoptCompression } from "@babylonjs/core/Meshes/Compression/meshoptCompression.js";
+/* the phone copy is meshopt-compressed: its decoder is served from this site (models/meshopt_decoder.js), never Babylon's CDN */
+MeshoptCompression.Configuration = { decoder: { url: "models/meshopt_decoder.js" } };
 import { clipAvatar } from "./avatar.js";
 import { powerPose } from "./power-poses.js";
 
