@@ -1368,14 +1368,14 @@ html.touch-ui.in-control .side{display:none}
     if (showCloud) {
       const p = who();
       cloud.scaling.set(cloudR * 2, cloudR * 0.85, cloudR * 2);
-      cloud.position.set(p.x, 4.2 + cloudR * 0.22, p.z);
+      cloud.position.set(p.x, (p.y || 0) + 4.2 + cloudR * 0.22, p.z);
       shelf.scaling.set(cloudR * 2.4, 1, cloudR * 2.4);
-      shelf.position.set(p.x, 6.5 + cloudR * 0.18, p.z);
+      shelf.position.set(p.x, (p.y || 0) + 6.5 + cloudR * 0.18, p.z);
       cloudMat.alpha = Math.min(0.84, 0.35 + cloudR / 40);
     }
     if (rainPs) {
       const p = who();
-      rainPs.emitter.set(p.x, 9, p.z);
+      rainPs.emitter.set(p.x, (p.y || 0) + 9, p.z);
       const w = wx();
       const globalRain = w && w.now ? w.now().rain : 0;
       rainPs.emitRate = localStorm ? (globalRain > 0.72 ? 60 : 900) : 0;
