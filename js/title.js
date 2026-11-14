@@ -40,6 +40,7 @@ export function startTitle() {
 
   let quiet = false;
   let autoTimer = 0;
+  const WARM_WAIT_MS = 12000; // the longest the auto-start waits for the shader warm-up
   try {
     const id = new URLSearchParams(location.search).get("playtest");
     if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch") quiet = true;
@@ -321,7 +322,18 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     // On a phone a cold session goes straight to the roof (no title wall): `autoStart.phoneSecs`.
     const autoSecs = cfg.autoStart ? (touchy() && cfg.autoStart.phoneSecs != null ? cfg.autoStart.phoneSecs : cfg.autoStart.secs) : 0;
     if (!quiet && via === "load" && autoSecs > 0 && day.coldopen && day.coldopen.pending()) {
-      autoTimer = setTimeout(() => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); }, autoSecs * 1000);
+      /* Not before the shader warm-up is over (js/app.js `day:warm`, `__warmIdle`): the title shows behind the loading card, and a
+         cold open that began there played through the warm-up's light-set switches and compiles (the phone's 1.5 s hitch). It still
+         starts at `autoSecs` after that, and at the latest `WARM_WAIT_MS` after the title showed whatever the GPU does. */
+      const fire = () => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); };
+      const warmed = () => window.__warmIdle === true;
+      if (warmed()) autoTimer = setTimeout(fire, autoSecs * 1000);
+      else {
+        const go = () => { window.removeEventListener("day:warm", onWarm); clearTimeout(autoTimer); autoTimer = setTimeout(fire, autoSecs * 1000); };
+        const onWarm = () => go();
+        window.addEventListener("day:warm", onWarm, { once: true });
+        autoTimer = setTimeout(() => { window.removeEventListener("day:warm", onWarm); fire(); }, WARM_WAIT_MS);
+      }
     }
     return true;
   }
