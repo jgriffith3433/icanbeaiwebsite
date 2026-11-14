@@ -374,12 +374,42 @@ export function createWindFog(B, scene, deps) {
   };
 
   /* ---- the vertex-shader bend on the world's own materials ---- */
-  function bendMaterial(mat, mode, extra) {
+  /* Turning a plugin on (and capping the lights) changes the material's defines: the shader of the whole prop / tree / awning set
+     recompiles. This module arrives in the middle of play (js/late.js), so doing all of them in one frame was the stall around the
+     first Fog cast (the scene drew nothing for several frames while the shaders linked). The world's own materials are therefore
+     enabled one at a time, each compiled before the next starts, with a gap between. Fresh materials (flags, laundry) have never
+     drawn, so they go on at once. The headless checks enable at once too. */
+  const eng0 = scene.getEngine();
+  const stagedOn = !(B.NullEngine && eng0 instanceof B.NullEngine);
+  const stage = [];
+  let staging = false;
+  function runStage() {
+    if (staging) return;
+    staging = true;
+    const next = () => {
+      const it = stage.shift();
+      if (!it) { staging = false; return; }
+      const { mat, pl, mesh } = it;
+      try {
+        if (mat.maxSimultaneousLights > 3) mat.maxSimultaneousLights = 3;
+        pl._enable(true);
+        const done = mat.forceCompilationAsync ? mat.forceCompilationAsync(mesh, { useInstances: !!mesh.thinInstanceCount }) : Promise.resolve();
+        Promise.resolve(done).catch(() => {}).then(() => setTimeout(next, 350));
+      } catch (err) { setTimeout(next, 350); }
+    };
+    setTimeout(next, 1200);
+  }
+  function bendMaterial(mat, mode, extra, mesh) {
     if (!mat || mat.__windBend) return mat;
+    const defer = stagedOn && !!mesh;
     // plugin + prepass (SSAO) + lights each cost a vertex uniform block; the GPU allows 14, so bent materials take at most 3 lights
-    if (mat.maxSimultaneousLights > 3) mat.maxSimultaneousLights = 3;
+    if (!defer && mat.maxSimultaneousLights > 3) mat.maxSimultaneousLights = 3;
     const pl = makeBendPlugin(B, mat, mode, U, extra);
-    if (pl) { mat.__windBend = pl; stats.plugins++; }
+    if (pl) {
+      mat.__windBend = pl;
+      stats.plugins++;
+      if (defer) { pl._enable(false); stage.push({ mat, pl, mesh }); }
+    }
     return mat;
   }
   const bent = new Set();
@@ -399,10 +429,11 @@ export function createWindFog(B, scene, deps) {
     }
   } catch (e) { /* no observable: the light cap alone */ }
   scene.meshes.forEach((m) => {
-    if (m.name === "props-solid" && m.material) bent.add(bendMaterial(m.material, "alpha"));
-    else if (m.name === "weather-awnings" && m.material) bent.add(bendMaterial(m.material, "cloth"));
-    else if (m.thinInstanceCount && (m.name === "trunk" || m.name.indexOf("crown") === 0) && m.material) bent.add(bendMaterial(m.material, "tree"));
+    if (m.name === "props-solid" && m.material) bent.add(bendMaterial(m.material, "alpha", undefined, m));
+    else if (m.name === "weather-awnings" && m.material) bent.add(bendMaterial(m.material, "cloth", undefined, m));
+    else if (m.thinInstanceCount && (m.name === "trunk" || m.name.indexOf("crown") === 0) && m.material) bent.add(bendMaterial(m.material, "tree", undefined, m));
   });
+  if (stage.length) runStage();
 
   /* ---- flags and laundry (shader), and three hero cloths (verlet, desktop) ---- */
   const FLAG_W = 1.6;
