@@ -1226,6 +1226,15 @@
         const e = sphere("eye" + i, 0.032, dark, head, 6);
         e.position.set(x, 0.14, 0.115);
       });
+      if (isMain) {
+        /* his glasses and the glowing blue seam down the jacket */
+        [-0.05, 0.05].forEach((x, i) => {
+          const g = box("lens" + i, 0.07, 0.05, 0.01, x, 0.14, 0.128, glowMat("#9cc6e8", "#3a5a78"), head, false);
+          glowing(g);
+        });
+        const seam = box("seam", 0.012, 0.5, 0.012, 0, 0.27, 0.125, glowMat("#58b8ff", "#58b8ff"), torso, false);
+        glowing(seam);
+      }
       const arm = (side, x) => {
         const sh = pivot("sh" + side, torso, x, 0.47, 0);
         const ua = capsule("ua" + side, 0.32, 0.055, top, sh);
@@ -1250,6 +1259,13 @@
         sh.position.y = -0.2;
         const foot = box("foot" + side, 0.1, 0.07, 0.24, 0, -0.43, 0.05, shoeM, kn);
         foot.position.y = -0.43;
+        if (isMain) {
+          /* the stand-in he wears until his model is on him reads as him, not a dark blank: a visible boot and its glowing sole */
+          foot.scaling.set(1.25, 1.3, 1.2);
+          foot.position.y = -0.42;
+          const sole = box("sole" + side, 0.135, 0.014, 0.3, 0, -0.4675, 0.055, glowMat("#58b8ff", "#58b8ff"), kn, false);
+          glowing(sole);
+        }
       };
       leg("L", -0.095);
       leg("R", 0.095);
