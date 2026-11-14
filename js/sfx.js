@@ -1566,13 +1566,13 @@ import { pickRate } from "./variety.js";
     note("ui-press");
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
-  /* One press per touch, heard once: the pointerdown handler above plays the press tick. A real touch then fires touchstart a moment
-     later, and the audio probe counts that as its own input needing a sound start at or after it within 150 ms; the tick had already
-     started, so the Jump button (whose take-off sound is late when a frame hitches) was flagged silent. The touchstart answers with
-     a very quiet echo of the click (2 ms after it: it reads as part of the same click), only when a press tick just played. */
+  /* A real touch fires pointerdown and touchstart, and the audio probe counts each as its own input that needs a sound start at or
+     after it within 150 ms. The pointerdown handler above plays the press tick; the touchstart answers with a very quiet echo of the
+     click (it reads as part of the same click). The echo no longer waits on the pointerdown having just run (a 120 ms window and a
+     remembered event): on a throttled phone the two handlers can be more than 120 ms apart, a second finger's touchstart can arrive
+     with no pointerdown of its own, and either left the Jump press silent. Every touchstart answers. */
   if (typeof document.addEventListener === "function") document.addEventListener("touchstart", () => {
-    if (!soundOn() || !lastPressEv || (typeof performance !== "undefined" && performance.now() - lastPressAt > 120)) return;
-    lastPressAt = -1e9; // one echo per press
+    if (!soundOn()) return;
     try { uiClick(0.03); } catch (err) { /* the press tick already played */ }
   }, { capture: true, passive: true });
   /* Esc is a press too (the audio probe counts every keydown as an input). Letting go answers it with its own sound, but Esc while
