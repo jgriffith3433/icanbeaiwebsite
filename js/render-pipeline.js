@@ -491,7 +491,7 @@ export function installRenderPipeline(world) {
   /* ---------- the finish: bloom, FXAA, aberration, vignette ---------- */
   function applyFinish(low) {
     if (!pipeline) return;
-    pipeline.bloomEnabled = true;
+    pipeline.bloomEnabled = !low; // phone: no bloom pass
     pipeline.bloomThreshold = 0.9; // emissives (windows, neon, bolts, seams, the cast glow); the sky and lit walls stay under it
     pipeline.bloomKernel = low ? 16 : 24;
     pipeline.bloomScale = 0.5; // half-res
