@@ -59,12 +59,20 @@ export function installGarden(day, world) {
     const root = new B.TransformNode("garden-plant-" + i, scene);
     root.position.set(p.x, y + 0.42, p.z);
     root.rotation.y = i * 1.3;
-    const stem = mk(B.MeshBuilder.CreateBox("garden-stem-" + i, { width: 0.05, height: 0.7, depth: 0.05 }, scene), root);
-    stem.position.y = 0.35;
+    /* The stem leaves the soil upright (a 0.3 m base inside the pot's rim) and only the upper part bends over, at `bend`:
+       a stem leaning from the soil's centre read as a pole stuck through the rim from the low third-person camera. */
+    const stem = mk(B.MeshBuilder.CreateBox("garden-stem-" + i, { width: 0.05, height: 0.3, depth: 0.05 }, scene), root);
+    stem.position.y = 0.15;
     stem.material = stemM;
+    const bend = new B.TransformNode("garden-bend-" + i, scene);
+    bend.parent = root;
+    bend.position.y = 0.3;
+    const upper = mk(B.MeshBuilder.CreateBox("garden-stem-up-" + i, { width: 0.05, height: 0.4, depth: 0.05 }, scene), bend);
+    upper.position.y = 0.2;
+    upper.material = stemM;
     const top = new B.TransformNode("garden-top-" + i, scene);
-    top.parent = root;
-    top.position.y = 0.7;
+    top.parent = bend;
+    top.position.y = 0.4;
     const leaves = [];
     for (let j = 0; j < 4; j++) {
       const piv = new B.TransformNode("garden-piv-" + i + j, scene);
@@ -76,12 +84,12 @@ export function installGarden(day, world) {
       leaves.push(piv);
     }
     const fruit = [0, 1].map((f) => {
-      const t = mk(B.MeshBuilder.CreateSphere("garden-tom-" + i + f, { diameter: 0.17, segments: 4 }, scene), root);
-      t.position.set(f ? -0.12 : 0.12, 0.58 - f * 0.1, 0.04);
+      const t = mk(B.MeshBuilder.CreateSphere("garden-tom-" + i + f, { diameter: 0.17, segments: 4 }, scene), bend);
+      t.position.set(f ? -0.12 : 0.12, 0.28 - f * 0.1, 0.04);
       t.material = fruitM;
       return t;
     });
-    return { root, top, leaves, fruit };
+    return { root, bend, top, leaves, fruit };
   });
 
   // dry tufts on the park lawn (overlay top 6.3 cm): they lie flat and straw-coloured until the rain
@@ -118,8 +126,8 @@ export function installGarden(day, world) {
     plants.forEach((p, i) => {
       const k = staggerK(st.k, i, plants.length);
       const q = gardenPose(k);
-      p.root.rotation.z = q.lean * (i % 2 ? -1 : 1);
-      p.root.rotation.x = q.lean * 0.4;
+      p.bend.rotation.z = q.lean * (i % 2 ? -1 : 1);
+      p.bend.rotation.x = q.lean * 0.4;
       p.root.scaling.y = q.grow;
       p.leaves.forEach((l) => { l.rotation.x = q.droop; });
       p.fruit.forEach((f) => { f.scaling.setAll(Math.max(0.001, q.fruit)); });
