@@ -1556,7 +1556,10 @@ import { pickRate } from "./variety.js";
   const pressable = (el) => el && el.closest && el.closest(PRESSABLE);
   let lastPressEv = null;
   let lastPressAt = -1e9;
-  if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
+  /* On the window, capture phase: it runs with the first handlers of the gesture, ahead of the document-level ones and of every
+     handler of the pressed control itself (a Rain press runs the whole cast, 700 ms of work on a throttled phone). The press tick
+     must start before any of that, so it is not a late answer to the tap. */
+  const onPressDown = (e) => {
     /* The audio probe counts every touch (pointerdown, touchstart) as an input that must start a sound within 150 ms: a tap on the
        canvas (aim the next cast), a look drag or a thumb that lands beside the stick is one too, so a touch answers with the press tick
        wherever it lands, not only on a control. */
@@ -1564,10 +1567,16 @@ import { pickRate } from "./variety.js";
     lastPressEv = e;
     lastPressAt = typeof performance !== "undefined" ? performance.now() : 0;
     let played = false;
+    const heardBefore = lastHeardMs;
     try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
-    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { console.warn("[sfx] press click failed", err); } }
+    // A clip that reported "played" but never started a source must not leave the press silent.
+    if (!played || (lastHeardMs === heardBefore && ctx())) { synthTag("ui"); try { uiClick(); } catch (err) { console.warn("[sfx] press click failed", err); } }
     note("ui-press");
-  }, true);
+  };
+  // Both: the window copy is first in the gesture's order; the document copy is the same handler (one press per event) and
+  // keeps working where only the document is listened to.
+  if (typeof window.addEventListener === "function") window.addEventListener("pointerdown", onPressDown, true);
+  if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", onPressDown, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
   /* A real touch fires pointerdown and touchstart, and the audio probe counts each as its own input that needs a sound start at or
      after it within 150 ms. The pointerdown handler above plays the press tick; the touchstart answers with a very quiet echo of the
