@@ -1962,6 +1962,58 @@
       }
       return Math.max(1.2, best);
     }
+    /* The camera's sphere cast against EVERY solid, not only the big boxes: the small ones (parapet lips, rooftop AC units,
+       kerb props), the rotated ones (the stair ramp, the Needle's turned box) and the stair's end wall. One ray from the target
+       against each box grown by `pad` (the camera's radius) is the sphere cast. Used by the damped camera after Let go, whose
+       old clearRadiusWide ignored anything under 2.5 m or 2 m wide and sat behind a roof lip with his legs hidden. Returns r
+       (clear) or the distance to the first hit minus `margin`, never under 1.2. */
+    const qInv = new B.Quaternion();
+    const vLoc = new B.Vector3();
+    const vDir = new B.Vector3();
+    function clearRadiusSolids(tx, ty, tz, dx, dy, dz, r, pad, margin) {
+      const reach = r + margin;
+      let best = reach;
+      for (let i = 0; i < solids.length; i++) {
+        const s = solids[i];
+        const ex = s.x - tx, ey = s.y - ty, ez = s.z - tz;
+        const big = Math.max(s.w, s.h, s.d) * 0.87 + pad + reach;
+        if (ex * ex + ey * ey + ez * ez > big * big) continue;
+        let ox, oy, oz, ddx = dx, ddy = dy, ddz = dz;
+        if (s.roll || s.yaw || s.pitch) {
+          if (!s._qi) s._qi = B.Quaternion.FromEulerAngles(s.pitch || 0, s.yaw || 0, s.roll || 0).invert();
+          qInv.copyFrom(s._qi);
+          vLoc.set(-ex, -ey, -ez).applyRotationQuaternionToRef(qInv, vLoc);
+          vDir.set(dx, dy, dz).applyRotationQuaternionToRef(qInv, vDir);
+          ox = vLoc.x; oy = vLoc.y; oz = vLoc.z;
+          ddx = vDir.x; ddy = vDir.y; ddz = vDir.z;
+        } else {
+          ox = -ex; oy = -ey; oz = -ez;
+        }
+        const hx = s.w / 2 + pad, hy = s.h / 2 + pad, hz = s.d / 2 + pad;
+        let t0 = 0, t1 = best, ok = true;
+        const o = [ox, oy, oz], d = [ddx, ddy, ddz], h = [hx, hy, hz];
+        for (let k = 0; k < 3 && ok; k++) {
+          if (Math.abs(d[k]) < 1e-6) {
+            if (o[k] < -h[k] || o[k] > h[k]) ok = false;
+          } else {
+            let a = (-h[k] - o[k]) / d[k];
+            let b = (h[k] - o[k]) / d[k];
+            if (a > b) { const x = a; a = b; b = x; }
+            if (a > t0) t0 = a;
+            if (b < t1) t1 = b;
+            if (t0 > t1) ok = false;
+          }
+        }
+        // a target already inside a (grown) box isn't something to pull in for: leave it, as clearRadius does
+        if (ok && t0 > 0.05 && t0 < best) best = t0;
+      }
+      return best >= reach ? r : Math.max(1.2, best - margin);
+    }
+    /* clearRadiusWide's five rays (centre, two sides, above, below) over the big boxes, plus the all-solids sphere cast. */
+    function cameraClear(tx, ty, tz, dx, dy, dz, r) {
+      const wide = clearRadiusWide(tx, ty, tz, dx, dy, dz, r, 0.6);
+      return Math.min(wide, clearRadiusSolids(tx, ty, tz, dx, dy, dz, r, 0.3, 0.3));
+    }
     function update(fr, dt, opts) {
       opts = opts || {};
       elapsed += dt;
@@ -2414,6 +2466,7 @@
         if (cx < lo) alphaGoal = Math.acos(Math.max(-1, Math.min(1, (lo - cam.x) / reach)));
       }
       if (cam.user > 0) {
+        cam.clearR = null;
         cam.alpha = camera.alpha;
         cam.beta = camera.beta;
         cam.radius = camera.radius;
@@ -2433,9 +2486,14 @@
         /* outdoors (not in a cutaway), keep the camera out of the buildings: pull in rather than sit in a facade */
         if (!(bd && bd.bounds)) {
           const sb = Math.sin(camera.beta);
-          const r = clearRadiusWide(cam.x, cam.y, cam.z, Math.cos(camera.alpha) * sb, Math.cos(camera.beta), Math.sin(camera.alpha) * sb, camera.radius, 0.6);
-          if (r < camera.radius) camera.radius = r;
-        }
+          const r = cameraClear(cam.x, cam.y, cam.z, Math.cos(camera.alpha) * sb, Math.cos(camera.beta), Math.sin(camera.alpha) * sb, camera.radius);
+          /* the pull-in (and the ease back out) is limited per frame so the camera never jumps: in at most 1.3 m a frame, out at 4/s */
+          const prev = cam.clearR != null && !snap ? cam.clearR : camera.radius;
+          let applied = r < prev ? Math.max(r, prev - 1.3) : Math.min(r, prev + 4 * dt);
+          if (applied > camera.radius) applied = camera.radius;
+          cam.clearR = applied;
+          if (applied < camera.radius) camera.radius = applied;
+        } else cam.clearR = null;
       }
       let goalPose = null;
       if (cam.user <= 0) {
@@ -2816,6 +2874,7 @@
       },
       surfaceAt,
       clearRadius,
+      cameraClear,
       groundAt,
       physics: () => physics,
       resize() {
