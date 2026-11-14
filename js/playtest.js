@@ -12013,6 +12013,15 @@ function phoneTouch(options, t) { return withAudioGapEvidence(t, () => phoneTouc
 async function phoneTouchRun(options, t) {
   const land = innerWidth > innerHeight;
   const playScene = land ? "Phone touch (landscape)" : "Phone touch (portrait)";
+  // A visitor's first gesture arms Sound (js/main.js arm). On a phone the cold session auto-plays into the roof with no gesture, and this
+  // bot's first input was the Bolt tap after the frame and model waits (up to ~45 s throttled), so the audio context sat unstarted and the
+  // probe read that stretch as ~19 s of silence. Press once on the Sound button first (a pointerdown arms, it doesn't toggle), as
+  // wake-him, hour-hints and the other scenarios do.
+  const sndBtn = $("sound");
+  if (sndBtn && sndBtn.getAttribute("aria-pressed") === "true") {
+    const sr0 = sndBtn.getBoundingClientRect();
+    sndBtn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: sr0.left + 4, clientY: sr0.top + 4, pointerId: 4, pointerType: "touch" }));
+  }
   // Until the first frame the game really is on its loading screen: say so to the audio probe, then the play scene.
   t.scene(window.day.now().frame ? playScene : "Loading");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
