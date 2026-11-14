@@ -123,15 +123,32 @@ export function createMover(world, cfg) {
     if (!physics()) return true;
     return CLEAR_PTS.every(([dx, dz]) => floorAt(x + dx, z + dz, 2.3) < 0.3);
   }
-  function freeSpotNear(x, z) {
+  /* How much open floor lies around (x, z): of 16 points on a 0.9 m ring, how many have nothing knee-high on them. */
+  const ROOM_PTS = [];
+  for (let i = 0; i < 16; i++) ROOM_PTS.push([Math.sin((i / 16) * TAU) * 0.9, Math.cos((i / 16) * TAU) * 0.9]);
+  function openness(x, z) {
+    let n = 0;
+    for (const [dx, dz] of ROOM_PTS) if (floorAt(x + dx, z + dz, 2.3) < 0.3) n++;
+    return n;
+  }
+  /* The nearest room to stand. Within the first ring that has any, the most open spot wins: the first fit used to be the gap between
+     the couch and the coffee table (0.69 m for a 0.72 m capsule), so he stood up wedged against the table with the couch's dark
+     back drawn right under his boots, which a high camera reads as him perched on a floating slab. A spot ahead of him (the way
+     he faces: the TV, the desk) wins ties, so he steps out in front of the seat rather than behind it. */
+  function freeSpotNear(x, z, yaw) {
     if (clear(x, z)) return { x, z };
     for (const r of [0.45, 0.7, 1.0, 1.4, 1.9]) {
+      let best = null;
+      let bestScore = -1;
       for (let i = 0; i < 12; i++) {
         const a = (i / 12) * TAU;
         const px = x + Math.sin(a) * r;
         const pz = z + Math.cos(a) * r;
-        if (clear(px, pz)) return { x: px, z: pz };
+        if (!clear(px, pz)) continue;
+        const score = physics() ? openness(px, pz) + 6 * ((px - x) * Math.sin(yaw || 0) + (pz - z) * Math.cos(yaw || 0)) / r : 0;
+        if (score > bestScore) { best = { x: px, z: pz }; bestScore = score; }
       }
+      if (best) return best;
     }
     return { x, z };
   }
@@ -139,7 +156,7 @@ export function createMover(world, cfg) {
   /* He's the player's from (x, z): if the day had him in a chair or in bed, he stands up beside it. */
   function start(x, z, yaw, from) {
     // `from` (a roof's height + a little): stand on whatever is under that height, not the street (the opening's roof)
-    const p = from != null ? { x, z } : freeSpotNear(x, z);
+    const p = from != null ? { x, z } : freeSpotNear(x, z, yaw);
     s.x = p.x;
     s.z = p.z;
     s.y = floorAt(p.x, p.z, from != null ? from : 2.3);
