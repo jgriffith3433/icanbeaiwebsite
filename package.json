@@ -7,11 +7,17 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 8093 --strictPort",
-    "test": "node scripts/check-anim-trace.mjs && node scripts/check-locomotion-blend.mjs && node scripts/check-chunks.mjs && node scripts/check-babylon-names.mjs && node scripts/check-audio-routing.mjs && node scripts/check-world.mjs && node scripts/check-powers.mjs && node scripts/check-lightning.mjs && node scripts/check-tornado.mjs && node scripts/check-rain.mjs && node scripts/check-aftermath.mjs && node scripts/check-windfog.mjs && node scripts/check-crowd.mjs && node scripts/check-voice.mjs && node scripts/check-pilot.mjs && node scripts/check-episodes.mjs && node scripts/check-finale.mjs && node scripts/check-neighbors.mjs && node scripts/check-npc-spots.mjs && node scripts/check-placement.mjs && node scripts/check-score.mjs && node scripts/check-stems.mjs && node scripts/check-daysound.mjs && node scripts/check-mix.mjs && node scripts/check-barks.mjs && node scripts/check-hud.mjs && node scripts/check-moments.mjs && node scripts/check-sfx.mjs && node scripts/sync-sfx.mjs --check && node scripts/sync-power-sfx.mjs --check && node scripts/check-render.mjs && node scripts/check-render-pipeline.mjs && node scripts/check-cutaway.mjs && node scripts/check-ground.mjs && node scripts/check-city.mjs && node scripts/check-night-glow.mjs && node scripts/check-dialogue.mjs && node scripts/check-memory.mjs && node scripts/check-remembers.mjs && node scripts/check-daily.mjs && node scripts/check-sky.mjs && node scripts/check-backdrop.mjs && node scripts/check-hero-motion.mjs && node scripts/check-clips.mjs && node scripts/check-idle-pose.mjs && node scripts/check-transition.mjs && node scripts/check-asks.mjs && node scripts/check-garden.mjs",
+    "test": "node scripts/check-anim-trace.mjs && node scripts/check-locomotion-blend.mjs && node scripts/check-chunks.mjs && node scripts/check-babylon-names.mjs && node scripts/check-audio-routing.mjs && node scripts/check-variety.mjs && node scripts/check-world.mjs && node scripts/check-powers.mjs && node scripts/check-lightning.mjs && node scripts/check-tornado.mjs && node scripts/check-rain.mjs && node scripts/check-aftermath.mjs && node scripts/check-windfog.mjs && node scripts/check-crowd.mjs && node scripts/check-voice.mjs && node scripts/check-pilot.mjs && node scripts/check-episodes.mjs && node scripts/check-finale.mjs && node scripts/check-neighbors.mjs && node scripts/check-npc-spots.mjs && node scripts/check-placement.mjs && node scripts/check-score.mjs && node scripts/check-stems.mjs && node scripts/check-daysound.mjs && node scripts/check-mix.mjs && node scripts/check-barks.mjs && node scripts/check-hud.mjs && node scripts/check-moments.mjs && node scripts/check-sfx.mjs && node scripts/sync-sfx.mjs --check && node scripts/sync-power-sfx.mjs --check && node scripts/check-render.mjs && node scripts/check-render-pipeline.mjs && node scripts/check-cutaway.mjs && node scripts/check-ground.mjs && node scripts/check-city.mjs && node scripts/check-night-glow.mjs && node scripts/check-dialogue.mjs && node scripts/check-memory.mjs && node scripts/check-remembers.mjs && node scripts/check-daily.mjs && node scripts/check-sky.mjs && node scripts/check-backdrop.mjs && node scripts/check-hero-motion.mjs && node scripts/check-clips.mjs && node scripts/check-idle-pose.mjs && node scripts/check-transition.mjs && node scripts/check-asks.mjs && node scripts/check-garden.mjs && node scripts/check-phone-model.mjs",
     "voice": "node scripts/make-voice.mjs",
-    "stamp": "node scripts/stamp-build.mjs"
+    "stamp": "node scripts/stamp-build.mjs",
+    "model:phone": "node scripts/make-phone-model.mjs"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "meshoptimizer": "^1.3.0",
+    "sharp": "^0.35.5",
     "vite": "^5.4.10"
   },
   "dependencies": {

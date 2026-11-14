@@ -5,6 +5,8 @@
    Missing files fall back to the procedural layers in js/weather.js.
    Recipes: hawkes.assets.json (audio.music / audio.sfx). Paths: day.config.js score.
    ========================================================================== */
+import { pickRate } from "./variety.js";
+
 
 /* Clear (and wind) weather plays a calm day bed or its night variation by the clock; the other weathers keep
    their own beds. "day" / "night" have their own files (Hawkes Gen) and fall back to the older beds until
@@ -612,7 +614,7 @@ export function startScore(dayApi) {
     const t = when != null ? when : ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    try { src.__hawkesSampleId = "score-" + String(url).split("/").pop(); src.playbackRate.value = jitterRate(src.__hawkesSampleId); } catch (e) { /* */ }
+    try { src.__hawkesSampleId = "score-" + String(url).split("/").pop(); src.playbackRate.value = pickRate(src.__hawkesSampleId); } catch (e) { /* */ }
     const g = ctx.createGain();
     g.gain.value = vol;
     if (pan != null && ctx.createStereoPanner) {
@@ -658,7 +660,7 @@ export function startScore(dayApi) {
           o.start(t0 + i * 0.08);
           o.stop(t0 + i * 0.08 + 0.7);
         });
-        window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { id: "sting-synth", bus: "music", gain: vol, rate: jitterRate("sting-synth") } }));
+        window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { id: "sting-synth", bus: "music", gain: vol, rate: pickRate("sting-synth") } }));
         mark();
         return true;
       } catch (e) { /* */ }

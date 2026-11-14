@@ -26,6 +26,7 @@ import "./sky.js"; // the sky: painted panoramas by the clock, a cloud deck, Sun
 import "./backdrop.js"; // the far city: a baked skyline silhouette ring tinted by the hour, never fogged, every quality (after sky)
 import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyline curtains, window runnels, drips, lens drops, height fog (after weather)
 import "./aftermath.js"; // Sun break after rain: steam, rainbow at 42°, dripping gutters, pigeons home, umbrellas fold (after rain + sky)
+import "./streetreact.js"; // Lightning sets off a car alarm near the bolt (after crowd + aftermath)
 import "./ui-art.js"; // UI art kit: verb icons, frames, ranks, busts, fonts (before powers paints the bar)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
 import "./barks.js"; // Small Weather's needs and weather reactions in the log, once each per day (docs/voice-style.md)
@@ -167,8 +168,14 @@ if (skinWorld) {
     if (window.__blockModel) return true;
     try { return /[?&]blockmodel=1/.test(location.search) || new URLSearchParams(location.search).get("block") === "model"; } catch (e) { return false; }
   };
+  /* phones and low quality fetch the compressed copy (meshopt, WebP: ~0.8 MB, not 3 MB); desktop high keeps the full model.
+     If the copy fails to load (old browser, 404) the full one is the fallback, once. */
+  let phoneCopy = false;
+  try { phoneCopy = !!(control.modelPhone && window.day.look && window.day.look.quality() === "low"); } catch (e) { phoneCopy = false; }
+  const modelUrl = () => (phoneCopy ? control.modelPhone : control.model);
+  status.modelFile = modelUrl();
   const fetchBytes = () => (blocked() ? Promise.resolve(null) : typeof fetch === "function"
-    ? fetch(control.model, { cache: "no-cache" }).then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
+    ? fetch(modelUrl(), { cache: "no-cache" }).then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
     : Promise.resolve(null));
   const firstBytesP = fetchBytes();
   const firstModuleP = import("./small-weather.js");
@@ -179,9 +186,10 @@ if (skinWorld) {
       if (RETRY_MS[i]) await new Promise((r) => setTimeout(r, RETRY_MS[i]));
       try {
         const [{ loadSmallWeather }, buf] = await Promise.all([i ? import("./small-weather.js") : firstModuleP, i ? fetchBytes() : firstBytesP]);
-        return await loadSmallWeather(w, control.model, buf);
+        return await loadSmallWeather(w, modelUrl(), buf);
       } catch (err) {
         lastErr = err;
+        if (phoneCopy) { phoneCopy = false; status.modelFile = control.model; console.warn("[world] phone model failed; using the full model"); }
         console.warn(`[world] Small Weather's model, try ${i + 1} of ${RETRY_MS.length}, didn't load:`, err);
       }
     }
@@ -194,7 +202,7 @@ if (skinWorld) {
       if (document.hidden && n < 20) return retryLater(n);
       try {
         const [{ loadSmallWeather }, buf] = await Promise.all([import("./small-weather.js"), fetchBytes()]);
-        const skin = await loadSmallWeather(w, control.model, buf);
+        const skin = await loadSmallWeather(w, modelUrl(), buf);
         w.setSkin(skin);
         Object.assign(status, { model: "small-weather", clips: skin.clips, modelError: null });
         console.info(`[world] Small Weather's model arrived on retry ${n}`);

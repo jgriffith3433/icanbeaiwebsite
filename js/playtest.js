@@ -1830,6 +1830,36 @@ async function modelBlocked(options, t) {
 }
 
 /* ---------------- warm-start: the longest frame after loading, each power's first-use cost, shader compile errors ---------------- */
+/** What the street did within about a second of a cast: the crowd's own numbers for Gale / Gust and Fog (logged for the review). */
+function streetReact(t, id) {
+  const D = window.day;
+  const c = D.crowd && D.crowd.info ? D.crowd.info() : null;
+  const wf = D.windfog && D.windfog.info ? D.windfog.info() : null;
+  if (!c) return;
+  if (id === "gale" || id === "gust") {
+    t.metric(`street.${id}.lean`, c.galeAmt || 0);
+    t.event(`street-${id}`, `pedestrians leaning ${Math.round((c.galeAmt || 0) * 100)}%, ${c.hats} hands on hats; trees/awnings bend ${wf && wf.wind != null ? wf.wind : "?"}`);
+    if (!(c.galeAmt > 0.2)) t.problem("bug", `The street did not react to the ${id} within a second (lean ${c.galeAmt || 0})`);
+  } else if (id === "sunbreak") {
+    const A = D.aftermath && D.aftermath.info ? D.aftermath.info() : null;
+    const out = (A && (A.umbrellasClosed || 0)) + 0;
+    t.metric("street.sunbreak.steam", A ? A.steam || 0 : 0);
+    t.event("street-sunbreak", `sun break on the street: aftermath ${A && A.on ? "on" : "off"}${A && A.dry ? " (dry)" : ""}, steam ${A ? Number((A.steam || 0).toFixed(2)) : "?"}, ${A ? A.birdsLanded || 0 : 0} birds landed, umbrellas folded ${out}, puddles ${((window.weather && window.weather.now && window.weather.now().puddleLevel) || 0).toFixed(2)} shrinking, shops open ${A ? A.shopsOut || 0 : 0}`);
+    if (!(A && A.on)) t.problem("bug", "The street did not answer the Sun break within a second (no steam, birds or people stepping out)");
+  } else if (id === "bolt") {
+    const R = D.streetreact && D.streetreact.info ? D.streetreact.info() : {};
+    const flick = window.__flickerSeenMs != null ? window.__flickerSeenMs : -1;
+    t.metric("street.bolt.flickerMs", Math.round(flick));
+    t.event("street-bolt", `bolt on the street: lamps and windows flickered ${flick >= 0 ? Math.round(flick) + " ms after the cast" : "never"}, ${c.flinching || 0} pedestrians flinching, ${c.lookingUp || 0} looking up, car alarm ${R.alarms ? "sounding at " + (R.last ? Math.round(R.last.x) + "," + Math.round(R.last.z) : "?") : "silent"}`);
+    if (flick < 0 || flick > 1000) t.problem("bug", `Lamps and windows did not flicker within 1 s of the Lightning (${flick < 0 ? "never" : Math.round(flick) + " ms"})`);
+    if (!R.alarms) t.problem("bug", "No car alarm went off after the Lightning");
+  } else if (id === "fog") {
+    const halos = wf && wf.haloOn;
+    t.metric("street.fog.coat", c.fogAmt || 0);
+    t.event("street-fog", `pedestrians slowed and pulling coats ${Math.round((c.fogAmt || 0) * 100)}%, car speed ${Number((c.carSpeed || 0).toFixed(2))}, lamp halos ${halos ? "on" : "off"}, headlights ${c.lights ? "on" : "off"}`);
+    if (!(c.fogAmt > 0.2)) t.problem("bug", `The street did not react to Fog within a second (coat ${c.fogAmt || 0})`);
+  }
+}
 async function warmStart(options, t) {
   const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
   t.scene("First seconds after the loading bar");
@@ -1868,16 +1898,40 @@ async function warmStart(options, t) {
     await t.until(() => P.now().energy + 0.05 >= cost, 20000, `Charge for ${id}`).catch(() => {});
     await sleep(400);
     const a = performance.now();
+    window.__flickerSeenMs = null;
+    const fobs = id === "bolt" ? scene.onBeforeRenderObservable.add(() => {
+      if (window.__flickerSeenMs == null && window.day.cityscape && window.day.cityscape.flickering && window.day.cityscape.flickering()) window.__flickerSeenMs = performance.now() - a;
+    }) : null;
     if (touch) await tapEl($("ability-" + slotId)); else pressKey(key);
     await sleep(1400);
+    if (fobs) scene.onBeforeRenderObservable.remove(fobs);
     const w = worstIn(a, performance.now());
     worstCast = Math.max(worstCast, w);
     t.metric(`firstCastWorstMs.${id}`, Math.round(w));
     heroCheck(t, `after ${id}`);
+    streetReact(t, id);
     if (w > (touch ? 150 : 100)) t.problem("bug", `The first ${id} cast cost a ${Math.round(w)} ms frame (limit ${touch ? 150 : 100})`);
     else t.event(`first-cast-${id}`, `worst frame ${Math.round(w)} ms`);
   }
   t.metric("firstCastWorstMs", Math.round(worstCast));
+  // Gale: hold Wind (a real hold on the button, by touch on a phone); the street must lean, grab hats and turn within 1 s
+  {
+    if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+    await sleep(300);
+    const btn = $("ability-wind");
+    const a = performance.now();
+    if (touch && btn) {
+      const r = btn.getBoundingClientRect();
+      touchOn(btn, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+      await sleep(1100);
+      touchOn(btn, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+    } else await holdVerb("v", 1100);
+    await sleep(900);
+    const w = worstIn(a, performance.now());
+    t.metric("firstCastWorstMs.gale", Math.round(w));
+    streetReact(t, "gale");
+    if (w > (touch ? 150 : 100)) t.problem("bug", `The Gale cast cost a ${Math.round(w)} ms frame (limit ${touch ? 150 : 100})`);
+  }
   // the first 30 s as a whole, then (phone) 60 s
   const total = touch ? 60000 : 30000;
   // the switch to snow near 24 s (a named setup shortcut: the forecast does it on snowy days): its flakes and roof caps must already be warm
@@ -11736,6 +11790,27 @@ async function audioCheck(options, t) {
   t.metric("audioCastsDistinct", sig.size);
   t.event("audio-casts", `${keys.length}/5 casts heard, ${sig.size} distinct sounds`);
   if (sig.size < 5) t.problem("bug", `The five casts must each play a distinct sound (${sig.size} distinct)`);
+  // The same power three times in a row: three different takes or rates (js/variety.js logs every one-shot's rate).
+  { const log = () => (window.__varietyLog || []);
+    const results = [];
+    for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"]]) {
+      const l0 = log().length;
+      for (let k = 0; k < 3; k++) {
+        refill();
+        if (C.mode() !== "schedule" || ($("control") && $("control").disabled)) await ensureControl(t, touch, `repeat ${name}`);
+        P.command(id, touch ? "touch" : "key");
+        await sleep(450);
+      }
+      const got = log().slice(l0).filter((e) => /^(power|castclip|press)-/.test(e.id));
+      const byId = {};
+      got.forEach((e) => { (byId[e.id] = byId[e.id] || []).push(e.r); });
+      Object.keys(byId).forEach((k) => { if (byId[k].length > 1 && new Set(byId[k]).size < byId[k].length) results.push(`${name}: ${k} repeated a rate ${byId[k].join(",")}`); });
+      t.event("audio-repeat-" + name, `${name} x3: ${Object.keys(byId).map((k) => k + " " + byId[k].join("/")).join("; ") || "no logged one-shots"}`);
+      await settleToIdle(t, name);
+    }
+    t.metric("audioRepeatedRates", results.length);
+    if (results.length) t.problem("bug", "Casting the same power three times repeated a sample at the same rate: " + results.join(" | "));
+  }
   t.progress(0.6);
 
   // a voiced line over the bed: the bed ducks, the line is louder, and it comes back
@@ -12160,6 +12235,11 @@ async function coldStart(options, t) {
   t.scene("Cold start");
   if (t.milestone) t.milestone("gameplay", "on the roof");
   { const stopHero = watchHero(t, "cold start"); t.onEnd ? t.onEnd(stopHero) : setTimeout(stopHero, 90000); }
+  { const ei = D.engineInfo ? D.engineInfo() : {}; let bytes = 0; try { const e = performance.getEntriesByType("resource").find((r) => /small-weather[^/]*\.glb/.test(r.name)); bytes = e ? e.transferSize || e.encodedBodySize || 0 : 0; } catch (e) { /* no timing */ }
+    const hero = D.world && D.world().heroDrawn ? D.world().heroDrawn() : "?";
+    t.event("cold-start-model", `model file ${ei.modelFile || "?"} (${bytes ? Math.round(bytes / 1024) + " KB transferred" : "size unknown"}), state ${ei.model}, drawn as ${hero}, quality ${D.look && D.look.quality ? D.look.quality() : "?"}`);
+    if (phone && ei.modelFile && !/phone/.test(ei.modelFile)) t.problem("bug", `The phone loaded the full model (${ei.modelFile}), not the compressed copy`);
+    if (phone && bytes && bytes > 900 * 1024) t.problem("bug", `The phone's model download was ${Math.round(bytes / 1024)} KB, over 900 KB`); }
   t.event("cold-start-control", `he is the player's ${T.control}s after Play; title ${D.title.showing() ? "STILL UP" : "closed"}`);
   if (D.title.showing()) t.problem("bug", "The title is still up after Play");
   if (D.tutorial && D.tutorial.blocking && D.tutorial.blocking()) t.problem("bug", "The first-visit card shows during the cold open");

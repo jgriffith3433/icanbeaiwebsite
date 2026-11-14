@@ -20,6 +20,8 @@
    onBeforeRender observer that reads day.control.state(): nothing here changes the day or polls the network.
    day.sfx.info() says what played (the playtest and the console).
    ========================================================================== */
+import { pickRate } from "./variety.js";
+
 (function () {
   const day = window.day;
   const world = day && day.world && day.world();
@@ -159,9 +161,10 @@
     // Tagged for the audio probe (hawkes-audio.js): the id names the voicing, the rate carries the pitch jitter, so
     // the shared white-noise buffer isn't read as one sample repeating.
     const pj = 0.94 + Math.random() * 0.12;
-    src.playbackRate.value = (o.rate || 1) * (0.97 + Math.random() * 0.06);
+    const nid = "syn-noise-" + (o.type || "lowpass") + "-" + Math.round(o.freq || 0) + (o.to ? ">" + Math.round(o.to) : "");
+    src.playbackRate.value = pickRate(nid, o.rate || 1);
     try {
-      src.__hawkesSampleId = "syn-noise-" + (o.type || "lowpass") + "-" + Math.round(o.freq || 0) + (o.to ? ">" + Math.round(o.to) : "");
+      src.__hawkesSampleId = nid;
       src.__hawkesBus = o.bus || "sfx";
       src.__hawkesGain = Math.max(0.0002, o.vol);
       src.__hawkesDur = o.dur;
@@ -380,7 +383,7 @@
     const src = a.c.createBufferSource();
     src.buffer = pick.b;
     try { src.__hawkesSampleId = "power-" + String(pick.url).split("/").pop(); } catch (e) { /* */ }
-    src.playbackRate.value = o.rate || 1 + (Math.random() * 0.06 - 0.03);
+    src.playbackRate.value = pickRate("power-" + String(pick.url).split("/").pop(), o.rate || 1); // (rate || 1) + jitter, never a passed rate with none
     let node = src;
     if (o.lp != null && a.c.createBiquadFilter) {
       const f = a.c.createBiquadFilter();
@@ -563,7 +566,7 @@
     const src = a.c.createBufferSource();
     src.buffer = b;
     try { src.__hawkesSampleId = "castclip-" + k; } catch (e) { /* */ }
-    src.playbackRate.value = (o.rate || 1) * (1 + (Math.random() * 0.06 - 0.03));
+    src.playbackRate.value = pickRate("castclip-" + k, o.rate || 1);
     let node = src;
     if (o.lp) {
       const f = a.c.createBiquadFilter();
@@ -634,7 +637,7 @@
     try {
       const src = a.c.createBufferSource();
       src.buffer = pressBuffer(a, id);
-      src.playbackRate.value = 1 + (Math.random() * 0.06 - 0.03);
+      src.playbackRate.value = pickRate("press-" + id);
       const vol = { bolt: 0.55, rain: 0.5, gust: 0.4, gale: 0.45, fog: 0.5, sunbreak: 0.3 }[id] || 0.4;
       try { src.__hawkesSampleId = "press-" + id; src.__hawkesBus = "sfx"; src.__hawkesGain = vol; } catch (e) { /* */ }
       const g = a.c.createGain();
@@ -1020,7 +1023,7 @@
       const src = a.c.createBufferSource();
       src.buffer = a.white;
       // Tagged for the audio probe: the shared white buffer isn't "buf:2x88200" repeating; the rate varies per pass.
-      src.playbackRate.value = 0.94 + Math.random() * 0.12;
+      src.playbackRate.value = pickRate("syn-car-pass");
       try { src.__hawkesSampleId = "syn-car-pass"; src.__hawkesBus = "sfx"; src.__hawkesGain = 0.07 * gain; } catch (e) { /* */ }
       const f = a.c.createBiquadFilter();
       f.type = "lowpass";
@@ -1210,7 +1213,7 @@
           try { src.__hawkesSampleId = "syn-tornado-" + kind; src.__hawkesBus = "sfx"; } catch (e) { /* */ }
         }
         src.loop = true;
-        src.playbackRate.value = 0.97 + Math.random() * 0.06; // a second tornado is never the same sample at the same rate
+        src.playbackRate.value = pickRate("syn-tornado-" + kind); // a second tornado is never the same sample at the same rate
         const f = a.c.createBiquadFilter();
         f.type = "lowpass";
         f.frequency.value = lpHz;
@@ -1350,7 +1353,7 @@
     }
     const src = a.c.createBufferSource();
     src.buffer = clickBuf;
-    src.playbackRate.value = 0.97 + Math.random() * 0.06;
+    src.playbackRate.value = pickRate("ui-click");
     try { src.__hawkesSampleId = "ui-click"; src.__hawkesBus = "ui"; src.__hawkesGain = 0.2; } catch (e) { /* */ }
     const g = a.c.createGain();
     g.gain.value = 0.2;
@@ -1447,7 +1450,22 @@
     if (d.action === "reaction") {
       if (d.kind === "storm") S.whoa(0, 0.9);
       else if (d.kind === "sun") S.cheer(0, 0.8);
-      else if (d.kind === "wind") S.clap(0, 0.8);
+      else if (d.kind === "gale") {
+        // the street answers a Gale: awnings and laundry flap in bursts, a hat is clutched, and the push of air dies over ~10 s
+        S.clap(0, 0.5);
+        [0.15, 0.9, 1.8, 3.1, 4.8, 7].forEach((t, k) => setTimeout(() => {
+          noise({ type: "bandpass", freq: 1300 + k * 90, to: 520, q: 2.2, dur: 0.38, vol: 0.1 * (1 - k * 0.12), attack: 0.02 });
+          if (k % 2 === 0) noise({ type: "highpass", freq: 3000, dur: 0.22, vol: 0.05, attack: 0.01, delay: 0.12 });
+        }, t * 1000));
+        note("gale-street");
+      } else if (d.kind === "fog") {
+        // fog on the river: a far low horn, twice, and the muffled shuffle of people pulling their coats tight
+        tone({ freq: 118, to: 108, dur: 2.1, vol: 0.07, wave: "sawtooth", attack: 0.5, delay: 0.5 });
+        tone({ freq: 118, to: 106, dur: 2.4, vol: 0.06, wave: "sawtooth", attack: 0.5, delay: 6.5 });
+        noise({ type: "lowpass", freq: 520, dur: 1.4, vol: 0.09, attack: 0.3, delay: 0.2 });
+        noise({ type: "bandpass", freq: 900, to: 700, q: 1.4, dur: 0.6, vol: 0.05, attack: 0.1, delay: 1.3 });
+        note("fog-street");
+      }
       return;
     }
     if (d.action === "aftermath") {
@@ -1465,6 +1483,18 @@
       return;
     }
     if (d.action === "flinch") { S.gasp(0, 0.7); return; }
+    if (d.action === "car-alarm") {
+      // a parked car's alarm: two-tone whoops (square, band-limited) from where the car is, ~4 s, fading with distance
+      const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
+      note("car-alarm");
+      synthTag("car");
+      const n = Math.max(3, Math.round((d.secs || 4) / 0.5));
+      for (let i = 0; i < n; i++) {
+        const hi = i % 2 === 0;
+        tone({ freq: hi ? 980 : 720, to: hi ? 760 : 940, dur: 0.46, vol: 0.05 * at.gain * (1 - i / (n * 1.6)), wave: "square", band: 1500, q: 1.2, pan: at.pan, delay: i * 0.5 });
+      }
+      return;
+    }
     if (d.action === "scatter" || d.action === "scream") {
       const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
       S.scream(at.pan, at.gain);

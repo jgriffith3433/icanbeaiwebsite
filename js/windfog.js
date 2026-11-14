@@ -832,6 +832,35 @@ export function createWindFog(B, scene, deps) {
     shaft.isVisible = false;
     FOG.shaft = shaft;
     hold.push(shaft);
+    // a lamp's halo: a soft camera-facing glow round the lamp head, so fog thickens round every lamp by day as well as at night
+    {
+      const ht = new B.DynamicTexture("wf-halo-tex", { width: 64, height: 64 }, scene, false);
+      const hx = ht.getContext();
+      const grd = hx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grd.addColorStop(0, "rgba(255,240,205,0.95)");
+      grd.addColorStop(0.28, "rgba(255,232,185,0.42)");
+      grd.addColorStop(1, "rgba(255,225,170,0)");
+      hx.fillStyle = grd;
+      hx.fillRect(0, 0, 64, 64);
+      ht.update();
+      ht.hasAlpha = true;
+      const halo = B.MeshBuilder.CreatePlane("wf-halo", { size: 4.4 }, scene);
+      halo.billboardMode = B.Mesh.BILLBOARDMODE_ALL;
+      const hm = std("wf-halo-mat", { unlit: true, emissive: [1, 0.93, 0.72], alpha: 0.0, add: true, noFog: true, noDepth: true, double: true });
+      hm.emissiveTexture = ht;
+      hm.opacityTexture = ht;
+      halo.material = hm;
+      halo.isPickable = false;
+      halo.alwaysSelectAsActiveMesh = true;
+      halo.doNotSyncBoundingInfo = true;
+      halo.thinInstanceEnablePicking = false;
+      FOG.haloBuf = new Float32Array(14 * 16);
+      halo.thinInstanceSetBuffer("matrix", FOG.haloBuf, 16, false);
+      halo.thinInstanceCount = 14;
+      halo.isVisible = false;
+      FOG.halo = halo;
+      hold.push(halo);
+    }
     const cone = B.MeshBuilder.CreateCylinder("wf-cone", { height: 14, diameterTop: 5, diameterBottom: 0.5, tessellation: 10, cap: B.Mesh.NO_CAP }, scene);
     cone.rotation.x = Math.PI / 2; // the narrow end at the car, the wide end ahead (+z)
     cone.bakeCurrentTransformIntoVertices();
@@ -870,6 +899,7 @@ export function createWindFog(B, scene, deps) {
     FOG.veils.forEach((v) => warm(v.mesh));
     warm(FOG.shaft, true);
     warm(FOG.cone, true);
+    warm(FOG.halo, true);
   }, 4000);
 
   let lastShaftAt = -9;
@@ -919,7 +949,10 @@ export function createWindFog(B, scene, deps) {
     const lampK = Math.min(1, sky.dusk * 0.8 + sky.night * 1.1);
     const shaftA = F.k * lampK;
     FOG.shaft.isVisible = shaftA > 0.02;
-    if (FOG.shaft.isVisible) {
+    const haloA = F.k * (0.5 + 0.5 * lampK); // halos round the lamps by day too
+    FOG.halo.isVisible = haloA > 0.02;
+    FOG.halo.material.alpha = Math.min(1, haloA * (quality === "low" ? 0.95 : 0.8));
+    if (FOG.shaft.isVisible || FOG.halo.isVisible) {
       FOG.shaft.material.emissiveColor.set(1 * shaftA * 0.55, 0.92 * shaftA * 0.55, 0.7 * shaftA * 0.55);
       if (F.drift - lastShaftAt > 0.4) {
         lastShaftAt = F.drift;
@@ -946,9 +979,14 @@ export function createWindFog(B, scene, deps) {
             c++;
           } else B.Matrix.ComposeToRef(tmpV.set(0, 0, 0), ID, tmpP.set(0, -20, 0), tmpM);
           tmpM.copyToArray(FOG.shaftBuf, i * 16);
+          if (e) B.Matrix.ComposeToRef(tmpV.set(1, 1, 1), ID, tmpP.set(e[0], 4.5, e[1]), tmpM);
+          else B.Matrix.ComposeToRef(tmpV.set(0, 0, 0), ID, tmpP.set(0, -20, 0), tmpM);
+          tmpM.copyToArray(FOG.haloBuf, i * 16);
         }
         FOG.shaft.thinInstanceBufferUpdated("matrix");
+        FOG.halo.thinInstanceBufferUpdated("matrix");
         stats.shafts = c;
+        stats.halos = c;
       }
     } else stats.shafts = 0;
     /* headlights: the cars near the camera cut a cone */
@@ -1045,7 +1083,7 @@ export function createWindFog(B, scene, deps) {
         ambient: W.ambient, fog: Number(F.k.toFixed(3)), bank: Number(F.bank.toFixed(3)), fogPush: Number(F.push.toFixed(2)), flips: W.flips,
         ribbons: stats.ribbons, leaves: stats.leaves, swirling: stats.swirling || 0, flags: stats.flags, laundry: stats.laundry, cloth: stats.cloth,
         clothSpread: cloths.map((c) => Number(c.spread().toFixed(2))), plugins: stats.plugins,
-        slices: stats.slices, visibleSlices: FOG.slices.filter((s) => s.mesh.isVisible).length, veils: stats.veils, shafts: stats.shafts, cones: stats.cones,
+        slices: stats.slices, visibleSlices: FOG.slices.filter((s) => s.mesh.isVisible).length, veils: stats.veils, shafts: stats.shafts, halos: stats.halos || 0, haloOn: !!(FOG.halo && FOG.halo.isVisible), cones: stats.cones,
         bent: [...bent].filter(Boolean).map((m) => m.name),
       };
     },

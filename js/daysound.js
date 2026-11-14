@@ -8,6 +8,7 @@
    Uses score's ambience bus when present; optional reverb zone hook when day.mix exists.
    day.daysound / window.daysound: now(), scape(), radioWeather(). Events: day:daysound.
    ========================================================================== */
+import { pickRate } from "./variety.js";
 import {
   SCAPES, scapeOf, radioWeatherOf, pickLoops, loopCap, activeLoops,
 } from "./daysound-core.js";
@@ -349,7 +350,7 @@ export function startDaySound(dayApi) {
       if (!buf) return false;
       const src = b.ctx.createBufferSource();
       src.buffer = buf;
-      try { src.__hawkesSampleId = "daysound-" + String(url || synthId || "oneshot").split("/").pop(); src.playbackRate.value = jitterRate(src.__hawkesSampleId); } catch (e) { /* */ }
+      try { src.__hawkesSampleId = "daysound-" + String(url || synthId || "oneshot").split("/").pop(); src.playbackRate.value = pickRate(src.__hawkesSampleId); } catch (e) { /* */ }
       const g = b.ctx.createGain();
       g.gain.value = (vol != null ? vol : 0.5) * cfg().mix;
       let node = g;
