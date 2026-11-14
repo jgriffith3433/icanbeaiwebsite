@@ -183,8 +183,10 @@ if (skinWorld) {
   try { phoneCopy = !!(control.modelPhone && window.day.look && window.day.look.quality() === "low"); } catch (e) { phoneCopy = false; }
   const modelUrl = () => (phoneCopy ? control.modelPhone : control.model);
   status.modelFile = modelUrl();
+  let early = window.__earlyModel && window.__earlyModel.url === modelUrl() ? window.__earlyModel.p : null; // index.html's head preload (phones), used once
+  const getModel = () => { if (early) { const e = early; early = null; return e.then((r) => (r && r.ok ? r : fetch(modelUrl(), { cache: "no-cache" }))); } return fetch(modelUrl(), { cache: "no-cache" }); };
   const fetchBytes = () => (blocked() ? Promise.resolve(null) : typeof fetch === "function"
-    ? fetch(modelUrl(), { cache: "no-cache" }).then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
+    ? getModel().then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
     : Promise.resolve(null));
   const firstBytesP = fetchBytes();
   const firstModuleP = import("./small-weather.js");

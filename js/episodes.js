@@ -216,8 +216,8 @@ export function challengeEp(ep, base) {
   if (ep.strain) o.strain = Object.assign({}, ep.strain, { budget: Math.max(2, ep.strain.budget + (ch.budget | 0)) });
   if (ep.pieces) {
     const extra = ch.extra || {};
-    o.pieces = ep.pieces.map((q) => Object.assign({}, q, { people: q.people.concat(extra[q.id] || []) }));
-    o.goals = ep.goals.map((g) => (g.kind === "help" && extra[g.piece] ? Object.assign({}, g, { count: g.count + extra[g.piece].length }) : g));
+    o.pieces = ep.pieces.map((q) => Object.assign({}, q, { people: (q.people || []).concat(extra[q.id] || []) }));
+    o.goals = (ep.goals || []).map((g) => (g.kind === "help" && extra[g.piece] ? Object.assign({}, g, { count: g.count + extra[g.piece].length }) : g));
   }
   return o;
 }
@@ -1417,7 +1417,7 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
     }
     A.over = A.strain > budget;
     paintHud();
-    if (A.toppled > 0) A.goals.filter((g) => g.kind === "intact").forEach(failGoal);
+    if (A.toppled > 0) (A.goals || []).filter((g) => g.kind === "intact").forEach(failGoal);
   }
 
   /* ---- rescue episodes (Rooftop storm): stranded people, helped by an ability called near them ---- */
@@ -1500,7 +1500,7 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
     R.def = def;
     R.at = active.age;
     R.lateSaid = false;
-    R.people = def.people.map((q) => {
+    R.people = (def.people || []).map((q) => {
       const m = buildPerson(q);
       const person = Object.assign({}, q, { helped: false, late: false, t: 0, m });
       if (m) props.people.push(person);
@@ -3030,7 +3030,7 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
             title: active.ep.title,
             challenge: !!active.ep.challengeOn,
             left: active.left,
-            goals: active.goals.map((g) => ({ id: g.id, done: g.done, progress: g.progress, label: g.label })),
+            goals: (active.goals || []).map((g) => ({ id: g.id, done: g.done, progress: g.progress, label: g.label })),
             rods: [...active.rodsHit],
             bolts: active.bolts,
             timed: active.timed,
@@ -3038,7 +3038,7 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
             cue: active.cueOn,
             unlocked: (active.unlocked || []).slice(),
             rescue: active.rescue
-              ? { score: active.rescue.score, helped: active.rescue.helped, total: active.rescue.total, piece: active.rescue.def ? active.rescue.def.id : null, twisted: active.rescue.twisted, late: active.rescue.late, hurt: active.rescue.hurt, precision: active.rescue.precision, rank: liveScore(active).rank, people: active.rescue.people.map((p) => ({ id: p.id, x: p.x, z: p.z, helped: p.helped })) }
+              ? { score: active.rescue.score, helped: active.rescue.helped, total: active.rescue.total, piece: active.rescue.def ? active.rescue.def.id : null, twisted: active.rescue.twisted, late: active.rescue.late, hurt: active.rescue.hurt, precision: active.rescue.precision, rank: liveScore(active).rank, people: (active.rescue.people || []).map((p) => ({ id: p.id, x: p.x, z: p.z, helped: p.helped })) }
               : null,
             prompt: active.ep.tutorial && currentTutorialGoal(active) ? currentTutorialGoal(active).prompt : null,
           }
