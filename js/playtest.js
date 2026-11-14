@@ -10528,6 +10528,121 @@ async function firstMinute(options, t) {
   t.progress(1);
 }
 
+/* ---------------- phone-touch: cold phone session on the roof, Take control and five casts, all by touch ---------------- */
+// Real input only: touch pointer events (tapEl) on Take control / the Bolt prompt / the ability buttons. Setup (named): a full
+// Charge before each cast. Works at 390x844 and 844x390 (the runner sets the window); reports every control's size and any overlap.
+async function phoneTouch(options, t) {
+  const land = innerWidth > innerHeight;
+  t.scene(land ? "Phone touch (landscape)" : "Phone touch (portrait)");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const C = D.control;
+  const P = window.powers || D.powers;
+  if (!C.state().touch) C.touch(true); // setup shortcut when the window isn't phone-sized
+  const t0 = performance.now();
+  // 1. A cold session: no saved keys, the title auto-starts straight onto the roof (js/title.js autoStart.phoneSecs).
+  if (!D.coldopen.now().on && C.mode() !== "control") {
+    Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+    D.coldopen.arm();
+    D.title.show("load");
+  }
+  const onRoof = await t.until(() => C.mode() === "control" && !D.title.showing(), 8000, "the roof scene on a cold phone session").then(() => true).catch(() => false);
+  const toRoof = Math.round((performance.now() - t0)) / 1000;
+  t.metric("phone.secondsToRoof", toRoof);
+  if (!onRoof) { t.problem("blocker", "A cold phone session never reached the roof (title wall: " + D.title.showing() + ")"); return; }
+  t.event("phone-cold-open", `${innerWidth}x${innerHeight}: on the roof ${toRoof}s after the check began, title ${D.title.showing() ? "UP" : "closed"}, cold open ${D.coldopen.now().phase}`);
+  if (D.title.showing()) t.problem("bug", "The title wall is still up on a cold phone session");
+  // the first cast of the cold open: tap the Bolt button
+  const bolt = $("coldopen-bolt");
+  if (D.coldopen.now().on && bolt) {
+    await t.until(() => hudVisible(bolt), 15000, "the Bolt button").catch(() => {});
+    if (hudVisible(bolt)) {
+      const r = bolt.getBoundingClientRect();
+      touchOn(bolt, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+      await sleep(700);
+      touchOn(bolt, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+    }
+    await t.until(() => !D.coldopen.now().on || !document.documentElement.classList.contains("cold-open"), 40000, "the cold open to finish").catch(() => {});
+    await sleep(800);
+  }
+  t.progress(0.3);
+
+  // 2. Let go and Take control again: the tap must hand him over within 1 s.
+  const btn = $("control");
+  if (C.mode() === "control") {
+    await tapEl(btn);
+    await t.until(() => C.mode() === "schedule", 20000, "him back on his day").catch(() => {});
+    t.event("phone-let-go", "tapped Let go: " + C.mode());
+  }
+  await sleep(400);
+  if (D.now().mode === "pause") { const pl = document.getElementById("play"); if (pl) pl.click(); }
+  let drive = 0;
+  while (btn.disabled && drive++ < 20) { if (D.jump) D.jump("19:00"); await sleep(400); } // he can't be taken while driving: setup shortcut
+  const tTap = performance.now();
+  await tapEl(btn);
+  const took = await t.until(() => C.mode() === "control", 3000, "Take control by tap").then(() => true).catch(() => false);
+  const ms = Math.round(performance.now() - tTap);
+  t.metric("phone.takeControlMs", ms);
+  t.event("phone-take-control", `a tap on Take control: ${took ? "control" : C.mode()} after ${ms} ms`);
+  if (!took) { t.problem("blocker", "A tap on Take control didn't enter control (pointer events only)"); return; }
+  if (ms > 1000) t.problem("bug", `Take control by tap took ${ms} ms (the limit is 1000)`);
+  await sleep(1200);
+
+  // 3. Every control: 44 px, on screen, no overlap.
+  const sels = ["#control", ".abilitybar .ab", ".touchpad .jump", ".touchpad .stick", "#sound", "#settings", "#episodes", "#time-btn", "#weather-btn"];
+  let minPx = 9999;
+  const small = [];
+  sels.forEach((sel) => document.querySelectorAll(sel).forEach((el) => {
+    const r = hudVisible(el);
+    if (!r) return;
+    const m = Math.min(r.width, r.height);
+    minPx = Math.min(minPx, m);
+    if (m < 43.5) small.push(`${el.id ? "#" + el.id : sel} ${Math.round(r.width)}x${Math.round(r.height)}`);
+    if (r.left < 0 || r.top < 0 || r.right > innerWidth + 0.5 || r.bottom > innerHeight + 0.5) t.problem("bug", `${el.id ? "#" + el.id : sel} runs off the ${innerWidth}x${innerHeight} screen`);
+  }));
+  t.metric("phone.minControlPx", Math.round(minPx));
+  t.event("phone-controls", `${innerWidth}x${innerHeight}: smallest control ${Math.round(minPx)} px${small.length ? ", SMALL: " + small.join(", ") : ""}`);
+  if (small.length) t.problem("bug", `Controls under 44 px at ${innerWidth}x${innerHeight}: ${small.join(", ")}`);
+  checkHud(t, land ? "phone landscape" : "phone portrait");
+
+  // 4. All five abilities, each by a tap, each with its effect on screen.
+  const verbs = [
+    ["bolt", (a) => a.some((e) => e.power === "bolt" || e.power === "storm")],
+    ["rain", (a) => a.some((e) => e.power === "rain")],
+    ["wind", (a) => a.some((e) => ["gust", "gale", "tornado", "wind"].includes(e.power))],
+    ["fog", (a) => a.some((e) => e.power === "fog")],
+    ["sunbreak", (a) => a.some((e) => e.power === "sunbreak" || e.power === "sun")],
+  ];
+  let ok = 0;
+  for (const [id, match] of verbs) {
+    const el = $("ability-" + id);
+    if (!el || !hudVisible(el)) { t.problem("bug", `No visible #ability-${id} button on the phone`); continue; }
+    if (P && P.abilities && P.abilities.reset) P.abilities.reset(100); // setup: a full Charge
+    const got = [];
+    const h = (e) => got.push(e.detail || {});
+    window.addEventListener("day:power", h);
+    const w0 = D.weather ? JSON.stringify((window.weather && window.weather.now && window.weather.now().state) || "") : "";
+    const tc = performance.now();
+    await tapEl(el);
+    await t.until(() => got.some((g) => g.action !== "denied"), 2500, "the " + id + " cast").catch(() => {});
+    window.removeEventListener("day:power", h);
+    const cast = got.filter((g) => g.action !== "denied");
+    const fx = !!match(cast) && cast.length > 0;
+    t.event("phone-cast-" + id, `${fx ? "cast" : "NO CAST"} ${Math.round(performance.now() - tc)} ms after the tap; ${cast.map((g) => g.power).join(",") || "nothing"}`);
+    if (fx) ok++; else t.problem("bug", `A tap on ${id} didn't cast it (events: ${got.map((g) => g.power + ":" + g.action).join(", ") || "none"})`);
+    await sleep(1800); // the effect on screen: the recording shows the sky, bolt, rain, wind or sun
+    el.dispatchEvent(new PointerEvent("pointerup", { pointerId: 9, pointerType: "touch", bubbles: true })); // release any hold
+    await sleep(300);
+    checkHud(t, "phone cast " + id);
+  }
+  t.metric("phone.castsWithEffect", ok);
+  if (ok < 5) t.problem("bug", `Only ${ok} of 5 abilities cast by touch`);
+  // frame rate over the casts (low quality on a phone)
+  try { t.metric("phone.quality", D.look && D.look.quality ? D.look.quality() === "low" ? 1 : 0 : -1); } catch (e) { /* none */ }
+  t.progress(1);
+}
+
 /* ---------------- cold-start: a new player's first Play to the first bolt and the street's reaction ---------------- */
 
 /* ---------------- audio-check: sound from the first tap, a distinct cast sound per power, the voice ducking the bed ----------------
@@ -12090,6 +12205,7 @@ installPlaytest({
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
     { id: "warm-start", title: "Warm start: no frame over 100 ms (phone 150) in the first 30 s after the loading bar, the first cast of each of the five powers costs no long frame, no shader compile errors, phone median fps >= 30 over 60 s", seconds: 90, tags: ["performance", "phone", "powers"], description: "Load with ?playtest=warm-start ({\"touch\":true} for 390x844 low quality). Real input: Take control, the five verb buttons one by one. Frame times by the render observable; metrics worstFrame30sMs, firstCastWorstMs.<power>, medianFps, shaderErrors, lightCapWorst." },
     { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
+    { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "foley", title: "Foley: recorded jump, landing, crowd, car, bird and UI sounds in lazy groups, taps on the ability arc and Episodes play the UI press, no clip file twice within 60 s, foley transfer under 400 KB", seconds: 130, tags: ["audio", "phone"], description: "Load with ?playtest=foley. Sound on, Take control by touch, taps on the ability arc and Episodes, Jump taps, then a two-minute listen. Events sound-on / ui-arc / sfx-sources / foley-repeats; metrics foley.bytes, foley.indexed." },
     { id: "power-sfx", title: "Power SFX: Lightning crack/body/rumble layers with distance delay at 343 m/s (≤30 m with the flash, ~340 m ≈ 1 s), ≥4 crack variants across 8 casts, tornado roar rises ≥6 dB from 60 m to 10 m; on phone the master limiter holds and the first cast sounds within 100 ms", seconds: 150, tags: ["audio", "powers", "phone"], description: "Load with ?playtest=power-sfx ({\"touch\":true} for 390x844). Sound on, Take control, near then far bolt, eight Lightning casts, Wind hold for Tornado. Events thunder-delay-formula / strike-near / strike-far / crack-variants / tornado-proximity / master-limiter; metrics thunderDelayFarSec, crackVariants, tornadoDbRise, firstCastSoundMs." },
@@ -12132,8 +12248,8 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "quiet-ui"].includes(id)) forcePublicView();
-      if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "title-progress" && id !== "street-teaches" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "quiet-ui", "phone-touch"].includes(id)) forcePublicView();
+      if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "title-progress" && id !== "street-teaches" && id !== "phone-touch" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
@@ -12141,6 +12257,8 @@ installPlaytest({
       else if (id === "barks") await barksScenario(options, t);
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "cold-start") await coldStart(options, t);
+      else if (id === "phone-touch") await phoneTouch(options, t);
+      else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "warm-start") await warmStart(options, t);
       else if (id === "title-key-art") await titleKeyArt(options, t);
       else if (id === "title-progress") await titleProgress(options, t);

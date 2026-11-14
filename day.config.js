@@ -218,7 +218,7 @@ window.DAY_CONFIG = {
     },
     hero: { x: -21, y: 6.16, z: 0.5, yaw: 1.5708 },
     glintEvery: [2.6, 5.2], // seconds between the storm's glints in the clouds
-    autoStart: { secs: 2.4 }, // a new player (cold open pending) is on the roof this long after the title shows: no Play wall. 0/absent = off
+    autoStart: { secs: 2.4, phoneSecs: 0.3 }, // a new player (cold open pending) is on the roof this long after the title shows: no Play wall. 0/absent = off
     day: "Day",
     night: "Night",
   },

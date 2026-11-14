@@ -468,11 +468,30 @@ function install() {
   }
   let lastDriving = null;
 
-  btn.addEventListener("click", (e) => {
-    const via = e.pointerType === "touch" || touchMode() ? "touch" : e.detail === 0 ? "key" : "button";
+  // Touch acts on pointerdown/up, not on the click that follows (a click can lag or never come): the press takes control at once,
+  // and the click that follows the same tap is swallowed so it doesn't let go again.
+  let touchActed = 0;
+  const pressBtn = (via) => {
+    if (btn.disabled) return;
     if (mode === "schedule") take(via);
     else if (mode === "control") letGo(via);
     btn.blur(); // Space and Enter belong to him now, not to the button
+  };
+  btn.style.touchAction = "manipulation";
+  btn.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+    btn.classList.add("pressed");
+  });
+  btn.addEventListener("pointerup", (e) => {
+    if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+    btn.classList.remove("pressed");
+    touchActed = performance.now();
+    pressBtn("touch");
+  });
+  btn.addEventListener("pointercancel", () => btn.classList.remove("pressed"));
+  btn.addEventListener("click", (e) => {
+    if (performance.now() - touchActed < 800) return; // the click of a tap already handled on pointerup
+    pressBtn(e.pointerType === "touch" || touchMode() ? "touch" : e.detail === 0 ? "key" : "button");
   });
 
   /* ---------- the camera ---------- */
