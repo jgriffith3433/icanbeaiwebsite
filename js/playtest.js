@@ -11540,7 +11540,7 @@ async function wakeHimRun(options, t) {
   const D = window.day;
   const C = D.control;
   const P = window.powers || D.powers;
-  try { localStorage.setItem("icanbe.opening", "wake-him"); localStorage.setItem("icanbe.tutorial", "wake-him"); localStorage.setItem("icanbe.firstrain", "done"); localStorage.setItem("icanbe.street", JSON.stringify({ done: true })); } catch (e) { /* private mode */ }
+  try { localStorage.setItem("icanbe.opening", "wake-him"); localStorage.setItem("icanbe.tutorial", "wake-him"); localStorage.setItem("icanbe.firstrain", "done"); localStorage.removeItem("icanbe.dayone"); localStorage.setItem("icanbe.street", JSON.stringify({ done: true })); } catch (e) { /* private mode */ }
   if (D.tutorial && D.tutorial.skip) D.tutorial.skip();
   if (D.title && D.title.quiet) D.title.quiet();
   if (phone && !C.state().touch) C.touch(true);
@@ -11581,6 +11581,18 @@ async function wakeHimRun(options, t) {
   // 1. the first tap: Take control
   const btn = $("control");
   if (!btn || !hudVisible(btn)) { t.problem("blocker", "No visible Take control button at 03:00"); return; }
+  // clarity: before the tap the verb bar is hidden and clear of the Take control button (one prompt, no icons yet)
+  {
+    const bar0 = document.querySelector(".abilitybar");
+    const barVis0 = bar0 ? getComputedStyle(bar0).visibility : "none";
+    const rb = btn.getBoundingClientRect(), rr = bar0 ? bar0.getBoundingClientRect() : null;
+    const overlap = !!rr && barVis0 === "visible" && rb.left < rr.right && rb.right > rr.left && rb.top < rr.bottom && rb.bottom > rr.top;
+    t.event("wake-prompt-clear", `before the tap: verb bar ${barVis0}, Take control "${(btn.textContent || "").trim()}" ${Math.round(rb.width)}x${Math.round(rb.height)}, overlap ${overlap ? "YES" : "no"}`);
+    if (barVis0 === "visible") t.problem("bug", "The verb icons show before control is taken (they hide the Take control prompt)");
+    if (overlap) t.problem("bug", "The verb bar overlaps the Take control button");
+    if (phone && (rb.width < 44 || rb.height < 44)) t.problem("bug", `Take control is under 44 px (${Math.round(rb.width)}x${Math.round(rb.height)})`);
+    if (document.documentElement.scrollWidth > window.innerWidth + 1) t.problem("bug", "The page scrolls sideways");
+  }
   const tTap = performance.now();
   if (phone) await tapEl(btn); else btn.click();
   t.milestone && t.milestone("first-input-accepted", "Take control tapped");
@@ -11595,10 +11607,24 @@ async function wakeHimRun(options, t) {
   const toReady = (wk.readyAt ? wk.readyAt - tTap : 99999) / 1000;
   const st = C.state();
   t.event("wake-roof", `${toReady.toFixed(2)}s after the tap: phase ${wk.phase}, he is at ${st.x.toFixed(1)}, ${st.y.toFixed(1)}, ${st.z.toFixed(1)}; weather ${window.weather ? window.weather.now().state : "?"}`);
+  try { const sc = window.score && window.score.now ? window.score.now() : (D.score && D.score.now ? D.score.now() : null); const fb = sc && sc.floorBed; t.event("wake-sound-floor", fb ? `floor bed on: rain ${fb.rain.toFixed(2)}, wind ${fb.wind.toFixed(2)}, room tone ${fb.room.toFixed(2)}` : "floor bed not running (Sound off or no gesture yet)"); } catch (e) { /* ok */ }
   t.metric("wake.secondsToReady", Math.round(toReady * 100) / 100);
   if (wk.phase !== "ready") t.problem("blocker", "Taking control at night never put him on the roof ready to cast");
   else if (st.y < 5) t.problem("bug", `He is not on the roof after waking (y ${st.y.toFixed(2)})`);
   if (!evs.some((e) => e.action === "stretch")) t.problem("bug", "The wake moment never played its stretch");
+  // Birdie's silent ask: out on the lawn, looking up and waving, a rain cloud in a thought bubble
+  await sleep(1500);
+  {
+    const bb = document.querySelector("#nb-birdie .nb-bubble");
+    const nb = D.neighbors.events().filter((e) => e.id === "birdie");
+    const bp = D.neighbors.now().people.find((q) => q.id === "birdie") || {};
+    const shown = !!bb && !bb.hidden && !!bb.querySelector("svg");
+    const r = bb ? bb.getBoundingClientRect() : null;
+    t.event("birdie-thought", `Birdie on the lawn (${bp.x != null ? Math.round(bp.x) + "," + Math.round(bp.z) : "?"}), waiting ${bp.waiting ? "yes" : "NO"}, looking up ${bp.lookUp ? "yes" : "no"}, rain thought bubble ${shown ? "visible" : "NOT visible"}, events ${nb.map((e) => e.action).slice(-5).join(",")}`);
+    t.metric("wake.birdieThought", shown ? 1 : 0);
+    if (!shown) t.problem("bug", "Birdie shows no rain thought bubble in the first minute after waking");
+    if (r && (r.left < 0 || r.right > innerWidth)) t.problem("bug", "Birdie's thought bubble runs off the screen sideways");
+  }
   // 2. the first cast: Lightning by touch (the button) or key
   if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
   const bolt = $("ability-bolt");
@@ -11616,6 +11642,58 @@ async function wakeHimRun(options, t) {
     t.milestone && t.milestone("first-success", "first cast after waking");
     if (secs > 10) t.problem("bug", `First cast came ${secs.toFixed(1)}s after the first tap (limit 10 s)`);
   }
+  // the first cast's payoff, all inside 2 s (js/firstcast.js): lawn greener, pond rings thrown, Birdie looking up and cheering
+  if (first) {
+    await sleep(2000);
+    const FC = (D.firstcast && D.firstcast.now()) || { log: [] };
+    const sl = (D.slice && D.slice.now && D.slice.now()) || {};
+    const react = FC.log.find((e) => e.action === "react");
+    const cheer = FC.log.find((e) => e.action === "cheer");
+    const bn = D.neighbors && D.neighbors.events ? D.neighbors.events().filter((e) => e.id === "birdie" && (e.action === "waiting" || e.action === "look-up" || e.action === "gesture")) : [];
+    t.metric("firstcast.reactMs", react ? Math.max(0, react.t - Math.round(first.at)) : -1);
+    t.metric("firstcast.cheerMs", cheer ? cheer.ms : -1);
+    t.metric("firstcast.lawnK", sl.lawnShown == null ? -1 : sl.lawnShown);
+    t.metric("firstcast.pondBursts", sl.firstCast || 0);
+    t.event("first-cast-reaction", `after the first cast: lawn ${sl.lawnShown}, pond burst ${sl.firstCast || 0}, Birdie ${cheer ? "cheered " + cheer.ms + " ms after" : "did NOT cheer"} (neighbour events ${bn.map((e) => e.action).join(",") || "none"})`);
+    if (!react) t.problem("bug", "The first cast drew no reaction (lawn, pond, Birdie)");
+    else {
+      if (!(sl.lawnShown >= 0.9)) t.problem("bug", `The lawn had not greened within 2 s of the first cast (${sl.lawnShown})`);
+      if (!sl.firstCast) t.problem("bug", "The pond did not ripple where the first cast hit");
+      if (!cheer || cheer.ms > 2000) t.problem("bug", "Birdie did not look up and cheer within 2 s of the first cast");
+    }
+  }
+  // day one's card (js/dayone.js): three outcomes, Tornado locked until "Start day two" is pressed (by touch on a phone)
+  if (first && D.dayone) {
+    const lockedBefore = D.dayone.now().locked;
+    const hold = D.powers && D.powers.abilities ? D.powers.abilities.isLocked("tornado") : null;
+    await t.until(() => { const c = $("day-one"); return !!c && !c.hidden && c.classList.contains("on"); }, 9000, "day one's card").catch(() => {});
+    await sleep(1500);
+    const card = $("day-one");
+    const shown = !!card && !card.hidden;
+    const rows = shown ? [...card.querySelectorAll("#day-one-outcomes li")].map((li) => li.textContent.trim().replace(/\s+/g, " ")) : [];
+    const sb = $("day-one-start");
+    const sr = sb ? sb.getBoundingClientRect() : null;
+    const cr = shown ? card.querySelector(".card").getBoundingClientRect() : null;
+    const inside = !!cr && cr.left >= 0 && cr.right <= innerWidth && cr.top >= 0 && cr.bottom <= innerHeight;
+    t.event("day-one-card", `${shown ? "shown" : "NOT shown"} ${((performance.now() - first.at) / 1000).toFixed(1)}s after the first cast: ${rows.length} outcomes (${rows.join(" | ")}), Tornado ${lockedBefore ? "locked" : "OPEN"} before, button ${sr ? Math.round(sr.width) + "x" + Math.round(sr.height) : "none"}, card ${inside ? "on screen" : "OFF SCREEN"}, scrollX ${document.documentElement.scrollWidth - innerWidth}`);
+    t.metric("dayone.outcomes", rows.length);
+    t.metric("dayone.buttonMinPx", sr ? Math.round(Math.min(sr.width, sr.height)) : 0);
+    if (!shown) t.problem("bug", "No day-one card appeared after the first cast");
+    else {
+      if (rows.length !== 3) t.problem("bug", `The day-one card shows ${rows.length} outcomes, not three`);
+      if (!inside) t.problem("bug", "The day-one card runs off the screen");
+      if (!sr || sr.width < 44 || sr.height < 44) t.problem("bug", "The Start day two button is under 44 px");
+      if (!lockedBefore || hold === false) t.problem("bug", "The next ability (Tornado) was not held back until the card");
+      if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The day-one card makes the page scroll sideways");
+      if (phone) await tapEl(sb); else sb.click();
+      await sleep(500);
+      const after = D.dayone.now();
+      const open = D.powers && D.powers.abilities ? !D.powers.abilities.isLocked("tornado") : false;
+      t.event("day-one-start", `Start day two pressed: card ${after.up ? "STILL UP" : "closed"}, Tornado ${open ? "unlocked" : "STILL LOCKED"}, saved ${after.done ? "yes" : "no"}`);
+      t.metric("dayone.unlocked", open ? 1 : 0);
+      if (after.up || !open) t.problem("bug", "Start day two did not close the card and unlock Tornado");
+    }
+  }
   await sleep(1500);
   checkHud(t, phone ? "wake (phone)" : "wake");
   if (phone) await checkCharacterClear(t, "wake (phone)");
@@ -11623,6 +11701,13 @@ async function wakeHimRun(options, t) {
   const back = $("control");
   if (phone) await tapEl(back); else back.click();
   t.event("wake-let-go", "Let go pressed on the roof");
+  // While he walks back the button must still offer an action (no dead "Walking back…")
+  await sleep(300);
+  if (C.mode() === "returning") {
+    const lb = $("control");
+    t.event("wake-walkback-button", `button reads "${lb ? lb.textContent : "?"}", ${lb && !lb.disabled ? "live" : "DISABLED"}`);
+    if (!lb || lb.disabled || /walking/i.test(lb.textContent)) t.problem("bug", "During the walk back the control button is dead or reads Walking back");
+  }
   // The walk back is world.js's own damped camera: once a second, name the nearest mesh between the camera and his hips (a roof
   // lip or slab hiding his legs reads as him sinking into it). A hit within 0.3 m of the hips is his own boots, not a slab.
   const lens = [];
@@ -14727,7 +14812,7 @@ installPlaytest({
     },
   },
   scenarios: [
-    { id: "charge-log-pause", title: "Charge vs Body Energy, Live log has no future rows, pause/scrub say Paused and hold the clock, resume continues in order", seconds: 70, tags: ["hud", "smoke"], description: "Load with ?playtest=charge-log-pause. Real input: Esc, Space, day bar scrub, Play/10x, Enter. Events live-log-clean / paused-status / paused-clock / coming-up / resumed / log-order / charge-bar / body-energy. Run at 1280x720 and 390x844." },
+    { id: "charge-log-pause", title: "Charge vs Body Energy, Live log has no future rows, pause/scrub say Paused and hold the clock, resume continues in order", seconds: 70, tags: ["hud", "smoke"], description: "After the first cast a day-one card shows three outcomes and Tornado unlocks on Start day two (events day-one-card / day-one-start; metrics dayone.outcomes, dayone.buttonMinPx, dayone.unlocked). Load with ?playtest=charge-log-pause. Real input: Esc, Space, day bar scrub, Play/10x, Enter. Events live-log-clean / paused-status / paused-clock / coming-up / resumed / log-order / charge-bar / body-energy. Run at 1280x720 and 390x844." },
     { id: "barks", title: "Small Weather's barks: the sky changes (rain, storm, fog, wind, snow, clear) and each gets one short log line from him; a day at speed adds hunger, thirst and tired lines; 12 or more distinct lines and none repeats within a day", seconds: 120, tags: ["story", "voice"], description: "Load with ?playtest=barks. Real input: Enter, keys 3 4 5 6 7 1, Esc, the 1200x button; the day bar to the morning and to nine hours (setup). Events bark-weather-<state> / bark-need-<need> / bark-lines / no-repeat." },
     { id: "chapter-openers", title: "Chapter openers: each of the five chapters (The Sky, The Neighbours, The Long Drought, Storm Chasers, The Night Show) opens on a voiced in-engine scene of 20 s or less: the title in the sky (clouds or a billboard), a camera move clear of geometry, the motif, a He and Pilot exchange, one caption line, Skip in thumb reach, no text card", seconds: 300, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=chapter-openers ({\"touch\":true} for the phone run). Setup: earlier episodes marked finished, chapter-seen flags cleared. Real input: the Episodes button and each chapter's first row, Esc, a tap on Skip. Events chapter-<n>-start / -layout / -end, chapter-summary; metrics chapterMaxSeconds, chapterCameraInsideFrames, chapterLines, chapterSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
@@ -14796,7 +14881,7 @@ installPlaytest({
     { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
     { id: "hour-hints", title: "Hour hints: taking control at 03:00, 08:00, 12:00, 16:00 and 20:00 each shows one hint (a verb icon, ring and marker over a place, one line in the toast lane); the verb answers it with a visible result and a reward pop, by touch at 390x844", seconds: 150, tags: ["neighbors", "retention", "phone", "touch"], description: "Load with ?playtest=hour-hints ({\"touch\":true} for 390x844). Setup (named): returning-player keys, clock jumped to each hour, him stood 6 m from the hint place. Real input: Take control, the verb button (key on a keyboard), Let go. Events hint-shown / hint-done; metrics hourHints.shown, hourHints.answered." },
     { id: "any-hour", title: "Any hour: a new visitor at 03:00, 09:00 and 14:00 taps Take control and casts the hinted power; first success within 30 s at each hour with no wall, by touch at 390x844", seconds: 120, tags: ["first-minute", "phone", "touch"], description: "Load with ?playtest=any-hour (390x844 touch for the phone run). Setup (named): new-visitor keys cleared and the clock forced to each hour in option hours (default 03:00, 09:00, 14:00). Real input: tap Take control, then the hinted cast (Tap the street for Rain, else the Lightning button). Events any-hour-setup / any-hour-success; metrics ftue.secondsToFirstSuccess.0300 / .0900 / .1400." },
-    { id: "wake-him", title: "Wake him: a visit forced to 03:00 finds him asleep; one tap on Take control stretches him awake, puts him on the roof in night fog and he casts within 10 s of the tap, by touch at 390x844; Let go returns him to bed with the clock still running", seconds: 90, tags: ["opening", "first-minute", "phone", "touch"], description: "Load with ?playtest=wake-him (390x844 touch for the phone run). Setup (named): returning player keys set, clock jumped to 03:00. Real input: tap Take control, tap the Lightning button (E on a keyboard), tap Let go. Events wake-asleep / wake-roof / wake-cast / wake-let-go / wake-back; metrics wake.secondsToReady, wake.secondsToFirstCast, wake.backInBed." },
+    { id: "wake-him", title: "Wake him: a visit forced to 03:00 finds him asleep; one tap on Take control stretches him awake, puts him on the roof in night fog and he casts within 10 s of the tap, by touch at 390x844; Let go returns him to bed with the clock still running", seconds: 90, tags: ["opening", "first-minute", "phone", "touch"], description: "Load with ?playtest=wake-him (390x844 touch for the phone run). Setup (named): returning player keys set, clock jumped to 03:00. Real input: tap Take control, tap the Lightning button (E on a keyboard), tap Let go. Events wake-asleep / wake-roof / birdie-thought / wake-sound-floor / wake-cast / first-cast-reaction / wake-let-go / wake-back; metrics wake.birdieThought, wake.secondsToReady, wake.secondsToFirstCast, wake.backInBed, firstcast.reactMs, firstcast.cheerMs, firstcast.lawnK, firstcast.pondBursts." },
     { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Birdie waits on the lawn, looks up while Rain is open, and the lawn greens after a tap on Rain (events birdie-waiting / birdie-look-up / birdie-wave / birdie-lawn; metrics birdie.*). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "foley", title: "Foley: recorded jump, landing, crowd, car, bird and UI sounds in lazy groups, taps on the ability arc and Episodes play the UI press, no clip file twice within 60 s, foley transfer under 400 KB", seconds: 130, tags: ["audio", "phone"], description: "Load with ?playtest=foley. Sound on, Take control by touch, taps on the ability arc and Episodes, Jump taps, then a two-minute listen. Events sound-on / ui-arc / sfx-sources / foley-repeats; metrics foley.bytes, foley.indexed." },

@@ -294,6 +294,7 @@ window.DAY_CONFIG = {
     camera: { alpha: -2.45, beta: 1.22, radius: 5.6, from: 9, secs: 1.0 }, // dives in from 9 m behind him
     sky: { state: "fog", intensity: 0.6, flash: [90, -0.3], flashAgainSecs: 2.2 }, // fog and far lightning: both read at night
     charge: 100,
+    birdie: { x: -13, z: 22 }, // Birdie on the park lawn, in view of the roof, waving up with a rain thought bubble (Birdie's usual wait spot)
     log: "Awake. The sky is open.",
   },
 
@@ -2204,8 +2205,8 @@ window.DAY_CONFIG = {
     home: {
       origin: [0, 0],
       bounds: [-7, -3.6, 11, 4.6],
-      wall: "#e6dfd2",
-      floor: "#c6aa7c",
+      wall: "#4b5168",
+      floor: "#5e4636",
       walls: [
         [-1, -3.6, -1, 0.9],
         [6, -3.6, 6, 0.9],
@@ -2217,8 +2218,8 @@ window.DAY_CONFIG = {
     office: {
       origin: [128, 0],
       bounds: [0, -3.6, 18, 4.6],
-      wall: "#d5dbe3",
-      floor: "#b9b4aa",
+      wall: "#434c60",
+      floor: "#4a4e57",
       walls: [
         [3, -3.6, 3, 1.2],
         [9, -3.6, 9, 1.2],
@@ -2255,7 +2256,7 @@ window.DAY_CONFIG = {
       building: "home",
       area: [-7, 1.3, -3.4, 4.6],
       light: "bathroomLight",
-      floor: "#d6dde0",
+      floor: "#4c5a66",
       doors: [[-4.0, 2.8], [-2.9, 2.8]],
       camera: { alpha: 1.75, beta: 0.9, radius: 7.5 },
       spots: {
@@ -2287,7 +2288,7 @@ window.DAY_CONFIG = {
       building: "home",
       area: [6, -3.6, 11, 4.6],
       light: "kitchenLight",
-      floor: "#d9ccb4",
+      floor: "#5a4a3c",
       doors: [[6.6, 2.0]],
       camera: { alpha: 1.62, beta: 0.95, radius: 8 },
       spots: {
@@ -2410,7 +2411,7 @@ window.DAY_CONFIG = {
     breakroom: {
       label: "Break room",
       building: "office",
-      floor: "#cfc3ac",
+      floor: "#54483c",
       area: [12, -3.6, 15, 1.2],
       doors: [[13.5, 0.6], [13.5, 1.9]],
       camera: { alpha: 1.55, beta: 0.95, radius: 7.5 },
@@ -2423,7 +2424,7 @@ window.DAY_CONFIG = {
     officeBath: {
       label: "Office bathroom",
       building: "office",
-      floor: "#d6dde0",
+      floor: "#4c5a66",
       area: [15, -3.6, 18, 1.2],
       doors: [[16.5, 0.4], [16.5, 1.9]],
       camera: { alpha: 1.75, beta: 0.92, radius: 7.5 },

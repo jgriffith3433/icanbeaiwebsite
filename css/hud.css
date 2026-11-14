@@ -32,7 +32,7 @@
   --tl: 118px;
   /* bottom row: the ability bar, and the line above it where Let go, Quality, the hint and the tutorial stack */
   --row-a: calc(var(--tl) + 10px);
-  --row-a-h: 104px;
+  --row-a-h: 120px;
   --above-a: calc(var(--row-a) + var(--row-a-h));
   /* left stack, bottom-up: one step per item */
   --l1: var(--tl);
@@ -81,13 +81,16 @@ html.in-control:not(.preview-public):not(.touch-ui) .side { max-height: calc(100
 html.touch-ui .tools { position: fixed; top: var(--safe-t); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
 
 /* ---------- Let go / Take control (centre, above the bottom row) ---------- */
-.control-btn { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tl) + 32px); }
+.control-btn { position: fixed; left: 50%; translate: -50% 0; bottom: calc(var(--tl) + 32px); }
+/* The kit's pressed state is transform: scale(.95), which shrank this button under 44 px and (when it carried the centring transform) threw it off centre.
+   Centre with `translate`, and keep the press feedback to the kit's filter and inset shadow. */
+.control-btn[data-hawkes-pressed] { transform: none; }
 html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(--above-a); }
 .preview-public .control-btn { bottom: 40px; }
 @media (max-width: 700px) {
-  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
+  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; translate: -50% 0; }
 }
-html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
+html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; translate: -50% 0; }
 
 /* ---------- Settings popover (top-right cluster, under the Settings button) ---------- */
 .tools { position: relative; }
@@ -159,7 +162,7 @@ html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; botto
 /* phone portrait, in control: Let go, Rain (weather), Neighbors and Episodes sit in the left thumb's reach, stacked above the stick
    (stick top is 148 px up); Pressure and the weather chip ride the same column. */
 @media (orientation: portrait) {
-  html.touch-ui.in-control .control-btn { top: auto; left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px), calc(var(--safe-b) + 148px)); }
+  html.touch-ui.in-control .control-btn { top: auto; left: max(12px, env(safe-area-inset-left)); translate: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px), calc(var(--safe-b) + 148px)); }
   html.touch-ui.in-control .hud-left { top: auto; bottom: max(220px, calc(env(safe-area-inset-bottom) + 208px), calc(var(--safe-b) + 204px)); flex-direction: column-reverse; gap: 10px; }
   html.touch-ui.in-control .hud-left .ep-btn { order: 1; }
   html.touch-ui.in-control .control-hint { bottom: max(470px, calc(env(safe-area-inset-bottom) + 458px), calc(var(--safe-b) + 454px)); }
@@ -175,7 +178,7 @@ html.touch-ui .abilitybar {
 }
 .powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; display: none !important; }
 /* phone: the controls legend shows once, then fades */
-html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 160px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
+html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); translate: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 160px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
 .control-hint.hint-faded { opacity: 0; visibility: hidden; transition: opacity .6s ease; }
 html.touch-ui .powerpad { display: none !important; }
 
@@ -258,7 +261,7 @@ html.touch-ui.in-control .voice-caption {
    Watching: one row along the bottom: Episodes left, Take control centre, the Time control right; the status card and the
    tools (Sound, Settings) are the top bar. On a phone Take control rises a row so the three never touch.
    In control (desktop): Let go, the hint, the caption and the tutorial stack above the ability bar, never over it. */
-:root { --pub-a: calc(var(--safe-b) + var(--row-a-h)); }
+:root { --pub-a: calc(var(--safe-b) + var(--row-a-h) + 16px); } /* +16: the bar's Charge row and cost badges stand taller than its 64 px buttons, so Take control / Let go stacks clear above the whole bar */
 .preview-public .hud.bottom { left: auto; right: var(--safe-r); bottom: 40px; width: auto; }
 .preview-public .time-drawer { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; width: min(560px, calc(100vw - var(--safe-l) - var(--safe-r))); }
 html.preview-public:not(.in-control) .hud-left { top: auto; bottom: 40px; left: var(--safe-l); flex-direction: column-reverse; }
@@ -281,6 +284,10 @@ html.title-up #weather-btn, html.title-up .ep-hud, html.title-up .mo-line, html.
 html.ep-menu-up .voice-caption, html.ep-menu-up .abilitybar, html.ep-menu-up .powerpad, html.ep-menu-up .touchpad, html.ep-menu-up .pressure,
 html.ep-menu-up #weather-btn, html.ep-menu-up .control-hint, html.ep-menu-up .tutorial, html.ep-menu-up .ep-hud, html.ep-menu-up .mo-line,
 html.ep-menu-up .ep-say, html.ep-menu-up .ep-toast, html.ep-menu-up .nb-layer, html.ep-menu-up .update-pill { visibility: hidden; }
+/* clarity: on his day (asleep, at work, walking back) the only thing to do is "Take control". The verb icons, Charge ring, pad and
+   stick belong to play and stay hidden until control is taken, so they never cover or compete with that one prompt. */
+html:not(.in-control) .abilitybar, html:not(.in-control) .powerpad, html:not(.in-control) .touchpad,
+html:not(.in-control) .pressure, html:not(.in-control) .control-hint { visibility: hidden; }
 /* the wake stretch (js/wakeup.js) is a beat of its own: no verb bar, pad or Charge until he is on the roof and ready */
 html.waking .abilitybar, html.waking .powerpad, html.waking .touchpad, html.waking .pressure, html.waking .control-hint { visibility: hidden; }
 
@@ -310,7 +317,9 @@ html.first-min:not(.in-control):not(.cold-open):not(.title-up) .control-btn { vi
 .co-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); z-index: 37; }
 .co-bolt { position: fixed; right: var(--safe-r); bottom: calc(var(--safe-b) + 124px); z-index: 37; }
 .co-say { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); z-index: 37; }
-html.touch-ui .co-prompt { left: auto; right: var(--safe-r); transform: none; bottom: calc(var(--safe-b) + 232px); }
+/* phone: the goal card rides the top of the screen, clear of the verb arc and the Rain / Bolt button (critic: it sat on Rain) */
+html.touch-ui .co-prompt { left: 50%; right: auto; transform: translateX(-50%); bottom: auto; top: max(56px, calc(var(--safe-t, 0px) + 48px)); max-width: calc(100vw - 24px); box-sizing: border-box; text-align: center; }
+@media (orientation: landscape) and (max-height: 520px) { html.touch-ui .co-prompt { top: calc(var(--safe-t, 0px) + 8px); } }
 html.touch-ui .co-say { bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px)); }
 html.title-up .co-prompt, html.title-up .co-bolt, html.title-up .co-say { visibility: hidden; }
 /* The R / Tap Rain hint steps aside (fades) while any story card or caption is on screen, so it never sits over card text. */

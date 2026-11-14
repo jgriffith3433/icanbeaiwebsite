@@ -196,7 +196,9 @@ export function installSlice(day, world) {
     });
     st.pond = +(0.78 + 0.22 * e).toFixed(3);
   };
-  const setLawn = (s, k, quiet, instant) => {
+  let easeSecs = LAWN_SECS;
+  const setLawn = (s, k, quiet, instant, secs) => {
+    easeSecs = secs > 0 ? secs : LAWN_SECS;
     const f = s === "damp" ? (k == null ? 1 : Math.max(0, Math.min(1, k))) : 0;
     st.lawn = s === "damp" && f > 0 ? "damp" : "straw";
     st.lawnK = +f.toFixed(2);
@@ -315,7 +317,7 @@ export function installSlice(day, world) {
     }
     if (st.easing) {
       const d = st.goal - cur;
-      const stp = dt / LAWN_SECS;
+      const stp = dt / easeSecs;
       cur = Math.abs(d) <= stp ? st.goal : cur + Math.sign(d) * stp;
       dirty = true;
       if (cur === st.goal) { st.easing = false; emit("lawn-done", { k: st.goal }); }
@@ -419,6 +421,14 @@ export function installSlice(day, world) {
     setLawn,
     setTomatoes,
     /** A Rain cast: the lawn darkens and the pond spreads within 1.6 s (js/powers.js `weatherCall`), and eases to full green/full pond. */
+    /** The first cast's payoff (js/firstcast.js): the lawn greens in `secs` (default 1.4) and every pond basin throws a ring at once. */
+    firstCast: (secs) => {
+      drenchOn = true;
+      setLawn("damp", 1, false, false, secs || 1.4);
+      rings.forEach((r, i) => { r.t = 3 + i * 0.12; r.ox = (i % 2 ? 1 : -1) * 0.4 * i; r.oz = (i % 3 - 1) * 0.5; });
+      st.firstCast = (st.firstCast || 0) + 1;
+      emit("ripple", { burst: true });
+    },
     drench: (on) => {
       drenchOn = on !== false;
       if (drenchOn) {

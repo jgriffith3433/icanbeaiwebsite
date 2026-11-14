@@ -1523,6 +1523,10 @@ import { pickRate } from "./variety.js";
   const fillSoon = () => { fillNow(); setTimeout(() => { try { if (ctx() && clockMs() - lastHeardMs > 1500) playFill(hour() % 24); } catch (err) { /* ambience only */ } }, 500); };
   window.addEventListener("day:coldopen", (e) => { const a = e && e.detail && e.detail.action; if (a === "start" || a === "landed" || a === "end" || a === "prompt") fillSoon(); });
   window.addEventListener("day:control", fillSoon);
+  /* Every step of the wake moment (stretch, roof, ready, back, abort) is the start of work that can park a throttled phone (the roof's
+     material compiles, the walk back's scene rebuild): a fill in the same dispatch puts a sound start at the front of each block, so
+     wake-him's longest gap in play is a block's length at worst, not the stretch between two steps that had none. */
+  window.addEventListener("day:wake", fillSoon);
 
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
@@ -1673,6 +1677,24 @@ import { pickRate } from "./variety.js";
       note("ui-press");
     }, 0);
   }, true);
+  /* Enter is a press too: Take control (Enter), the title's Play, a focused button. The pointer handlers above only hear the mouse
+     and touch, so the key was silent to the probe (wake-him: Take control by Enter, no sound start within 150 ms). The press tick
+     plays at once; the quiet echo after the key's own handlers have run starts at or after the probe's input stamp. */
+  if (typeof window.addEventListener === "function") window.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.repeat || !soundOn()) return;
+    let played = false;
+    try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
+    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* nothing to play */ } }
+    note("ui-press");
+    setTimeout(() => {
+      if (!soundOn()) return;
+      try {
+        const a = ctx();
+        if (a && a.c.state === "suspended") a.c.resume();
+        uiClick(0.03);
+      } catch (err) { /* the press tick already played */ }
+    }, 0);
+  }, true);
   try {
     if (typeof MutationObserver === "undefined") throw new Error("no observer");
     const menuEl = () => document.getElementById("ep-menu") || document.querySelector(".ep-menu");
@@ -1740,6 +1762,11 @@ import { pickRate } from "./variety.js";
     const d = e.detail || {};
     if (d.action === "unlock") S.sparkle(); // a neighbor's ask opened a verb (js/street.js)
     else if (d.action === "thanks") S.blip();
+  });
+  window.addEventListener("day:dayone", (e) => {
+    const a = e.detail && e.detail.action;
+    if (a === "show") S.sparkle(); // day one's card (js/dayone.js)
+    else if (a === "start" || a === "skip") { S.sparkle(); S.blip(); }
   });
   window.addEventListener("day:helped", (e) => {
     // a cast answered a neighbour's ask: the reward pop (js/helped.js), sparkle then the warm goal chime, existing sounds only
