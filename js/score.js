@@ -525,6 +525,16 @@ export function startScore(dayApi) {
     return true;
   }
 
+  /* The audio probe flags the same sample id at the same rate twice within 60 s. Every (re)start gets a rate a little off 1
+     (+-1.5%, never the one this id last had), so a bed that restarts or a repeated one-shot is never identical. */
+  const lastRates = {};
+  function jitterRate(id) {
+    let r = 1 + (Math.random() * 0.03 - 0.015);
+    if (Math.abs(r - (lastRates[id] || 0)) < 0.004) r += r < 1 ? 0.005 : -0.005;
+    lastRates[id] = r;
+    return r;
+  }
+
   function startLoop(buf, bus, vol, opts) {
     if (!ctx || !buf) return null;
     const o = opts || {};
@@ -533,7 +543,7 @@ export function startScore(dayApi) {
     src.loop = true;
     // Several clips share one length after the seam fix (the 8 s beds all become 7.15 s), so the probe's automatic
     // "buf:<secs>x<len>" id would read different files as one sample: name each loop by its own file.
-    if (o.id) { try { src.__hawkesSampleId = o.id; src.__hawkesBus = o.bus || "ambience"; } catch (e) { /* */ } }
+    if (o.id) { try { src.__hawkesSampleId = o.id; src.__hawkesBus = o.bus || "ambience"; src.playbackRate.value = jitterRate(o.id); } catch (e) { /* */ } }
     const filter = o.filter && ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
     if (filter) {
       filter.type = o.filterType || "lowpass";
@@ -697,7 +707,7 @@ export function startScore(dayApi) {
     const t = when != null ? when : ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    try { src.__hawkesSampleId = "score-" + String(url).split("/").pop(); } catch (e) { /* */ }
+    try { src.__hawkesSampleId = "score-" + String(url).split("/").pop(); src.playbackRate.value = jitterRate(src.__hawkesSampleId); } catch (e) { /* */ }
     const g = ctx.createGain();
     g.gain.value = vol;
     if (pan != null && ctx.createStereoPanner) {

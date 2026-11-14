@@ -93,10 +93,26 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
   /* The warm-up is a head start, never a reason to keep the card up: world.warmLights keeps its own 8 s budget and carries on
      behind the title once the card is gone; this cap (2.5 s) is the gate's own, so whatever that promise does (a compile that never settles on a slow or software GL), the
      card goes once the model, the frame and the title are in. */
+  /* Two runs are asked for (first frame, then once his model is on). They never overlap (two warmLights fighting over the forced light
+     groups switch the lights under a player), and `window.__warmIdle` / the `day:warm` event say when the last one is over:
+     js/title.js holds a phone's auto-started cold open until then, so the warm-up's light-set switches and compiles never land on frames
+     the player is already playing (the cold-start phone's 1.5 s hitch: the cold open began behind the loading card at +0.3 s). */
+  let running = false;
+  let again = false;
+  const idle = () => {
+    window.__warmIdle = true;
+    try { window.dispatchEvent(new CustomEvent("day:warm", { detail: { idle: true } })); } catch (e) { /* old browser */ }
+  };
   const go = () => {
+    if (running) { again = true; return; }
+    running = true;
+    window.__warmIdle = false;
     const t0 = Date.now();
     setTimeout(() => { if (!ready.lights) { ready.lights = true; console.info(`[app] loading card: warm-up gate capped at ${LIGHTS_CAP_MS} ms`); maybeDone(); } }, LIGHTS_CAP_MS);
-    const lightsDone = (how) => { if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
+    const lightsDone = (how) => {
+      running = false;
+      if (again) { again = false; go(); } else if (window.__warmModelSettled || !control.model) idle();
+      if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
     /* then rain, fog, a sun break and wind drawn for a few frames each (weather.warmCasts): the first cast of each used to pay
        its compile and allocation as a 400-1000 ms frame */
     w.warmLights(8000).catch(() => {})
@@ -156,12 +172,14 @@ if (skinWorld) {
       w.setSkin(skin);
       Object.assign(status, { model: "small-weather", clips: skin.clips });
       ready.model = true;
+      window.__warmModelSettled = true;
       loading.set("model", 1);
       maybeDone();
       if (window.__warmLights) window.__warmLights();
       console.info(`[world] Small Weather's model: ${skin.clips.length} clips (${skin.clips.join(" ")})`);
     })
     .catch((err) => {
+      window.__warmModelSettled = true;
       if (window.__warmLights) window.__warmLights();
       w.setSkin(null); // he stays hidden: Small Weather or nothing, never the box figure
       Object.assign(status, { model: "none", modelError: String((err && err.message) || err) });

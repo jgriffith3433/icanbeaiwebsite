@@ -1909,6 +1909,28 @@
       }
       return best >= reach ? r : Math.max(1.2, best - m);
     }
+    /* The same, for a camera with some body: the centre ray plus four rays from the target to points 0.45 m
+       to each side and above/below where the camera would sit, so a facade that slides past the camera's
+       side (walking down a stair along a block) pulls it in too, not only one straight in line. */
+    function clearRadiusWide(tx, ty, tz, dx, dy, dz, r, margin) {
+      let best = clearRadius(tx, ty, tz, dx, dy, dz, r, margin);
+      const px = -dz;
+      const pz = dx;
+      const pl = Math.hypot(px, pz) || 1;
+      const sx = px / pl;
+      const sz = pz / pl;
+      const W = 0.45;
+      const offs = [[sx * W, 0, sz * W], [-sx * W, 0, -sz * W], [0, W, 0], [0, -W, 0]];
+      for (const o of offs) {
+        const vx = dx * r + o[0];
+        const vy = dy * r + o[1];
+        const vz = dz * r + o[2];
+        const L = Math.hypot(vx, vy, vz) || 1;
+        const c = clearRadius(tx, ty, tz, vx / L, vy / L, vz / L, L, margin);
+        if (c < L) best = Math.min(best, (c / L) * r);
+      }
+      return Math.max(1.2, best);
+    }
     function update(fr, dt, opts) {
       opts = opts || {};
       elapsed += dt;
@@ -2374,7 +2396,7 @@
         /* outdoors (not in a cutaway), keep the camera out of the buildings: pull in rather than sit in a facade */
         if (!(bd && bd.bounds)) {
           const sb = Math.sin(camera.beta);
-          const r = clearRadius(cam.x, cam.y, cam.z, Math.cos(camera.alpha) * sb, Math.cos(camera.beta), Math.sin(camera.alpha) * sb, camera.radius, 0.6);
+          const r = clearRadiusWide(cam.x, cam.y, cam.z, Math.cos(camera.alpha) * sb, Math.cos(camera.beta), Math.sin(camera.alpha) * sb, camera.radius, 0.6);
           if (r < camera.radius) camera.radius = r;
         }
       }
