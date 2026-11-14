@@ -11531,6 +11531,10 @@ function wakeHim(options, t) { return withAudioGapEvidence(t, () => wakeHimRun(o
 
 async function wakeHimRun(options, t) {
   const phone = innerWidth <= 700 || !!(window.day && window.day.control && window.day.control.state().touch);
+  // The setup below (first frame, his model, the storm wipe and the jump to 03:00) is loading, not play: ~40 s on the throttled phone.
+  // With no scene named the audio probe counted it as play (an unnamed scene is not a menu), so the stretch between the last sound before
+  // the model load and the first one after it read as a 42 s silence. Same as phone-touch; play is the "Wake him" scene named below.
+  t.scene("Loading");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
   const D = window.day;
@@ -11986,33 +11990,47 @@ async function birdieWaits(t, label) {
   await sleep(600);
 }
 
-/* Evidence for the audio probe's longest silence (it counts buffer-source starts only): the time of every source start and of every
-   scenario step (events, progress), then the longest gap between two starts and the step it fell in, as events and metrics
-   (audio.longestGapS, audio.longestGapAtS, audio.longestGapStep, audio.gapSources). Shows whether a gap is at boot or mid-play. */
+/* Evidence for the audio probe's longest silence (it counts buffer-source starts only): the time of every source start (with the
+   AudioContext's state at that start) and of every scenario step and scene change, then the longest gap between two starts as
+   events and metrics (audio.longestGapS, audio.longestGapAtS, audio.longestGapStep, audio.gapSources). The event names where the
+   gap begins and ends (seconds into the run), the step and scene it begins and ends in, the AudioContext state at its start and at
+   its end, and whether the Sound button was on and the fill timer's last-heard clock agreed, so one run says whether a gap is boot,
+   a gesture lock (state "suspended"), Sound off, or a real stall mid-play. */
 async function withAudioGapEvidence(t, fn) {
   const starts = [];
-  const steps = [{ at: performance.now(), name: "scenario start" }];
+  const steps = [{ at: performance.now(), name: "scenario start", scene: "(none)" }];
+  let scene = "(none)";
   const proto = typeof AudioBufferSourceNode !== "undefined" ? AudioBufferSourceNode.prototype : null;
   const origStart = proto && proto.start;
-  if (origStart) proto.start = function (...a) { starts.push(performance.now()); return origStart.apply(this, a); };
-  const origEvent = t.event, origProgress = t.progress;
-  t.event = function (type, detail) { steps.push({ at: performance.now(), name: String(type) }); return origEvent.call(t, type, detail); };
-  t.progress = function (p) { steps.push({ at: performance.now(), name: "progress " + p }); return origProgress.call(t, p); };
+  if (origStart) proto.start = function (...a) {
+    let state = "?";
+    try { state = this.context ? this.context.state : "?"; } catch (e) { /* none */ }
+    starts.push({ at: performance.now(), state });
+    return origStart.apply(this, a);
+  };
+  const origEvent = t.event, origProgress = t.progress, origScene = t.scene;
+  t.event = function (type, detail) { steps.push({ at: performance.now(), name: String(type), scene }); return origEvent.call(t, type, detail); };
+  t.progress = function (p) { steps.push({ at: performance.now(), name: "progress " + p, scene }); return origProgress.call(t, p); };
+  t.scene = function (name) { scene = String(name); steps.push({ at: performance.now(), name: "scene " + scene, scene }); return origScene.call(t, name); };
   try { await fn(); }
   finally {
     if (origStart) proto.start = origStart;
-    t.event = origEvent; t.progress = origProgress;
+    t.event = origEvent; t.progress = origProgress; t.scene = origScene;
     const end = performance.now();
-    const marks = [steps[0].at, ...starts, end].sort((a, b) => a - b);
-    let best = { gap: 0, from: marks[0] };
-    for (let i = 1; i < marks.length; i++) if (marks[i] - marks[i - 1] > best.gap) best = { gap: marks[i] - marks[i - 1], from: marks[i - 1] };
-    let step = steps[0].name;
-    for (const s of steps) if (s.at <= best.from + best.gap / 2) step = s.name;
+    const t0 = steps[0].at;
+    const marks = [{ at: t0, state: "none yet" }, ...starts, { at: end, state: "end of run" }].sort((a, b) => a.at - b.at);
+    let best = { gap: 0, i: 0 };
+    for (let i = 1; i < marks.length; i++) if (marks[i].at - marks[i - 1].at > best.gap) best = { gap: marks[i].at - marks[i - 1].at, i: i - 1 };
+    const from = marks[best.i], to = marks[best.i + 1];
+    const stepAt = (ms) => { let s = steps[0]; for (const x of steps) if (x.at <= ms) s = x; return s; };
+    const sFrom = stepAt(from.at), sTo = stepAt(to.at);
     const r1 = (v) => Math.round(v) / 1000;
+    let soundBtn = "?";
+    try { const b = document.getElementById("sound"); soundBtn = b ? b.getAttribute("aria-pressed") : "none"; } catch (e) { /* none */ }
     t.metric("audio.longestGapS", r1(best.gap));
-    t.metric("audio.longestGapAtS", r1(best.from - steps[0].at));
+    t.metric("audio.longestGapAtS", r1(from.at - t0));
     t.metric("audio.gapSources", starts.length);
-    t.event("audio-longest-gap", `longest gap between sound starts ${r1(best.gap)} s, from ${r1(best.from - steps[0].at)} s into the run, in step "${step}" (${starts.length} starts, ${steps.length} steps)`);
+    t.event("audio-longest-gap", `longest gap between sound starts ${r1(best.gap)} s, from ${r1(from.at - t0)} s to ${r1(to.at - t0)} s into the run; it begins in step "${sFrom.name}" (scene ${sFrom.scene}) with the AudioContext ${from.state}, and ends in step "${sTo.name}" (scene ${sTo.scene}) with it ${to.state}; Sound button aria-pressed ${soundBtn}; ${starts.length} starts, ${steps.length} steps`);
   }
 }
 
