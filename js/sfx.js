@@ -1523,26 +1523,40 @@ import { pickRate } from "./variety.js";
      `ui` and `move` groups on the first press (or when Sound turns on), so the first press already has its clip. */
   /* The press fallback (the clip isn't loaded yet, or isn't in the build): a rendered click played as a buffer source, tagged
      "ui-click". The audio probe sees buffer sources only, so the oscillator this used to be left a press silent to it. */
-  let clickBuf = null;
+  /* A pool of CLICK_TAKES differently pitched clicks, each its own sample id ("ui-click-<n>") and each with its own rate history, so
+     the same buffer at the same rate never plays twice inside 60 s: one press fires up to five clicks (press, touchstart, release,
+     click, the net) and a phone run crowded the single id's 5-10% rate band. Takes rotate, never the same one twice in a row. */
+  const CLICK_TAKES = 8;
+  let clickBufs = null;
+  let clickLast = -1;
+  let clickRate = 0;
   function uiClick(level) {
     const a = ctx();
     if (!a) return;
     const sr = a.c.sampleRate;
-    if (!clickBuf || clickBuf.sampleRate !== sr) {
-      const n = Math.floor(sr * 0.08), cb = a.c.createBuffer(1, n, sr), d = cb.getChannelData(0);
-      let ph = 0;
-      for (let i = 0; i < n; i++) {
-        const x = i / sr;
-        ph += 2 * Math.PI * (1250 + 250 * Math.min(1, x / 0.05)) / sr;
-        d[i] = (2 / Math.PI) * Math.asin(Math.sin(ph)) * Math.min(1, x / 0.005) * Math.exp(-x * 45);
+    if (!clickBufs || clickBufs.sampleRate !== sr) {
+      clickBufs = [];
+      clickBufs.sampleRate = sr;
+      for (let k = 0; k < CLICK_TAKES; k++) {
+        const n = Math.floor(sr * 0.08), cb = a.c.createBuffer(1, n, sr), d = cb.getChannelData(0);
+        const f0 = 1250 * (0.8 + 0.06 * k), sweep = 250 * (0.7 + 0.1 * k);
+        let ph = 0;
+        for (let i = 0; i < n; i++) {
+          const x = i / sr;
+          ph += 2 * Math.PI * (f0 + sweep * Math.min(1, x / 0.05)) / sr;
+          d[i] = (2 / Math.PI) * Math.asin(Math.sin(ph)) * Math.min(1, x / 0.005) * Math.exp(-x * (40 + 2 * k));
+        }
+        clickBufs.push(cb);
       }
-      clickBuf = cb;
     }
+    clickRate = (clickRate + 3) % CLICK_TAKES; // coprime step: visits every take, never the same twice running
+    const take = clickRate === clickLast ? (clickRate + 1) % CLICK_TAKES : clickRate;
+    clickLast = take;
     const src = a.c.createBufferSource();
-    src.buffer = clickBuf;
-    src.playbackRate.value = pickRate("ui-click");
+    src.buffer = clickBufs[take];
+    src.playbackRate.value = pickRate("ui-click-" + take);
     const lv = level == null ? 0.2 : level;
-    try { src.__hawkesSampleId = "ui-click"; src.__hawkesBus = "ui"; src.__hawkesGain = lv; } catch (e) { /* */ }
+    try { src.__hawkesSampleId = "ui-click-" + take; src.__hawkesBus = "ui"; src.__hawkesGain = lv; } catch (e) { /* */ }
     const g = a.c.createGain();
     g.gain.value = lv;
     src.connect(g);
