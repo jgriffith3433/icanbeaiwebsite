@@ -11762,6 +11762,12 @@ async function coldStart(options, t) {
   const free = !document.documentElement.classList.contains("cold-open");
   t.event("cold-start-free", `${since().toFixed(1)}s after Play: HUD ${free ? "back" : "STILL HIDDEN"}, cold open ${D.coldopen.now().phase}`);
   if (!free) t.problem("bug", "The HUD never came back after the first bolt");
+  if (window.__compilesAfterLoad) {
+    // the dusk switch (the cold open's jump to 19:00) must not compile anything: the lamp lights stay enabled and only fade
+    const n = window.__compilesAfterLoad();
+    t.metric("perf.compilesAfterLoad", n);
+    t.event("cold-start-compiles", `${n} shader effects compiled after the loading card; lamp lights ${JSON.stringify(D.cityscape && D.cityscape.info ? D.cityscape.info().dynamicLights : null)}`);
+  }
   checkHud(t, "cold-start");
   // the episode offer is a corner toast that comes after the first cast: under 40 words that waits until the first minute is over (the 40-word limit), the day clock keeps running, clear of the ability bar
   const m0 = D.now().minutes;
