@@ -1137,7 +1137,7 @@
   }
 
   /* ---------------- the city ---------------- */
-  const amb = { bird: 4, car: 3, siren: 60 };
+  const amb = { bird: 4, car: 3, siren: 60, fill: 5 };
   function hour() {
     try { return (day.now().minutes || 0) / 60; } catch (err) { return 12; }
   }
@@ -1158,6 +1158,16 @@
       try { cars = (day.crowd && day.crowd.info().cars) || 0; } catch (err) { cars = 0; }
       amb.car = cars > 0 ? Math.max(1.8, 14 - Math.min(12, cars / 4)) * (0.6 + Math.random() * 0.8) : 8;
       if (cars > 0) S.car(Math.random() < 0.5 ? -0.8 : 0.8, Math.min(1, 0.4 + cars / 60));
+    }
+    // Never more than ~8 s with nothing heard: birds need fair weather and day, cars need a crowd, sirens need night, so a
+    // storm at dusk (the cold open) could go 45 s on the roof with only the one looping bed. Whatever else fired resets it.
+    amb.fill -= dt;
+    if (amb.fill <= 0) {
+      amb.fill = 4.5 + Math.random() * 2.5;
+      const pan = Math.random() * 1.6 - 0.8;
+      if (state === "rain" || state === "storm") S.dripTick(pan, 0.7);
+      else if (fair && h > 5.5 && h < 20) S.bird(pan, 1);
+      else S.car(pan < 0 ? -0.8 : 0.8, 0.5);
     }
     amb.siren -= dt;
     if (amb.siren <= 0) {
