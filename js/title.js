@@ -43,7 +43,7 @@ export function startTitle() {
   const WARM_WAIT_MS = 12000; // the longest the auto-start waits for the shader warm-up
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch" && id !== "audio-check") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
