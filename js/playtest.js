@@ -11587,6 +11587,92 @@ async function wakeHim(options, t) {
   window.removeEventListener("day:power", hp);
 }
 
+/* ---------------- any-hour: a new visitor at 03:00, 09:00 and 14:00 reaches a first success within 30 s, no wall ---------------- */
+// Setup (named): the visit's clock is forced to each hour in options.hours (default 03:00, 09:00, 14:00) and the new-visitor keys
+// (first Rain, street lesson) are cleared. Real input from there: tap / click Take control, then the cast the screen hints
+// (the pulsing "Tap the street" for Rain, else the Lightning button / E). Metric ftue.secondsToFirstSuccess.<HH> per hour is
+// seconds from the first tap to the first cast. Fails naming the hour on a wall (asleep, a card, a title) or over 30 s.
+async function anyHour(options, t) {
+  const D0 = window.day;
+  const phone = !!(options && options.touch) || innerWidth <= 700 || !!(D0 && D0.control && D0.control.state().touch);
+  t.scene(phone ? "Any hour (phone)" : "Any hour");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const C = D.control;
+  const P = window.powers || D.powers;
+  const hours = (options && Array.isArray(options.hours) && options.hours.length ? options.hours : ["03:00", "09:00", "14:00"]).map(String);
+  const LIMIT = 30;
+  if (phone && !C.state().touch) C.touch(true);
+  let n = 0;
+  for (const hour of hours) {
+    n++;
+    const key = hour.replace(":", "");
+    const bad = (msg, sev = "bug") => t.problem(sev, `${hour}: ${msg}`);
+    if (C.mode() === "control") { C.letGo(); await t.until(() => C.mode() === "schedule", 70000, "him back on his day").catch(() => {}); }
+    // named setup: a new visitor's keys, then the clock forced to the hour
+    try {
+      ["icanbe.firstrain", "icanbe.street", "icanbe.episodes.tutorial"].forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem("icanbe.opening", "any-hour"); localStorage.setItem("icanbe.tutorial", "any-hour");
+      if (D.firstrain && D.firstrain.reset) D.firstrain.reset();
+      if (D.title && D.title.quiet) D.title.quiet();
+    } catch (e) { /* private mode */ }
+    D.jump(hour);
+    let drive = 0;
+    while (D.now().frame && D.now().frame.person.inCar && drive++ < 20) { D.jump(hour); await sleep(400); }
+    await sleep(900);
+    const wall0 = gameplayWall("any-hour");
+    const asleep = !!wall0 && /^bed/.test(wall0);
+    t.event("any-hour-setup", `${hour}: clock ${D.now().frame ? D.now().frame.clock || "" : ""} pose ${D.now().frame ? D.now().frame.person.pose : "?"}; ${wall0 ? "on screen: " + wall0 : "nothing in the way"}`);
+    if (wall0 && !asleep) { bad(`a wall before the first tap: ${wall0}`, "blocker"); continue; }
+    const pw = [];
+    const hp = (e) => { const d = e.detail || {}; if (d.action !== "denied") pw.push({ ...d, at: performance.now() }); };
+    window.addEventListener("day:power", hp);
+    const btn = $("control");
+    if (!btn || !hudVisible(btn)) { window.removeEventListener("day:power", hp); bad("no visible Take control button", "blocker"); continue; }
+    // 1. the first tap: Take control
+    const t0 = performance.now();
+    if (phone) await tapEl(btn); else btn.click();
+    t.milestone && t.milestone("first-input-accepted", `${hour}: Take control tapped`);
+    const took = await t.until(() => C.mode() === "control", 8000, "Take control").then(() => true, () => false);
+    if (!took) { window.removeEventListener("day:power", hp); bad("Take control never handed him over", "blocker"); continue; }
+    if (asleep) await t.until(() => D.wake && D.wake.now().phase === "ready", 8000, "the wake moment").catch(() => {});
+    else await sleep(500);
+    try { P.abilities.reset && P.abilities.reset(100); } catch (e) { /* ok */ }
+    // 2. the hinted cast
+    const rainCue = $("first-rain-cue");
+    const rainHint = !!rainCue && rainCue.getBoundingClientRect().width > 0 && document.documentElement.classList.contains("first-rain");
+    if (rainHint) {
+      const cv = document.querySelector("canvas");
+      const rc = cv.getBoundingClientRect();
+      const x = rc.left + rc.width / 2, y = rc.top + rc.height * 0.62;
+      const ptr = (type) => cv.dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: phone ? "touch" : "mouse", isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true }));
+      ptr("pointerdown"); await sleep(90); ptr("pointerup");
+    } else {
+      const bolt = $("ability-bolt");
+      if (phone) { if (bolt && hudVisible(bolt)) await tapEl(bolt); else bad("no visible Lightning button to cast"); }
+      else { keyDown("e"); await sleep(120); keyUp("e"); }
+    }
+    await t.until(() => pw.length > 0, 6000, "the first cast").catch(() => {});
+    window.removeEventListener("day:power", hp);
+    const first = pw[0];
+    const secs = first ? Math.round((first.at - t0) / 100) / 10 : 99999;
+    if (first) {
+      t.metric(`ftue.secondsToFirstSuccess.${key}`, secs);
+      t.milestone && t.milestone("first-success", `${hour}: first ${first.power} at ${secs}s`);
+    }
+    t.event("any-hour-success", `${hour}: ${first ? `first cast (${first.power}, ${rainHint ? "the Rain hint" : "Lightning"}) ${secs}s after the first tap` : "NO CAST"}${asleep ? "; he was asleep, woken by the tap" : ""}`);
+    if (!first) bad(`no cast within the window (${rainHint ? "the street tap" : "the Lightning button"})`, "blocker");
+    else if (secs > LIMIT) bad(`first success took ${secs}s (limit ${LIMIT} s)`);
+    await sleep(1200);
+    const wall1 = gameplayWall("any-hour");
+    if (wall1 && !/^bed/.test(wall1)) bad(`a wall met after taking control: ${wall1}`, "blocker");
+    checkHud(t, `any-hour ${hour}${phone ? " (phone)" : ""}`);
+    t.progress(n / hours.length);
+  }
+  if (C.mode() === "control") C.letGo();
+}
+
 /* ---------------- phone-touch: cold phone session on the roof, Take control and five casts, all by touch ---------------- */
 // Real input only: touch pointer events (tapEl) on Take control / the Bolt prompt / the ability buttons. Setup (named): a full
 // Charge before each cast. Works at 390x844 and 844x390 (the runner sets the window); reports every control's size and any overlap.
@@ -14354,6 +14440,7 @@ installPlaytest({
     { id: "model-blocked", title: "Model blocked: with the GLB refused the stand-in stays visible through casts and walking, play continues, and the model arrives on the background retry", seconds: 90, tags: ["phone", "characters"], description: "Load with ?playtest=model-blocked ({\"touch\":true} for 390x844). The model is dropped and blocked (window.__blockModel, or ?blockmodel=1 from load); real input: Take control, Rain and Lightning, walk; he must be on screen each time; then the block lifts and the retry brings the real model." },
     { id: "warm-start", title: "Warm start: no frame over 100 ms (phone 150) in the first 30 s after the loading bar, the first cast of each of the five powers costs no long frame, no shader compile errors, phone median fps >= 30 over 60 s", seconds: 90, tags: ["performance", "phone", "powers"], description: "Load with ?playtest=warm-start ({\"touch\":true} for 390x844 low quality). Real input: Take control, the five verb buttons one by one. Frame times by the render observable; metrics worstFrame30sMs, firstCastWorstMs.<power>, medianFps, shaderErrors, lightCapWorst." },
     { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
+    { id: "any-hour", title: "Any hour: a new visitor at 03:00, 09:00 and 14:00 taps Take control and casts the hinted power; first success within 30 s at each hour with no wall, by touch at 390x844", seconds: 120, tags: ["first-minute", "phone", "touch"], description: "Load with ?playtest=any-hour (390x844 touch for the phone run). Setup (named): new-visitor keys cleared and the clock forced to each hour in option hours (default 03:00, 09:00, 14:00). Real input: tap Take control, then the hinted cast (Tap the street for Rain, else the Lightning button). Events any-hour-setup / any-hour-success; metrics ftue.secondsToFirstSuccess.0300 / .0900 / .1400." },
     { id: "wake-him", title: "Wake him: a visit forced to 03:00 finds him asleep; one tap on Take control stretches him awake, puts him on the roof in night fog and he casts within 10 s of the tap, by touch at 390x844; Let go returns him to bed with the clock still running", seconds: 90, tags: ["opening", "first-minute", "phone", "touch"], description: "Load with ?playtest=wake-him (390x844 touch for the phone run). Setup (named): returning player keys set, clock jumped to 03:00. Real input: tap Take control, tap the Lightning button (E on a keyboard), tap Let go. Events wake-asleep / wake-roof / wake-cast / wake-let-go / wake-back; metrics wake.secondsToReady, wake.secondsToFirstCast, wake.backInBed." },
     { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
@@ -14417,6 +14504,7 @@ installPlaytest({
       else if (id === "cold-start") await coldStart(options, t);
       else if (id === "phone-touch") await phoneTouch(options, t);
       else if (id === "wake-him") await wakeHim(options, t);
+      else if (id === "any-hour") await anyHour(options, t);
       else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "warm-start") await warmStart(options, t);
       else if (id === "model-blocked") await modelBlocked(options, t);
