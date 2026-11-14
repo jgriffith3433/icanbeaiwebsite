@@ -147,6 +147,8 @@ html.title-up .ask-mark,html.cold-open .ask-mark,html.cine-up .ask-mark,html.ep-
   function current() {
     const out = [];
     const S = day.street && day.street.open && day.street.open();
+    const Hh = day.hourhint && day.hourhint.open && day.hourhint.open();
+    if (Hh) out.push({ key: Hh.key, who: Hh.who, verb: norm(Hh.verb), x: Hh.place.x, z: Hh.place.z, hint: true });
     if (S) {
       const verb = norm(S.verb);
       out.push({ key: S.id, who: S.who, verb, x: S.x, z: S.z, inside: S.inside, scale: S.who === "birdie" ? 0.88 : S.who === "quill" ? 1.1 : 1 });
@@ -204,7 +206,7 @@ html.title-up .ask-mark,html.cold-open .ask-mark,html.cine-up .ask-mark,html.ep-
       let m = marks.get(a.key);
       if (!m) {
         const color = VERB_TINT[a.verb] || [1, 0.8, 0.4];
-        const place = placeFor(cfg, a.who, a.verb, a);
+        const place = a.hint ? Object.assign({ r: 6 }, day.hourhint.open().place) : placeFor(cfg, a.who, a.verb, a);
         m = { el: markEl(a.key, a.verb, color), ask: a, place, color, gy: 0 };
         marks.set(a.key, m);
         const wk = a.verb + ":" + a.key;
@@ -230,7 +232,7 @@ html.title-up .ask-mark,html.cold-open .ask-mark,html.cine-up .ask-mark,html.ep-
       W.icon.position.set(p.x, gy + H + bob, p.z);
       m.iconPos = { x: p.x, y: gy + H, z: p.z };
       // over the asker: the plumbob (DOM, so it's a real tap target)
-      const ay = a.inside ? 3 : 2.05 * (a.scale || 1) + (cfg.markHeight || 0.85) + groundAt(a.x, a.z);
+      const ay = a.hint ? H + 1.5 : a.inside ? 3 : 2.05 * (a.scale || 1) + (cfg.markHeight || 0.85) + groundAt(a.x, a.z);
       v.set(a.x, ay + Math.sin(T * 1.6) * 0.08, a.z);
       const pr = B.Vector3.Project(v, B.Matrix.IdentityReadOnly, scene.getTransformMatrix(), cam.viewport.toGlobal(w, h));
       const on = pr.z > 0 && pr.z < 1;

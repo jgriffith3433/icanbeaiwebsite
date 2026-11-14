@@ -159,6 +159,7 @@ html.title-up .helped-pop,html.cine-up .helped-pop{display:none}
   const api = {
     now: () => ({ count: rec.who.length, who: rec.who.slice(), date: rec.date, visible: !!(el.offsetWidth && el.offsetHeight), log: log.slice() }),
     add,
+    pop, // the sparkle alone (js/hourhint.js)
     reload: () => { rec = load(); paint(); emit("reload"); return api.now(); },
   };
   day.helped = api;

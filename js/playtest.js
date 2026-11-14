@@ -11587,6 +11587,83 @@ async function wakeHim(options, t) {
   window.removeEventListener("day:power", hp);
 }
 
+/* ---------------- hour-hints: taking control at 03:00, 08:00, 12:00, 16:00 and 20:00 shows one hint with a target; doing it changes the world ---------------- */
+// Needs ?playtest=hour-hints ({"touch":true} for 390x844). Setup (named): returning-player keys set, the clock jumped to each hour,
+// and (after the hint shows) him stood 6 m from the hint's place, as a player who walked there. Real input: tap / click Take control,
+// then the verb's button (a key on a keyboard), then Let go. Per hour: the hint's marker is on screen (44 px), the line sits in the toast
+// lane clear of controls, the cast clears the marker and pops the reward, and the verb's own weather shows (screenshots).
+async function hourHints(options, t) {
+  t.scene("Hour hints");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const C = D.control;
+  const P = window.powers || D.powers;
+  const phone = innerWidth <= 700 || !!(C && C.state && C.state().touch);
+  try { localStorage.setItem("icanbe.opening", "hour-hints"); localStorage.setItem("icanbe.tutorial", "hour-hints"); localStorage.setItem("icanbe.firstrain", "done"); localStorage.setItem("icanbe.street", JSON.stringify({ done: true })); localStorage.setItem("icanbe.episodes.tutorial", "skip"); } catch (e) { /* private mode */ }
+  if (D.tutorial && D.tutorial.skip) D.tutorial.skip();
+  if (D.title && D.title.quiet) D.title.quiet();
+  if (phone && !C.state().touch) C.touch(true);
+  if (!D.hourhint) { t.problem("blocker", "The hour-hint module isn't installed"); return; }
+  const hints = [];
+  window.addEventListener("day:hint", (e) => hints.push(Object.assign({ at: performance.now() }, e.detail)));
+  const keys = { rain: "r", wind: "v", fog: "c", bolt: "e", sunbreak: "x" };
+  const btnId = { rain: "ability-rain", wind: "ability-wind", fog: "ability-fog", bolt: "ability-bolt", sunbreak: "ability-sunbreak" };
+  const want = [["03:00", "night", "fog"], ["08:00", "morning", "rain"], ["12:00", "midday", "wind"], ["16:00", "afternoon", "fog"], ["20:00", "evening", "bolt"]];
+  let shown = 0, done = 0;
+  for (const [clock, id, verb] of want) {
+    if (C.mode() === "control") C.letGo();
+    await t.until(() => C.mode() === "schedule", 70000, "him back on his day").catch(() => {});
+    D.jump(clock);
+    await sleep(1500);
+    t.scene(`${clock}: take control`);
+    const n0 = hints.length;
+    const btn = $("control");
+    if (!btn || !hudVisible(btn)) { t.problem("blocker", `No visible Take control button at ${clock}`); continue; }
+    if (phone) await tapEl(btn); else btn.click();
+    await t.until(() => C.mode() === "control", 8000, "control").catch(() => {});
+    await t.until(() => D.hourhint.now().open, 9000, "the hint").catch(() => {});
+    await sleep(900);
+    const h = D.hourhint.now();
+    const mk = D.asks.now().asks.find((a) => a.key === "hour-" + id);
+    const ok = !!(h.open && h.open.id === id && h.open.verb === verb && mk && mk.visible && mk.w >= 44);
+    t.event("hint-shown", `${clock}: ${h.open ? h.open.id + " " + h.open.verb + " over " + h.open.place.name : "NO hint"}; marker ${mk ? (mk.visible ? "on screen " + mk.screen.x + "," + mk.screen.y + " " + mk.w + "x" + mk.h : "NOT on screen") : "missing"}; line "${h.text}"`);
+    if (!h.open) { t.problem("bug", `Taking control at ${clock} showed no hint`); continue; }
+    if (h.open.id !== id || h.open.verb !== verb) t.problem("bug", `At ${clock} the hint is ${h.open.id}/${h.open.verb}, wanted ${id}/${verb}`);
+    if (!mk || !mk.visible) t.problem("bug", `At ${clock} the hint's marker isn't on screen`);
+    else if (mk.w < 44 || mk.h < 44) t.problem("bug", `At ${clock} the hint's marker is ${mk.w}x${mk.h} (44 px at least)`);
+    if (!mk || !mk.icon || mk.icon.y - mk.gy < 3) t.problem("bug", `At ${clock} the hint's verb icon isn't hung over its place`);
+    if (!h.visible) t.problem("bug", `At ${clock} the hint line isn't showing`);
+    if (window.hudLayout) { const f = window.hudLayout.check(); if (f.length) t.problem("bug", `At ${clock} the hint overlaps a control (${f[0]})`); }
+    checkHud(t, `hour-hint ${clock}`);
+    if (ok) shown++;
+    // named setup: stood 6 m from the place, as a player who walked there
+    const p = h.open.place;
+    C.place(p.x - 6, p.z, 0, {});
+    await sleep(900);
+    if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+    const tCast = performance.now();
+    const b = $(btnId[verb]);
+    if (phone) { if (b && hudVisible(b)) await tapEl(b); else t.problem("bug", `At ${clock} no visible ${verb} button on the phone`); }
+    else { keyDown(keys[verb]); await sleep(verb === "bolt" ? 200 : 80); keyUp(keys[verb]); }
+    await t.until(() => hints.some((e) => e.action === "done" && e.id === id && e.at >= tCast), 4000, "the hint to be answered").catch(() => {});
+    const dn = hints.find((e) => e.action === "done" && e.id === id && e.at >= tCast);
+    await sleep(2600);
+    const after = D.hourhint.now();
+    const wx = window.weather && window.weather.now ? window.weather.now() : {};
+    t.scene(`${clock}: after the ${verb}`);
+    t.event("hint-done", `${clock}: ${dn ? "answered" : "NOT answered"}; marker ${D.asks.now().asks.some((a) => a.key === "hour-" + id) ? "still up" : "cleared"}; weather ${wx.state || "?"}; thanks "${after.text}"`);
+    if (!dn) t.problem("bug", `At ${clock} the ${verb} cast didn't answer the hint`);
+    else { done++; if (D.asks.now().asks.some((a) => a.key === "hour-" + id)) t.problem("bug", `At ${clock} the marker is still up after the cast`); }
+    if (dn && !document.querySelector(".helped-pop") && !after.visible) t.problem("bug", `At ${clock} no reward pop or thanks followed the cast`);
+  }
+  t.metric("hourHints.shown", shown);
+  t.metric("hourHints.answered", done);
+  if (shown < want.length) t.problem("bug", `Only ${shown} of ${want.length} hours showed a hint with an on-screen target`);
+  if (C.mode() === "control") C.letGo();
+}
+
 /* ---------------- any-hour: a new visitor at 03:00, 09:00 and 14:00 reaches a first success within 30 s, no wall ---------------- */
 // Setup (named): the visit's clock is forced to each hour in options.hours (default 03:00, 09:00, 14:00) and the new-visitor keys
 // (first Rain, street lesson) are cleared. Real input from there: tap / click Take control, then the cast the screen hints
@@ -14440,6 +14517,7 @@ installPlaytest({
     { id: "model-blocked", title: "Model blocked: with the GLB refused the stand-in stays visible through casts and walking, play continues, and the model arrives on the background retry", seconds: 90, tags: ["phone", "characters"], description: "Load with ?playtest=model-blocked ({\"touch\":true} for 390x844). The model is dropped and blocked (window.__blockModel, or ?blockmodel=1 from load); real input: Take control, Rain and Lightning, walk; he must be on screen each time; then the block lifts and the retry brings the real model." },
     { id: "warm-start", title: "Warm start: no frame over 100 ms (phone 150) in the first 30 s after the loading bar, the first cast of each of the five powers costs no long frame, no shader compile errors, phone median fps >= 30 over 60 s", seconds: 90, tags: ["performance", "phone", "powers"], description: "Load with ?playtest=warm-start ({\"touch\":true} for 390x844 low quality). Real input: Take control, the five verb buttons one by one. Frame times by the render observable; metrics worstFrame30sMs, firstCastWorstMs.<power>, medianFps, shaderErrors, lightCapWorst." },
     { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
+    { id: "hour-hints", title: "Hour hints: taking control at 03:00, 08:00, 12:00, 16:00 and 20:00 each shows one hint (a verb icon, ring and marker over a place, one line in the toast lane); the verb answers it with a visible result and a reward pop, by touch at 390x844", seconds: 150, tags: ["neighbors", "retention", "phone", "touch"], description: "Load with ?playtest=hour-hints ({\"touch\":true} for 390x844). Setup (named): returning-player keys, clock jumped to each hour, him stood 6 m from the hint place. Real input: Take control, the verb button (key on a keyboard), Let go. Events hint-shown / hint-done; metrics hourHints.shown, hourHints.answered." },
     { id: "any-hour", title: "Any hour: a new visitor at 03:00, 09:00 and 14:00 taps Take control and casts the hinted power; first success within 30 s at each hour with no wall, by touch at 390x844", seconds: 120, tags: ["first-minute", "phone", "touch"], description: "Load with ?playtest=any-hour (390x844 touch for the phone run). Setup (named): new-visitor keys cleared and the clock forced to each hour in option hours (default 03:00, 09:00, 14:00). Real input: tap Take control, then the hinted cast (Tap the street for Rain, else the Lightning button). Events any-hour-setup / any-hour-success; metrics ftue.secondsToFirstSuccess.0300 / .0900 / .1400." },
     { id: "wake-him", title: "Wake him: a visit forced to 03:00 finds him asleep; one tap on Take control stretches him awake, puts him on the roof in night fog and he casts within 10 s of the tap, by touch at 390x844; Let go returns him to bed with the clock still running", seconds: 90, tags: ["opening", "first-minute", "phone", "touch"], description: "Load with ?playtest=wake-him (390x844 touch for the phone run). Setup (named): returning player keys set, clock jumped to 03:00. Real input: tap Take control, tap the Lightning button (E on a keyboard), tap Let go. Events wake-asleep / wake-roof / wake-cast / wake-let-go / wake-back; metrics wake.secondsToReady, wake.secondsToFirstCast, wake.backInBed." },
     { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
@@ -14495,7 +14573,7 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "ask-markers", "quiet-ui", "phone-touch", "wake-him"].includes(id)) forcePublicView();
+      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "ask-markers", "quiet-ui", "phone-touch", "wake-him", "hour-hints"].includes(id)) forcePublicView();
       if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
@@ -14514,6 +14592,7 @@ installPlaytest({
       else if (id === "title-progress") await titleProgress(options, t);
       else if (id === "street-teaches") await streetTeaches(options, t);
       else if (id === "ask-markers") await askMarkers(options, t);
+      else if (id === "hour-hints") await hourHints(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
       else if (id === "hud-layout") await hudLayoutScenario(options, t);
