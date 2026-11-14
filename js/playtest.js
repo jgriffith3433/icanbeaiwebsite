@@ -13281,6 +13281,7 @@ async function coldStart(options, t) {
   const baseSlice = { lawn: sl().lawnShown || 0, pond: sl().pond || 0.78 };
   const base = baseSlice;
   const g0 = D.garden && D.garden.now ? D.garden.now() : null;
+  const W = window.weather || D.weather;
   const wPre = W && W.now ? W.now() : {};
   const cPre = D.crowd && D.crowd.info ? D.crowd.info() : {};
   t.event("cold-start-pre-cast", `before cast: manual ${!!wPre.manual}, lawn ${base.lawn}, pond ${base.pond}, garden k ${g0 ? g0.k : "?"}, crowd reaction ${cPre.reaction || "none"}`);

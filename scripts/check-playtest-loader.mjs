@@ -2,9 +2,12 @@
 // a player's page keeps the stub and never imports it statically.
 import { readFileSync } from "node:fs";
 const loader = readFileSync("js/playtest-loader.js", "utf8");
+const playtest = readFileSync("js/playtest.js", "utf8");
 const html = readFileSync("index.html", "utf8");
 const app = readFileSync("js/app.js", "utf8");
 const bad = [];
+const coldBody = (playtest.split("async function coldStart(")[1] || "").split(/\nasync function /)[0];
+if (/\bW\b/.test(coldBody) && !/\bconst W\s*=/.test(coldBody)) bad.push("coldStart in js/playtest.js uses W without declaring const W");
 if (!/^if \(window\.__playtestBot\) await import\("\.\/playtest\.js"\)\.catch\(/m.test(loader)) bad.push("loader must top-level await import(playtest.js) on the bot path, with a .catch");
 if (!/navigator\.webdriver/.test(loader) || !/get\("playtest"\)/.test(loader)) bad.push("bot path must test navigator.webdriver and ?playtest=");
 if (!/if \(!bot\) \{\s*[^}]*window\.hawkesPlaytest = stub/.test(loader)) bad.push("the stub must stay for players");
