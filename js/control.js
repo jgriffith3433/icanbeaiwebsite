@@ -1172,14 +1172,20 @@ function install() {
         }
         return rm;
       };
-      if (room(cs.aimA) < want - 0.3) {
+      const roomHere = room(cs.aimA);
+      if (roomHere < want - 0.3) {
         let pick = null;
+        let bestA = null;
+        let bestRoom = roomHere + 0.4; // a small room (the bedroom on the walk back) has no full-room heading: take the roomiest one that is clearly better
         for (let k = 1; k <= 12 && pick == null; k++) {
           for (const sg of [1, -1]) {
             const a = cs.aimA + sg * k * 0.2618;
-            if (room(a) >= want - 0.05) { pick = a; break; }
+            const ra = room(a);
+            if (ra >= want - 0.05) { pick = a; break; }
+            if (ra > bestRoom) { bestRoom = ra; bestA = a; }
           }
         }
+        if (pick == null) pick = bestA;
         if (pick != null) cs.aimA += Math.max(-2.2 * dt, Math.min(2.2 * dt, pick - cs.aimA));
       }
     }
