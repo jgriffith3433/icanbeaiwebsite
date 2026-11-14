@@ -810,8 +810,8 @@
       const cm = mat("#7a5a49");
       const cm2 = mat("#6a4c3d");
       box("couchbase", 2.3, 0.4, 0.9, 0, 0.3, -0.12, cm2, n);
-      box("cushion1", 1.08, 0.14, 0.8, -0.56, 0.55, -0.1, cm, n);
-      box("cushion2", 1.08, 0.14, 0.8, 0.56, 0.55, -0.1, cm, n);
+      box("cushion1", 1.08, 0.14, 0.8, -0.56, 0.465, -0.1, cm, n); /* top 0.535 like the chair seat: his hips sit 0.62, thighs clear the cushion */
+      box("cushion2", 1.08, 0.14, 0.8, 0.56, 0.465, -0.1, cm, n);
       box("couchback", 2.3, 0.62, 0.22, 0, 0.8, -0.5, cm2, n);
       box("armL", 0.2, 0.55, 0.9, -1.15, 0.5, -0.12, cm2, n);
       box("armR", 0.2, 0.55, 0.9, 1.15, 0.5, -0.12, cm2, n);
