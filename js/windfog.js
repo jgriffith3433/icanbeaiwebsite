@@ -912,7 +912,14 @@ export function createWindFog(B, scene, deps) {
     if (F.k < 0.004 && F.target === 0) F.k = 0;
     const show = F.k > 0.01;
     const sc = scene.fogColor;
-    fogCol.copyFromFloats(clamp(sc.r * 1.02 + 0.04, 0, 1), clamp(sc.g * 1.02 + 0.04, 0, 1), clamp(sc.b * 1.04 + 0.05, 0, 1));
+    /* The slices and veils are unlit, drawn in scene.fogColor, which is near-black at dusk and night: a bank then read as a
+       black void over the lit city (phone-touch, bad lighting: a dark ragged disc filling the upper frame after a Fog cast).
+       A floor of cool pale grey keeps mist reading as mist at any hour; daylight fog is already above it. */
+    fogCol.copyFromFloats(
+      clamp(Math.max(sc.r * 1.02 + 0.04, 0.3), 0, 1),
+      clamp(Math.max(sc.g * 1.02 + 0.04, 0.33), 0, 1),
+      clamp(Math.max(sc.b * 1.04 + 0.05, 0.4), 0, 1),
+    );
     F.drift += dt;
     if (show) F.push += (0.9 + 0.35) * (0.4 + 1.4 * Math.min(1, W.k)) * dt; // metres the fog pattern has slid downwind (the playtest reads it)
     const sn = Math.hypot(sc.r, sc.g, sc.b);
