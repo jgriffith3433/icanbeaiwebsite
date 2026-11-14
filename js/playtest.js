@@ -11880,6 +11880,19 @@ async function phoneTouch(options, t) {
   if (!onRoof) { t.problem("blocker", "A cold phone session never reached the roof (title wall: " + D.title.showing() + ")"); return; }
   t.event("phone-cold-open", `${innerWidth}x${innerHeight}: on the roof ${toRoof}s after the check began, title ${D.title.showing() ? "UP" : "closed"}, cold open ${D.coldopen.now().phase}`);
   if (D.title.showing()) t.problem("bug", "The title wall is still up on a cold phone session");
+  { // the load card's bar followed real events (bundle chunks, scripts, frame, title), and play came within 15 s of the page opening
+    const LL = window.__loading;
+    if (LL) {
+      const steps = LL.log().filter((e) => e.action === "progress");
+      const handoff = LL.log().find((e) => e.action === "handoff");
+      t.event("load-progress", `${steps.length} real progress steps (${steps.map((e) => e.part + " " + e.pct + "%").join(", ")}); card handed off at ${handoff ? handoff.seconds + " s" : "not yet"}`);
+      t.metric("phone.loadProgressSteps", steps.length);
+      if (LL.log().some((e) => e.action === "deadline" || e.action === "fail")) t.problem("bug", "The loading card hit its deadline or failed on a phone load");
+    }
+    const pageSecs = Math.round(performance.now()) / 1000;
+    t.metric("phone.secondsPageToRoof", pageSecs);
+    t.event("roof-under-15s", `on the roof ${pageSecs} s after the page opened`);
+  }
   // the first cast of the cold open: tap the Bolt button
   const bolt = $("coldopen-bolt");
   if (D.coldopen.now().on && bolt) {
