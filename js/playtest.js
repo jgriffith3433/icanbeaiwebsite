@@ -12025,13 +12025,15 @@ async function phoneTouchRun(options, t) {
   // bot's first input was the Bolt tap after the frame and model waits (up to ~45 s throttled), so the audio context sat unstarted and the
   // probe read that stretch as ~19 s of silence. Press once on the Sound button first (a pointerdown arms, it doesn't toggle), as
   // wake-him, hour-hints and the other scenarios do.
+  // The scene is Loading from the start: the audio probe only advances "last sound in play" on play-scene starts, so sounds heard
+  // before a later Loading (his model) stretch used to open a gap spanning that whole stretch (44 s throttled) once play resumed.
+  t.scene("Loading");
   const sndBtn = $("sound");
   if (sndBtn && sndBtn.getAttribute("aria-pressed") === "true") {
     const sr0 = sndBtn.getBoundingClientRect();
     sndBtn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: sr0.left + 4, clientY: sr0.top + 4, pointerId: 4, pointerType: "touch" }));
   }
   // Until the first frame the game really is on its loading screen: say so to the audio probe, then the play scene.
-  t.scene(window.day.now().frame ? playScene : "Loading");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   // His model streams in and compiles after the first frame (up to ~30 s on a throttled phone, the main thread busy): the game shows
   // its loading state until he is on screen (the stand-in is never shown as him), so this wait is loading, not play.
