@@ -2609,7 +2609,7 @@
         bodies++;
       }
       /* a box around a mesh, turned the way it is turned; small things (cups, plates, rugs) aren't in the way */
-      function meshBox(add, m) {
+      function meshBox(add, m, indoor) {
         if (!m.getTotalVertices || !m.getTotalVertices()) return;
         m.computeWorldMatrix(true);
         const bb = m.getBoundingInfo().boundingBox;
@@ -2617,7 +2617,18 @@
         const size = new B.Vector3(bb.extendSize.x * 2 * Math.abs(scl.x), bb.extendSize.y * 2 * Math.abs(scl.y), bb.extendSize.z * 2 * Math.abs(scl.z));
         const big = size.y >= 0.25 || (size.y >= 0.03 && Math.max(size.x, size.z) >= 1.5);
         if (!big || Math.max(size.x, size.z) < 0.04) return;
-        add(B.Vector3.TransformCoordinates(bb.center, m.getWorldMatrix()), rot.clone(), size);
+        const c = B.Vector3.TransformCoordinates(bb.center, m.getWorldMatrix());
+        /* Tall furniture standing on the floor (shelf, fridge, shower glass) reaches the ceiling for the mover: his three
+           jumps clear 1.9 m, and standing on top of one left his legs through its edge. Only the collider grows. */
+        if (indoor && size.y >= 1.5 && size.y < 2.3 && Math.abs(rot.x) + Math.abs(rot.z) < 1e-3) {
+          const bottom = c.y - size.y / 2;
+          if (bottom < 0.35) {
+            const top = bottom + 2.6;
+            c.y = (bottom + top) / 2;
+            size.y = top - bottom;
+          }
+        }
+        add(c, rot.clone(), size);
       }
       body("ground", (add) => {
         // a thick slab under the ground plane: nothing tunnels through it
@@ -2625,7 +2636,7 @@
         streetMeshes.forEach((m) => meshBox(add, m));
       });
       body("town", (add) => solids.forEach((o) => add(V3(o.x, o.y, o.z), B.Quaternion.FromEulerAngles(o.pitch || 0, o.yaw || 0, o.roll || 0), V3(o.w, o.h, o.d))));
-      body("rooms", (add) => solidMeshes.forEach((m) => meshBox(add, m)));
+      body("rooms", (add) => solidMeshes.forEach((m) => meshBox(add, m, true)));
       physics = { plugin, bodies, colliders };
       return physics;
     }
