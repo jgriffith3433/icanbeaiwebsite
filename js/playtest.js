@@ -31,7 +31,7 @@ const HUD_PARTS = [
   ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .charge", "Charge"],
   [".powerpad button", "power pad"], [".touchpad .stick", "stick"], [".touchpad .jump", "jump"],
   [".tutorial", "tutorial card"], [".ep-hud", "episode HUD"], [".control-hint", "controls hint"],
-  ["#storm-toast", "storm tally card"], ["#voice-caption", "voice caption"], ["#voices", "Voices"], ["#time-btn", "Time control"], ["#time-drawer", "Time drawer"], ["#update-pill", "New version"],
+  ["#storm-toast", "storm tally card"], ["#helped-count", "neighbours helped counter"], ["#voice-caption", "voice caption"], ["#voices", "Voices"], ["#time-btn", "Time control"], ["#time-drawer", "Time drawer"], ["#update-pill", "New version"],
 ];
 /* HUD regions: the parts above grouped as a player sees them (the status card and the tools are the top bar, an ability
    bar of six buttons is one region). The public view holds these to six at any time. */
@@ -12556,6 +12556,8 @@ async function askMarkers(options, t) {
   window.addEventListener("day:voice", (e) => { const d = e.detail || {}; if (d.action === "play") voices.push(Object.assign({ at: performance.now() }, d)); });
   const asksEv = [];
   window.addEventListener("day:ask", (e) => asksEv.push(Object.assign({ at: performance.now() }, e.detail)));
+  const helpedEv = [];
+  window.addEventListener("day:helped", (e) => helpedEv.push(Object.assign({ at: performance.now() }, e.detail)));
   t.event("ask-setup", `${innerWidth}x${innerHeight}, ${phone ? "touch" : "keyboard and mouse"}`);
 
   const playBtn = $("title-play");
@@ -12633,13 +12635,32 @@ async function askMarkers(options, t) {
   if (!thanks.length) t.problem("bug", "Birdie's thanks wasn't voiced when the lawn recovered");
   const gone = !D.asks.now().asks.some((a) => a.who === "birdie");
   if (!gone) t.problem("bug", "Birdie's marker is still up after the rain");
+  // the reward: voiced thanks and the pop within 3 s of the cast, no story text card, the counter ticked and clear of the controls
+  const hp = helpedEv.find((e) => e.action === "add" && e.who === "birdie");
+  const hDelay = hp ? (hp.at - tRain) / 1000 : null;
+  const spoke = thanks[0] ? (thanks[0].at - tRain) / 1000 : null;
+  const sayEl = document.querySelector("#episode-say, .ep-say");
+  const card = !!(sayEl && !sayEl.hidden && sayEl.textContent.trim());
+  t.event("ask-reward", `Birdie's thanks ${spoke === null ? "NOT voiced" : "voiced at " + spoke.toFixed(1) + " s"}; the pop ${hp ? "at " + hDelay.toFixed(1) + " s, on screen " + (hp.screen ? hp.screen.x + "," + hp.screen.y : "?") : "MISSING"}; counter ${D.helped ? D.helped.now().count : "no module"}${card ? "; a text card is up" : ""}`);
+  if (!hp) t.problem("bug", "No reward pop when the cast answered Birdie");
+  else if (hDelay > 3) t.problem("bug", `The reward pop came ${hDelay.toFixed(1)} s after the cast (3 s at most)`);
+  if (spoke === null || spoke > 3) t.problem("bug", "Birdie's voiced thanks didn't play within 3 s of the cast");
+  if (card) t.problem("bug", "A story text card is up for the thanks (it is voice only)");
+  const hc = $("helped-count");
+  const hr = hc && hc.getBoundingClientRect();
+  if (!hc || !hr.width || hc.textContent.indexOf("1") < 0) t.problem("bug", "The neighbours-helped counter doesn't show 1 after Birdie's thanks");
+  checkHud(t, "ask-markers-helped");
 
   // 5. it stays: same-day reload
   const m = D.memory.reload();
+  D.helped.reload();
   await sleep(300);
   const re = D.slice.now();
   t.event("ask-reload", `after a same-day reload: lawn ${re.lawn} ${re.lawnShown}, pond ${re.pond}, memory lawn ${m.lawn}`);
   if (re.lawnShown < 0.99 || re.pond < 0.99) t.problem("bug", "The green lawn and the fuller pond didn't survive a same-day reload");
+  const hr2 = $("helped-count") && $("helped-count").getBoundingClientRect();
+  t.event("ask-helped-reload", `after the reload the counter shows ${D.helped.now().count} (${hr2 && hr2.width ? "visible" : "NOT visible"})`);
+  if (D.helped.now().count !== 1 || !hr2 || !hr2.width) t.problem("bug", "The neighbours-helped counter didn't still show 1 after a same-day reload");
   t.scene("After a same-day reload the park is still green");
 
   // 6. the same system for the next neighbor

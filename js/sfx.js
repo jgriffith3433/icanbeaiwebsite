@@ -1559,6 +1559,11 @@ import { pickRate } from "./variety.js";
     if (d.action === "unlock") S.sparkle(); // a neighbor's ask opened a verb (js/street.js)
     else if (d.action === "thanks") S.blip();
   });
+  window.addEventListener("day:helped", (e) => {
+    // a cast answered a neighbour's ask: the reward pop (js/helped.js), sparkle then the warm goal chime, existing sounds only
+    const d = e.detail || {};
+    if (d.action === "add") { S.sparkle(); setTimeout(() => S.chimeUp(), 160); }
+  });
   window.addEventListener("day:crowd", (e) => {
     const d = e.detail || {};
     if (d.action === "reaction") {
