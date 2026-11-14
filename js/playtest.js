@@ -11581,6 +11581,18 @@ async function wakeHimRun(options, t) {
   // 1. the first tap: Take control
   const btn = $("control");
   if (!btn || !hudVisible(btn)) { t.problem("blocker", "No visible Take control button at 03:00"); return; }
+  // clarity: before the tap the verb bar is hidden and clear of the Take control button (one prompt, no icons yet)
+  {
+    const bar0 = document.querySelector(".abilitybar");
+    const barVis0 = bar0 ? getComputedStyle(bar0).visibility : "none";
+    const rb = btn.getBoundingClientRect(), rr = bar0 ? bar0.getBoundingClientRect() : null;
+    const overlap = !!rr && barVis0 === "visible" && rb.left < rr.right && rb.right > rr.left && rb.top < rr.bottom && rb.bottom > rr.top;
+    t.event("wake-prompt-clear", `before the tap: verb bar ${barVis0}, Take control "${(btn.textContent || "").trim()}" ${Math.round(rb.width)}x${Math.round(rb.height)}, overlap ${overlap ? "YES" : "no"}`);
+    if (barVis0 === "visible") t.problem("bug", "The verb icons show before control is taken (they hide the Take control prompt)");
+    if (overlap) t.problem("bug", "The verb bar overlaps the Take control button");
+    if (phone && (rb.width < 44 || rb.height < 44)) t.problem("bug", `Take control is under 44 px (${Math.round(rb.width)}x${Math.round(rb.height)})`);
+    if (document.documentElement.scrollWidth > window.innerWidth + 1) t.problem("bug", "The page scrolls sideways");
+  }
   const tTap = performance.now();
   if (phone) await tapEl(btn); else btn.click();
   t.milestone && t.milestone("first-input-accepted", "Take control tapped");
