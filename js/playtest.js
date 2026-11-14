@@ -12025,6 +12025,12 @@ async function phoneTouch(options, t) {
       if (cs) clear = Math.min(clear, Math.hypot(r.left + r.width / 2 - cs.x, r.top + r.height / 2 - cs.y) - r.width / 2 - cs.r);
       rects.slice(i + 1).forEach((p) => { gap = Math.min(gap, Math.hypot(r.left + r.width / 2 - p.r.left - p.r.width / 2, r.top + r.height / 2 - p.r.top - p.r.height / 2) - r.width / 2 - p.r.width / 2); });
     });
+    const labels = ["rain", "wind", "bolt"].map((id) => { const l = document.querySelector(`#ability-${id} .lb`); return l && hudVisible(l) ? l.textContent.trim() : ""; });
+    const jr = document.querySelector(".touchpad .jump") ? document.querySelector(".touchpad .jump").getBoundingClientRect() : null;
+    const above = jr ? rects.every((o) => o.r.bottom <= jr.top + 1 || o.r.left >= jr.right || o.r.right <= jr.left) : true;
+    t.event("phone-ability-labels", `labels ${labels.join(", ")}; row above Jump: ${above}`);
+    if (labels.some((x) => !x)) t.problem("bug", `A labelled ability (Rain, Wind, Bolt) has no visible label on the phone (${labels.join("/")})`);
+    if (!above) t.problem("bug", "The ability row overlaps the Jump button");
     t.metric("phone.abilityEdgePx", Math.round(edge));
     t.metric("phone.chargeClearPx", Math.round(clear));
     t.event("phone-ability-arc", `${rects.length} verbs; nearest screen edge ${Math.round(edge)} px, nearest the Charge ring ${Math.round(clear)} px, nearest each other ${Math.round(gap)} px`);

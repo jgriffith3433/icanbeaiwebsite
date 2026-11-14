@@ -170,7 +170,7 @@ html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; botto
 html:not(.preview-public):not(.touch-ui) .abilitybar { bottom: var(--row-a); }
 /* phone: verb arc on the right edge above the thumb zone (Jump), clear of the character */
 html.touch-ui .abilitybar {
-  left: auto; right: max(8px, env(safe-area-inset-right));
+  left: auto; right: max(10px, env(safe-area-inset-right));
   bottom: max(166px, calc(env(safe-area-inset-bottom) + 154px)); transform: none;
 }
 .powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; display: none !important; }

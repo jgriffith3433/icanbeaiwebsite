@@ -184,14 +184,14 @@ html.ui-kit #loading h2 {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 html.touch-ui .abilitybar .ab {
-  width: 50px;
-  height: 50px;
+  width: 54px;
+  height: 54px;
   min-width: 44px;
   min-height: 44px;
 }
 html.touch-ui .abilitybar .ab .ico {
-  width: 78%;
-  height: 78%;
+  width: 28px;
+  height: 28px;
 }
 /* Keep arc placement transforms on the button; press scale stays on .face */
 html.touch-ui .abilitybar .ab:active,
