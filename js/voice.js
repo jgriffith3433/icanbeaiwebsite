@@ -132,7 +132,10 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
   const captionBust = caption.querySelector(".bust");
 
   const captionWho = caption.querySelector("b");
-  function showCaption(text, who, secs) {
+  function showCaption(text, who, secs, lead) {
+    // A new player's first minute carries at most 40 words on screen (teach by doing): the cold open's one call is captioned,
+    // every other voiced line in it plays without a caption until js/coldopen.js drops `first-min`.
+    if (!lead && document.documentElement.classList.contains("first-min")) { live.caption = null; return; }
     if (captionTimer) clearTimeout(captionTimer);
     const name = who || "Small Weather";
     captionWho.textContent = name;
@@ -550,12 +553,12 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
         playPri = 9;
         live.playing = true;
         if (isFinite(a.duration) && a.duration > 0) secs = a.duration + 0.4;
-        else a.addEventListener("loadedmetadata", () => { if (!done && isFinite(a.duration)) showCaption(text, who, a.duration + 0.4); }, { once: true });
+        else a.addEventListener("loadedmetadata", () => { if (!done && isFinite(a.duration)) showCaption(text, who, a.duration + 0.4, opts.via === "coldopen"); }, { once: true });
       } catch (err) {
         a = null;
       }
     }
-    showCaption(text, who, secs);
+    showCaption(text, who, secs, opts.via === "coldopen");
     quietNote(`${who}: ${text}`);
     if (!a) setTimeout(finish, secs * 1000);
     emit({ action: "play", id, group: live.last.group, text, file: a ? file : null, who, via: opts.via || "neighbor", positional: true, gain: +where.gain.toFixed(2), pan: +where.pan.toFixed(2), caption: true });
