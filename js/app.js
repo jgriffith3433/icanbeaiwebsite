@@ -23,28 +23,34 @@ import "./stems.js"; // the stem score under control: one 4-note motif, three sy
 import "./daysound.js"; // autopilot diegetic soundscapes by schedule block (after score: uses ambience bus)
 import "./render-pipeline.js"; // the picture: ACES, a grade LUT per hour and weather, emissive bloom, SSAO2, cascaded shadows (after weather: it follows weather.now())
 import "./sky.js"; // the sky: painted panoramas by the clock, a cloud deck, Sun break god rays, sky reflections (after look, weather and the pipeline)
+import "./backdrop.js"; // the far city: a baked skyline silhouette ring tinted by the hour, never fogged, every quality (after sky)
 import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyline curtains, window runnels, drips, lens drops, height fog (after weather)
 import "./aftermath.js"; // Sun break after rain: steam, rainbow at 42°, dripping gutters, pigeons home, umbrellas fold (after rain + sky)
+import "./streetreact.js"; // Lightning sets off a car alarm near the bolt (after crowd + aftermath)
 import "./ui-art.js"; // UI art kit: verb icons, frames, ranks, busts, fonts (before powers paints the bar)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
-import "./windfog.js"; // wind and fog you can see: a shader bend, ribbons, leaves, flags, cloth, umbrellas, ground-fog slices (after powers, weather, crowd)
 import "./barks.js"; // Small Weather's needs and weather reactions in the log, once each per day (docs/voice-style.md)
 import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
 import "./pilot.js"; // Pilot: the AI that runs his day — schedule nudges, take/let-go, wrist ring (after voice.js)
-import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
+import { loadLate } from "./late.js"; // the Episodes button now; episodes.js (+finale), windfog.js, moments.js and tornado.js load after the first cast or on idle
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
 import "./phonemenu.js"; // phone: Neighbors and Episodes behind one Menu button (after both)
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
 import "./street.js"; // the street teaches: Rain, Sun, Fog and Wind each arrive on a neighbor's voiced ask (starts on the cold open)
 import "./coldopen.js"; // a new player's first Play: the roof at dusk, one prompt, the first bolt (before title.js calls it)
+import "./wakeup.js"; // taking control while he sleeps: a stretch, then the roof at night, ready to cast (after coldopen)
 import "./firstrain.js"; // clarity: one glowing Rain icon and a "Tap the street" arrow until the first Rain; the other four verbs wait
 import "./heroprompt.js"; // one in-world prompt over him until the first cast: "Hold V to call wind"
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
-import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build
+import "./npcbarks.js"; // a neighbour barks one short voiced line when he passes or casts near them (existing clips; after neighbors, voice, dialogue)
 import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
 import "./garden.js"; // Birdie's wilting pots and dry lawn tufts that the first Rain revives (after slice.js)
 import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)
+import "./tally.js"; // what the storm changed: a card after a deed, the same tally on the title (after memory)
+import "./helped.js"; // neighbours helped today: a reward pop and a counter when a cast answers an ask (before asks; after memory)
+import "./hud-layout.js"; // HUD keep-out zones for world markers and the toast lane check (before asks)
+import "./hourhint.js"; // the hour's hint on take control, drawn by the ask markers (before asks; after tally)
 import "./asks.js"; // asks in the world: a plumbob over the neighbor who asks, the verb icon over the place it is for (after street, neighbors, memory)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
 import "./titlesound.js"; // night-city ambience under the title, a click on its buttons, a whoosh on the first Gust (before title.js)
@@ -54,6 +60,14 @@ import "./title.js"; // the title screen: the skyline, Play and Episodes (opens 
 import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause perf & leak monitor (window.hawkesPerf)
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
+
+/* The late chunk (js/late.js) normally starts after the first cast. A bot's tab for any scenario but cold-start loads it here, before the
+   page is up, so those scenarios see episodes, wind and fog, moments and the tornado as they always did (cold-start measures the real order). */
+{
+  let botParam = null;
+  try { botParam = new URLSearchParams(location.search).get("playtest"); } catch (e) { /* no location */ }
+  if (botParam && botParam !== "cold-start") await loadLate();
+}
 
 /* The loading card (index.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
 const loading = window.__loading || { set() {}, done() {}, fail() {} };
@@ -65,7 +79,12 @@ const ready = { model: false, frame: false, title: false, lights: false };
    the first use of each power never compile. It is still bounded: LIGHTS_CAP_MS ends the gate whatever the GPU does (a slow or
    software GL, a compile that never settles), and the warm-up carries on behind the title. One timeout, no polling. */
 const LIGHTS_CAP_MS = (typeof window !== "undefined" && (window.innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches))) ? 3500 : 6000;
-const maybeDone = () => { if (ready.frame && ready.title && ready.lights) loading.done(); };
+const effectCount = () => { try { const e = window.BABYLON && window.BABYLON.EngineStore && window.BABYLON.EngineStore.LastCreatedEngine; return e && e._compiledEffects ? Object.keys(e._compiledEffects).length : -1; } catch (err) { return -1; } };
+let loadBase = null;
+/* perf.compilesAfterLoad: shader effects compiled after the loading card went (the playtest reads window.__compilesAfterLoad()) */
+window.__compilesAfterLoad = () => (loadBase == null || loadBase < 0 ? 0 : Math.max(0, effectCount() - loadBase));
+const MODEL_CAP_MS = 9000;
+const maybeDone = () => { if (ready.frame && ready.title && ready.lights && ready.model) { if (loadBase == null) loadBase = effectCount(); loading.done(); } };
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
@@ -100,6 +119,7 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
      js/title.js holds a phone's auto-started cold open until then, so the warm-up's light-set switches and compiles never land on frames
      the player is already playing (the cold-start phone's 1.5 s hitch: the cold open began behind the loading card at +0.3 s). */
   let running = false;
+  let castsWarmed = false;
   let again = false;
   const idle = () => {
     window.__warmIdle = true;
@@ -117,8 +137,12 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
       if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
     /* then rain, fog, a sun break and wind drawn for a few frames each (weather.warmCasts): the first cast of each used to pay
        its compile and allocation as a 400-1000 ms frame */
-    w.warmLights(8000).catch(() => {})
-      .then(() => (window.weather && window.weather.warmCasts ? window.weather.warmCasts() : null)).catch(() => {})
+    /* The casts go FIRST and once: warmLights can run for 8 s plus its leftovers, past the card's cap, and a player (or the bot) who
+       casts meanwhile takes the sky over (weather.warm yields to any real call), which left fog, sun break and wind cold: their
+       first casts were 400-2900 ms frames. The casts are short, and the light sets that follow compile the materials they made. */
+    const casts = !castsWarmed && window.weather && window.weather.warmCasts ? (castsWarmed = true, window.weather.warmCasts()) : null;
+    Promise.resolve(casts).catch(() => {})
+      .then(() => w.warmLights(8000)).catch(() => {})
       .finally(() => lightsDone("the warm-up")); // the card waits for it, up to LIGHTS_CAP_MS
   };
   window.__warmLights = () => (function afterFrame() {
@@ -130,6 +154,9 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
 const skinWorld = control.model && window.day && window.day.world();
 if (skinWorld) {
   const w = skinWorld;
+  /* no box stand-in while the real model is coming; the loading card waits for it (capped, so a slow network can't hold it forever) */
+  if (w.holdStandIn) w.holdStandIn(true);
+  setTimeout(() => { if (!ready.model) { ready.model = true; console.info(`[app] loading card: model gate capped at ${MODEL_CAP_MS} ms`); maybeDone(); } }, MODEL_CAP_MS);
   // Streams the GLB so the loading card's bar follows the bytes (Content-Length), not a guess.
   const readBody = async (r) => {
     const total = Number(r.headers.get("content-length")) || 0;
@@ -149,8 +176,21 @@ if (skinWorld) {
     chunks.forEach((c) => { out.set(c, at); at += c.length; });
     return out.buffer;
   };
-  const fetchBytes = () => (typeof fetch === "function"
-    ? fetch(control.model, { cache: "no-cache" }).then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
+  /* ?blockmodel=1 or window.__blockModel (the playtest's "GLB blocked" option) or ?block=model: the model's fetch fails, as on a bad network */
+  const blocked = () => {
+    if (window.__blockModel) return true;
+    try { return /[?&]blockmodel=1/.test(location.search) || new URLSearchParams(location.search).get("block") === "model"; } catch (e) { return false; }
+  };
+  /* phones and low quality fetch the compressed copy (meshopt, WebP: ~0.8 MB, not 3 MB); desktop high keeps the full model.
+     If the copy fails to load (old browser, 404) the full one is the fallback, once. */
+  let phoneCopy = false;
+  try { phoneCopy = !!(control.modelPhone && window.day.look && window.day.look.quality() === "low"); } catch (e) { phoneCopy = false; }
+  const modelUrl = () => (phoneCopy ? control.modelPhone : control.model);
+  status.modelFile = modelUrl();
+  let early = window.__earlyModel && window.__earlyModel.url === modelUrl() ? window.__earlyModel.p : null; // index.html's head preload (phones), used once
+  const getModel = () => { if (early) { const e = early; early = null; return e.then((r) => (r && r.ok ? r : fetch(modelUrl(), { cache: "no-cache" }))); } return fetch(modelUrl(), { cache: "no-cache" }); };
+  const fetchBytes = () => (blocked() ? Promise.resolve(null) : typeof fetch === "function"
+    ? getModel().then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
     : Promise.resolve(null));
   const firstBytesP = fetchBytes();
   const firstModuleP = import("./small-weather.js");
@@ -161,14 +201,34 @@ if (skinWorld) {
       if (RETRY_MS[i]) await new Promise((r) => setTimeout(r, RETRY_MS[i]));
       try {
         const [{ loadSmallWeather }, buf] = await Promise.all([i ? import("./small-weather.js") : firstModuleP, i ? fetchBytes() : firstBytesP]);
-        return await loadSmallWeather(w, control.model, buf);
+        return await loadSmallWeather(w, modelUrl(), buf);
       } catch (err) {
         lastErr = err;
+        if (phoneCopy) { phoneCopy = false; status.modelFile = control.model; console.warn("[world] phone model failed; using the full model"); }
         console.warn(`[world] Small Weather's model, try ${i + 1} of ${RETRY_MS.length}, didn't load:`, err);
       }
     }
     throw lastErr;
   };
+  /* background retries with backoff (8 s doubling to 2 min), until it lands; never reloads the page, never hides him */
+  const retryLater = (n) => {
+    const wait = Math.min(120000, 8000 * 2 ** (n - 1));
+    setTimeout(async () => {
+      if (document.hidden && n < 20) return retryLater(n);
+      try {
+        const [{ loadSmallWeather }, buf] = await Promise.all([import("./small-weather.js"), fetchBytes()]);
+        const skin = await loadSmallWeather(w, modelUrl(), buf);
+        w.setSkin(skin);
+        Object.assign(status, { model: "small-weather", clips: skin.clips, modelError: null });
+        console.info(`[world] Small Weather's model arrived on retry ${n}`);
+        window.dispatchEvent(new CustomEvent("day:model", { detail: { ...status } }));
+      } catch (err) {
+        console.warn(`[world] model retry ${n} failed:`, err);
+        retryLater(n + 1);
+      }
+    }, wait);
+  };
+  window.__retryModelNow = () => retryLater(1);
   wear()
     .then((skin) => {
       w.setSkin(skin);
@@ -183,10 +243,13 @@ if (skinWorld) {
     .catch((err) => {
       window.__warmModelSettled = true;
       if (window.__warmLights) window.__warmLights();
-      w.setSkin(null); // he stays hidden: Small Weather or nothing, never the box figure
+      w.setSkin(null); // the stand-in figure stays drawn (never hidden); the model keeps retrying in the background below
       Object.assign(status, { model: "none", modelError: String((err && err.message) || err) });
       console.error("[world] Small Weather's model didn't load:", err);
-      loading.fail(String((err && err.message) || err), "Small Weather");
+      ready.model = true; // the card doesn't wait on a model that is coming later: the stand-in plays meanwhile
+      maybeDone();
+      console.warn("[world] the stand-in stays visible; retrying his model in the background");
+      retryLater(1);
     })
     .finally(() => window.dispatchEvent(new CustomEvent("day:model", { detail: { ...status } })));
 }

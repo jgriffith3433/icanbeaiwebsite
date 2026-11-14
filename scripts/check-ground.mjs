@@ -33,7 +33,7 @@ const ok = (cond, msg) => {
 const cfg = globalThis.DAY_CONFIG;
 const E = globalThis.DayEngine;
 const day = E.build(cfg, '2026-10-19');
-const world = globalThis.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
+const world = globalThis.DayWorld.create({ ...events, removeAttribute() {}, setAttribute() {}, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 const { installLook } = await import(new URL('js/look.js', root).href);
 installLook(world);
 const { installCityscape } = await import(new URL('js/cityscape.js', root).href);

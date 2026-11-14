@@ -54,15 +54,14 @@ const theyLines = [...texts].filter((t) => /\b(they|their|theirs|themselves)\b/i
 ok([...texts].some((t) => t.includes('Small Weather')), 'no line in the day names Small Weather');
 ok(!theyLines.length, `lines that still say "they": ${theyLines.slice(0, 5).join(' | ')}`);
 
-const world = sandbox.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
+const world = sandbox.DayWorld.create({ ...events, removeAttribute() {}, setAttribute() {}, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 ok(world && world.person, 'the world has no person');
-// Small Weather or nothing: with a model configured, the box figure is never drawn, not before his model is on and
-// not after a failed load (setSkin(null)).
+// The stand-in figure is drawn until his model is on him and again after a failed load (setSkin(null)): never hidden.
 const figureShowing = () => world.person.getChildMeshes(false).filter((m) => m.isEnabled() && !/phone|cup|bag|shadowproxy/i.test(m.name));
 if (cfg.control && cfg.control.model) {
-  ok(figureShowing().length === 0, `the box stand-in shows before his model loads: ${figureShowing().slice(0, 4).map((m) => m.name).join(', ')}`);
+  ok(figureShowing().length > 0, "the box stand-in is drawn before his model loads (never hidden)");
   world.setSkin(null);
-  ok(figureShowing().length === 0, 'the box stand-in comes back after a failed model load');
+  ok(figureShowing().length > 0, "the box stand-in comes back after a failed model load");
 }
 const { installLook } = await import(new URL('js/look.js', root).href);
 installLook(world);
@@ -99,7 +98,7 @@ ok(world.stage.bedroomLight && world.stage.bedroomLight.intensity > 0.35, `bedro
 world.update(sandbox.DayEngine.frame(day, 12 * 60), 0.016, { snap: true });
 world.look.quality('low');
 const low = world.look.info();
-ok(low.quality === 'low' && low.bloom === true && low.shadows === true && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
+ok(low.quality === 'low' && low.bloom === false && low.shadows === true && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
 world.look.quality('high');
 ok(world.look.info().bloom === true, 'high quality left bloom off');
 
@@ -481,9 +480,11 @@ ok(!power.now().manual && power.now().state === 'clear' && power.now().wet < 0.1
   ok(!w.warming() && !w.now().manual && w.now().state === 'clear' && w.now().rain < 0.01 && w.now().sun < 0.01, 'warm-up did not snap back to the forecast');
   w.warm({ state: 'fog', intensity: 0.8 });
   w.set('rain', 0.75, 'cell');
-  ok(!w.warming() && w.now().manual && w.now().state === 'rain', 'a real set did not take over from the warm-up');
+  ok(!w.warming() && !w.now().manual && w.now().state === 'rain', 'a cell set did not take over from the warm-up without setting manual');
   ok(!w.warm(null) && w.now().state === 'rain', 'the warm-up ended a real call');
   ok(!w.warm({ state: 'fog', intensity: 1 }), 'the warm-up took over a real call');
+  w.set('rain', 1, 'power');
+  ok(w.now().manual && w.now().state === 'rain', 'a power set did not mark weather manual');
 }
 const sim = createWeather({ blend: wx.blend || 3.4, forecast: wx.forecast });
 sim.set('clear', 1, 'key');
@@ -648,6 +649,23 @@ ok((world.scene.effectLayers || []).length === 0, `scene still has ${(world.scen
 ok(snap.batching.frozenMeshes >= 400, `only ${snap.batching.frozenMeshes} static meshes are frozen`);
 ok(avgFrameMs < 15, `average NullEngine frame time is ${avgFrameMs.toFixed(2)} ms (expected < 15 ms)`);
 
+// The walk-back camera's sphere cast sees small and rotated solids (roof lips, the stair ramp), not only the big boxes.
+{
+  const sol = world.solids || [];
+  const lip = sol.find((o) => !o.roll && !o.yaw && !o.pitch && o.h < 1.5 && o.h > 0.3 && o.w > 3 && o.d < 1 && o.y > 5);
+  if (lip) {
+    // from 4 m before the lip, 0.2 m under its top, straight at it, the camera 8 m out: the old cast let it sit behind it
+    const ty = lip.y, tx = lip.x, tz = lip.z - lip.d / 2 - 4;
+    const r = world.cameraClear(tx, ty, tz, 0, 0, 1, 8);
+    ok(r < 5, `the camera's sphere cast ignores a ${lip.w.toFixed(1)}x${lip.h.toFixed(1)}x${lip.d.toFixed(1)} roof lip (radius ${r.toFixed(2)} of 8)`);
+    ok(world.cameraClear(tx, ty + 4, tz, 0, 0, 1, 8) === 8, 'the camera is pulled in for a lip 4 m below it');
+  } else ok(false, 'no roof lip solid found to check the camera cast against');
+  const ramp = sol.find((o) => o.roll);
+  if (ramp) {
+    const r = world.cameraClear(ramp.x, ramp.y + 3, ramp.z, 0, -1, 0, 8);
+    ok(r < 4, `the camera's sphere cast ignores the stair ramp (radius ${r.toFixed(2)} of 8, straight down onto it)`);
+  } else ok(false, 'no rotated stair ramp solid found');
+}
 const summary = `Babylon ${core.Engine.Version}, Havok: ${p.colliders} colliders in ${p.bodies} bodies; ${day.actions.length} actions; field ${g && g.y.toFixed(2)}, road ${r && r.y.toFixed(2)}, home floor ${inside && inside.y.toFixed(2)}, bed ${onBed && onBed.y.toFixed(2)}, capsule at ${cap.position.y.toFixed(2)}; control: walk ${walked.toFixed(2)} m/s, three jumps ${(peak - y0).toFixed(2)} m, walked back in ${(steps / 60).toFixed(1)} s; ${modelInfo}; perf: ${avgFrameMs.toFixed(2)} ms/frame, ${snap.geometry.shadowTris} shadow tris, ${snap.batching.frozenMeshes} frozen meshes`;
 if (problems.length) {
   console.error(`check-world: ${problems.length} problem(s)\n- ${problems.join('\n- ')}\n${summary}`);

@@ -24,6 +24,7 @@ class FakeCtx {
 
 // ---- the page and the day ----
 const listeners = {};
+const docListeners = {};
 let pressed = 'true';
 const soundBtn = { getAttribute: () => pressed };
 const observers = [];
@@ -43,7 +44,7 @@ Object.assign(globalThis, {
   day,
   BABYLON: { Axis: { X: {} } },
   AudioContext: FakeCtx,
-  document: { getElementById: (id) => (id === 'sound' ? soundBtn : null) },
+  document: { getElementById: (id) => (id === 'sound' ? soundBtn : null), addEventListener: (type, fn) => (docListeners[type] = docListeners[type] || []).push(fn) },
   addEventListener: (type, fn) => (listeners[type] = listeners[type] || []).push(fn),
 });
 await import(new URL('../js/sfx.js', import.meta.url).href);
@@ -57,6 +58,25 @@ pressed = 'false';
 send('day:episode', { action: 'goal' });
 ok(started === 0, `sound plays with the Sound button off (${started} sources)`);
 pressed = 'true';
+
+// One touch, one press: a touch on the world (not a control) fires pointerdown then touchstart, and answers with exactly one
+// ui-press. A mouse press on empty world stays silent; a control press is one too.
+{
+  const fire = (type, ev) => (docListeners[type] || []).forEach((fn) => fn(ev));
+  const world = { closest: () => null };
+  const control = { closest: () => ({}) };
+  const presses = () => heard()['ui-press'] || 0;
+  const before = presses();
+  fire('pointerdown', { pointerType: 'touch', target: world });
+  fire('touchstart', { target: world });
+  ok(presses() - before === 1, `a world touch (pointerdown + touchstart) played ${presses() - before} presses, wanted exactly 1`);
+  const b2 = presses();
+  fire('pointerdown', { pointerType: 'touch', target: control });
+  fire('touchstart', { target: control });
+  ok(presses() - b2 === 1, `a control touch played ${presses() - b2} presses, wanted exactly 1`);
+  const noted = Object.keys(heard()).filter((k) => k === 'ui-tap');
+  ok(noted.length === 0, 'a second world-touch handler (ui-tap) is back: one path answers a touch');
+}
 
 // Every beat the player causes is heard.
 const beats = [
@@ -155,6 +175,18 @@ ok(pl.length === 30, `jump clips played ${pl.length} of 30 times`);
 ok(pl.every((p, i) => i === 0 || p.file !== pl[i - 1].file), 'the same jump file played twice in a row');
 ok(pl.every((p) => p.rate >= 0.888 && p.rate <= 1.112 && Math.abs(p.rate - 1) >= 0.035), 'jump pitch jitter outside 5-10%');
 ok(day.sfx.info().sources.jump === 'file', 'info().sources.jump is not file after a clip played');
+
+// The foley scheduler: ids drawn by hour and weather, a file never twice inside 60 s, gaps from a one-shot's end.
+for (const [k, n] of [['bird', 2], ['pigeon', 2], ['car-pass', 2], ['siren-far', 2], ['car-horn', 2]]) bank.buffers[k] = Array.from({ length: n }, (_, i) => ({ url: `audio/foley/${k}-${i + 1}.mp3`, b: { duration: 2 } }));
+const f0 = day.sfx.info().foley;
+ok(f0 && f0.minGap === 6 && f0.maxGap === 15, 'info().foley has no 6-15 s scheduler');
+for (let i = 0; i < 12; i++) day.sfx.foleyNow();
+const fp = day.sfx.info().plays.filter((p) => /^(bird|pigeon|car-pass|siren-far|car-horn)$/.test(p.kind));
+const seen = new Set();
+let dup = 0;
+fp.forEach((p) => { if (seen.has(p.file)) dup++; seen.add(p.file); });
+ok(dup === 0, `the scheduler played a file twice inside 60 s (${dup} repeats in ${fp.length} plays)`);
+ok(day.sfx.info().foley.count >= 1, 'the scheduler never played a street one-shot');
 
 if (problems.length) {
   console.error('check-sfx: ' + problems.length + ' problem(s)\n - ' + problems.join('\n - '));

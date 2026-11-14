@@ -11,9 +11,9 @@
    ========================================================================== */
 
 import * as boltFx from "./lightning.js";
-import * as tornadoFx from "./tornado.js";
 import { createAbilities, startAbilityBar, VERB_IDS } from "./abilities.js";
-export { debrisCap, shellCount, inPlaza, plazaCourse, FUNNEL_LIFE } from "./tornado.js";
+import { powerPose } from "./power-poses.js";
+/* tornado.js is NOT re-exported here: a static re-export keeps it in the first chunk and runs it before gameplay (js/late.js loads it). Import its helpers from "./tornado.js" directly. */
 
 /** All spendable effects (verbs + hold depths). The bar shows VERB_IDS only. */
 export const POWER_NAMES = ["bolt", "rain", "wind", "fog", "sunbreak", "storm", "gust", "gale", "tornado"];
@@ -505,7 +505,12 @@ export function startPowers(world, dayApi) {
       }
     } catch (err) { /* memory optional */ }
   }
-  const tornadoLook = tornadoFx.createTornadoFx(B, scene, {
+  /* The tornado's module (js/tornado.js, 735 lines) is not in the first chunk: js/late.js loads it right after the first cast
+     (or on idle) through `loadTornado()`. Until then `tornadoLook` is an idle stand-in and a Tornado cast waits for it. */
+  let tornadoFx = null;
+  let tornadoLook = { warm() {}, ensurePool() {}, pool: [], propPositions: () => [], update() {}, start: () => null, info: () => ({ active: null, landed: 0, settleLeft: 0 }) };
+  let tornadoP = null;
+  const buildTornado = () => tornadoFx.createTornadoFx(B, scene, {
     quality: qOf,
     physics: () => world.physics && world.physics(),
     surfaceAt: (x, z) => {
@@ -529,7 +534,17 @@ export function startPowers(world, dayApi) {
     },
     specs: looseSpecs,
   });
-  setTimeout(() => tornadoLook.warm(), 0);
+  function loadTornado() {
+    if (!tornadoP) {
+      tornadoP = import("./tornado.js").then((mod) => {
+        tornadoFx = mod;
+        tornadoLook = buildTornado();
+        setTimeout(() => tornadoLook.warm(), 0);
+        return true;
+      }).catch((err) => { tornadoP = null; console.error("[powers] the tornado didn't load:", err); return false; });
+    }
+    return tornadoP;
+  }
 
   let cloudR = 0;
   let cloudTarget = 0;
@@ -721,9 +736,18 @@ export function startPowers(world, dayApi) {
     return true;
   }
 
+  let tornadoWait = false;
   function sendTornado(via) {
     if (mode() !== "control") return false;
     if (tornado && tornado.life > 0) return false;
+    if (!tornadoFx) { // still loading: show it, then cast once it is in (never a silent tap)
+      if (!tornadoWait) {
+        tornadoWait = true;
+        window.dispatchEvent(new CustomEvent("day:late", { detail: { feature: "tornado", state: "loading", via } }));
+        loadTornado().then((ok) => { tornadoWait = false; if (ok) sendTornado(via); });
+      }
+      return false;
+    }
     if (!gauge.spend("tornado")) return refuse("tornado", via);
     ensureProps();
     const p = who();
@@ -794,9 +818,103 @@ export function startPowers(world, dayApi) {
   ["rain", "gale", "fog", "sunbreak"].forEach((id) => (commands[id] = (via) => weatherCall(id, via)));
   function command(name, via) {
     const fn = commands[name];
-    if (!fn || mode() !== "control") return false;
+    if (!fn) return false;
+    if (mode() !== "control") return pressWatching(name, via || "key");
+    // A power pressed while the wake stretch is still playing cuts to the roof now and casts in this same input.
+    try { if (day.wake && day.wake.skip) day.wake.skip(name); } catch (e) { /* the wake never blocks a cast */ }
     if (gateFn && !gateFn(name, via || "key")) return false;
-    return fn(via || "key");
+    if (releaseCast) return fn(via || "key");
+    return windUp(name, via || "key", fn);
+  }
+  // A Gust/Gale/Lightning tap fires on release: the press itself was the wind-up, so no second pause before the effect.
+  let releaseCast = false;
+
+  /* The wind-up: a cast made standing still turns him to face the aim (a step when it is over 90 deg: js/control.js `face`)
+     and plays the raise-the-hands pose before the effect fires, 0.12-0.22 s after the press, so the first visible effect
+     stays under 300 ms. On the move, in the air, or a power already pending, it goes at once. */
+  const WINDUP_MIN = 0.12;
+  const WINDUP_MAX = 0.22;
+  let pendingCast = null;
+  function windUp(name, via, fn) {
+    const st = day.control && day.control.state ? day.control.state() : null;
+    const still = st && st.grounded && (st.speed || 0) < 0.8;
+    if (!still || pendingCast || !day.control.face || aimOverride) return fn(via);
+    if (name === "rain" || name === "fog" || name === "sunbreak") {
+      // sky casts don't need his hands up first: the sky answers on the press frame, he still turns toward the aim as it lands
+      const a = groundAim();
+      const q = who();
+      if (a && Math.hypot(a.x - q.x, a.z - q.z) > 0.8) day.control.face(Math.atan2(a.x - q.x, a.z - q.z));
+      return fn(via);
+    }
+    const aim = groundAim();
+    const p = who();
+    let wait = WINDUP_MIN;
+    if (aim && Math.hypot(aim.x - p.x, aim.z - p.z) > 0.8) {
+      const t = day.control.face(Math.atan2(aim.x - p.x, aim.z - p.z));
+      if (t) wait = Math.min(WINDUP_MAX, Math.max(WINDUP_MIN, t.dur * 0.75));
+    }
+    pendingCast = { name, via, fn, left: wait, total: wait };
+    return true;
+  }
+  function tickWindUp(dt) {
+    if (!pendingCast) return;
+    const c = pendingCast;
+    c.left -= dt;
+    if (c.left > 0) return;
+    pendingCast = null;
+    if (mode() !== "control") return;
+    if (!c.fn(c.via)) refuseBar(c.name);
+  }
+
+  /* A power pressed while only watching is never refused: the first press takes control (the Take control button's own
+     path, so the night wake runs too) and then casts that power, with a one-line toast on how to give him back. */
+  let watchCast = null; // a cast waiting for the night wake to land him on the roof
+  function takeToast() {
+    if (!canDom) return;
+    const touch = !!(day.control.state && day.control.state().touch);
+    const text = touch ? line("takeoverTouch") : line("takeover");
+    if (!text) return;
+    let el = document.getElementById("take-toast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "take-toast";
+      el.className = "take-toast";
+      el.setAttribute("role", "status");
+      document.body.append(el);
+    }
+    el.textContent = text;
+    el.classList.remove("show");
+    void el.offsetWidth;
+    el.classList.add("show");
+    clearTimeout(takeToast.h);
+    takeToast.h = setTimeout(() => el.classList.remove("show"), 3600);
+    note(text);
+  }
+  function pressWatching(name, via) {
+    if (!canDom || !day.control || !day.control.take || mode() !== "schedule") return false;
+    const cls = document.documentElement.classList;
+    if (cls.contains("title-up") || cls.contains("cold-open")) return false;
+    if (!day.control.take(via)) return false; // driving: the one case he can't be taken
+    takeToast();
+    const cast = () => {
+      if (mode() !== "control") return;
+      const ok = gateFn && !gateFn(name, via) ? false : commands[name](via);
+      if (!ok) refuseBar(name);
+    };
+    const wk = day.wake && day.wake.now ? day.wake.now() : null;
+    if (wk && wk.active) {
+      // asleep: he stretches and is put on the roof first; cast the moment he is ready
+      const h = (e) => {
+        const a = e.detail && e.detail.action;
+        if (a !== "ready" && a !== "abort") return;
+        window.removeEventListener("day:wake", h);
+        clearTimeout(watchCast);
+        if (a === "ready") setTimeout(cast, 60);
+      };
+      window.addEventListener("day:wake", h);
+      watchCast = setTimeout(() => window.removeEventListener("day:wake", h), 8000);
+    } else cast();
+    return true;
   }
 
   /* A bolt prefers a tall conductor (an antenna, the Needle) within 3 m of where it was aimed. */
@@ -944,6 +1062,23 @@ export function startPowers(world, dayApi) {
     }
     return audio;
   }
+  // The three cast sounds share one 1 s noise buffer, which the audio probe names "buf:1x44100": tag each source by its own
+  // kind and give it a playback rate that differs from that kind's last one, so no sample+rate repeats inside 60 s.
+  const noiseRates = {};
+  function tagNoise(src, kind) {
+    // The probe flags a repeat against ANY play of the same sample and rate in the last 60 s (rates match within 0.001),
+    // so keep every rate used by this kind in that window and pick one at least 0.002 from all of them; if the window
+    // is crowded, widen the spread rather than repeat.
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+    const used = (noiseRates[kind] = (noiseRates[kind] || []).filter((u) => now - u.t < 62));
+    let r = 1;
+    for (let spread = 0.06, tries = 0; tries < 60; tries++, spread = Math.min(0.4, spread + 0.01)) {
+      r = 1 + (Math.random() * 2 - 1) * spread;
+      if (used.every((u) => Math.abs(u.r - r) >= 0.002)) break;
+    }
+    used.push({ r, t: now });
+    try { src.__hawkesSampleId = "power-noise-" + kind; src.playbackRate.value = r; } catch (e) { /* */ }
+  }
   function burst(freq, dur, vol, type) {
     const a = ensureAudio();
     if (!a || !soundOn()) return;
@@ -951,6 +1086,7 @@ export function startPowers(world, dayApi) {
     const t = a.ctx.currentTime;
     const src = a.ctx.createBufferSource();
     src.buffer = a.buf;
+    tagNoise(src, "burst");
     const filter = a.ctx.createBiquadFilter();
     filter.type = type || "lowpass";
     // The noise buffer is normalised hot (x2.6, clamped), so the level is scaled down here; each play jitters
@@ -976,6 +1112,7 @@ export function startPowers(world, dayApi) {
     const t = a.ctx.currentTime;
     const src = a.ctx.createBufferSource();
     src.buffer = a.buf;
+    tagNoise(src, "wash");
     src.loop = true;
     const f = a.ctx.createBiquadFilter();
     f.type = type;
@@ -998,6 +1135,7 @@ export function startPowers(world, dayApi) {
     const t = a.ctx.currentTime;
     const src = a.ctx.createBufferSource();
     src.buffer = a.buf;
+    tagNoise(src, "sweep");
     src.loop = true;
     const f = a.ctx.createBiquadFilter();
     f.type = "bandpass";
@@ -1113,15 +1251,37 @@ html.touch-ui.in-control .side{display:none}
   }, {
     verbs: VERB_IDS,
     onHold(id, down) {
+      // watching: the press takes control and casts the tap (Lightning / Gust); holds start from the next press
+      if (mode() === "schedule") {
+        if (down && !pressWatching(id === "wind" ? "gust" : "bolt", "touch")) refuseBar(id === "wind" ? "gust" : "bolt");
+        return;
+      }
+      const wasBolt = touchBolt;
+      const wasWind = touchWind;
       if (id === "bolt") touchBolt = !!down;
       if (id === "wind") touchWind = !!down;
+      // A tap fires on the release itself, not on the next frame's tick: on a slow phone frame that wait was the whole latency.
+      if (!down && mode() === "control") {
+        if (id === "bolt" && wasBolt && !keyBolt && !padBolt) {
+          prevTouchBolt = false; // the tick must not release it a second time
+          releaseBolt("touch");
+          boltCharge = 0; boltResolved = false; gatherNoted = false; charge = 0;
+        } else if (id === "wind" && wasWind && !keyWind && !padWind) {
+          prevTouchWind = false;
+          releaseWind("touch");
+          windCharge = 0; windResolved = ""; windGatherNoted = false;
+        }
+      }
     },
   });
 
   function paintMeter() {
     if (!canDom) return;
     const on = mode() === "control";
-    bar.paint(on);
+    // watching, the ring is there too: a tap on a power takes control and casts it (not while he drives or the cold open runs)
+    const fr = day.control && day.control.mode && !on && day.now ? day.now().frame : null;
+    const watching = !on && mode() === "schedule" && !!fr && !(fr.person && fr.person.inCar) && !document.documentElement.classList.contains("cold-open");
+    bar.paint(on || watching);
     meter.hidden = true;
     pad.hidden = true;
     if (!on) reticle.hidden = true;
@@ -1170,22 +1330,33 @@ html.touch-ui.in-control .side{display:none}
   function releaseBolt(via) {
     if (boltResolved) return;
     if (boltCharge < (cfg.tapMax || 0.28)) {
-      if (!command("bolt", via)) refuseBar("bolt");
+      releaseCast = true;
+      try { if (!command("bolt", via)) refuseBar("bolt"); } finally { releaseCast = false; }
     }
     // held past Storm threshold already fired; mid-hold with no Storm = no bolt
   }
   function releaseWind(via) {
     // Exclusive depths (same idea as Lightning): tap Gust, mid hold Gale on release, full charge Tornado while held.
     if (windResolved === "tornado") return;
-    if (windCharge >= (cfg.windHold || 0.55)) {
-      if (!command("gale", via)) refuseBar("gale");
-      return;
-    }
-    if (!command("gust", via)) refuseBar("gust");
+    releaseCast = true;
+    try {
+      if (windCharge >= (cfg.windHold || 0.55)) {
+        if (!command("gale", via)) refuseBar("gale");
+        return;
+      }
+      if (!command("gust", via)) refuseBar("gust");
+    } finally { releaseCast = false; }
   }
   window.addEventListener("keydown", (e) => {
     if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
     const name = keyName[(e.key || "").toLowerCase()];
+    if (name && mode() === "schedule" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && commands[name === "wind" ? "gust" : name === "bolt" ? "bolt" : name]) {
+      if (pressWatching(name === "wind" ? "gust" : name, "key")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+      return;
+    }
     if (!name || mode() !== "control") return;
     if (name === "bolt") {
       if (!e.repeat) keyBolt = true;
@@ -1320,6 +1491,9 @@ html.touch-ui.in-control .side{display:none}
     padWind = padState.windHold;
 
     wantStorm = boltDown && !boltResolved && boltCharge >= (cfg.tapMax || 0.28);
+    /* `charge` drives pose(): it must never outlive the hold (a key release used to leave it above 0, so the wind-up pose
+       was asked for until Let go and he never settled back to idle). */
+    if (!boltDown) charge = 0;
     if (boltDown) {
       boltCharge += dt;
       charge = boltCharge;
@@ -1369,10 +1543,22 @@ html.touch-ui.in-control .side{display:none}
       const p = who();
       cloud.scaling.set(cloudR * 2, cloudR * 0.85, cloudR * 2);
       // The sphere's underside (centre - 0.425R) stays 7 m over his feet at any size, so the camera and he are never inside it.
-      cloud.position.set(p.x, (p.y || 0) + 7 + cloudR * 0.425, p.z);
+      // ...and never under or around the camera: a high / zoomed-out orbit camera (phone landscape) sat inside it, a dark orb over his head.
+      const camY = world.camera && world.camera.position ? world.camera.position.y : 0;
+      const under = Math.max((p.y || 0) + 7, camY + 3);
+      cloud.position.set(p.x, under + cloudR * 0.425, p.z);
       shelf.scaling.set(cloudR * 2.4, 1, cloudR * 2.4);
-      shelf.position.set(p.x, (p.y || 0) + 7.2, p.z);
-      cloudMat.alpha = Math.min(0.84, 0.35 + cloudR / 40);
+      shelf.position.set(p.x, under + 0.2, p.z);
+      // Belt and braces: whatever the camera does between frames (a pull-back, a zoom, a wall swing), a cloud close to the lens fades out
+      // instead of showing as an opaque dark disc over his head (the playtest's camera-inside, phone landscape).
+      let near = 1;
+      if (world.camera && world.camera.position) {
+        const cp = world.camera.position;
+        const d = Math.hypot(cp.x - p.x, cp.y - cloud.position.y, cp.z - p.z);
+        const reach = cloudR * 0.6 + 2;
+        near = Math.max(0, Math.min(1, (d - reach) / 4));
+      }
+      cloudMat.alpha = Math.min(0.84, 0.35 + cloudR / 40) * near;
     }
     if (rainPs) {
       const p = who();
@@ -1382,6 +1568,7 @@ html.touch-ui.in-control .side{display:none}
       rainPs.emitRate = localStorm ? (globalRain > 0.72 ? 60 : 900) : 0;
     }
 
+    tickWindUp(dt);
     castFor = Math.max(0, castFor - dt);
     throwFor = Math.max(0, throwFor - dt);
     flash = Math.max(0, flash - dt * 3.1);
@@ -1549,16 +1736,14 @@ html.touch-ui.in-control .side{display:none}
   function pose() {
     if (mode() !== "control") return null;
     if (throwFor > 0) return "throw";
+    if (pendingCast) return powerPose(pendingCast.name);
     // Distinct wind-ups: Lightning/Storm gather vs Rain/Fog/Sun/Wind gather (js/small-weather.js clips).
     const boltHand = !!(keyBolt || touchBolt || padBolt || wantStorm || (charge > 0 && !windCharge));
     const weatherHand = !!(keyWind || touchWind || padWind || windCharge > 0);
     if (boltHand) return "windbolt";
     if (weatherHand) return "windrain";
     if (castFor > 0) {
-      const id = lastCast && lastCast.id;
-      if (id === "lightning" || id === "storm" || id === "bolt") return "windbolt";
-      if (id === "rain" || id === "fog" || id === "sun" || id === "gale" || id === "gust" || id === "tornado" || id === "wind") return "windrain";
-      return "cast";
+      return powerPose(lastCast && lastCast.id);
     }
     return null;
   }
@@ -1621,6 +1806,8 @@ html.touch-ui.in-control .side{display:none}
 
   const api = {
     now,
+    loadTornado,
+    tornadoLoaded: () => !!tornadoFx,
     pose,
     command,
     thunderDelay,

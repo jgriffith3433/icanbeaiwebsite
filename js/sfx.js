@@ -20,6 +20,8 @@
    onBeforeRender observer that reads day.control.state(): nothing here changes the day or polls the network.
    day.sfx.info() says what played (the playtest and the console).
    ========================================================================== */
+import { pickRate } from "./variety.js";
+
 (function () {
   const day = window.day;
   const world = day && day.world && day.world();
@@ -30,7 +32,11 @@
   const heard = {}; // name -> count, for info()
   const clockMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
   let lastHeardMs = clockMs();
-  const note = (name) => { lastHeardMs = clockMs(); return (heard[name] = (heard[name] || 0) + 1); };
+  /* note() only counts. lastHeardMs is stamped where a source really starts (started()): a note() for an event whose sound never
+     started (a muted bus, a clip not decoded yet, a one-shot gated off) must not hold the ambient fill back. */
+  let startCount = 0; // every source any path starts (started() and the press click), so a press can tell if anything answered it
+  const started = () => { lastHeardMs = clockMs(); startCount++; };
+  const note = (name) => { return (heard[name] = (heard[name] || 0) + 1); };
 
   /* ---------------- the audio graph ---------------- */
   let audio = null;
@@ -146,6 +152,37 @@
     return out(a, 0, busName);
   }
 
+  /* Footstep / landing voicing context: while a step or landing is synthesized every layer is tagged for the audio probe
+     with the surface and a round-robin take ("step-gravel-2:syn-noise-..."), takes differ in pitch, and the level follows
+     the phone / voice mix (stepGain). */
+  let curTag = "";
+  let curVar = 1;
+  let curGain = 1;
+  const RR_PITCH = [1, 0.93, 1.08, 0.97];
+  const rr = {};
+  let voiceOn = 0;
+  function stepGain() {
+    let g = 1;
+    try { if (document.documentElement.classList.contains("touch-ui")) g *= 0.7; } catch (e) { /* */ }
+    if (voiceOn > 0) g *= 0.5;
+    return g;
+  }
+  let voiceTimer = 0;
+  ["day:voice", "day:dialogue"].forEach((n) => window.addEventListener(n, (ev) => {
+    const act = (ev && ev.detail && ev.detail.action) || "play";
+    clearTimeout(voiceTimer);
+    if (act === "end" || act === "stop") { voiceOn = 0; return; }
+    voiceOn = 1;
+    voiceTimer = setTimeout(() => { voiceOn = 0; }, 7000); // failsafe if an end never comes
+  }));
+  function voicing(tag, fn, pitched) {
+    const n = (rr[tag] = ((rr[tag] || 0) + 1) % RR_PITCH.length);
+    curTag = tag + "-" + n;
+    curVar = pitched === false ? 1 : RR_PITCH[n];
+    curGain = stepGain();
+    try { fn(); } finally { curTag = ""; curVar = 1; curGain = 1; }
+    return curTag || tag;
+  }
   /** Filtered noise: a hit, a thump, a whoosh (sweep with `to`). Pass x/z for HRTF+occlusion via mix. */
   function noise(o) {
     const a = ctx();
@@ -156,9 +193,10 @@
     // Tagged for the audio probe (hawkes-audio.js): the id names the voicing, the rate carries the pitch jitter, so
     // the shared white-noise buffer isn't read as one sample repeating.
     const pj = 0.94 + Math.random() * 0.12;
-    src.playbackRate.value = (o.rate || 1) * (0.97 + Math.random() * 0.06);
+    const nid = (curTag ? curTag + ":" : "") + "syn-noise-" + (o.type || "lowpass") + "-" + Math.round(o.freq || 0) + (o.to ? ">" + Math.round(o.to) : "");
+    src.playbackRate.value = pickRate(nid, o.rate || 1);
     try {
-      src.__hawkesSampleId = "syn-noise-" + (o.type || "lowpass") + "-" + Math.round(o.freq || 0) + (o.to ? ">" + Math.round(o.to) : "");
+      src.__hawkesSampleId = nid;
       src.__hawkesBus = o.bus || "sfx";
       src.__hawkesGain = Math.max(0.0002, o.vol);
       src.__hawkesDur = o.dur;
@@ -167,10 +205,10 @@
     f.type = o.type || "lowpass";
     f.Q.value = o.q || 0.8;
     // Every synthesized hit varies a little (pitch ~+-6%, level ~+-8%) so repeats never sound identical.
-    f.frequency.setValueAtTime(o.freq * pj, t);
-    if (o.to) f.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
+    f.frequency.setValueAtTime(o.freq * pj * curVar, t);
+    if (o.to) f.frequency.exponentialRampToValueAtTime(o.to * pj * curVar, t + o.dur);
     const g = a.c.createGain();
-    const vol = Math.max(0.0002, o.vol) * (0.92 + Math.random() * 0.16);
+    const vol = Math.max(0.0002, o.vol) * curGain * (0.92 + Math.random() * 0.16);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + Math.max(0.006, o.attack || 0.008));
     g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
@@ -179,7 +217,7 @@
     f.connect(g);
     const bus = o.bus || "sfx";
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
-    src.start(t, Math.random() * 1.5);
+    src.start(t, Math.random() * 1.5); started();
     src.stop(t + o.dur + 0.05);
   }
   /** One oscillator note, optionally gliding. Pass x/z for HRTF+occlusion via mix. */
@@ -189,12 +227,14 @@
     const t = a.c.currentTime + (o.delay || 0);
     const osc = a.c.createOscillator();
     osc.type = o.wave || "sine";
-    const pj = 0.97 + Math.random() * 0.06; // +-3% pitch: musical notes stay in tune, repeats still differ
+    const sid = (curTag ? curTag + ":" : "") + "syn-tone-" + o.freq + (o.to ? ">" + o.to : "") + "-" + (o.wave || "sine");
+    // +-3% pitch (musical notes stay in tune), but never the same rate for one tone id twice in 60 s (the audio probe's rule)
+    const pj = pickRate(sid, curVar, { min: 0.004, max: 0.03 });
     osc.frequency.setValueAtTime(o.freq * pj, t);
     if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
     const g = a.c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol) * (0.94 + Math.random() * 0.12), t + Math.max(0.008, o.attack || 0.01));
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol) * curGain * (0.94 + Math.random() * 0.12), t + Math.max(0.008, o.attack || 0.01));
     g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
     g.gain.setValueAtTime(0, t + o.dur + 0.002);
     let node = osc;
@@ -209,11 +249,11 @@
     node.connect(g);
     const bus = o.bus || "sfx";
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
-    osc.start(t);
+    osc.start(t); started();
     osc.stop(t + o.dur + 0.05);
     // An oscillator isn't a buffer source, so the audio probe can't see it: say so through the sound kit's event.
     try {
-      window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { type: "sound-start", sample: "syn-tone-" + o.freq + (o.to ? ">" + o.to : "") + "-" + (o.wave || "sine"), bus: o.bus || "sfx", rate: Math.round(pj * 1000) / 1000, gain: o.vol, dur: o.dur } }));
+      window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { type: "sound-start", sample: sid, bus: o.bus || "sfx", rate: Math.round(pj * 1000) / 1000, gain: o.vol, dur: o.dur } }));
     } catch (e) { /* */ }
   }
   const notes = (freqs, gap, vol, wave, dur) => freqs.forEach((f, i) => tone({ freq: f, dur: dur || 0.5, vol, wave: wave || "triangle", delay: i * gap }));
@@ -227,12 +267,12 @@
   const GROUPS = [
     [/^(jump|land-)/, "move"],
     [/^(crowd-|umbrella-)/, "crowd"],
-    [/^(car-|siren|pigeon|bird)/, "city"],
+    [/^(car-|siren|pigeon|bird|door|dog|chatter|awning)/, "city"],
     [/^ui-/, "ui"],
   ];
   const groupOf = (kind) => { for (const [re, g] of GROUPS) if (re.test(kind)) return g; return "misc"; };
-  const bank = { index: null, indexing: false, files: {}, buffers: {}, groups: {}, last: {}, plays: [], sources: {}, bytes: 0 };
-  const lastRate = {};
+  const bank = { index: null, indexing: false, files: {}, buffers: {}, groups: {}, last: {}, plays: [], sources: {}, bytes: 0, usedAt: {}, lastSrc: null, lastDur: 0 };
+  const lastRate = {}; // file url -> [{ r, t }] rates played in the last 60 s
   function loadGroup(g) {
     if (bank.groups[g] || !bank.index) return;
     bank.groups[g] = "loading";
@@ -274,12 +314,25 @@
     wantGroup(groupOf(kind));
     const list = bank.buffers[kind];
     if (!list || !list.length) return false;
-    let pick = list[Math.floor(Math.random() * list.length)];
-    if (list.length > 1 && pick.url === bank.last[kind]) pick = list[(list.indexOf(pick) + 1) % list.length];
+    // Never the same file twice inside 60 s while another variant is free (the audio probe counts an identical sample); a caller
+    // that needs it strict (the scheduler) passes `fresh` and gets false, then picks another kind.
+    const nowMs = clockMs();
+    let cands = list.filter((p) => !(bank.usedAt[p.url] > nowMs - 60000));
+    if (!cands.length) { if (o.fresh) return false; cands = list; }
+    let pick = cands[Math.floor(Math.random() * cands.length)];
+    if (cands.length > 1 && pick.url === bank.last[kind]) pick = cands[(cands.indexOf(pick) + 1) % cands.length];
     bank.last[kind] = pick.url;
-    let rate = 1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1); // 5-10% either way
-    if (Math.abs(rate - (lastRate[pick.url] || 0)) < 0.01) rate += 0.012;
-    lastRate[pick.url] = rate;
+    bank.usedAt[pick.url] = nowMs;
+    // 5-10% either way, and never near a rate this file already played at inside 60 s (a forced reuse of a small pool then
+    // differs in pitch: the audio probe counts the same buffer at the same rate as an identical repeat).
+    const recent = (lastRate[pick.url] = (lastRate[pick.url] || []).filter((r) => r.t > nowMs - 60000));
+    let rate = 1, best = -1;
+    for (let i = 0; i < 12 && best < 0.03; i++) {
+      const r = 1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1);
+      const d = recent.reduce((m, x) => Math.min(m, Math.abs(x.r - r)), 1);
+      if (d > best) { best = d; rate = r; }
+    }
+    recent.push({ r: rate, t: nowMs });
     const vol = (o.gain == null ? 1 : o.gain) * (1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1));
     const src = a.c.createBufferSource();
     src.buffer = pick.b;
@@ -291,7 +344,9 @@
     src.connect(g);
     const bus = o.bus || (String(kind).startsWith("ui-") ? "ui" : "sfx");
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
-    src.start(a.c.currentTime + (o.delay || 0));
+    src.start(a.c.currentTime + (o.delay || 0)); started();
+    bank.lastSrc = src;
+    bank.lastDur = (pick.b && pick.b.duration ? pick.b.duration : 2) / rate;
     const tag = groupOf(kind) === "move" ? (kind === "jump" ? "jump" : "landing") : kind.split("-")[0] === "crowd" || kind === "umbrella-pop" ? "crowd" : kind.startsWith("car") || kind === "siren-far" ? "car" : kind === "bird" || kind === "pigeon" ? "bird" : "ui";
     bank.sources[tag] = "file";
     bank.plays.push({ kind, file: pick.url, rate: +rate.toFixed(3), t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
@@ -377,7 +432,7 @@
     const src = a.c.createBufferSource();
     src.buffer = pick.b;
     try { src.__hawkesSampleId = "power-" + String(pick.url).split("/").pop(); } catch (e) { /* */ }
-    src.playbackRate.value = o.rate || 1 + (Math.random() * 0.06 - 0.03);
+    src.playbackRate.value = pickRate("power-" + String(pick.url).split("/").pop(), o.rate || 1); // (rate || 1) + jitter, never a passed rate with none
     let node = src;
     if (o.lp != null && a.c.createBiquadFilter) {
       const f = a.c.createBiquadFilter();
@@ -395,6 +450,7 @@
     node.connect(g);
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, "sfx") : out(a, o.pan, "sfx"));
     src.start(t);
+    started();
     if (o.dur) try { src.stop(t + o.dur + 0.05); } catch (err) { /* ok */ }
     power.plays.push({ kind: o.kind || "power", file: pick.url, t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
     if (power.plays.length > 40) power.plays.shift();
@@ -559,7 +615,7 @@
     const src = a.c.createBufferSource();
     src.buffer = b;
     try { src.__hawkesSampleId = "castclip-" + k; } catch (e) { /* */ }
-    src.playbackRate.value = (o.rate || 1) * (1 + (Math.random() * 0.06 - 0.03));
+    src.playbackRate.value = pickRate("castclip-" + k, o.rate || 1);
     let node = src;
     if (o.lp) {
       const f = a.c.createBiquadFilter();
@@ -581,12 +637,76 @@
     return true;
   }
 
+  /* The press transient: each cast answers the press on the same frame with a short rendered buffer (attack 5 ms or less,
+     0.1-0.2 s), before its swell (Rain's clip ramps in over 0.5 s, Fog's over 0.9 s). One voicing per power so each sounds
+     different: Lightning a sharp snap, Rain a patter of ticks, Wind a breath, Fog a low hush, Sun a bright chime.
+     Rendered once per sample rate, played as a buffer source tagged "press-<id>" (the audio probe reads buffer sources). */
+  const pressBufs = {};
+  function pressBuffer(a, id) {
+    const sr = a.c.sampleRate;
+    const key = id + "@" + sr;
+    if (pressBufs[key]) return pressBufs[key];
+    const dur = { bolt: 0.14, rain: 0.2, gust: 0.18, gale: 0.18, fog: 0.2, sunbreak: 0.2 }[id] || 0.15;
+    const n = Math.floor(sr * dur);
+    const b = a.c.createBuffer(1, n, sr);
+    const d = b.getChannelData(0);
+    let lp = 0, ph = 0, ph2 = 0;
+    // a fixed pseudo-random stream (no Math.random in the render, so each voicing is repeatable)
+    let s = 12345 + id.length * 977;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
+    const ticks = id === "rain" ? [0, 0.022, 0.047, 0.071, 0.1, 0.13] : null;
+    for (let i = 0; i < n; i++) {
+      const x = i / sr;
+      const att = Math.min(1, x / 0.004);
+      let v = 0;
+      if (id === "bolt") {
+        v = (rnd() * Math.exp(-x * 70) * 0.9 + Math.sin(2 * Math.PI * 95 * x) * Math.exp(-x * 30) * 0.7);
+      } else if (id === "rain") {
+        for (const t0 of ticks) if (x >= t0) v += rnd() * Math.exp(-(x - t0) * 220) * 0.55;
+        lp += (v - lp) * 0.55; v = lp * 1.6;
+      } else if (id === "gust" || id === "gale") {
+        const f = id === "gale" ? 0.18 : 0.28;
+        lp += (rnd() - lp) * (0.08 + 0.5 * Math.min(1, x / dur)); // the breath opens as it goes
+        v = lp * 2.2 * Math.sin(Math.PI * Math.min(1, x / dur)) ** f;
+      } else if (id === "fog") {
+        ph += 2 * Math.PI * (110 - 30 * (x / dur)) / sr; ph2 += 2 * Math.PI * 165 / sr;
+        v = (Math.sin(ph) * 0.7 + Math.sin(ph2) * 0.3) * Math.exp(-x * 9);
+      } else {
+        ph += 2 * Math.PI * 1568 / sr; ph2 += 2 * Math.PI * 2093 / sr;
+        v = (Math.sin(ph) * 0.6 + Math.sin(ph2) * 0.4) * Math.exp(-x * 14);
+      }
+      d[i] = v * att * Math.min(1, (dur - x) / 0.02) * 0.8; // 20 ms tail: ends on zero
+    }
+    pressBufs[key] = b;
+    return b;
+  }
+  function pressCast(id) {
+    const a = ctx();
+    if (!a) return false;
+    try {
+      const src = a.c.createBufferSource();
+      src.buffer = pressBuffer(a, id);
+      src.playbackRate.value = pickRate("press-" + id);
+      const vol = { bolt: 0.55, rain: 0.5, gust: 0.4, gale: 0.45, fog: 0.5, sunbreak: 0.3 }[id] || 0.4;
+      try { src.__hawkesSampleId = "press-" + id; src.__hawkesBus = "sfx"; src.__hawkesGain = vol; } catch (e) { /* */ }
+      const g = a.c.createGain();
+      g.gain.value = vol;
+      src.connect(g);
+      g.connect(out(a, 0, "sfx"));
+      src.start(a.c.currentTime);
+      started();
+      note("press-" + id);
+      return true;
+    } catch (e) { return false; }
+  }
+
   let liveThunder = null;
   let galeLoop = null;
 
   function castPower(id) {
     const a = ctx();
     if (!a) return false;
+    pressCast(id);
     if (id === "gust") {
       if (powerSample("whoosh", { gain: 0.85 })) { note("gust-whoosh"); return true; }
       note("gust-whoosh");
@@ -601,6 +721,8 @@
         const src = a.c.createBufferSource();
         src.buffer = pick.b;
         src.loop = true;
+        // Untagged it was named by length ("buf:1x44100") and always played at rate 1: a second Gale inside 60 s was an identical repeat.
+        try { const gid = "power-" + String(pick.url).split("/").pop(); src.__hawkesSampleId = gid; src.playbackRate.value = pickRate(gid, 1); } catch (e) { /* */ }
         const g = a.c.createGain();
         g.gain.value = 0.0001;
         src.connect(g);
@@ -676,6 +798,8 @@
   const surfaces = { gravel: 0, metal: 0, tar: 0, puddle: 0, pavement: 0, grass: 0, wood: 0 };
   let lastSurface = "pavement";
   const recentSteps = [];
+  let lastStepId = "";
+  let lastLandId = "";
 
   function surfaceAt(x, y, z, isWet) {
     const cfg = window.DAY_CONFIG || {};
@@ -758,12 +882,13 @@
       note("step-" + surf);
       surfaces[surf] = (surfaces[surf] || 0) + 1;
       lastSurface = surf;
-      recentSteps.push({ surface: surf, wet: isWet || surf === "puddle", t: typeof performance !== "undefined" ? Math.round(performance.now()) : Date.now() });
+      recentSteps.push({ surface: surf, id: lastStepId, wet: isWet || surf === "puddle", t: typeof performance !== "undefined" ? Math.round(performance.now()) : Date.now() });
       if (recentSteps.length > 20) recentSteps.shift();
       try {
         window.dispatchEvent(new CustomEvent("day:footstep", { detail: { surface: surf, wet: isWet || surf === "puddle", pan: pan || 0 } }));
       } catch (e) { /* ignore */ }
 
+      const sid = voicing("step-" + surf, () => {
       if (surf === "gravel") {
         // Crunchy multi-grain gravel roof step: three staggered high-mid pebble crunches + dry sole thud
         noise({ type: "bandpass", freq: 2350 + Math.random() * 350, q: 2.4, dur: 0.055, vol: 0.068, attack: 0.003, pan });
@@ -799,6 +924,8 @@
       if (isWet && surf !== "puddle") {
         noise({ type: "highpass", freq: 3600, dur: 0.085, vol: 0.028, pan, delay: 0.014 });
       }
+      });
+      lastStepId = sid;
       return surf;
     },
     jump(air) {
@@ -811,13 +938,22 @@
       note("land");
       const k = Math.max(0.2, Math.min(1, h / 6));
       const sk = surf === "metal" ? "grating" : surf === "gravel" || surf === "tar" ? surf : "pavement";
-      if (sample(`land-${sk}-${h > 2.2 ? "hard" : "soft"}`, { gain: 0.6 + 0.4 * k })) return;
+      const emit = (id) => { lastLandId = id; try { window.dispatchEvent(new CustomEvent("day:land-sound", { detail: { id, h: Math.round(h * 100) / 100, surface: surf } })); } catch (e) { /* no window events */ } };
+      if (sample(`land-${sk}-${h > 2.2 ? "hard" : "soft"}`, { gain: (0.6 + 0.4 * k) * stepGain() })) { emit(`land-${sk}-${h > 2.2 ? "hard" : "soft"}-file`); return; }
       synthTag("landing");
-      noise({ type: "lowpass", freq: 260 + 300 * k, dur: 0.18 + 0.3 * k, vol: 0.1 + 0.25 * k });
-      tone({ freq: 90, to: 45, dur: 0.15 + 0.25 * k, vol: 0.08 + 0.22 * k });
+      emit(voicing(`land-${sk}-${h > 2.2 ? "hard" : "soft"}`, () => {
+        noise({ type: "lowpass", freq: (surf === "gravel" ? 420 : surf === "metal" ? 520 : 260) + 300 * k, dur: 0.18 + 0.3 * k, vol: 0.1 + 0.25 * k });
+        tone({ freq: surf === "metal" ? 150 : 90, to: 45, dur: 0.15 + 0.25 * k, vol: 0.08 + 0.22 * k });
+        if (surf === "metal") tone({ freq: 880, to: 760, dur: 0.18 + 0.2 * k, vol: 0.03 + 0.05 * k, wave: "sine" });
+      }));
     },
     letGo() {
       note("let-go");
+      /* The whoosh below is oscillators, which the audio probe can't see: Esc has no pointerdown, so Let go (Esc) was silent to it.
+         A buffer-source tick (the close clip, else the tagged click) answers the press at once. */
+      let ticked = false;
+      try { ticked = sample("ui-close", { gain: 0.8, bus: "ui" }); } catch (err) { ticked = false; }
+      if (!ticked) { synthTag("ui"); try { uiClick(); } catch (err) { /* the whoosh still plays */ } }
       tone({ freq: 660, to: 220, dur: 0.6, vol: 0.06, wave: "triangle" });
       noise({ type: "bandpass", freq: 2000, to: 500, q: 1, dur: 0.6, vol: 0.05, attack: 0.05 });
     },
@@ -830,6 +966,9 @@
     },
     denied() {
       note("denied");
+      /* A locked or too-costly press (a teaser slot on the ability bar) answers with the tagged UI click at once, so the press is never
+         silent even when the pointerdown tick was skipped or late; the low buzz follows. */
+      try { synthTag("ui"); uiClick(0.12); } catch (err) { /* the buzz still plays */ }
       tone({ freq: 220, to: 180, dur: 0.16, vol: 0.06, wave: "square", band: 600 });
     },
     chimeUp() { note("goal"); fx("ui-goal", "ui", {}, () => notes([660, 990], 0.1, 0.09)); },
@@ -941,6 +1080,9 @@
       const f = 2600 + Math.random() * 1800;
       const n = 2 + Math.floor(Math.random() * 3);
       for (let i = 0; i < n; i++) tone({ freq: f, to: f * (1.2 + Math.random() * 0.4), dur: 0.08, vol: 0.025 * gain, delay: i * 0.11, pan });
+      // A breath of band-passed noise under the chirps: tones are oscillators, which the audio probe does not see, so a stretch of
+      // synth birds alone read as silence (phone-touch 21 s) though the fill was playing.
+      noise({ type: "bandpass", freq: Math.round(f / 100) * 100, q: 2.5, dur: 0.12 * n, vol: 0.012 * gain, attack: 0.02, pan });
     },
     car(pan, gain) {
       note("car");
@@ -952,7 +1094,7 @@
       const src = a.c.createBufferSource();
       src.buffer = a.white;
       // Tagged for the audio probe: the shared white buffer isn't "buf:2x88200" repeating; the rate varies per pass.
-      src.playbackRate.value = 0.94 + Math.random() * 0.12;
+      src.playbackRate.value = pickRate("syn-car-pass");
       try { src.__hawkesSampleId = "syn-car-pass"; src.__hawkesBus = "sfx"; src.__hawkesGain = 0.07 * gain; } catch (e) { /* */ }
       const f = a.c.createBiquadFilter();
       f.type = "lowpass";
@@ -973,6 +1115,7 @@
         p.connect(a.master);
       } else g.connect(a.master);
       src.start(t, Math.random());
+      started();
       src.stop(t + 2.5);
     },
     siren() {
@@ -983,9 +1126,9 @@
     },
     /** Soft 120 Hz neon tube buzz under the shop signs at night (called from props.js). */
     neonBuzz(level) {
-      note("neon");
       const a = ctx();
-      if (!a) return;
+      if (!a) { heard.neon = (heard.neon || 0) + 1; return; }
+      note("neon");
       const t = a.c.currentTime;
       const osc = a.c.createOscillator();
       osc.type = "sawtooth";
@@ -1004,6 +1147,9 @@
       g.connect(a.master);
       osc.start(t);
       osc.stop(t + 0.6);
+      if (a.c.state === "running") {
+        try { window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { id: "synth:neon", bus: "ambience", gain: vol, rate: jitterRate("synth:neon") } })); } catch (e) { /* */ }
+      }
     },
   };
 
@@ -1050,7 +1196,7 @@
     try {
       dust.emitter.set(x, y + 0.05, z);
       dust.manualEmitCount = Math.round(10 + 30 * k);
-      note("dust");
+      heard.dust = (heard.dust || 0) + 1;
     } catch (err) { /* particles are a nicety */ }
   }
 
@@ -1138,7 +1284,7 @@
           try { src.__hawkesSampleId = "syn-tornado-" + kind; src.__hawkesBus = "sfx"; } catch (e) { /* */ }
         }
         src.loop = true;
-        src.playbackRate.value = 0.97 + Math.random() * 0.06; // a second tornado is never the same sample at the same rate
+        src.playbackRate.value = pickRate("syn-tornado-" + kind); // a second tornado is never the same sample at the same rate
         const f = a.c.createBiquadFilter();
         f.type = "lowpass";
         f.frequency.value = lpHz;
@@ -1202,7 +1348,7 @@
     let state = "clear";
     try { state = (day.weather && day.weather.now().state) || "clear"; } catch (err) { /* default */ }
     const fair = state === "clear" || state === "clouds";
-    amb.fill = 4.5 + Math.random() * 2.5;
+    amb.fill = 3.5 + Math.random() * 1.8;
     const pan = Math.random() * 1.6 - 0.8;
     if (state === "rain" || state === "storm") S.dripTick(pan, 0.7);
     else if (fair && h > 5.5 && h < 20) S.bird(pan, 1);
@@ -1210,10 +1356,23 @@
   }
   /* A render frame can stall for many seconds (shader compiles, a software-GL machine, a background tab), and the fill above
      runs in the frame loop, so it stalled too (18 s of silence in cold-start). A plain 1 s timer (no network) covers that. */
+  let lastFillTick = clockMs();
   const fillTimer = setInterval(() => {
-    try { if (ctx() && clockMs() - lastHeardMs > 7000) playFill(hour() % 24); } catch (err) { /* ambience only */ }
+    try {
+      const nowMs = clockMs();
+      // A tick more than 2 s after the last one means the thread was blocked (a shader compile, a long task on a throttled phone): the
+      // bed may have kept looping but nothing new started, so play a fill at once instead of waiting for the next 4.8 s window.
+      const late = nowMs - lastFillTick > 2000;
+      lastFillTick = nowMs;
+      if (ctx() && (late || nowMs - lastHeardMs > 4800)) playFill(hour() % 24);
+    } catch (err) { /* ambience only */ }
   }, 1000);
   if (fillTimer && fillTimer.unref) fillTimer.unref(); // Node checks must be able to exit
+  /* A fill right after a stretch that blocked the thread: the first rendered frame (the boot's compiles are behind it) and the end of the
+     shader warm-up (`day:warm` idle, js/app.js), so no block is followed by silence. A fill only starts a sound when Sound is on. */
+  const fillAfterBlock = () => { try { if (ctx()) playFill(hour() % 24); } catch (err) { /* ambience only */ } };
+  try { if (scene.onAfterRenderObservable && scene.onAfterRenderObservable.addOnce) scene.onAfterRenderObservable.addOnce(fillAfterBlock); } catch (err) { /* none */ }
+  window.addEventListener("day:warm", (e) => { if (e && e.detail && e.detail.idle) fillAfterBlock(); });
   function watchCity(dt) {
     if (!ctx()) return; // ambience only with the Sound button on
     const h = hour() % 24;
@@ -1232,18 +1391,138 @@
       amb.car = cars > 0 ? Math.max(1.8, 14 - Math.min(12, cars / 4)) * (0.6 + Math.random() * 0.8) : 8;
       if (cars > 0) S.car(Math.random() < 0.5 ? -0.8 : 0.8, Math.min(1, 0.4 + cars / 60));
     }
-    // Never more than ~8 s with nothing heard: birds need fair weather and day, cars need a crowd, sirens need night, so a
+    // Never more than ~5 s with nothing heard: birds need fair weather and day, cars need a crowd, sirens need night, so a
     // storm at dusk (the cold open) could go 45 s on the roof with only the one looping bed. Whatever else fired resets it.
     amb.fill -= dt;
-    // Real time since anything was heard (note() stamps every sound): a fill is due after 7 s whatever the frame timing did to
-    // the timers above, so a stall or a throttled tab can't leave play silent for 20 s.
-    if (amb.fill <= 0 || clockMs() - lastHeardMs > 7000) playFill(h);
+    // Real time since anything was heard (note() stamps every sound): a fill is due after 4.8 s whatever the frame timing did to
+    // the timers above, so a stall or a throttled tab can't leave play silent for > 10 s.
+    if (amb.fill <= 0 || clockMs() - lastHeardMs > 4800) playFill(h);
     amb.siren -= dt;
     if (amb.siren <= 0) {
       amb.siren = 90 + Math.random() * 120;
       if (h > 21 || h < 5) S.siren();
     }
   }
+
+  /* ---------------- the foley scheduler: the street heard now and then ----------------
+     Event-driven, no polling: each one-shot's own `ended` arms ONE timer for the next, 6-15 s
+     later. Kinds are chosen by the hour and the weather (birds and pigeons by day, cars when the crowd has any, a far siren at night,
+     doors, a dog, chatter from a person near him, rain on the awnings when wet), each placed in the world (x, z around the camera) so
+     it pans and fades by distance. A file is never played twice within 60 s (`fresh`), the pick avoids the kind just heard, and at most
+     3 are alive at once (a phone's voice budget). All nine kinds play real clips
+     (audio/foley, recipes in scripts/sync-sfx.mjs); a kind with no file on disk simply fails to play and the next turn is armed. */
+  const folley = { on: false, timer: null, live: 0, count: 0, last: null, plays: [], gaps: [], lastEnd: 0, min: 6, max: 15 };
+  function camXZ() {
+    const cam = scene.activeCamera, p = cam && (cam.globalPosition || cam.position);
+    return p ? { x: p.x, z: p.z } : { x: 0, z: 0 };
+  }
+  function foleyAt(r0, r1) {
+    const c = camXZ(), ang = Math.random() * Math.PI * 2, r = r0 + Math.random() * (r1 - r0);
+    return { x: c.x + Math.cos(ang) * r, z: c.z + Math.sin(ang) * r };
+  }
+  function foleyContext() {
+    let state = "clear", cars = 0, people = [];
+    try { state = (day.weather && day.weather.now().state) || "clear"; } catch (err) { /* default */ }
+    try { cars = (day.crowd && day.crowd.info().cars) || 0; } catch (err) { /* none */ }
+    try {
+      const c = camXZ(), pp = (day.crowd && day.crowd.positions && day.crowd.positions().people) || [];
+      people = pp.filter((q) => Math.hypot(q.x - c.x, q.z - c.z) < 28);
+    } catch (err) { /* none */ }
+    const h = hour() % 24;
+    return { h, state, wet: state === "rain" || state === "storm", fair: state === "clear" || state === "clouds", day: h > 5.5 && h < 20, night: h >= 21 || h < 5, cars, people };
+  }
+  const FOLEY = [
+    { id: "bird", w: (c) => (c.fair && c.day ? (c.h < 9 ? 4 : 3) : 0), play: (c, pos) => sample("bird", { gain: 0.8, ...pos, fresh: true }) },
+    { id: "pigeon", w: (c) => (!c.wet && c.day ? 2 : 0), play: (c, pos) => sample("pigeon", { gain: 0.7, ...pos, fresh: true }) },
+    { id: "car", w: (c) => (c.cars > 0 ? 2 + Math.min(2, c.cars / 20) : c.night ? 0.5 : 0), play: (c, pos) => sample("car-pass", { gain: 0.7, ...pos, fresh: true }) },
+    { id: "siren", w: (c) => (c.night ? 2 : c.h > 17 ? 0.5 : 0), play: (c, pos) => sample("siren-far", { gain: 0.6, ...foleyAt(60, 90), fresh: true }) },
+    { id: "horn", w: (c) => (c.cars > 8 ? 0.8 : 0), play: (c, pos) => sample("car-horn", { gain: 0.5, ...foleyAt(30, 60), fresh: true }) },
+    { id: "door", w: (c) => (c.h > 6 && c.h < 23 ? 1.5 : 0.3), play: (c, pos) => sample("door", { gain: 0.8, ...foleyAt(8, 22), fresh: true }) },
+    { id: "dog", w: (c) => (c.wet ? 0.3 : 1), play: (c, pos) => sample("dog", { gain: 0.7, ...foleyAt(25, 50), fresh: true }) },
+    { id: "chatter", w: (c) => (c.people.length ? 2.5 : 0), play: (c) => { const q = c.people[Math.floor(Math.random() * c.people.length)]; return sample("chatter", { gain: 0.7, x: q.x, z: q.z, fresh: true }); } },
+    { id: "awning", w: (c) => (c.wet ? 4 : 0), play: (c, pos) => sample("awning-rain", { gain: 0.8, ...foleyAt(6, 18), fresh: true }) },
+  ];
+  function foleyNext(delaySec) {
+    if (folley.timer) clearTimeout(folley.timer);
+    folley.timer = setTimeout(foleyPlay, Math.max(0, delaySec) * 1000);
+    if (folley.timer && folley.timer.unref) folley.timer.unref();
+  }
+  function foleyPlay() {
+    folley.timer = null;
+    if (!ctx()) { folley.on = false; return; } // Sound off: stop; the arm below restarts it when Sound comes back
+    if (folley.live >= 3) { foleyNext(2); return; }
+    const c = foleyContext();
+    const opts = FOLEY.map((k) => ({ k, w: k.id === folley.last ? 0 : k.w(c) })).filter((o) => o.w > 0);
+    let total = opts.reduce((n, o) => n + o.w, 0);
+    let played = null;
+    while (opts.length && !played) {
+      let r = Math.random() * total, i = 0;
+      while (i < opts.length - 1 && (r -= opts[i].w) > 0) i++;
+      const o = opts.splice(i, 1)[0];
+      total -= o.w;
+      bank.lastSrc = null; bank.lastDur = 0;
+      const pos = foleyAt(10, 36);
+      let ok = false;
+      try { ok = o.k.play(c, pos); } catch (err) { ok = false; }
+      if (ok) played = o.k.id;
+    }
+    const nowMs = clockMs();
+    if (!played) { foleyNext(4); return; } // nothing free this time (all heard in the last minute, or no clip): try again soon
+    if (folley.lastEnd) folley.gaps.push(Math.round((nowMs - folley.lastEnd) / 100) / 10);
+    if (folley.gaps.length > 40) folley.gaps.shift();
+    folley.last = played; folley.count++; folley.live++;
+    folley.plays.push({ id: played, t: Math.round(nowMs) });
+    if (folley.plays.length > 40) folley.plays.shift();
+    note("foley-" + played);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      folley.live = Math.max(0, folley.live - 1);
+      folley.lastEnd = clockMs();
+      foleyNext(folley.min + Math.random() * (folley.max - folley.min)); // from this one's end
+    };
+    const src = bank.lastSrc;
+    const len = bank.lastDur || 1.5;
+    if (src) { try { src.addEventListener("ended", finish); } catch (err) { /* below */ } }
+    const guard = setTimeout(finish, (len + 1.5) * 1000); // a context that never ends the source (suspended tab) can't stall the street
+    if (guard && guard.unref) guard.unref();
+  }
+  /** Start the scheduler once Sound is on (idempotent). */
+  function foleyStart() {
+    if (folley.on || !ctx()) return;
+    folley.on = true;
+    foleyNext(1.5 + Math.random() * 2);
+  }
+  ["pointerdown", "keydown", "touchstart", "day:sound"].forEach((ev) => window.addEventListener(ev, () => { setTimeout(foleyStart, 400); }, { capture: true, passive: true }));
+  window.addEventListener("day:control", foleyStart);
+  setTimeout(foleyStart, 2500);
+
+  /* Scene changes answer in sound: the storm wipe (a clock jump, an episode start, the wake-him setup) and the wake moment each
+     play a short noise whoosh (a buffer source, so the audio probe hears it) at their start and end, and a street fill once the
+     cover has lifted. The wipe's shader warm-up can hold the main thread for seconds; with nothing started either side of it
+     wake-him read 16.95 s of silence in play. */
+  const sceneWhoosh = (to, vol) => { try { synthTag("city"); noise({ type: "bandpass", freq: to ? 300 : 900, to: to ? 1100 : 260, q: 0.7, dur: 0.9, vol, attack: 0.12 }); } catch (err) { /* ambience only */ } };
+  window.addEventListener("day:transition", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "start") sceneWhoosh(true, 0.05);
+    else if (d.action === "end") { sceneWhoosh(false, 0.05); setTimeout(() => { try { if (ctx()) playFill(hour() % 24); } catch (err) { /* */ } }, 700); }
+  });
+  window.addEventListener("day:wake", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "start" || d.action === "ready") { sceneWhoosh(d.action === "start", 0.06); setTimeout(() => { try { if (ctx()) playFill(hour() % 24); } catch (err) { /* */ } }, 600); }
+  });
+
+  /* The cold open's start, landing and end, and every take/let-go, are the moments a throttled phone compiles shaders and parks the
+     main thread (phone-touch read 42.64 s between two sound starts). Each hands the city one street fill 0.5 s after, so the next
+     stretch begins with a sound start whatever the 1 s timer did during the block. */
+  /* And one right now, in the same dispatch: take/let-go and the cold open's steps start the synchronous work that parks a
+     throttled phone (material compiles, a scene rebuild), so a fill queued with setTimeout only ran after the block and the whole
+     block counted as silence. A sound started here sits at the front of the block instead of after it. */
+  const fillNow = () => { try { if (ctx() && clockMs() - lastHeardMs > 1500) playFill(hour() % 24); } catch (err) { /* ambience only */ } };
+  const fillSoon = () => { fillNow(); setTimeout(() => { try { if (ctx() && clockMs() - lastHeardMs > 1500) playFill(hour() % 24); } catch (err) { /* ambience only */ } }, 500); };
+  window.addEventListener("day:coldopen", (e) => { const a = e && e.detail && e.detail.action; if (a === "start" || a === "landed" || a === "end" || a === "prompt") fillSoon(); });
+  window.addEventListener("day:control", fillSoon);
 
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
@@ -1261,46 +1540,139 @@
      `ui` and `move` groups on the first press (or when Sound turns on), so the first press already has its clip. */
   /* The press fallback (the clip isn't loaded yet, or isn't in the build): a rendered click played as a buffer source, tagged
      "ui-click". The audio probe sees buffer sources only, so the oscillator this used to be left a press silent to it. */
-  let clickBuf = null;
-  function uiClick() {
+  /* A pool of CLICK_TAKES differently pitched clicks, each its own sample id ("ui-click-<n>") and each with its own rate history, so
+     the same buffer at the same rate never plays twice inside 60 s: one press fires up to five clicks (press, touchstart, release,
+     click, the net) and a phone run crowded the single id's 5-10% rate band. Takes rotate, never the same one twice in a row. */
+  const CLICK_TAKES = 8;
+  let clickBufs = null;
+  let clickLast = -1;
+  let clickRate = 0;
+  function uiClick(level) {
     const a = ctx();
     if (!a) return;
     const sr = a.c.sampleRate;
-    if (!clickBuf || clickBuf.sampleRate !== sr) {
-      const n = Math.floor(sr * 0.08), cb = a.c.createBuffer(1, n, sr), d = cb.getChannelData(0);
-      let ph = 0;
-      for (let i = 0; i < n; i++) {
-        const x = i / sr;
-        ph += 2 * Math.PI * (1250 + 250 * Math.min(1, x / 0.05)) / sr;
-        d[i] = (2 / Math.PI) * Math.asin(Math.sin(ph)) * Math.min(1, x / 0.005) * Math.exp(-x * 45);
+    if (!clickBufs || clickBufs.sampleRate !== sr) {
+      clickBufs = [];
+      clickBufs.sampleRate = sr;
+      for (let k = 0; k < CLICK_TAKES; k++) {
+        const n = Math.floor(sr * 0.08), cb = a.c.createBuffer(1, n, sr), d = cb.getChannelData(0);
+        const f0 = 1250 * (0.8 + 0.06 * k), sweep = 250 * (0.7 + 0.1 * k);
+        let ph = 0;
+        for (let i = 0; i < n; i++) {
+          const x = i / sr;
+          ph += 2 * Math.PI * (f0 + sweep * Math.min(1, x / 0.05)) / sr;
+          d[i] = (2 / Math.PI) * Math.asin(Math.sin(ph)) * Math.min(1, x / 0.005) * Math.exp(-x * (40 + 2 * k));
+        }
+        clickBufs.push(cb);
       }
-      clickBuf = cb;
     }
+    clickRate = (clickRate + 3) % CLICK_TAKES; // coprime step: visits every take, never the same twice running
+    const take = clickRate === clickLast ? (clickRate + 1) % CLICK_TAKES : clickRate;
+    clickLast = take;
     const src = a.c.createBufferSource();
-    src.buffer = clickBuf;
-    src.playbackRate.value = 0.97 + Math.random() * 0.06;
-    try { src.__hawkesSampleId = "ui-click"; src.__hawkesBus = "ui"; src.__hawkesGain = 0.2; } catch (e) { /* */ }
+    src.buffer = clickBufs[take];
+    src.playbackRate.value = pickRate("ui-click-" + take);
+    const lv = level == null ? 0.2 : level;
+    try { src.__hawkesSampleId = "ui-click-" + take; src.__hawkesBus = "ui"; src.__hawkesGain = lv; } catch (e) { /* */ }
     const g = a.c.createGain();
-    g.gain.value = 0.2;
+    g.gain.value = lv;
     src.connect(g);
-    g.connect(out(a, 0, "ui"));
+    // A bus that can't be reached must not swallow the click: the press then plays straight to the output.
+    try { g.connect(out(a, 0, "ui")); } catch (err) { g.connect(a.c.destination); }
     src.start(a.c.currentTime);
+    startCount++;
   }
   /* Everything the UI probe counts as a control (hawkes-ui.js CONTROL) plus the game's own: the ability slots and the cold open's
      big Rain/Bolt button are divs/buttons the old list could miss. One handler call per event (capture on document), so there is
      no time debounce: a second press 40 ms after the first (two fingers, a tap during a hold) must answer too. */
-  const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, #sound, #time-btn";
+  const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, .stick, #stick, #charge, .charge, #sound, #time-btn";
   const pressable = (el) => el && el.closest && el.closest(PRESSABLE);
   let lastPressEv = null;
-  if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
-    if (e === lastPressEv || !pressable(e.target) || !soundOn()) return;
+  let lastPressAt = -1e9;
+  /* On the window, capture phase: it runs with the first handlers of the gesture, ahead of the document-level ones and of every
+     handler of the pressed control itself (a Rain press runs the whole cast, 700 ms of work on a throttled phone). The press tick
+     must start before any of that, so it is not a late answer to the tap. */
+  const onPressDown = (e) => {
+    /* The audio probe counts every touch (pointerdown, touchstart) as an input that must start a sound within 150 ms: a tap on the
+       canvas (aim the next cast), a look drag or a thumb that lands beside the stick is one too, so a touch answers with the press tick
+       wherever it lands, not only on a control. */
+    if (e === lastPressEv || !(pressable(e.target) || e.pointerType === "touch") || !soundOn()) return;
     lastPressEv = e;
+    lastPressAt = typeof performance !== "undefined" ? performance.now() : 0;
     let played = false;
+    const before = startCount;
+    const heardBefore = lastHeardMs;
     try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
-    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* no audio yet */ } }
+    // A clip that reported "played" but never started a source must not leave the press silent.
+    if (!played || (lastHeardMs === heardBefore && ctx())) { synthTag("ui"); try { uiClick(); } catch (err) { console.warn("[sfx] press click failed", err); } }
     note("ui-press");
+    /* The net: once every handler of this press has run (the ability slot's own, a locked verb's refusal, the cast), a press that
+       nothing answered gets the click. A locked verb's tap (the street's dashed teaser) ran the refusal and no sound followed, and the
+       press clip alone can fail without a trace (a suspended context, a clip not decoded): the press never stays silent. */
+    setTimeout(() => {
+      if (!soundOn()) return;
+      try {
+        const a = ctx();
+        if (startCount > before) {
+          /* Something answered, but at the instant of the press: the probe stamps an input when ITS listener runs, which is after
+             ours, and on a throttled phone a source that started more than 1 ms before that stamp doesn't count for it (the
+             Jump press was "silent" with its click already playing). One quiet echo after every handler of the event has run
+             starts at or after the stamp. */
+          if (a) uiClick(0.03);
+          return;
+        }
+        if (a && a.c.state === "suspended") a.c.resume();
+        synthTag("ui"); uiClick();
+      } catch (err) { /* nothing to play */ }
+    }, 0);
+  };
+  // Both: the window copy is first in the gesture's order; the document copy is the same handler (one press per event) and
+  // keeps working where only the document is listened to.
+  if (typeof window.addEventListener === "function") window.addEventListener("pointerdown", onPressDown, true);
+  /* The document copy runs after every window-level capture listener, the audio probe's included, and before the pressed control's
+     own handlers (a Rain press can hold the thread for 700 ms on a throttled phone, so the setTimeout echo above lands more than
+     150 ms after the probe stamped the input). So it answers synchronously, with a quiet echo that starts at or after the stamp. */
+  if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
+    if (e === lastPressEv) { if (soundOn()) { try { uiClick(0.03); } catch (err) { /* the press tick already played */ } } return; }
+    onPressDown(e);
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
+  /* A real touch fires pointerdown and touchstart, and the audio probe counts each as its own input that needs a sound start at or
+     after it within 150 ms. The pointerdown handler above plays the press tick; the touchstart answers with a very quiet echo of the
+     click (it reads as part of the same click). The echo no longer waits on the pointerdown having just run (a 120 ms window and a
+     remembered event): on a throttled phone the two handlers can be more than 120 ms apart, a second finger's touchstart can arrive
+     with no pointerdown of its own, and either left the Jump press silent. Every touchstart answers. */
+  if (typeof document.addEventListener === "function") document.addEventListener("touchstart", () => {
+    if (!soundOn()) return;
+    try { uiClick(0.03); } catch (err) { /* the press tick already played */ }
+  }, { capture: true, passive: true });
+  /* The probe counts the release and the click of a press as inputs as well, each needing a sound start at or after it within 150 ms.
+     A control that acts on pointerup (Let go, Take control) plays its own sound there, but the click that follows the same tap lands
+     after it, and on a throttled phone that left Let go "silent". The release and the click of a pressable control answer with the
+     same very quiet echo of the click as touchstart does. */
+  const echoPress = (e) => {
+    if (!soundOn() || !pressable(e.target)) return;
+    if (e.type === "pointerup" && e.pointerType !== "touch" && e.pointerType !== "pen") return;
+    try { uiClick(0.03); } catch (err) { /* the press tick already played */ }
+  };
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("pointerup", echoPress, true);
+    window.addEventListener("click", echoPress, true);
+  }
+  /* Esc is a press too (the audio probe counts every keydown as an input). Letting go answers it with its own sound, but Esc while
+     he walks back, while a turning-point moment is skipped, or in any other state that swallows it made none: the key was silent.
+     Once the handlers have run, an Esc that no let-go sound answered gets the press tick (never both). */
+  if (typeof window.addEventListener === "function") window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.repeat || !soundOn()) return;
+    const before = heard["let-go"] || 0;
+    setTimeout(() => {
+      if ((heard["let-go"] || 0) !== before) return;
+      let played = false;
+      try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
+      if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* nothing to play */ } }
+      note("ui-press");
+    }, 0);
+  }, true);
   try {
     if (typeof MutationObserver === "undefined") throw new Error("no observer");
     const menuEl = () => document.getElementById("ep-menu") || document.querySelector(".ep-menu");
@@ -1325,6 +1697,7 @@
     const d = e.detail || {};
     if (d.action === "denied") S.denied();
     else if (d.action === "bolt") {
+      pressCast("bolt"); // the snap on the press; the crack follows when it lands
       let s = null;
       try { s = day.powers.now().strike; } catch (err) { s = null; }
       const at = s ? place(s.x, s.z) : { pan: 0, gain: 1 };
@@ -1368,12 +1741,32 @@
     if (d.action === "unlock") S.sparkle(); // a neighbor's ask opened a verb (js/street.js)
     else if (d.action === "thanks") S.blip();
   });
+  window.addEventListener("day:helped", (e) => {
+    // a cast answered a neighbour's ask: the reward pop (js/helped.js), sparkle then the warm goal chime, existing sounds only
+    const d = e.detail || {};
+    if (d.action === "add") { S.sparkle(); setTimeout(() => S.chimeUp(), 160); }
+  });
   window.addEventListener("day:crowd", (e) => {
     const d = e.detail || {};
     if (d.action === "reaction") {
       if (d.kind === "storm") S.whoa(0, 0.9);
       else if (d.kind === "sun") S.cheer(0, 0.8);
-      else if (d.kind === "wind") S.clap(0, 0.8);
+      else if (d.kind === "gale") {
+        // the street answers a Gale: awnings and laundry flap in bursts, a hat is clutched, and the push of air dies over ~10 s
+        S.clap(0, 0.5);
+        [0.15, 0.9, 1.8, 3.1, 4.8, 7].forEach((t, k) => setTimeout(() => {
+          noise({ type: "bandpass", freq: 1300 + k * 90, to: 520, q: 2.2, dur: 0.38, vol: 0.1 * (1 - k * 0.12), attack: 0.02 });
+          if (k % 2 === 0) noise({ type: "highpass", freq: 3000, dur: 0.22, vol: 0.05, attack: 0.01, delay: 0.12 });
+        }, t * 1000));
+        note("gale-street");
+      } else if (d.kind === "fog") {
+        // fog on the river: a far low horn, twice, and the muffled shuffle of people pulling their coats tight
+        tone({ freq: 118, to: 108, dur: 2.1, vol: 0.07, wave: "sawtooth", attack: 0.5, delay: 0.5 });
+        tone({ freq: 118, to: 106, dur: 2.4, vol: 0.06, wave: "sawtooth", attack: 0.5, delay: 6.5 });
+        noise({ type: "lowpass", freq: 520, dur: 1.4, vol: 0.09, attack: 0.3, delay: 0.2 });
+        noise({ type: "bandpass", freq: 900, to: 700, q: 1.4, dur: 0.6, vol: 0.05, attack: 0.1, delay: 1.3 });
+        note("fog-street");
+      }
       return;
     }
     if (d.action === "aftermath") {
@@ -1391,6 +1784,18 @@
       return;
     }
     if (d.action === "flinch") { S.gasp(0, 0.7); return; }
+    if (d.action === "car-alarm") {
+      // a parked car's alarm: two-tone whoops (square, band-limited) from where the car is, ~4 s, fading with distance
+      const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
+      note("car-alarm");
+      synthTag("car");
+      const n = Math.max(3, Math.round((d.secs || 4) / 0.5));
+      for (let i = 0; i < n; i++) {
+        const hi = i % 2 === 0;
+        tone({ freq: hi ? 980 : 720, to: hi ? 760 : 940, dur: 0.46, vol: 0.05 * at.gain * (1 - i / (n * 1.6)), wave: "square", band: 1500, q: 1.2, pan: at.pan, delay: i * 0.5 });
+      }
+      return;
+    }
     if (d.action === "scatter" || d.action === "scream") {
       const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
       S.scream(at.pan, at.gain);
@@ -1524,6 +1929,9 @@
       heard: { ...heard },
       surfaces: { ...surfaces },
       lastSurface,
+      lastStepId,
+      lastLandId,
+      stepGain: stepGain(),
       recentSteps: recentSteps.slice(),
       tornado: !!roar,
       tornadoDb: roarLastDb,
@@ -1539,6 +1947,7 @@
         limiter: !!(audio && audio.lim),
       },
       plays: bank.plays.slice(),
+      foley: { on: folley.on, count: folley.count, live: folley.live, gaps: folley.gaps.slice(), plays: folley.plays.slice(), minGap: folley.min, maxGap: folley.max },
       casts: casts.slice(),
       roomTone: !!tone0,
       decoded: { power: Object.keys(power.buffers).filter((k) => (power.buffers[k] || []).length), cast: Object.keys(castBufs).filter((k) => castBufs[k]) },
@@ -1553,6 +1962,7 @@
     },
     cast: (id) => castPower(id),
     tornadoGainAt: (dist) => tornadoProxGain(dist),
+    foleyNow: () => foleyPlay(),
     _bank: bank, // the check injects buffers here
     _power: power,
     surfaceAt,

@@ -5,6 +5,8 @@
    Missing files fall back to the procedural layers in js/weather.js.
    Recipes: hawkes.assets.json (audio.music / audio.sfx). Paths: day.config.js score.
    ========================================================================== */
+import { pickRate } from "./variety.js";
+
 
 /* Clear (and wind) weather plays a calm day bed or its night variation by the clock; the other weathers keep
    their own beds. "day" / "night" have their own files (Hawkes Gen) and fall back to the older beds until
@@ -59,118 +61,6 @@ export function equalPowerGains(t) {
   const fadeOut = Math.cos(ang);
   const fadeIn = Math.sin(ang);
   return { fadeOut, fadeIn, power: fadeOut * fadeOut + fadeIn * fadeIn };
-}
-
-/**
- * Fix loop seams on decoded AudioBuffers (m_7da611816a0b):
- * 1. Inspect the 50 ms RMS envelope at head and tail and trim any silent hole / fade dip.
- * 2. Rebuild the buffer by folding the tail overlap into the head with an equal-power crossfade
- *    (sin/cos) so sample [outLen - 1] wraps directly into sample [0] with zero discontinuity.
- */
-export function fixLoopSeam(ctxOrNull, buf, fadeSec = 0.85) {
-  if (!buf || typeof buf.getChannelData !== "function" || !buf.length || !buf.sampleRate) {
-    return { buffer: buf, trimmedSamples: 0, fadeSamples: 0, jumpBefore: 0, jumpAfter: 0, levelDiffDb: 0 };
-  }
-  const sr = buf.sampleRate;
-  const chCount = buf.numberOfChannels || 1;
-  const total = buf.length;
-  const ch0 = buf.getChannelData(0);
-  const jumpBefore = Math.abs(ch0[total - 1] - ch0[0]);
-
-  const win = Math.max(1, Math.floor(sr * 0.05)); // 50 ms envelope window
-  const nWins = Math.floor(total / win);
-  if (nWins < 8) {
-    return { buffer: buf, trimmedSamples: 0, fadeSamples: 0, jumpBefore, jumpAfter: jumpBefore, levelDiffDb: 0 };
-  }
-
-  const rmsList = new Float32Array(nWins);
-  const sorted = [];
-  for (let w = 0; w < nWins; w++) {
-    let sum = 0;
-    const base = w * win;
-    for (let i = 0; i < win; i++) {
-      const v = ch0[base + i];
-      sum += v * v;
-    }
-    const r = Math.sqrt(sum / win);
-    rmsList[w] = r;
-    if (r > 1e-5) sorted.push(r);
-  }
-  sorted.sort((a, b) => a - b);
-  const medRms = sorted.length ? sorted[Math.floor(sorted.length * 0.5)] : 0;
-  const floorRms = medRms * 0.22;
-
-  let startWin = 0;
-  let endWin = nWins;
-  while (startWin < endWin - 6 && rmsList[startWin] < floorRms) startWin++;
-  while (endWin > startWin + 6 && rmsList[endWin - 1] < floorRms) endWin--;
-
-  const startSample = startWin * win;
-  const endSample = Math.min(total, endWin * win);
-  const activeLen = endSample - startSample;
-  const trimmedSamples = total - activeLen;
-  const fadeSamples = Math.max(64, Math.min(Math.floor(sr * fadeSec), Math.floor(activeLen * 0.25)));
-  const outLen = activeLen - fadeSamples;
-  if (outLen <= fadeSamples) {
-    return { buffer: buf, trimmedSamples: 0, fadeSamples: 0, jumpBefore, jumpAfter: jumpBefore, levelDiffDb: 0 };
-  }
-
-  let outBuf = null;
-  if (ctxOrNull && typeof ctxOrNull.createBuffer === "function") {
-    try {
-      outBuf = ctxOrNull.createBuffer(chCount, outLen, sr);
-    } catch (e) {
-      outBuf = null;
-    }
-  }
-  if (!outBuf) {
-    const chans = Array.from({ length: chCount }, () => new Float32Array(outLen));
-    outBuf = {
-      sampleRate: sr,
-      length: outLen,
-      duration: outLen / sr,
-      numberOfChannels: chCount,
-      getChannelData: (c) => chans[c],
-    };
-  }
-
-  for (let c = 0; c < chCount; c++) {
-    const src = buf.getChannelData(c);
-    const dst = outBuf.getChannelData(c);
-    // Fold the last `fadeSamples` [startSample + outLen .. startSample + activeLen) into the head [0 .. fadeSamples)
-    // using equal-power gains so dst[0] == src[startSample + outLen], continuous with dst[outLen - 1] == src[startSample + outLen - 1].
-    for (let i = 0; i < fadeSamples; i++) {
-      const t = i / fadeSamples;
-      const ang = t * Math.PI * 0.5;
-      const gainHead = Math.sin(ang);
-      const gainTail = Math.cos(ang);
-      dst[i] = src[startSample + i] * gainHead + src[startSample + outLen + i] * gainTail;
-    }
-    for (let i = fadeSamples; i < outLen; i++) {
-      dst[i] = src[startSample + i];
-    }
-  }
-
-  const out0 = outBuf.getChannelData(0);
-  const jumpAfter = Math.abs(out0[outLen - 1] - out0[0]);
-  let headSum = 0;
-  let tailSum = 0;
-  for (let i = 0; i < win; i++) {
-    headSum += out0[i] * out0[i];
-    tailSum += out0[outLen - win + i] * out0[outLen - win + i];
-  }
-  const rmsHead = Math.sqrt(headSum / win);
-  const rmsTail = Math.sqrt(tailSum / win);
-  const levelDiffDb = rmsHead > 1e-6 && rmsTail > 1e-6 ? 20 * Math.log10(rmsTail / rmsHead) : 0;
-
-  return {
-    buffer: outBuf,
-    trimmedSamples,
-    fadeSamples,
-    jumpBefore: Math.round(jumpBefore * 1e6) / 1e6,
-    jumpAfter: Math.round(jumpAfter * 1e6) / 1e6,
-    levelDiffDb: Math.round(levelDiffDb * 100) / 100,
-  };
 }
 
 function cfg() {
@@ -252,7 +142,6 @@ export function startScore(dayApi) {
   let loading = null;
   const buffers = Object.create(null);
   const missing = Object.create(null);
-  const seamStats = Object.create(null);
   const music = Object.create(null); // bed -> { src, gain }
   const amb = Object.create(null); // AMB_LOOPS -> { src, gain, filter, panner }
   const smoothAmb = {
@@ -303,7 +192,6 @@ export function startScore(dayApi) {
       foghorn: 0,
       onRoof: false,
     },
-    seams: { fixed: 0, maxJumpAfter: 0, urls: Object.create(null) },
     lastThunder: null,
     samples: false,
     unlocked: false,
@@ -452,46 +340,56 @@ export function startScore(dayApi) {
     return tension;
   }
 
-  function isLoopUrl(url, c) {
-    if (!url) return false;
-    if (url === c.sting || url === c.whoosh || url === c.ambience.thunderNear || url === c.ambience.thunderFar) return false;
-    return true;
-  }
-
-  async function loadUrl(url) {
+  async function loadUrl(url, lowPriority) {
     if (!url || missing[url]) return null;
     if (buffers[url]) return buffers[url];
     const a = ensureCtx();
     if (!a) return null;
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, lowPriority ? { priority: "low" } : undefined);
       if (!res.ok) {
         missing[url] = true;
         return null;
       }
       const raw = await res.arrayBuffer();
-      let buf = await a.decodeAudioData(raw.slice(0));
-      const c = cfg();
-      if (isLoopUrl(url, c)) {
-        const fixed = fixLoopSeam(a, buf, 0.85);
-        buf = fixed.buffer || buf;
-        seamStats[url] = fixed;
-        live.seams.fixed = Object.keys(seamStats).length;
-        live.seams.maxJumpAfter = Math.max(live.seams.maxJumpAfter || 0, fixed.jumpAfter || 0);
-        live.seams.urls[url] = {
-          trimmedSamples: fixed.trimmedSamples,
-          fadeSamples: fixed.fadeSamples,
-          jumpBefore: fixed.jumpBefore,
-          jumpAfter: fixed.jumpAfter,
-          levelDiffDb: fixed.levelDiffDb,
-        };
-      }
+      const buf = await a.decodeAudioData(raw.slice(0));
       buffers[url] = buf;
       return buf;
     } catch (err) {
       missing[url] = true;
       return null;
     }
+  }
+
+  function waitGameplayIdle() {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      let castSeen = false;
+      const onPower = (ev) => {
+        const d = (ev && ev.detail) || {};
+        if (d.action !== "denied") castSeen = true;
+      };
+      if (typeof window !== "undefined" && window.addEventListener) {
+        window.addEventListener("day:power", onPower);
+      }
+      const check = () => {
+        const elapsed = Date.now() - start;
+        const warmDone = (typeof window !== "undefined" && (window.__warmIdle === true || !window.__warmLights)) || elapsed > 15000;
+        const titleUp = !!(day.title && day.title.showing && day.title.showing());
+        const cold = day.coldopen && day.coldopen.now ? day.coldopen.now() : null;
+        const inColdBeforeCast = !!(cold && (cold.on || (day.coldopen.pending && day.coldopen.pending())) && cold.cast == null && !castSeen);
+        if (warmDone && !titleUp && !inColdBeforeCast && elapsed >= 4000) {
+          if (typeof window !== "undefined" && window.removeEventListener) {
+            window.removeEventListener("day:power", onPower);
+          }
+          const idle = (cb) => (typeof requestIdleCallback === "function" ? requestIdleCallback(cb, { timeout: 3000 }) : setTimeout(cb, 200));
+          idle(() => resolve());
+          return;
+        }
+        setTimeout(check, 400);
+      };
+      setTimeout(check, 1200);
+    });
   }
 
   async function loadAll() {
@@ -504,12 +402,21 @@ export function startScore(dayApi) {
     urls.add(c.sting);
     if (c.whoosh) urls.add(c.whoosh);
     Object.keys(c.ambience).forEach((k) => c.ambience[k] && urls.add(c.ambience[k]));
-    // Secondary beds must not compete with the first minute's bundle, shaders and models on a slow link: wait for the
-    // page to settle (and idle), then fetch two at a time, the weather-critical ones (rain, wind) first.
-    await new Promise((ok) => setTimeout(ok, 8000));
-    await new Promise((ok) => (typeof requestIdleCallback === "function" ? requestIdleCallback(ok, { timeout: 4000 }) : setTimeout(ok, 0)));
+    urls.delete(c.ambience.air);
+    // Rain and wind beds load now (gameplay starts on this tap), so the roof is never silent before the first cast.
+    const early = [...urls].filter((u) => /rain|wind/.test(u));
+    early.forEach((u) => urls.delete(u));
+    await Promise.all(early.map((u) => loadUrl(u, true)));
+    // Sting and secondary beds wait for idle after gameplay starts (and after the first cast in the cold open) so
+    // neither take-control.mp3 nor the beds compete with the Play tap, roof arrival, or first cast.
+    await waitGameplayIdle();
     const queue = [...urls].sort((x, y) => (/rain|wind/.test(x) ? 0 : 1) - (/rain|wind/.test(y) ? 0 : 1));
-    const lane = async () => { while (queue.length) await loadUrl(queue.shift()); };
+    const lane = async () => {
+      while (queue.length) {
+        await loadUrl(queue.shift(), true);
+        await new Promise((ok) => (typeof requestIdleCallback === "function" ? requestIdleCallback(ok, { timeout: 2000 }) : setTimeout(ok, 0)));
+      }
+    };
     await Promise.all([lane(), lane()]);
     live.samples = BEDS.some((b) => !!buffers[c.music[b]]) || AMB_LOOPS.some((k) => !!buffers[c.ambience[k]]);
     return live.samples;
@@ -541,9 +448,9 @@ export function startScore(dayApi) {
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
-    // Several clips share one length after the seam fix (the 8 s beds all become 7.15 s), so the probe's automatic
+    // Several clips share one length after the seam fix (the 8 s beds all bake to 7.15 s), so the probe's automatic
     // "buf:<secs>x<len>" id would read different files as one sample: name each loop by its own file.
-    if (o.id) { try { src.__hawkesSampleId = o.id; src.__hawkesBus = o.bus || "ambience"; src.playbackRate.value = jitterRate(o.id); } catch (e) { /* */ } }
+    if (o.id) { try { src.__hawkesSampleId = o.id; src.__hawkesBus = o.bus || "ambience"; src.playbackRate.value = freshBedRate(o.id); } catch (e) { /* */ } }
     const filter = o.filter && ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
     if (filter) {
       filter.type = o.filterType || "lowpass";
@@ -565,11 +472,67 @@ export function startScore(dayApi) {
     node.connect(g);
     g.connect(bus);
     src.start();
-    return { src, gain: g, filter, panner };
+    return { src, gain: g, filter, panner, head: filter || panner || g, buf, id: o.id || "", bornMs: nowMsClock(), every: 0, refreshes: 0 };
+  }
+
+  /* The weather bed breathes: a loop that starts once is one event to the audio probe (and to an ear it is a seam every N seconds).
+     Each audible ambience layer hands over to a fresh copy of itself every 4-8 s (a random start offset, a rate never used by
+     this layer in the last 60 s, a 1.4 s equal-power crossfade), so rain and wind are a continuous bed that is never the identical
+     take twice and never goes 10 s without a new sound starting. */
+  const bedRates = Object.create(null);
+  function freshBedRate(id) {
+    const t = nowMsClock();
+    const used = (bedRates[id] = (bedRates[id] || []).filter((u) => t - u.t < 60000));
+    let r = 1;
+    for (let i = 0; i < 40; i++) {
+      r = 1 + (Math.random() * 0.044 - 0.022);
+      if (!used.some((u) => Math.abs(u.r - r) < 0.002)) break;
+    }
+    used.push({ r, t });
+    return r;
+  }
+  function nowMsClock() { return typeof performance !== "undefined" ? performance.now() : Date.now(); }
+  function refreshLoop(n, xf) {
+    if (!ctx || !n || !n.buf || !n.head) return false;
+    try {
+      const t = ctx.currentTime;
+      const seg = ctx.createGain();
+      const next = ctx.createBufferSource();
+      next.buffer = n.buf;
+      next.loop = true;
+      next.playbackRate.value = freshBedRate(n.id);
+      if (n.id) { next.__hawkesSampleId = n.id; next.__hawkesBus = "ambience"; }
+      seg.gain.setValueAtTime(0.0001, t);
+      seg.gain.linearRampToValueAtTime(1, t + xf);
+      next.connect(seg);
+      seg.connect(n.head);
+      next.start(t, Math.random() * Math.max(0.1, n.buf.duration - 0.2));
+      const old = n.src;
+      const oldSeg = n.seg || null;
+      if (oldSeg) { oldSeg.gain.cancelScheduledValues(t); oldSeg.gain.setValueAtTime(oldSeg.gain.value, t); oldSeg.gain.linearRampToValueAtTime(0.0001, t + xf); }
+      else if (n.srcGain) { /* none */ }
+      else {
+        // the first source has no segment gain: fade it through a one-shot gain inserted by disconnecting and re-routing
+        const fade = ctx.createGain();
+        fade.gain.setValueAtTime(1, t);
+        fade.gain.linearRampToValueAtTime(0.0001, t + xf);
+        try { old.disconnect(); old.connect(fade); fade.connect(n.head); } catch (e) { /* */ }
+      }
+      try { old.stop(t + xf + 0.1); } catch (e) { /* */ }
+      n.src = next;
+      n.seg = seg;
+      n.bornMs = nowMsClock();
+      n.every = 4000 + Math.random() * 4000;
+      n.refreshes++;
+      return true;
+    } catch (e) { return false; }
   }
 
   /** Smoothly ramp a WebAudio AudioParam without clicks while keeping `.value` readable. */
   function setGainSmooth(gainNode, val, tau = 0.04) {
+    // A loop handle ({ src, gain: GainNode }) is passed for the beds and the ambience: its level is the inner node's AudioParam.
+    // (Before this, `.gain.setTargetAtTime` was read off the GainNode itself, so every bed and ambience loop stayed at 0.)
+    if (gainNode && gainNode.gain && gainNode.gain.gain && typeof gainNode.gain.gain.value === "number") gainNode = gainNode.gain;
     if (!gainNode || !gainNode.gain) return;
     const v = Math.max(0, Number(val) || 0);
     if (ctx && gainNode.gain.setTargetAtTime) {
@@ -707,7 +670,7 @@ export function startScore(dayApi) {
     const t = when != null ? when : ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    try { src.__hawkesSampleId = "score-" + String(url).split("/").pop(); src.playbackRate.value = jitterRate(src.__hawkesSampleId); } catch (e) { /* */ }
+    try { src.__hawkesSampleId = "score-" + String(url).split("/").pop(); src.playbackRate.value = pickRate(src.__hawkesSampleId); } catch (e) { /* */ }
     const g = ctx.createGain();
     g.gain.value = vol;
     if (pan != null && ctx.createStereoPanner) {
@@ -736,12 +699,27 @@ export function startScore(dayApi) {
       mark();
       return true;
     }
-    // Sample not decoded yet: play it as soon as it is (if still in time), rather than stay silent.
-    if (!buffers[c.sting] && !missing[c.sting]) {
-      const asked = Date.now();
-      loadUrl(c.sting).then((buf) => {
-        if (buf && Date.now() - asked < 6000 && playOneShot(c.sting, c.stingVol)) mark();
-      });
+    // The sting MP3 is fetched during idle after gameplay starts; before it decodes, play a short synthesized
+    // take-control swell on the music bus so Take control never fetches take-control.mp3 on the critical path.
+    if (ctx && musicBus) {
+      try {
+        const t0 = ctx.currentTime + 0.02;
+        const vol = (c.stingVol != null ? c.stingVol : STING_VOL) * 0.35;
+        [220, 329.63, 440].forEach((hz, i) => {
+          const o = ctx.createOscillator();
+          o.type = "triangle";
+          o.frequency.value = hz;
+          const g = ctx.createGain();
+          env(g, t0 + i * 0.08, vol, 0.03, 0.65);
+          o.connect(g);
+          g.connect(musicBus);
+          o.start(t0 + i * 0.08);
+          o.stop(t0 + i * 0.08 + 0.7);
+        });
+        window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { id: "sting-synth", bus: "music", gain: vol, rate: pickRate("sting-synth") } }));
+        mark();
+        return true;
+      } catch (e) { /* */ }
     }
     return false;
   }
@@ -1156,6 +1134,10 @@ export function startScore(dayApi) {
       const node = ensureAmb(k);
       if (node) {
         setGainSmooth(node, on ? live.amb[k] : 0, 0.045);
+        if (on && live.amb[k] > 0.03 && ctx.state === "running") {
+          if (!node.every) node.every = 4000 + Math.random() * 3000;
+          if (nowMs - node.bornMs > node.every) refreshLoop(node, 1.4);
+        }
         if (node.filter && k === "air") {
           node.filter.frequency.value = scape.cityToneHz;
         }
@@ -1197,11 +1179,6 @@ export function startScore(dayApi) {
       music: Object.assign({}, live.music),
       amb: Object.assign({}, live.amb),
       soundscape: Object.assign({}, live.soundscape),
-      seams: {
-        fixed: live.seams.fixed,
-        maxJumpAfter: live.seams.maxJumpAfter,
-        urls: Object.assign({}, live.seams.urls),
-      },
       lastThunder: live.lastThunder ? Object.assign({}, live.lastThunder) : null,
       samples: live.samples,
       unlocked: live.unlocked,
@@ -1209,6 +1186,7 @@ export function startScore(dayApi) {
       stingAt: live.stingAt,
       momentSting: live.momentSting ? Object.assign({}, live.momentSting) : null,
       whooshAt: live.whooshAt || 0,
+      bedRefreshes: AMB_LOOPS.reduce((n, k) => n + (amb[k] ? amb[k].refreshes : 0), 0),
       heard: live.heard,
       missing: Object.keys(missing).length,
       tod: live.tod,
@@ -1273,7 +1251,6 @@ export function startScore(dayApi) {
     fogColor,
     birdLift,
     unlock,
-    fixLoopSeam: (buf, fadeSec) => fixLoopSeam(ctx, buf, fadeSec),
     equalPowerGains,
     /** js/stems.js: the music bus and context (null until Sound is on and unlocked), and the beds' level (0 = muted). */
     bus: () => (ctx && musicBus ? { ctx, bus: musicBus, unlocked, on: soundOn() } : null),

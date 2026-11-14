@@ -34,6 +34,10 @@ export const KINDS = [
   ['ui-rank', 'ui', 1, 0.8, 'A rank stamp: heavy rubber stamp thump on paper with a small shimmer'],
   ['ui-open', 'ui', 1, 0.5, 'A soft UI menu opening swish, short'],
   ['ui-close', 'ui', 1, 0.5, 'A soft UI menu closing swish, short, descending'],
+  ['door', 'city', 2, 1.4, 'A wooden apartment door closing with a latch click on a quiet city street, a little distant, no music'],
+  ['dog', 'city', 2, 1.6, 'A dog barking twice somewhere down a city street, distant, outdoors, no music'],
+  ['chatter', 'crowd', 2, 2.5, 'Two or three people chatting casually on a street, indistinct words, outdoors, no music'],
+  ['awning-rain', 'city', 2, 3.0, 'Steady rain pattering on a fabric shop awning with a few drips, outdoors, close, no music'],
 ];
 export const MAX_BYTES = 60 * 1024;
 export const names = () => KINDS.flatMap(([k, , n]) => Array.from({ length: n }, (_, i) => `${k}-${i + 1}`));

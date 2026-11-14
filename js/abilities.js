@@ -134,12 +134,13 @@ export function startAbilityBar(abilities, onPress, opt) {
 .abilitybar .ab:active .face,.abilitybar .ab.pressed .face{transform:scale(.9)}
 .abilitybar .ab .ico{width:70%;height:70%;object-fit:contain;pointer-events:none;filter:drop-shadow(0 0 6px rgba(126,200,255,.25))}
 .abilitybar .ab .k,.abilitybar .ab .n{display:none}
+.abilitybar .ab .lb{display:none}
 .abilitybar .ab .c{position:absolute;top:3px;right:5px;z-index:2;font-size:.62rem;color:#7ec8ff;text-shadow:0 1px 3px rgba(0,0,0,.85)}
 .abilitybar .ab .wipe{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;background:conic-gradient(from -90deg,rgba(3,6,12,.78) calc(var(--cd,0)*360deg),transparent 0)}
 .abilitybar .ab.cooling .wipe{opacity:1}
 .abilitybar .ab .cd{position:absolute;left:0;right:0;bottom:0;z-index:2;display:none;align-items:center;justify-content:center;padding:1px 0;font-size:.7rem;line-height:1;color:#fff;background:transparent;text-shadow:0 1px 4px rgba(0,0,0,.9)}
 .abilitybar .ab.cooling .cd{display:flex}
-.abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor){border-color:#9fd4ff;box-shadow:0 0 0 1px rgba(159,212,255,.35),0 0 18px rgba(126,200,255,.75)}
+.abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor){border-color:#9fd4ff;box-shadow:0 0 0 1px rgba(159,212,255,.35),0 0 8px rgba(126,200,255,.75)}
 .abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor) .ico{filter:drop-shadow(0 0 10px rgba(126,200,255,.85)) brightness(1.12)}
 .abilitybar .ab.locked .ico{filter:grayscale(1) brightness(.7);opacity:.55}
 .abilitybar .ab.cooling .ico{opacity:.55;filter:grayscale(.35) brightness(.85)}
@@ -162,37 +163,44 @@ export function startAbilityBar(abilities, onPress, opt) {
 .abilitybar .charge.refused .refuse{display:block}
 .abilitybar .charge.refused .et{display:none}
 /* phone: five verbs in an arc on the right edge above the thumb; Charge is a ring around the arc */
-html.touch-ui .abilitybar{align-items:center;justify-content:center;gap:0;width:240px;height:240px;font-size:.8rem;pointer-events:none}
-html.touch-ui .abilitybar .row{position:relative;width:240px;height:240px;gap:0;pointer-events:none}
-html.touch-ui .abilitybar .charge{position:absolute;inset:0;width:auto;min-width:0;pointer-events:none;z-index:0}
+/* the box is the arc's own bounds (ring x 62-178, verbs x 92-247, y -8..242 of the 240 px layout square) and only the buttons take touches:
+   a drag anywhere else in it reaches the game's look pad */
+html.touch-ui .abilitybar{display:block;position:fixed;width:186px;height:250px;font-size:.8rem;pointer-events:none}
+html.touch-ui .abilitybar .row{position:absolute;left:0;top:0;width:240px;height:240px;gap:0;pointer-events:none}
+html.touch-ui .abilitybar .charge{position:absolute;inset:auto;left:58px;top:128px;width:0;height:0;min-width:0;pointer-events:none;z-index:0}
 html.touch-ui .abilitybar .charge .et{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.8rem;font-weight:700;white-space:nowrap}
 html.touch-ui .abilitybar .charge .bar{display:none}
-html.touch-ui .abilitybar .charge .ring{position:absolute;left:50%;top:50%;width:116px;height:116px;margin:-58px 0 0 -58px;border-radius:50%;border:3px solid rgba(240,168,74,.28);box-sizing:border-box;background:conic-gradient(#f0a84a var(--charge-deg,0deg),rgba(20,12,4,.45) 0)}
+html.touch-ui .abilitybar .charge .ring{position:absolute;left:50%;top:50%;width:88px;height:88px;margin:-44px 0 0 -44px;border-radius:50%;border:3px solid rgba(240,168,74,.28);box-sizing:border-box;background:conic-gradient(#f0a84a var(--charge-deg,0deg),rgba(20,12,4,.45) 0)}
 html.touch-ui .abilitybar .charge .ring::after{content:"";position:absolute;inset:5px;border-radius:50%;background:rgba(8,12,20,.55)}
-html.touch-ui .abilitybar .ab{position:absolute;width:56px;height:56px;min-width:44px;min-height:44px;border-radius:50%;gap:0;justify-content:center;padding:0;z-index:1;left:50%;top:50%;margin:-28px 0 0 -28px;pointer-events:auto}
-/* the verbs sit on an 86 px radius round the Charge ring (54 px): 8 px clear of the ring, 10 px between icons, and the
-   whole arc inside the 220 px box, so the right-most icon is 9 px from the screen edge, never cut off */
+html.touch-ui .abilitybar .ab{position:absolute;width:54px;height:54px;min-width:44px;min-height:44px;border-radius:50%;gap:0;justify-content:center;padding:0;z-index:1;left:58px;top:128px;margin:-27px 0 0 -27px;pointer-events:auto}
+html.touch-ui .abilitybar .ab .face{bottom:13px}
+html.touch-ui .abilitybar .ab .lb{display:block;position:absolute;left:0;right:0;bottom:5px;text-align:center;font-size:.62rem;line-height:1;font-weight:700;letter-spacing:.02em;color:#e7eef8;text-shadow:0 1px 3px rgba(0,0,0,.95);pointer-events:none;z-index:2}
+/* the verbs sit on a 94 px radius round the 96 px Charge ring: 21 px clear of the ring, 14 px between 50 px icons (40 deg apart),
+   the whole arc inside the 240 px box. The arc just fades in: no transform transition, so nothing slides over the ring */
 html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(0,-100px)}
 html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(64px,-77px)}
-html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(99px,-17px)}
-html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(86px,50px)}
+html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(98px,-17px)}
+html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(87px,50px)}
 html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(34px,94px)}
+html.touch-ui .abilitybar{animation:abfade .25s ease-out}
+html.touch-ui .abilitybar .ab.pulse{animation:abpulse-t .32s ease-out}
+@keyframes abpulse-t{0%{box-shadow:0 0 0 0 rgba(255,255,255,.95)}35%{box-shadow:0 0 8px 3px rgba(126,200,255,.95)}100%{box-shadow:0 0 0 0 rgba(126,200,255,0)}}
+@keyframes abfade{from{opacity:0}to{opacity:1}}
 html.touch-ui .abilitybar .ab .ico{width:78%;height:78%}
 html.touch-ui .abilitybar .ab .c{top:0;right:0;min-width:20px;height:20px;line-height:20px;text-align:center;border-radius:10px;background:rgba(8,12,20,.9);border:1px solid rgba(240,168,74,.8);color:#ffe2b0;font-size:.8rem;font-weight:700;padding:0 3px;box-sizing:border-box;z-index:3}
 html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:1.1rem;background:transparent;border-radius:50%}
 html.touch-ui .abilitybar .ab .wipe{border-radius:50%}
 @media (orientation:landscape) and (max-height:520px){
   /* centre near the box's foot: the arc fans across the top */
-  html.touch-ui .abilitybar{width:260px;height:160px}
-  html.touch-ui .abilitybar .row{width:260px;height:160px}
-  html.touch-ui .abilitybar .charge .ring{top:130px}
-  html.touch-ui .abilitybar .charge .et{top:130px}
-  html.touch-ui .abilitybar .ab{top:130px}
-  html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(-99px,-17px)}
+  html.touch-ui .abilitybar{width:254px;height:186px}
+  html.touch-ui .abilitybar .row{left:0;top:0;width:260px;height:160px}
+  html.touch-ui .abilitybar .charge{left:127px;top:128px}
+  html.touch-ui .abilitybar .ab{left:127px;top:128px}
+  html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(-98px,-17px)}
   html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(-64px,-77px)}
   html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(0,-100px)}
   html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(64px,-77px)}
-  html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(99px,-17px)}
+  html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(98px,-17px)}
 }
 html.in-control:not(.preview-public):not(.touch-ui) .side .log{max-height:22vh}
 html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.touch-ui):not(.in-control) body:has(.tutorial:not([hidden])) .control-hint{visibility:hidden}
@@ -226,6 +234,7 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
     if (art && art.verbIcon) return art.verbIcon(id, lit);
     return `textures/ui/verb-${id}-${lit ? "lit" : "unlit"}.svg`;
   }
+  const LABELS = { bolt: "Bolt", rain: "Rain", wind: "Wind", fog: "Fog", sunbreak: "Sun" };
   function slot(a, verbIndex) {
     const b = document.createElement("div");
     b.className = "ab";
@@ -236,7 +245,7 @@ html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.tou
     if (verbIndex >= 0) b.dataset.verb = String(verbIndex);
     b.setAttribute("role", "button");
     b.setAttribute("aria-label", `${a.name}, costs ${a.cost} Charge`);
-    b.innerHTML = `<span class="face"><img class="ico" alt="" draggable="false"/><span class="wipe" aria-hidden="true"></span></span><span class="c">${a.cost}</span><span class="cd"></span>`;
+    b.innerHTML = `<span class="lb" aria-hidden="true">${LABELS[a.id] || a.name}</span><span class="face"><img class="ico" alt="" draggable="false"/><span class="wipe" aria-hidden="true"></span></span><span class="c">${a.cost}</span><span class="cd"></span>`;
     const ico = b.querySelector(".ico");
     ico.src = iconUrl(a.id, true);
     const down = (e) => {

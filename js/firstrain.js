@@ -6,7 +6,7 @@
    while it is up (`html.first-rain`), so the first screen is the city, the stick, Jump and one thing to do.
    Not during the cold open (the roof's bolt is Lightning: this takes over when it ends) and it doesn't fight the
    street lesson (street.js keeps Sun, Fog and Wind locked past Rain). Kept in localStorage `icanbe.firstrain`.
-   Any episode start finishes it. A bot's tab (`?playtest=` other than audio-check / first-rain) never meets it.
+   Any episode start finishes it. A bot's tab (`?playtest=` other than audio-check / first-rain / any-hour) never meets it.
    `day.firstrain`: now(), reset(); events `day:firstrain` (show / done). Playtest: `first-rain`.
    ========================================================================== */
 export function startFirstRain() {
@@ -20,7 +20,7 @@ export function startFirstRain() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "audio-check" && id !== "first-rain") quiet = true;
+    if (id && id !== "audio-check" && id !== "first-rain" && id !== "any-hour") quiet = true;
     else if (!id && navigator.webdriver) quiet = true;
   } catch (e) { /* no location */ }
 

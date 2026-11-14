@@ -812,6 +812,10 @@ export function installProps(ctx) {
   solidMat.diffuseColor = new B.Color3(1, 1, 1);
   solidMat.specularColor = new B.Color3(0.04, 0.04, 0.05);
   solidMat.maxSimultaneousLights = 4;
+  /* Tree crowns, benches and the rest of the kerb props are lit only by the weak dusk/night hemisphere light, so a crown
+     close to the phone camera read as a flat near-black disc (phone-touch, bad lighting). The same ambient fill as the
+     roof units and paving (scene.ambientColor x this x the vertex colour) keeps leaf colour and form at any hour. */
+  solidMat.ambientColor = new B.Color3(2.4, 2.5, 2.6);
   const warmMat = new B.StandardMaterial("props-glow", scene);
   warmMat.diffuseColor = new B.Color3(0.2, 0.2, 0.2);
   warmMat.specularColor = new B.Color3(0, 0, 0);

@@ -172,11 +172,13 @@ export function startAftermath(world, dayApi) {
     if (m != null) st.lastWetMin = m;
   }
 
-  function start(via) {
+  function start(via, dry) {
     const Cfg = cfg();
     st.on = true;
+    st.dry = !!dry;
     st.age = 0;
-    st.steamLeft = Cfg.steamSec;
+    // a Sun break on a dry street still answers (people step out, birds land, a little steam off the damp roofs)
+    st.steamLeft = dry ? Cfg.steamSec * 0.35 : Cfg.steamSec;
     st.dripLeft = Cfg.dripSec;
     st.rainbowLeft = Cfg.rainbowSec;
     st.sparkleLeft = Cfg.sparkleSec;
@@ -213,7 +215,7 @@ export function startAftermath(world, dayApi) {
     } catch (e) { /* */ }
 
     launchBirds();
-    emit("start", { via: via || "sunbreak", lastWetMin: st.lastWetMin, minutes: st.startedAt });
+    emit("start", { via: via || "sunbreak", dry: !!dry, lastWetMin: st.lastWetMin, minutes: st.startedAt });
     try {
       window.dispatchEvent(new CustomEvent("day:crowd", {
         detail: { action: "aftermath", steam: Cfg.steamSec, drip: Cfg.dripSec, rainbow: true, shops: Cfg.shopOut },
@@ -259,11 +261,8 @@ export function startAftermath(world, dayApi) {
     if (d && d.action === "denied") return;
     const now = minutesNow();
     // Strict: Sun break must land within rainWindowMin game minutes of the last rain/storm
-    if (!wetWindowOk(st.lastWetMin, now, cfg().rainWindowMin)) {
-      emit("skip", { why: "dry", lastWetMin: st.lastWetMin, minutes: now });
-      return;
-    }
-    start(d.via || "power");
+    const wet = wetWindowOk(st.lastWetMin, now, cfg().rainWindowMin);
+    start(d.via || "power", !wet);
   }
 
   if (typeof window !== "undefined" && window.addEventListener) {
@@ -526,6 +525,7 @@ export function startAftermath(world, dayApi) {
       const W = window.weather && window.weather.now ? window.weather.now() : {};
       return {
         on: st.on,
+        dry: !!st.dry,
         age: Math.round(st.age * 100) / 100,
         lastWetMin: st.lastWetMin,
         steamLeft: Math.round(st.steamLeft * 100) / 100,

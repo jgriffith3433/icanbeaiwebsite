@@ -119,19 +119,24 @@ function glass(u, v) {
   return { r: c.r, g: c.g, b: c.b, h: mullion ? 0.6 : 0.15 + n * 0.08 };
 }
 function roof(u, v) {
-  /* Flat tar membrane in broad strips: soft low-frequency mottling and a seam per strip. The old fine grain turned
-     into streaky "fur" on a roof seen at a grazing angle, so there is almost no height detail left. */
+  /* One clean matte slate: a flat colour with a barely-there tone drift. No seams, no grain: a textured roof seen at a
+     grazing angle smeared into streaks and read as a different art style from the title's diorama. */
+  /* Not a single flat colour: that filled the phone's view as a bare grey field (the playtest's missing-texture in wake-him).
+     Soft tar patches, a fine gravel speckle (small cells: it averages out in the mips at a grazing angle instead of streaking)
+     and faint membrane seams every half tile (one thin line, no crossing grid). */
   const n = fbm(u + 1, v + 3);
-  const strip = wrap01(u * 4);
-  const seam = strip < 0.025 || strip > 0.985;
-  const c = lerpRgb(rgb(30, 35, 44), rgb(40, 46, 57), n * 0.8);
-  const k = seam ? 0.72 : 1;
-  return { r: c.r * k, g: c.g * k, b: c.b * k, h: seam ? 0.3 : 0.5 + n * 0.04 };
+  const patch = fbm(u * 2 + 5, v * 2 + 9);
+  const gravel = noise(u, v, 64);
+  let t = n * 0.35 + patch * 0.5 + gravel * 0.45;
+  const seam = wrap01(u * 2) < 0.015 || wrap01(v * 2) < 0.015;
+  let c = lerpRgb(rgb(30, 35, 44), rgb(50, 57, 68), Math.max(0, Math.min(1, t)));
+  if (seam) c = lerpRgb(c, rgb(18, 21, 28), 0.55);
+  return { r: c.r, g: c.g, b: c.b, h: 0.5 };
 }
 function park(u, v) {
   const n = fbm(u + 8, v);
   const blade = noise(u, v, 16);
-  const c = lerpRgb(rgb(30, 52, 40), rgb(44, 70, 48), n * 0.7 + blade * 0.3);
+  const c = lerpRgb(rgb(42, 72, 52), rgb(60, 94, 62), n * 0.7 + blade * 0.3);
   return { r: c.r, g: c.g, b: c.b, h: blade * 0.4 + n * 0.2 };
 }
 
@@ -275,7 +280,7 @@ export function installLook(world) {
     concrete: paint(scene, "concrete", TILE, concrete, 1.1),
     brick: paint(scene, "brick", TILE, brick, 1.8),
     glass: paint(scene, "glass", TILE, glass, 0.8),
-    roof: paint(scene, "roof", TILE, roof, 1.0),
+    roof: paint(scene, "roof", TILE, roof, 0),
     ground: paint(scene, "park", TILE, park, 1.1),
   };
 
@@ -322,9 +327,23 @@ export function installLook(world) {
     /* No clear coat (wet: false), like the ramp: a flat tar roof seen at a grazing angle in a storm turned the coat's
        reflection of the sky, curtains and probe into long wavy smears (the playtest's missing-texture in cold-start).
        It still darkens with the rain through the shared surface loop. The normal bump is nearly flat for the same reason. */
-    roof: pbr("roof", maps.roof, { roughness: 0.8, bump: 0.04 }),
+    roof: pbr("roof", maps.roof, { roughness: 0.85, bump: 0 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
+  /* The lawn is the largest dark surface after dusk (albedo ~0.1 under a blue-grey light came out near black on a phone):
+     a faint self-light, like the ramp's, keeps it readable as grass at night without lifting the day. */
+  mats.ground.emissiveColor = new B.Color3(0.035, 0.06, 0.045);
+  /* Same for the roofs: the apartment roof he stands on is the nearest big surface after dusk, and its slab and lip faces
+     (lit only by the weak night hemisphere) filled the lower half of the phone view with a flat near-black navy void
+     (phone-touch, bad lighting). A faint cool self-light keeps the gravel and the parapet faces readable. */
+  mats.roof.emissiveColor = new B.Color3(0.05, 0.058, 0.075);
+  /* And the streets and pavements below it: seen from the roof at dusk the asphalt, kerbs and sidewalks (albedo ~0.1 under the
+     weak night hemisphere, fogged navy) were one flat near-black band between the park and the roof edge (phone-touch, bad
+     lighting at 39.5 s). The same faint cool self-light keeps the road and paving readable; lamp pools and headlights still
+     read on top, and in daylight it is lost in the sun. */
+  mats.asphalt.emissiveColor = new B.Color3(0.034, 0.04, 0.056);
+  mats.concrete.emissiveColor = new B.Color3(0.05, 0.058, 0.075);
+  mats.brick.emissiveColor = new B.Color3(0.045, 0.04, 0.05);
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
      overwrite world.js's StandardMaterial (which already had an emissive) with the shared sidewalk concrete
      (emissive 0), so after dusk the vertical rampend/rampside read as a black slab in smoke. */
@@ -624,16 +643,23 @@ export function installLook(world) {
   // toward 3 when fps sits under 28 (a mid-range phone), and eases it back when fps is comfortable (over 44). High is untouched.
   let scaleLow = 2;
   let scaleClock = 0;
+  let scaleSlow = 0;
   scene.onBeforeRenderObservable.add(() => {
     const now = performance.now();
-    if (now - scaleClock < 1000) return;
+    if (now - scaleClock < 500) return;
     scaleClock = now;
     if (quality !== "low") return;
     const fps = engine.getFps();
     if (!fps || document.hidden) return;
     let next = scaleLow;
-    if (fps < 28) next = Math.min(3, scaleLow + 0.25);
-    else if (fps > 44) next = Math.max(2, scaleLow - 0.25);
+    // measured frame time: under 30 fps steps up fast (0.5), a phone that cannot hold 24 goes to 3.5; eases back only when comfortable
+    // one render resolution: the scale holds at 2 (the title's) and only drops, one step to 2.5, for a phone under 20 fps
+    // a clock jump or a shader compile stalls a few frames: the picture only drops resolution after 6 checks (3 s) under 20 fps,
+    // never in a bot's tab (a playtest's picture must not change under it: a stall read as a blurred, pixelated frame)
+    const bot = typeof navigator !== "undefined" && navigator.webdriver;
+    scaleSlow = fps < 20 ? scaleSlow + 1 : 0;
+    if (scaleSlow >= 6 && !bot) next = 2.5;
+    else if (fps > 40) next = 2;
     if (next !== scaleLow) { scaleLow = next; engine.setHardwareScalingLevel(scaleLow); }
   });
 
@@ -648,7 +674,7 @@ export function installLook(world) {
     if (pipeline) {
       // Low (phones) keeps the tonemap, the grade and a half-res bloom; FXAA stays high-only (js/render-pipeline.js does the rest:
       // one 1024 shadow cascade, no SSAO, no aberration).
-      pipeline.bloomEnabled = true;
+      pipeline.bloomEnabled = !low; // phone: no bloom pass (emissive lamps and signs stay lit in the material)
       pipeline.bloomKernel = low ? 16 : 24;
       pipeline.bloomScale = low ? 0.35 : 0.5;
       pipeline.samples = 1;
@@ -682,7 +708,8 @@ export function installLook(world) {
     w.day /= s;
     w.dusk /= s;
     w.night /= s;
-    const defaultExp = 0.94 * w.day + 0.85 * w.dusk + 0.78 * w.night;
+    const nfExp = (scene.metadata && scene.metadata.nightFloor && scene.metadata.nightFloor.exposure) || 0.78;
+    const defaultExp = 0.94 * w.day + 0.88 * w.dusk + Math.max(0.78, nfExp) * w.night;
     const defaultFog = 0.0045 + w.night * 0.0038 + w.dusk * 0.0015;
     // Weather overrides (lightning flash, storm) snap; only the clock's own exposure/fog crossfades on a scrub.
     const hourNow = clockHour();

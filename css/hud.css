@@ -26,8 +26,8 @@
   /* edges, with the safe areas */
   --safe-l: max(var(--gutter, 18px), env(safe-area-inset-left));
   --safe-r: max(var(--gutter, 18px), env(safe-area-inset-right));
-  --safe-t: max(12px, env(safe-area-inset-top));
-  --safe-b: max(16px, env(safe-area-inset-bottom));
+  --safe-t: max(12px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px));
+  --safe-b: max(16px, env(safe-area-inset-bottom), var(--hawkes-safe-bottom, 0px));
   /* the timeline's top edge (desktop): nothing but the timeline is under this line */
   --tl: 118px;
   /* bottom row: the ability bar, and the line above it where Let go, Quality, the hint and the tutorial stack */
@@ -45,7 +45,13 @@
   /* phone: the right column (tools, Quality, Episodes) */
   --tr-quality: calc(var(--safe-t) + 100px);
   --tr-ep: calc(var(--safe-t) + 150px);
+  /* the ONE toast lane: top centre, under the safe area and the top bar; ep-toast, nb-toast, storm-toast and the like all sit here, nothing else does.
+     --toast-top-px is the same number for js/hud-layout.js (markers keep out of it) */
+  --toast-top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  --toast-top-px: 64;
 }
+html.touch-ui { --toast-top: max(184px, calc(env(safe-area-inset-top) + 176px)); --toast-top-px: 184; } /* below the status card / clock in the top-left and the Episodes strip, never over them */
+@media (orientation: landscape) and (max-height: 520px) { html.touch-ui { --toast-top: calc(var(--safe-t) + 76px); --toast-top-px: 88; } }
 
 /* ---------- side panel ---------- */
 .side {
@@ -79,9 +85,9 @@ html.touch-ui .tools { position: fixed; top: var(--safe-t); right: max(12px, env
 html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(--above-a); }
 .preview-public .control-btn { bottom: 40px; }
 @media (max-width: 700px) {
-  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
+  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
 }
-html.touch-ui.in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
+html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
 
 /* ---------- Settings popover (top-right cluster, under the Settings button) ---------- */
 .tools { position: relative; }
@@ -153,10 +159,10 @@ html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; botto
 /* phone portrait, in control: Let go, Rain (weather), Neighbors and Episodes sit in the left thumb's reach, stacked above the stick
    (stick top is 148 px up); Pressure and the weather chip ride the same column. */
 @media (orientation: portrait) {
-  html.touch-ui.in-control .control-btn { top: auto; left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); }
-  html.touch-ui.in-control .hud-left { top: auto; bottom: max(220px, calc(env(safe-area-inset-bottom) + 208px)); flex-direction: column-reverse; gap: 10px; }
+  html.touch-ui.in-control .control-btn { top: auto; left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px), calc(var(--safe-b) + 148px)); }
+  html.touch-ui.in-control .hud-left { top: auto; bottom: max(220px, calc(env(safe-area-inset-bottom) + 208px), calc(var(--safe-b) + 204px)); flex-direction: column-reverse; gap: 10px; }
   html.touch-ui.in-control .hud-left .ep-btn { order: 1; }
-  html.touch-ui.in-control .control-hint { bottom: max(470px, calc(env(safe-area-inset-bottom) + 458px)); }
+  html.touch-ui.in-control .control-hint { bottom: max(470px, calc(env(safe-area-inset-bottom) + 458px), calc(var(--safe-b) + 454px)); }
 }
 
 /* ---------- bottom row: the ability bar (five verbs; phone = arc + Charge ring) ---------- */
@@ -164,8 +170,8 @@ html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; botto
 html:not(.preview-public):not(.touch-ui) .abilitybar { bottom: var(--row-a); }
 /* phone: verb arc on the right edge above the thumb zone (Jump), clear of the character */
 html.touch-ui .abilitybar {
-  left: auto; right: max(16px, env(safe-area-inset-right));
-  bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); transform: none;
+  left: auto; right: max(10px, env(safe-area-inset-right));
+  bottom: max(166px, calc(env(safe-area-inset-bottom) + 154px)); transform: none;
 }
 .powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; display: none !important; }
 /* phone: the controls legend shows once, then fades */
@@ -198,8 +204,9 @@ html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { 
   html.touch-ui .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: calc(var(--safe-t) + 8px); width: min(480px, 70vw); max-height: 72px; overflow: hidden; }
 }
 .ep-say { position: fixed; left: 50%; bottom: max(96px, calc(env(safe-area-inset-bottom) + 88px)); }
-.ep-toast { position: fixed; left: 50%; top: max(64px, calc(env(safe-area-inset-top) + 56px)); }
-.nb-toast { position: fixed; left: 50%; top: max(110px, calc(env(safe-area-inset-top) + 100px)); }
+.ep-toast, .nb-toast, .storm-toast { position: fixed; left: 50%; top: var(--toast-top); max-width: min(420px, calc(100vw - 24px)); box-sizing: border-box; }
+.helped-count { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); } /* js/helped.js: neighbours helped today */
+html.touch-ui .helped-count { left: max(12px, env(safe-area-inset-left)); top: var(--safe-t); transform: none; }
 .mo-line { position: fixed; left: 50%; bottom: max(230px, calc(env(safe-area-inset-bottom) + 210px)); transform: translateX(-50%); }
 html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); } /* above the ability bar */
 /* a turning-point moment (js/moments.js `play`): one caption line and Skip at the bottom, in the thumb's reach; the rest of the HUD steps aside */
@@ -209,7 +216,7 @@ html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-
 html.cine-up .hud, html.cine-up .side, html.cine-up .hud-left, html.cine-up .abilitybar, html.cine-up .powerpad, html.cine-up .touchpad,
 html.cine-up .control-btn, html.cine-up .control-hint, html.cine-up .public-toggle, html.cine-up .version-tag, html.cine-up .update-pill,
 html.cine-up .quality-btn, html.cine-up .voices-btn, html.cine-up .tutorial, html.cine-up .nb-btn, html.cine-up .ep-btn, html.cine-up .ep-hud,
-html.cine-up .ep-say, html.cine-up .ep-toast, html.cine-up .nb-toast, html.cine-up .nb-layer, html.cine-up .power-reticle, html.cine-up .pressure,
+html.cine-up .ep-say, html.cine-up .ep-toast, html.cine-up .nb-toast, html.cine-up .storm-toast, html.title-up .storm-toast, html.cold-open .storm-toast, html.cine-up .nb-layer, html.cine-up .power-reticle, html.cine-up .pressure,
 html.cine-up #weather-btn, html.cine-up .mo-line, html.cine-up .voice-caption, html.cine-up .ep-offer, html.cine-up .co-bolt { visibility: hidden; }
 
 /* voice director caption: above the ability bar, never over it */
@@ -240,7 +247,7 @@ html.touch-ui.in-control .voice-caption {
 
 /* ---------- phone landscape (short window): the ability bar and the tutorial sit between the stick and the pad ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
-  html.touch-ui .abilitybar { right: max(8px, env(safe-area-inset-right)); left: auto; bottom: max(56px, calc(env(safe-area-inset-bottom) + 48px)); }
+  html.touch-ui .abilitybar { right: max(5px, env(safe-area-inset-right)); left: auto; bottom: max(28px, calc(env(safe-area-inset-bottom) + 20px)); }
   html.touch-ui.in-control:not(.preview-public) .tutorial { left: 50%; transform: translateX(-50%); bottom: max(146px, calc(env(safe-area-inset-bottom) + 140px)); }
 }
 
@@ -255,8 +262,8 @@ html.touch-ui.in-control .voice-caption {
 .preview-public .hud.bottom { left: auto; right: var(--safe-r); bottom: 40px; width: auto; }
 .preview-public .time-drawer { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; width: min(560px, calc(100vw - var(--safe-l) - var(--safe-r))); }
 html.preview-public:not(.in-control) .hud-left { top: auto; bottom: 40px; left: var(--safe-l); flex-direction: column-reverse; }
-html.touch-ui.preview-public:not(.in-control) .control-btn { bottom: 92px; }
-@media (max-width: 700px) { html.preview-public:not(.in-control) .control-btn { bottom: 92px; } }
+html.touch-ui.preview-public:not(.in-control) .control-btn { bottom: max(92px, calc(env(safe-area-inset-bottom) + 80px)); max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 24px); }
+@media (max-width: 700px) { html.preview-public:not(.in-control) .control-btn { bottom: max(92px, calc(env(safe-area-inset-bottom) + 80px)); } }
 html.preview-public.in-control:not(.touch-ui) .control-btn { bottom: calc(var(--pub-a) + 8px); }
 html.preview-public.in-control:not(.touch-ui) .control-hint { bottom: calc(var(--pub-a) + 56px); }
 html.preview-public.in-control:not(.touch-ui) .voice-caption { bottom: calc(var(--pub-a) + 104px); }
@@ -274,6 +281,8 @@ html.title-up #weather-btn, html.title-up .ep-hud, html.title-up .mo-line, html.
 html.ep-menu-up .voice-caption, html.ep-menu-up .abilitybar, html.ep-menu-up .powerpad, html.ep-menu-up .touchpad, html.ep-menu-up .pressure,
 html.ep-menu-up #weather-btn, html.ep-menu-up .control-hint, html.ep-menu-up .tutorial, html.ep-menu-up .ep-hud, html.ep-menu-up .mo-line,
 html.ep-menu-up .ep-say, html.ep-menu-up .ep-toast, html.ep-menu-up .nb-layer, html.ep-menu-up .update-pill { visibility: hidden; }
+/* the wake stretch (js/wakeup.js) is a beat of its own: no verb bar, pad or Charge until he is on the roof and ready */
+html.waking .abilitybar, html.waking .powerpad, html.waking .touchpad, html.waking .pressure, html.waking .control-hint { visibility: hidden; }
 
 /* ---------- the cold open (js/coldopen.js): a new player's first bolt, nothing on screen but the one prompt ----------
    html.cold-open hides the whole HUD (header, side panel, timeline, weather, Pressure, abilities, hints, Let go) until the
@@ -291,7 +300,11 @@ html.first-min .hud, html.first-min .side, html.first-min .hud-left, html.first-
 html.first-min .public-toggle, html.first-min .version-tag, html.first-min .privacy-tag, html.first-min .update-pill,
 html.first-min .quality-btn, html.first-min .voices-btn, html.first-min .tutorial, html.first-min .nb-btn, html.first-min .ep-btn,
 html.first-min .pressure, html.first-min #weather-btn, html.first-min #episodes,
-html.first-min .abilitybar .et, html.first-min .abilitybar .cd, html.first-min .abilitybar .c { visibility: hidden; }
+html.first-min .abilitybar .et, html.first-min .abilitybar .cd, html.first-min .abilitybar .c,
+/* ...and every other line of text that is not the one prompt, the one call and the first-rain cue: name tags and bubbles, toasts, the offer, the street's promise, the story card */
+html.first-min .nb-layer, html.first-min .nb-toast, html.first-min .storm-toast, html.first-min .storm-tally, html.first-min .ep-toast,
+html.first-min .ep-say, html.first-min .ep-hud, html.first-min .ep-offer, html.first-min .take-toast, html.first-min #ability-toast,
+html.first-min #street-promise, html.first-min .helped-count .hc-t { visibility: hidden; }
 /* Back on his day inside that minute (let go): the way back into control must show, or a phone has no move, no Jump and no button. */
 html.first-min:not(.in-control):not(.cold-open):not(.title-up) .control-btn { visibility: visible; }
 .co-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); z-index: 37; }
@@ -311,6 +324,17 @@ html:not(.cold-open.touch-ui):has(.voice-caption:not([hidden]):not(.leaving), .c
 .ep-offer { position: fixed; top: calc(var(--safe-t, env(safe-area-inset-top, 0px)) + 64px); right: max(10px, var(--safe-r, 0px)); left: auto; bottom: auto; inset-inline-start: auto; }
 @media (max-width: 700px) { .ep-offer { top: calc(var(--tr-ep) + 56px); } }
 
+/* ---------- Storm tally & return hook (js/memory.js): top-centre on desktop; under status card on phone portrait; under Let go on landscape ---------- */
+.storm-tally { position: fixed; left: 50%; transform: translateX(-50%); top: var(--safe-t); }
+@media (max-width: 700px) {
+  .storm-tally { left: max(12px, env(safe-area-inset-left)); transform: none; top: max(104px, calc(env(safe-area-inset-top) + 96px)); }
+}
+html.touch-ui .storm-tally { left: max(12px, env(safe-area-inset-left)); transform: none; top: max(104px, calc(env(safe-area-inset-top) + 96px)); }
+@media (orientation: landscape) and (max-height: 520px) {
+  html.touch-ui .storm-tally { left: 50%; transform: translateX(-50%); top: max(62px, calc(env(safe-area-inset-top) + 56px)); }
+}
+html.title-up .storm-tally, html.ep-menu-up .storm-tally, html.cold-open .storm-tally, html.first-rain .storm-tally, html.cine-up .storm-tally,
+html:has(.ep-hud:not([hidden]), .side:not([hidden]), #neighbors-panel:not([hidden]), .settings-pop:not([hidden]), #update-pill:not([hidden])) .storm-tally { visibility: hidden; }
 /* ---------- phone menu (js/phonemenu.js): Neighbors and Episodes sit behind one 44 px Menu button ---------- */
 .pm-btn { display: none; z-index: 7; appearance: none; align-items: center; justify-content: center; min-width: 88px; height: 48px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(240,194,122,.55); background: rgba(14,16,22,.78); color: #f6f1e8; font: 700 .95rem Outfit, system-ui, sans-serif; cursor: pointer; backdrop-filter: blur(12px); touch-action: manipulation; }
 .pm-btn:active, .hud-left.menu-open .pm-btn { background: rgba(240,194,122,.25); transform: scale(.97); }
@@ -318,3 +342,9 @@ html.touch-ui .pm-btn { display: inline-flex; order: 0; }
 html.touch-ui .hud-left:not(.menu-open) .ep-btn, html.touch-ui .hud-left:not(.menu-open) .nb-btn { display: none !important; }
 html.touch-ui .hud-left.menu-open .ep-btn, html.touch-ui .hud-left.menu-open .nb-btn { display: inline-flex !important; min-width: 120px; height: 48px; font-size: .95rem; }
 html.touch-ui.preview-public .hud-left.menu-open .nb-btn { display: none !important; }
+
+/* ---------- the first power press while watching: "He's yours now" (js/powers.js pressWatching) ---------- */
+.take-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(340px, calc(env(safe-area-inset-bottom) + 328px)); z-index: 38; max-width: min(86vw, 420px); box-sizing: border-box; padding: 10px 16px; border-radius: 12px; background: rgba(10,14,22,.82); border: 1px solid rgba(126,200,255,.55); color: #e8f4ff; font-size: .85rem; line-height: 1.3; text-align: center; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .25s ease; }
+.take-toast.show { opacity: 1; visibility: visible; }
+html.touch-ui .take-toast { bottom: max(460px, calc(env(safe-area-inset-bottom) + 448px)); }
+html.title-up .take-toast, html.cold-open .take-toast { visibility: hidden; }

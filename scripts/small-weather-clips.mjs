@@ -184,14 +184,14 @@ const CLIPS = {
       return inPlace(p, STAND);
     }),
 
-  /* floating down slowly: arms spread wide like riding the wind, leaning into it; loops */
+  /* floating down slowly: arms spread wide and up in a V (never level with the shoulders: that reads as a T-pose) like riding the wind, leaning into it; loops */
   float: () =>
     frames(3, (u) => {
       const a = u * TAU;
       const p = idleAt(0);
       turn(sk, p, "Spine", X, 0.12);
       turn(sk, p, "Head", X, -0.22);
-      arms(p, [1, -0.12 + 0.06 * Math.sin(a), 0.05], [1, -0.02 + 0.1 * Math.sin(a + 0.7), 0.12]);
+      arms(p, [1, 0.62 + 0.06 * Math.sin(a), 0.05], [1, 0.72 + 0.1 * Math.sin(a + 0.7), 0.12]);
       legs(p, [0.04, -1, -0.1], [0.02, -1, -0.32 + 0.05 * Math.sin(a)], [-0.05, -1, 0.02], [-0.02, -1, -0.12 - 0.05 * Math.sin(a)]);
       return inPlace(p, STAND + 0.03 * Math.sin(a));
     }),

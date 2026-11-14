@@ -9,6 +9,7 @@
    "Sound off" (localStorage icanbe.sound) keeps all of it silent. Once the Sound button is on, sfx.js / score.js own
    the click and the whoosh, so this stays out of their way, and the ambience fades out into the score's beds.
    `day.titlesound.info()`: ambience, clicks, whooshes, ctx state; events `day:titlesound` {action}. */
+import { pickRate } from "./variety.js";
 const day = window.day;
 
 function startTitleSound() {
@@ -176,7 +177,7 @@ function startTitleSound() {
     const g = r.c.createGain();
     g.gain.value = 0.16;
     o.connect(g); g.connect(r.out);
-    o.playbackRate.value = 0.96 + Math.random() * 0.08; // never the same rate twice in a row for the audio probe
+    o.playbackRate.value = pickRate("title/ui-click"); // never the same rate twice inside 60 s (the audio probe)
     tag(o, "title/ui-click", "ui", 0.16);
     o.start(t);
     st.clicks++;

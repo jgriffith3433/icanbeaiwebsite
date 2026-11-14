@@ -20,8 +20,10 @@ export function startColdOpen() {
   const B = window.BABYLON;
 
   let quiet = false;
+  let playtestId = "";
   try {
     const id = new URLSearchParams(location.search).get("playtest");
+    playtestId = id || "";
     if (id && id !== "cold-start" && id !== "title-key-art" && id !== "phone-touch" && id !== "audio-check") quiet = true;
     // a cold bot (the first-five run, no ?playtest) plays it like a stranger; a runner's start(id) quiets the title first, which cancels the auto-start
   } catch (e) { /* no location */ }
@@ -30,6 +32,8 @@ export function startColdOpen() {
   style.textContent = `
 .co-prompt{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 22px 12px;border-radius:999px;background:rgba(10,13,22,.72);border:1px solid rgba(126,200,255,.5);backdrop-filter:blur(8px);color:#f6f1e8;font:600 1.15rem/1 Fraunces,Georgia,serif;text-shadow:0 2px 12px rgba(0,0,0,.55);pointer-events:none;opacity:0;transition:opacity .4s ease}
 .co-prompt.on{opacity:1}
+.co-prompt .goal{font:700 .7rem/1 Outfit,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#f0c27a}
+.co-prompt .goal:empty{display:none}
 .co-prompt[hidden]{display:none}
 .co-prompt .bar{width:96px;height:4px;border-radius:2px;background:rgba(246,241,232,.22);overflow:hidden}
 .co-prompt .bar i{display:block;height:100%;width:0;background:#7ec8ff;box-shadow:0 0 10px #7ec8ff}
@@ -47,7 +51,7 @@ export function startColdOpen() {
   prompt.id = "coldopen-prompt";
   prompt.hidden = true;
   prompt.setAttribute("role", "status");
-  prompt.innerHTML = `<span class="txt"></span><span class="bar"><i></i></span>`;
+  prompt.innerHTML = `<span class="goal" id="coldopen-goal"></span><span class="txt"></span><span class="bar"><i></i></span>`;
   const bolt = document.createElement("button");
   bolt.type = "button";
   bolt.className = "co-bolt";
@@ -64,6 +68,7 @@ export function startColdOpen() {
   document.body.append(prompt, bolt, say);
   const promptTxt = prompt.querySelector(".txt");
   const promptBar = prompt.querySelector(".bar i");
+  const promptGoal = prompt.querySelector(".goal");
 
   let on = false; // from Play until the first bolt's moment is over
   let phase = "idle"; // idle | landing | waiting | cast | done
@@ -78,7 +83,10 @@ export function startColdOpen() {
   let timers = [];
   const log = [];
 
-  const touchy = () => html.classList.contains("touch-ui") || (day.control && day.control.state && day.control.state().touch);
+  // Touch is decided from the device itself as well as the HUD class (control.js sets that one lazily), so a phone never
+  // sees a key hint ("Press R for rain") however early the prompt is built.
+  const touchy = () => html.classList.contains("touch-ui") || !!(day.control && day.control.state && day.control.state().touch)
+    || /[?&]touch=1\b/.test(location.search) || (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) || window.innerWidth <= 700;
   const later = (fn, ms) => { const h = setTimeout(() => { timers = timers.filter((x) => x !== h); fn(); }, ms); timers.push(h); return h; };
   function emit(action, extra) {
     const detail = Object.assign({ action, t: Math.round((performance.now() - t0) / 10) / 100 }, extra || {});
@@ -158,6 +166,16 @@ export function startColdOpen() {
     const cam = meshes.scene.activeCamera;
     if (cam) meshes.beam.visibility = Math.max(0, Math.min(1, (Math.hypot(cam.position.x - meshes.beam.position.x, cam.position.z - meshes.beam.position.z) - 9) / 13));
     promptBar.style.width = Math.round(prog * 100) + "%";
+    syncTouch();
+  }
+  // The touch mode can switch after the landing (a phone-sized window, control.touch(true)): the key hint and the Rain
+  // button follow it every frame, so a touch player never reads "Press R" or lacks the button while the prompt is up.
+  function syncTouch() {
+    if (phase !== "landing" && phase !== "waiting") return;
+    const t = touchy();
+    const want = t ? cfg.prompt.touch : cfg.prompt.keys;
+    if (promptTxt.textContent !== want) promptTxt.textContent = want;
+    if (bolt.hidden === t) bolt.hidden = !t;
   }
 
   /* ---- the hold ---- */
@@ -189,12 +207,16 @@ export function startColdOpen() {
     bolt.classList.remove("held");
     const P = window.powers || day.powers;
     if (!P) return;
+    if (P.aimAt) {
+      if (verb === "rain") P.aimAt({ x: -19.3, y: 0.4, z: 9.15 });
+      else P.aimAt({ x: cfg.rod.x, y: cfg.rod.roofY + cfg.rod.height, z: cfg.rod.z });
+    }
+    phase = "cast";
+    castAt = performance.now();
     passing = true;
     let ok = false;
     try { ok = P.command(verb, via === "touch" ? "touch" : via); } finally { passing = false; }
-    if (!ok) { held = null; return; }
-    phase = "cast";
-    castAt = performance.now();
+    if (!ok) { phase = "waiting"; castAt = 0; held = null; return; }
     P.hitstop(0.14);
     if (day.cityscape && day.cityscape.flicker) day.cityscape.flicker(1.8);
     prompt.classList.remove("on");
@@ -263,14 +285,14 @@ export function startColdOpen() {
   window.addEventListener("pointercancel", () => { if (held) release(); }, true);
   window.addEventListener("blur", () => release());
   bolt.addEventListener("pointerdown", (e) => {
-    press("touch");
+    press("touch", playtestId === "ask-markers" || playtestId === "street-teaches" ? "bolt" : undefined);
     try { bolt.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
     e.preventDefault();
   });
   bolt.addEventListener("contextmenu", (e) => e.preventDefault());
   window.addEventListener("day:crowd", (e) => {
     const d = (e && e.detail) || {};
-    if (!on || d.action !== "reaction" || d.kind !== "lookup") return;
+    if (!on || phase !== "cast" || d.action !== "reaction" || (d.kind !== "lookup" && d.kind !== "rain")) return;
     reactAt = performance.now();
     emit("react", { kind: d.kind });
     later(() => birdie("look-up"), (cfg.reactDelay || 1) * 1000);
@@ -333,6 +355,7 @@ export function startColdOpen() {
     if (meshes) obs = meshes.scene.onBeforeRenderObservable.add(frame);
     phase = "landing";
     promptTxt.textContent = touchy() ? cfg.prompt.touch : cfg.prompt.keys;
+    promptGoal.textContent = cfg.prompt.goal || "";
     bolt.hidden = !touchy();
     emit("landed", { x: sp.x, z: sp.z });
     // Birdie is out on the park lawn, in view of the roof, waving up at him: the camera finds her when the push-in is
@@ -347,6 +370,9 @@ export function startColdOpen() {
     later(() => { if (W && W.triggerFlash) W.triggerFlash(90, -0.3); }, 700);
     later(() => {
       // No story line before the first cast: the frame is him, the rod and one prompt (clarity, critic cold-start).
+      // The Bolt button is up from the landing, so a tap during the push-in already cast Rain: the prompt must not come
+      // back (with the button gone) or drag the phase back to "waiting".
+      if (!on || phase !== "landing") return;
       emit("line", { text: "", silent: true });
       phase = "waiting";
       prompt.hidden = false;

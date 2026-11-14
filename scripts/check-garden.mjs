@@ -1,4 +1,4 @@
-import { gardenPose, staggerK, POTS } from "../js/garden.js";
+import { gardenPose, staggerK, POTS, REVIVE_SECS } from "../js/garden.js";
 const fail = (m) => { console.error("check-garden: " + m); process.exit(1); };
 const w = gardenPose(0), f = gardenPose(1), m = gardenPose(0.5);
 if (!(w.droop > 1.3 && f.droop < 0.4)) fail("droop range");
@@ -8,4 +8,5 @@ if (!(w.color[1] < f.color[1] && m.droop < w.droop && m.droop > f.droop)) fail("
 if (staggerK(0.4, 0, 4) <= staggerK(0.4, 3, 4)) fail("stagger");
 if (staggerK(1, 3, 4) !== 1 || staggerK(0, 0, 4) !== 0) fail("stagger ends");
 if (POTS.length < 3) fail("pots");
+if (!(REVIVE_SECS > 0 && REVIVE_SECS <= 1.0)) fail("revive secs: " + REVIVE_SECS);
 console.log("check-garden ok");

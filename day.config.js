@@ -122,9 +122,9 @@ window.DAY_CONFIG = {
     hair: "#2a2422",
     shoes: "#241f1c",
     outfits: { // top, bottom, and optional feet (shoes/socks) colours
-      sleep: { top: "#8395b0", bottom: "#5b6884", feet: "#e2b394" },
-      work: { top: "#c46b52", bottom: "#3a3e46" },
-      home: { top: "#6f8f78", bottom: "#4a4f5a" },
+      sleep: { top: "#2a3550", bottom: "#1d222c", feet: "#e2b394" },
+      work: { top: "#1f2a44", bottom: "#1d222c" },
+      home: { top: "#2a3550", bottom: "#1d222c" },
       towel: { top: "#e2b394", bottom: "#f1ede4", feet: "#e2b394" },
     },
   },
@@ -188,6 +188,9 @@ window.DAY_CONFIG = {
        walk, run, jump, fall, float, cast, throw, and the day's sit, type, phone, lie, side,
        recline. null = the box-built figure. */
     model: "models/small-weather.glb",
+    /* The phone / low-quality copy (npm run model:phone, scripts/make-phone-model.mjs: meshopt, WebP, <= 900 KB). js/app.js
+       fetches it when look.quality() is low at boot, else `model`. null = always the full one. */
+    modelPhone: "models/small-weather.phone.glb",
   },
 
   /* ------------------------------------------------------------------------
@@ -228,9 +231,9 @@ window.DAY_CONFIG = {
     crane: {
       secs: 7,
       from: { x: 70, y: 34, z: 18, alpha: -1.0, beta: 1.0, radius: 150 },
-      to: { x: -21, y: 7.51, z: 0.5, alpha: 3.1416, beta: 1.22, radius: 9 },
+      to: { x: -21, y: 7.51, z: 0.5, alpha: -2.45, beta: 1.22, radius: 9 },
     },
-    hero: { x: -21, y: 6.16, z: 0.5, yaw: 1.5708 },
+    hero: { x: -21, y: 6.16, z: 0.5, yaw: 0.92 },
     glintEvery: [2.6, 5.2], // seconds between the storm's glints in the clouds
     autoStart: { secs: 2.4, phoneSecs: 0.3 }, // a new player (cold open pending) is on the roof this long after the title shows: no Play wall. 0/absent = off
     day: "Day",
@@ -260,8 +263,8 @@ window.DAY_CONFIG = {
   coldopen: {
     keys: ["icanbe.opening", "icanbe.tutorial"], // either one set = a returning player
     clock: "19:00", // dusk: the lamps are coming on
-    spot: { x: -21, z: 0.5, yaw: 1.5708, from: 14 }, // the apartment roof (block "apt", roof 6.16 m), facing east down the avenue
-    camera: { alpha: 3.1416, beta: 1.22, radius: 5.6, from: 24, fov: 0.32, secs: 2.6 }, // lands behind him over his shoulder
+    spot: { x: -21, z: 0.5, yaw: 0.92, from: 14 }, // the apartment roof (block "apt", roof 6.16 m), facing the park and avenue
+    camera: { alpha: -2.45, beta: 1.22, radius: 5.6, from: 24, fov: 0.32, secs: 2.6 }, // lands behind him over his shoulder
     rod: { x: 50, z: 0.5, roofY: 3.3, height: 2.2 }, // the shop roof's lightning rod
     cell: { state: "rain", intensity: 0.75 }, // the cell nobody called (weather via "cell")
     birdie: { x: -13, z: 22 }, // Birdie waits on the park lawn, in view of the roof: the player sees her before any word
@@ -270,12 +273,28 @@ window.DAY_CONFIG = {
     dive: { from: 9, secs: 1.0 }, // Play from the title: the title's last shot is this pose at radius 9; the camera dives in over this long
     firstLine: 0.8, // seconds after he lands before he speaks
     reactDelay: 1.0, // seconds from the look-up to Birdie's call
-    prompt: { keys: "Press R for rain", touch: "Tap Rain" },
+    prompt: { keys: "Press R for rain", touch: "Tap Rain", goal: "Birdie needs rain" }, // the goal line names who and what; keys never show on touch
     lines: {
       he: ["He", "That storm isn't mine. That rod is."], // not spoken before the first cast (kept for later use)
       birdie: ["Birdie", "Small Weather! Send my tomatoes some rain."],
       after: ["He", "Rain. I can do that."],
     },
+  },
+
+  /* ------------------------------------------------------------------------
+     WAKE HIM (js/wakeup.js) — Take control while he is asleep in bed (any hour he sleeps, so a visit at 03:00 finds him
+     under the quilt). He stretches (the lookup clip, arms up to the window), a flash covers the cut, and he is on the
+     apartment roof facing the sky, ready to cast, in night weather: fog rolling in with far lightning. Let go sends him
+     back to bed by the day's own routes (or the quick catch-up) and the day carries on.
+     ------------------------------------------------------------------------ */
+  wake: {
+    stretch: { clip: "lookup", secs: 0.9 }, // beside the bed: arms up, a look at the window
+    cutSecs: 0.35, // (unused since ready no longer waits on a timer) the flash that hides the move to the roof
+    spot: { x: -21, z: 0.5, yaw: 0.92, from: 14 }, // the apartment roof, as the cold open's
+    camera: { alpha: -2.45, beta: 1.22, radius: 5.6, from: 9, secs: 1.0 }, // dives in from 9 m behind him
+    sky: { state: "fog", intensity: 0.6, flash: [90, -0.3], flashAgainSecs: 2.2 }, // fog and far lightning: both read at night
+    charge: 100,
+    log: "Awake. The sky is open.",
   },
 
   /* ------------------------------------------------------------------------
@@ -850,6 +869,8 @@ window.DAY_CONFIG = {
       sunbreak: "The clouds split. Warm light.",
       dry: "Not enough charge.",
       locked: "Not unlocked yet.",
+      takeover: "He's yours now. Esc lets him go.",
+      takeoverTouch: "He's yours now. Tap Let go to give him back.",
     },
     // Havok debris for the tornado (and bolt/gust shove): street near home plus a dense set on the plaza
     // so a plaza cast lifts 8+. Caps: 30 desktop, 12 low/phone (js/tornado.js).
@@ -2498,6 +2519,24 @@ window.DAY_CONFIG = {
     near: 9, // m: how close for a beat to start
     range: 16, // m: how close he must be when he answers an ask
     tagRange: 90, // m: name tags show this far
+    /* STREET BARKS (js/npcbarks.js): passing a named neighbour (inside `awareness.look`) or casting near them (inside
+       `awareness.react`) gets one short voiced line from them. Every line below is an EXISTING clip (audio/dialogue,
+       same words as a beat, a story line or a remember line; scripts/check-npc-barks.mjs fails on one without a clip),
+       so nothing is generated. `repeat` s: a line is not used again inside it. `gap` s: any two barks. `person` s: one
+       neighbour's pass barks. An empty pool stays quiet. */
+    barks: {
+      delay: 0.6, gap: 7, person: 25, repeat: 180,
+      pass: {
+        birdie: ["A little rain. Not a lot. A little.", "Picked these for you. Don't tell the pigeons."],
+        dex: ["Parcel for you. No return address. It hums a bit.", "Some of that was perfect. Some of that was weather.", "Best seat on the avenue. Keep the beat."],
+        quill: ["The sky is keeping time. So are we.", "Whatever you do, do it on time. The sky keeps a beat."],
+      },
+      cast: {
+        birdie: { rain: ["Look at them drink. Bless you."] },
+        dex: { sun: ["Dry as a bone. I owe you a delivery."], wind: ["The stalls! Mind the stalls!"], rain: ["Parcels, produce, everything's gone soft. You can't sell soft."] },
+        quill: { bolt: ["Got it. Look at that blue."], wind: ["They're turning. Do you see how they turn?"] },
+      },
+    },
     lines: {
       open: "Neighbors",
       title: "Your neighbors",
@@ -2519,6 +2558,16 @@ window.DAY_CONFIG = {
        on a stem and a ground ring that sit on the surface. `places` is [who][verb] -> where it is for. Tapping the marker
        takes control if he's on his day and swings the camera to the ask (`day.control.frame`). Answered or missed, they go. */
     askMarks: {
+      /* The hour's hint on take control (js/hourhint.js): the first entry whose [from, to) holds the hour; one per part of the day. */
+      hourRange: 30, // m: how close he must be to the place for the cast to count
+      hourSecs: 90, // s: the hint waits this long, then goes quietly
+      hours: [
+        { id: "morning", from: 5, to: 11, verb: "rain", place: { x: -6, z: 33, r: 7, name: "the gardens" }, line: "The gardens are dry. A little rain?", thanks: "The tomatoes are drinking it in." },
+        { id: "midday", from: 11, to: 14, verb: "wind", place: { x: 154, z: 9.8, r: 6, name: "the laundry on the annex" }, line: "Washing's out and nothing's moving. A gust?", thanks: "The sheets are flying." },
+        { id: "afternoon", from: 14, to: 17.5, verb: "fog", place: { x: 46, z: 9.8, r: 6, name: "the hot avenue" }, line: "The avenue is baking. Some low cloud would help.", thanks: "The street breathes out." },
+        { id: "evening", from: 17.5, to: 21, verb: "bolt", place: { x: 118, z: 26, r: 7, name: "the plaza" }, line: "Everyone's out in the plaza. Give them a show.", thanks: "The whole plaza looks up." },
+        { id: "night", from: 21, to: 5, verb: "fog", place: { x: 118, z: 26, r: 7, name: "the quiet plaza" }, line: "The city's asleep. Wrap it in fog.", thanks: "Quiet, and a little eerie." },
+      ],
       iconHeight: 6.5, // m over the ground
       markHeight: 0.85, // m over the asker's head
       places: {
@@ -2535,7 +2584,7 @@ window.DAY_CONFIG = {
       range: 18, // m: how close he must be to answer
       nag: 40, // s: an unanswered call is said once more
       steps: [
-        { id: "rain", who: "birdie", unlock: "rain", answer: ["rain"], color: [0.45, 0.7, 1], spot: { x: -21, z: 9.5 },
+        { id: "rain", who: "birdie", unlock: "rain", answer: ["rain"], color: [0.45, 0.7, 1], spot: { x: -21, z: 9.5 }, range: 26, // she waits on the lawn 23 m from the roof he starts on: Rain from there counts
           call: null, // the cold open's line is her call
           thanks: "Look at them drink. Bless you." },
         { id: "sun", who: "dex", unlock: "sunbreak", answer: ["sunbreak"], color: [1, 0.8, 0.35], spot: { x: 46, z: 9.8 },
@@ -2553,7 +2602,7 @@ window.DAY_CONFIG = {
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
         look: { skin: "#e0b794", top: "#f2c230", pants: "#4a5a3a", shoes: "#5a3a22", hair: "#7a5a3a", bun: true, coat: 0.5, hat: { type: "straw", brim: 0.62, color: "#c9a85a", band: "#4f9a5b" }, carry: "basket" },
-        stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5, "sit"], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
+        stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5, null, "water"], [11.5, 109.7, 24.4, "sit", "eat"], [14.8, 44.4, 10.6, null, "chat"], [17, -6, 17.2, null, "water"], [20, -26.5, 9.2, "inside"]],
         /* What she remembers when he walks up (voiced; once a day each): `helped` after he answered her ask, `botched` after he left it. */
         remember: { helped: "Small Weather. My tomatoes are still talking about that rain.", botched: "The tomatoes got by without you. Barely." },
         beats: [
@@ -2565,7 +2614,7 @@ window.DAY_CONFIG = {
       {
         id: "dex", name: "Dex Moreno", role: "Courier, the shop", home: "the shop, mid avenue", scale: 1, color: "#ff7a1a",
         look: { skin: "#8a5a3c", top: "#ff7a1a", pants: "#24262c", shoes: "#e8e8e8", build: 1.1, hat: { type: "helmet", color: "#e8e8e8" }, carry: "parcel" },
-        stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5, "sit"], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
+        stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8, null, "phone"], [9.3, -21, 9.8, null, "chat"], [11.6, 126.3, 24.4, "sit", "eat"], [14.4, 151.6, 10.4, null, "chat"], [17.2, 75, 14.6, null, "phone"], [19.8, 47, 9.8, "inside"]],
         remember: { helped: "Hey, sun break. The parcels stayed dry. I haven't forgotten.", botched: "The parcels came out soggy. No hard feelings. Some." },
         beats: [
           { id: "dex-ask", kind: "ask", from: 7, to: 15, ability: "sunbreak", text: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.", reward: null },
@@ -2576,13 +2625,23 @@ window.DAY_CONFIG = {
       {
         id: "quill", name: "Ines Quill", role: "Stargazer, the annex", home: "the annex, east end", scale: 1.1, color: "#7a5cd6",
         look: { skin: "#e3c4a8", top: "#7a5cd6", pants: "#1c1c2a", shoes: "#1c1c2a", hair: "#2a2038", glasses: "#9fd4ff", coat: 0.55, carry: "telescope" },
-        stops: [[0, 154, 9.8], [6.5, 154, 9.8, "inside"], [16.5, 154, 9.8]],
+        stops: [[0, 154, 9.8, null, "scope"], [6, 126.3, 28.4, "sit", "eat"], [10, 154, 9.8, null, "chat"], [16.8, 60, 78.6, null, "scope"], [21.8, 154, 9.8, null, "scope"]],
         remember: { helped: "That blue is still on my sensor. Thank you.", botched: "No bolt, no photograph. I stayed up anyway." },
         beats: [
           { id: "quill-ask", kind: "ask", from: 17, to: 5, ability: "bolt", text: "Thirty nights and no lightning in my lens. One bolt, if you would. Not at me.", reward: null },
           { id: "quill-thanks", kind: "thanks", text: "Got it. Look at that blue.", reward: { score: 50, pressure: 25, label: "for the photograph" } },
           { id: "quill-surprise", kind: "surprise", from: 20.5, to: 5, text: "Look up. My charts and your weather agree: tonight you're the brightest thing out.", reward: { score: 100, pressure: 60, label: "and a star named for him" } },
         ],
+      },
+      /* A routine-only neighbour (no ask, no beats yet): the bread. Rises early, sells from a plaza stall, lunches on a bench,
+         chats on the shop stoop, locks up at his own door. Stops are [hour, x, z, mode?, idle action?]: `mode` "inside" (drawn
+         nowhere) or "sit"; `action` is what the figure does there: water, phone, scope, chat, eat. Walked on the pavement
+         graph (js/pavement.js), never over the lawn or through a house. */
+      {
+        id: "fenn", name: "Fenn Adeyemi", role: "Baker, the mid block", home: "the mid block, mid avenue", scale: 0.97, color: "#2fa8a0",
+        look: { skin: "#b9825a", top: "#2fa8a0", pants: "#3a3a44", shoes: "#2a2420", hair: "#2a1e18", coat: 0.2 },
+        stops: [[0, 86, 9.6, "inside"], [5.8, 118, 18.4, null, "chat"], [11.8, 109.7, 28.4, "sit", "eat"], [14.6, 47.4, 10.6, null, "chat"], [17.4, 86, 9.8, null, "chat"], [20, 86, 9.6, "inside"]],
+        beats: [],
       },
     ],
     /* PERSONAL ARCS (3 beats each, persisted in js/memory.js `arcs` across real days). Beat kinds:

@@ -28,6 +28,16 @@ if (dist) {
   for (const f of fs.readdirSync(dir).filter((n) => /^(babylon|havok)-.*\.js$/.test(n))) {
     try { await import(path.join(dir, f)); } catch (e) { ok(false, `${f} throws when evaluated: ${e.message}`); }
   }
+  // Every hashed chunk a built file imports (static or dynamic, e.g. pbrMaterialLoadingAdapter-*.js behind Small Weather's glTF
+  // loader) must be in assets/: a deploy missing one 404s the model load.
+  const have = new Set(fs.readdirSync(dir));
+  const refs = /["'`](?:\.\/|\/assets\/)?([A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js)["'`]/g;
+  const html = fs.readFileSync(path.resolve(dist, "index.html"), "utf8");
+  for (const f of have) {
+    if (!f.endsWith(".js")) continue;
+    for (const m of fs.readFileSync(path.join(dir, f), "utf8").matchAll(refs)) ok(have.has(m[1]), `${f} references ${m[1]}, which is not in ${dist}/assets`);
+  }
+  for (const m of html.matchAll(/assets\/([A-Za-z0-9_.-]+\.(?:js|css))/g)) ok(have.has(m[1]), `index.html references ${m[1]}, which is not in ${dist}/assets`);
 }
 if (failed) process.exit(1);
 console.log("check-chunks: ok");

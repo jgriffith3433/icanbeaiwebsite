@@ -8,6 +8,7 @@
    Uses score's ambience bus when present; optional reverb zone hook when day.mix exists.
    day.daysound / window.daysound: now(), scape(), radioWeather(). Events: day:daysound.
    ========================================================================== */
+import { pickRate } from "./variety.js";
 import {
   SCAPES, scapeOf, radioWeatherOf, pickLoops, loopCap, activeLoops,
 } from "./daysound-core.js";
@@ -220,10 +221,6 @@ export function startDaySound(dayApi) {
       })
       .then((ab) => b.ctx.decodeAudioData(ab.slice(0)))
       .then((buf) => {
-        // Equal-power loop seam when score exposes the fixer.
-        try {
-          if (day.score && typeof day.score.fixLoopSeam === "function") day.score.fixLoopSeam(buf, 0.6);
-        } catch (e) { /* */ }
         buffers[url] = buf;
         delete loading[url];
         if (live.loaded.indexOf(url) < 0) live.loaded.push(url);
@@ -272,6 +269,24 @@ export function startDaySound(dayApi) {
     delete playing[id];
   }
 
+  /* Ducked under control: -6 dB (x0.5) on every loop, ramped over 0.4 s. */
+  const DUCK_DB = -6;
+  let duck = 1;
+  function setDuck(on) {
+    const want = on ? Math.pow(10, DUCK_DB / 20) : 1;
+    live.ducked = on;
+    live.duckDb = on ? DUCK_DB : 0;
+    if (want === duck) return;
+    duck = want;
+    try {
+      const b = bus();
+      Object.keys(playing).forEach((id) => {
+        const node = playing[id];
+        if (b && node && node.gain) node.gain.gain.setTargetAtTime(node.vol * duck, b.ctx.currentTime, 0.15);
+      });
+    } catch (e) { /* */ }
+  }
+
   function stopAll(fade) {
     Object.keys(playing).forEach((id) => stopLoop(id, fade));
   }
@@ -291,6 +306,9 @@ export function startDaySound(dayApi) {
     const src = b.ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
+    // Name the bed by its id (the synth beds are all 2.4 s, so the probe's "buf:<secs>x<len>" would read them as one sample) and
+    // start it a little off 1 so a restart is never identical.
+    try { src.__hawkesSampleId = "daysound-loop-" + id; src.playbackRate.value = jitterRate(id); } catch (e) { /* */ }
     const g = b.ctx.createGain();
     g.gain.value = 0.0001;
     let node = g;
@@ -309,7 +327,7 @@ export function startDaySound(dayApi) {
     const vol = (layer && layer.vol != null ? layer.vol : 0.45) * cfg().mix;
     const t0 = b.ctx.currentTime;
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.linearRampToValueAtTime(vol, t0 + cfg().fade);
+    g.gain.linearRampToValueAtTime(vol * duck, t0 + cfg().fade);
     try { src.start(); } catch (e) { return null; }
     playing[id] = { src, gain: g, panner, file: source, vol, spot: layer && layer.at };
     live.sources[id] = source;
@@ -319,11 +337,24 @@ export function startDaySound(dayApi) {
 
   /* The audio probe flags the same sample id at the same rate twice within 60 s. Every (re)start gets a rate a little off 1
      (+-1.5%, never the one this id last had), so a bed that restarts or a repeated one-shot is never identical. */
-  const lastRates = {};
+  const lastRates = {}; // id -> [{ r, t }] of the rates it started at in the last 60 s
   function jitterRate(id) {
+    const t = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+    const list = (lastRates[id] || []).filter((u) => t - u.t <= 60);
+    const clash = (r) => list.some((u) => Math.abs(u.r - r) < 0.003);
     let r = 1 + (Math.random() * 0.03 - 0.015);
-    if (Math.abs(r - (lastRates[id] || 0)) < 0.004) r += r < 1 ? 0.005 : -0.005;
-    lastRates[id] = r;
+    for (let i = 0; i < 24 && clash(r); i++) r = 1 + (Math.random() * 0.03 - 0.015);
+    if (clash(r)) { // crowded: take the free rate farthest from every recent one
+      let best = r, bestD = -1;
+      for (let k = 0; k <= 60; k++) {
+        const c = 0.985 + k * 0.0005;
+        const d = list.reduce((m, u) => Math.min(m, Math.abs(u.r - c)), 9);
+        if (d > bestD) { bestD = d; best = c; }
+      }
+      r = best;
+    }
+    list.push({ r, t });
+    lastRates[id] = list;
     return r;
   }
 
@@ -335,7 +366,7 @@ export function startDaySound(dayApi) {
       if (!buf) return false;
       const src = b.ctx.createBufferSource();
       src.buffer = buf;
-      try { src.__hawkesSampleId = "daysound-" + String(url || synthId || "oneshot").split("/").pop(); src.playbackRate.value = jitterRate(src.__hawkesSampleId); } catch (e) { /* */ }
+      try { src.__hawkesSampleId = "daysound-" + String(url || synthId || "oneshot").split("/").pop(); src.playbackRate.value = pickRate(src.__hawkesSampleId); } catch (e) { /* */ }
       const g = b.ctx.createGain();
       g.gain.value = (vol != null ? vol : 0.5) * cfg().mix;
       let node = g;
@@ -427,7 +458,7 @@ export function startDaySound(dayApi) {
           node.panner.pan.value = p.pan;
           try {
             const b = bus();
-            if (b) node.gain.gain.setTargetAtTime(node.vol * p.gain, b.ctx.currentTime, 0.15);
+            if (b) node.gain.gain.setTargetAtTime(node.vol * p.gain * duck, b.ctx.currentTime, 0.15);
           } catch (e) { /* */ }
         }
       });
@@ -470,16 +501,9 @@ export function startDaySound(dayApi) {
       live.playing = 0;
       return;
     }
-    // Autopilot room tone only: under control the stems / weather beds carry the mix.
+    // Under control the day's room tone stays, ducked about 6 dB (never muted) so the roof is not silent.
     const mode = day.control && typeof day.control.mode === "function" ? day.control.mode() : "schedule";
-    if (mode === "control" || mode === "returning") {
-      if (Object.keys(playing).length) stopAll(0.35);
-      live.on = true;
-      live.playing = 0;
-      live.loops = [];
-      live.keyboard = false;
-      return;
-    }
+    setDuck(mode === "control" || mode === "returning");
     resume();
     const fc = frameContext(info);
     const scape = scapeOf(fc);
@@ -572,6 +596,8 @@ export function startDaySound(dayApi) {
       block: live.block,
       loops: live.loops.slice(),
       playing: live.playing,
+      ducked: !!live.ducked,
+      duckDb: live.duckDb || 0,
       cap: live.cap,
       sources: Object.assign({}, live.sources),
       radio: live.radio ? Object.assign({}, live.radio) : null,

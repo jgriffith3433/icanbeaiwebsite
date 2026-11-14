@@ -16,11 +16,24 @@
    ========================================================================== */
 
 const TAU = Math.PI * 2;
+const POSE_MAX_SPEED = 0.45; // m/s: the cast/throw pose (standing, boots still) shows only below this
 const damp = (cur, target, dt, speed) => cur + (target - cur) * (1 - Math.exp(-speed * dt));
 const dampAngle = (cur, target, dt, speed) => {
   const d = ((((target - cur + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
   return cur + d * (1 - Math.exp(-speed * dt));
 };
+
+/* A turn never exceeds this (deg/s): a reversal of the stick used to swing his heading ~1900 deg/s in one frame. */
+export const TURN_MAX_DEG = 600;
+const wrapAng = (d) => ((((d + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
+const turnToward = (cur, target, dt, speed, maxDeg) => {
+  const d = wrapAng(target - cur);
+  const step = d * (1 - Math.exp(-speed * dt));
+  const cap = (maxDeg * Math.PI / 180) * dt;
+  return cur + Math.max(-cap, Math.min(cap, step));
+};
+/* The turn-in-place before a cast: 600 deg/s, so 90 deg takes 0.15 s and 180 deg 0.3 s. */
+export const turnSeconds = (deg) => Math.min(0.3, Math.max(0.15, Math.abs(deg) / TURN_MAX_DEG));
 
 export const MOVE_DEFAULTS = {
   walk: 2.4,
@@ -62,6 +75,7 @@ export function createMover(world, cfg) {
     x: 0, y: 0, z: 0, yaw: 0, vx: 0, vy: 0, vz: 0,
     grounded: true, coyote: 0, airTime: 0, jumpsLeft: M.airJumps, jumps: 0, takeoffY: 0, peak: 0,
     floating: false, gliding: false, softLand: false, lift: 0, anim: "idle", speed: 0,
+    jumpId: 0, landId: 0, landDrop: 0, // counters the skin and the camera read: each take-off press, each touchdown and how far it fell
     flights: 0, lastFlight: null, // { jumps, height, soft?, glide? } of the last time he was in the air
   };
   let cc = null;
@@ -99,20 +113,42 @@ export function createMover(world, cfg) {
     p.plugin.raycast(new B.Vector3(x, fromY, z), new B.Vector3(x, -1, z), ray, cc ? { ignoreBody: cc._body } : undefined);
     return ray.hasHit ? ray.hitPoint.y : guessFloor(x, z);
   }
+  /* The footprint probed for room to stand: the centre, a ring at half the radius and 12 points just outside it, so a couch
+     arm, a table leg or a shelf's edge between four compass points can't hide (the stand-up once put his legs in the couch). */
+  const CLEAR_PTS = [[0, 0]];
+  for (let i = 0; i < 8; i++) CLEAR_PTS.push([Math.sin((i / 8) * TAU) * R * 0.5, Math.cos((i / 8) * TAU) * R * 0.5]);
+  for (let i = 0; i < 12; i++) CLEAR_PTS.push([Math.sin((i / 12) * TAU) * (R + 0.12), Math.cos((i / 12) * TAU) * (R + 0.12)]);
   /* Room to stand: nothing knee-high where his capsule would be. */
   function clear(x, z) {
     if (!physics()) return true;
-    return [[0, 0], [R, 0], [-R, 0], [0, R], [0, -R]].every(([dx, dz]) => floorAt(x + dx, z + dz, 2.3) < 0.3);
+    return CLEAR_PTS.every(([dx, dz]) => floorAt(x + dx, z + dz, 2.3) < 0.3);
   }
-  function freeSpotNear(x, z) {
+  /* How much open floor lies around (x, z): of 16 points on a 0.9 m ring, how many have nothing knee-high on them. */
+  const ROOM_PTS = [];
+  for (let i = 0; i < 16; i++) ROOM_PTS.push([Math.sin((i / 16) * TAU) * 0.9, Math.cos((i / 16) * TAU) * 0.9]);
+  function openness(x, z) {
+    let n = 0;
+    for (const [dx, dz] of ROOM_PTS) if (floorAt(x + dx, z + dz, 2.3) < 0.3) n++;
+    return n;
+  }
+  /* The nearest room to stand. Within the first ring that has any, the most open spot wins: the first fit used to be the gap between
+     the couch and the coffee table (0.69 m for a 0.72 m capsule), so he stood up wedged against the table with the couch's dark
+     back drawn right under his boots, which a high camera reads as him perched on a floating slab. A spot ahead of him (the way
+     he faces: the TV, the desk) wins ties, so he steps out in front of the seat rather than behind it. */
+  function freeSpotNear(x, z, yaw) {
     if (clear(x, z)) return { x, z };
     for (const r of [0.45, 0.7, 1.0, 1.4, 1.9]) {
+      let best = null;
+      let bestScore = -1;
       for (let i = 0; i < 12; i++) {
         const a = (i / 12) * TAU;
         const px = x + Math.sin(a) * r;
         const pz = z + Math.cos(a) * r;
-        if (clear(px, pz)) return { x: px, z: pz };
+        if (!clear(px, pz)) continue;
+        const score = physics() ? openness(px, pz) + 6 * ((px - x) * Math.sin(yaw || 0) + (pz - z) * Math.cos(yaw || 0)) / r : 0;
+        if (score > bestScore) { best = { x: px, z: pz }; bestScore = score; }
       }
+      if (best) return best;
     }
     return { x, z };
   }
@@ -120,11 +156,12 @@ export function createMover(world, cfg) {
   /* He's the player's from (x, z): if the day had him in a chair or in bed, he stands up beside it. */
   function start(x, z, yaw, from) {
     // `from` (a roof's height + a little): stand on whatever is under that height, not the street (the opening's roof)
-    const p = from != null ? { x, z } : freeSpotNear(x, z);
+    const p = from != null ? { x, z } : freeSpotNear(x, z, yaw);
     s.x = p.x;
     s.z = p.z;
     s.y = floorAt(p.x, p.z, from != null ? from : 2.3);
     s.yaw = yaw;
+    s.face = null;
     s.vx = s.vy = s.vz = 0;
     s.grounded = true;
     s.jumpsLeft = M.airJumps;
@@ -167,6 +204,7 @@ export function createMover(world, cfg) {
     }
 
     if (onGround) {
+      if (!s.grounded && s.airTime > 0.08) { s.landId++; s.landDrop = Math.max(0, s.peak - s.y); }
       if (!s.grounded && s.jumps) {
         s.lastFlight = {
           jumps: s.jumps,
@@ -191,7 +229,7 @@ export function createMover(world, cfg) {
       s.jumpsLeft = M.airJumps;
       s.jumps = 0;
     } else {
-      if (s.grounded) s.takeoffY = s.y; // walked off an edge
+      if (s.grounded) { s.takeoffY = s.y; s.peak = s.y; } // walked off an edge
       s.grounded = false;
       s.coyote = Math.max(0, s.coyote - h);
       s.airTime += h;
@@ -202,6 +240,7 @@ export function createMover(world, cfg) {
         s.vy = jumpVel;
         s.takeoffY = s.y;
         s.peak = s.y;
+        s.jumpId++;
         s.jumps = 1;
         s.airTime = 0;
         s.grounded = false;
@@ -291,10 +330,23 @@ export function createMover(world, cfg) {
     age += dt;
     if (updrafts.length) updrafts = updrafts.filter((u) => u.until == null || age < u.until);
     const n = Math.max(1, Math.ceil(dt / (1 / 30)));
-    let speed = 0;
-    for (let i = 0; i < n; i++) speed += sub(dt / n, input, i === 0 ? input.jump || 0 : 0) / n;
+    const fx0 = s.x, fz0 = s.z;
+    for (let i = 0; i < n; i++) sub(dt / n, input, i === 0 ? input.jump || 0 : 0);
+    /* His speed is the net ground he covered this frame, not the sum of each sub-step's push: pressed into furniture the
+       capsule is shoved in and out, and summing that read as running while he went nowhere (the walk cycle played on
+       boots that slid, anim.footSlideSeconds). */
+    const speed = Math.hypot(s.x - fx0, s.z - fz0) / Math.max(dt, 1e-6);
     s.speed = damp(s.speed, speed, dt, 10);
-    if (Math.hypot(input.x || 0, input.z || 0) > 0.1) s.yaw = dampAngle(s.yaw, Math.atan2(input.x, input.z), dt, 12);
+    if (Math.hypot(input.x || 0, input.z || 0) > 0.1) {
+      s.yaw = turnToward(s.yaw, Math.atan2(input.x, input.z), dt, 12, TURN_MAX_DEG);
+      s.face = null;
+    } else if (s.face) {
+      // turn in place toward the cast (linear: the rate is the cap, never a snap)
+      const f = s.face;
+      f.t = Math.min(f.dur, f.t + dt);
+      s.yaw = f.from + f.d * (f.t / f.dur);
+      if (f.t >= f.dur) s.face = null;
+    }
     s.anim = pickAnim(s.speed);
     return s;
   }
@@ -304,7 +356,18 @@ export function createMover(world, cfg) {
     const here = E.roomAt(world.rooms, s.x, s.z);
     const far = Math.hypot(target.x - s.x, target.z - s.z);
     const sameBuilding = here && target.room && world.rooms[here] && world.rooms[target.room] && world.rooms[here].building === world.rooms[target.room].building;
-    route = { path: E.route(world.rooms, { x: s.x, z: s.z, room: here }, target), i: 1, room: target.room, catchUp: !!target.inCar || (!sameBuilding && far > 40) };
+    let path = E.route(world.rooms, { x: s.x, z: s.z, room: here }, target);
+    // On a walkable roof he goes down the block's own stair, not straight off the parapet (the wake-him cut puts him on the apt roof).
+    const blocks = (window.DAY_CONFIG && window.DAY_CONFIG.city && window.DAY_CONFIG.city.blocks) || [];
+    const roof = !here && blocks.find((b) => b.stair && Math.abs(s.x - b.x) <= b.w / 2 && Math.abs(s.z - b.z) <= b.d / 2 && s.y > b.h - 1);
+    if (roof) {
+      const st = roof.stair;
+      const top = { x: st.x1 - 0.3, z: st.z };
+      const foot = { x: st.x0, z: st.z };
+      const rest = E.route(world.rooms, { x: foot.x, z: foot.z, room: world.rooms.yard ? "yard" : null }, target);
+      path = [{ x: s.x, z: s.z }, top, foot].concat(rest.slice(1));
+    }
+    route = { path, i: 1, room: target.room, catchUp: !!target.inCar || (!sameBuilding && far > 40) };
   }
   function walkBack(dt, target) {
     if (!route || route.room !== target.room) planBack(target);
@@ -325,7 +388,7 @@ export function createMover(world, cfg) {
       const go = Math.min(d, left);
       s.x += (dx / d) * go;
       s.z += (dz / d) * go;
-      s.yaw = dampAngle(s.yaw, Math.atan2(dx, dz), dt, 10);
+      s.yaw = turnToward(s.yaw, Math.atan2(dx, dz), dt, 10, TURN_MAX_DEG);
       left -= go;
       moved += go;
       if (go >= d - 1e-6) route.i++;
@@ -333,6 +396,7 @@ export function createMover(world, cfg) {
     // down off whatever he was standing on, gently; never up onto furniture (the ray starts inside it)
     let floor = floorAt(s.x, s.z, s.y + 0.35);
     if (floor > s.y + 0.3) floor = s.y;
+    if (s.y > floor + 0.01 && s.y - floor <= STEP_DOWN) s.y = floor; // a stair or ramp is stepped down, not fallen
     s.vy = s.y > floor + 0.01 ? Math.max(-M.maxFall, s.vy - M.gravity * dt) : 0;
     s.y = Math.max(floor, s.y + s.vy * dt);
     s.grounded = s.y <= floor + 0.01;
@@ -346,8 +410,18 @@ export function createMover(world, cfg) {
   return {
     state: s,
     move: M,
+    standSpot: freeSpotNear,
     start,
     step,
+    /* Turn in place to face `yaw` (a cast's aim): linear at TURN_MAX_DEG, 0.15-0.3 s. Returns { deg, dur, step } (step: over 90 deg). */
+    face(yaw) {
+      const d = wrapAng(yaw - s.yaw);
+      const deg = Math.abs(d) * 180 / Math.PI;
+      if (deg < 4) { s.face = null; return { deg, dur: 0, step: false }; }
+      const dur = turnSeconds(deg);
+      s.face = { from: s.yaw, d, t: 0, dur, step: deg > 90 };
+      return { deg, dur, step: deg > 90 };
+    },
     walkBack,
     walkBackSpeed,
     route: () => route,
@@ -412,6 +486,7 @@ function install() {
   let mode = "schedule"; // schedule | control | returning
   let since = 0; // seconds in this mode
   let catchUpAt = 0;
+  let bedSide = null; // the stand-up spot beside the bed for the walk back
   let lastFrame = null;
   const log = []; // what happened, for the playtest: { t, what }
   const mark = (what, detail) => {
@@ -467,6 +542,15 @@ function install() {
     }
   }
   let lastDriving = null;
+  // The hint is a first-time pill: once he has cast anything it has done its job, so it goes away for good.
+  window.addEventListener("day:power", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "denied" || d.action === "unlock") return;
+    hint.classList.add("hint-faded");
+    hint.hidden = true;
+    clearTimeout(hint._fade);
+    try { localStorage.setItem(HINT_SEEN_KEY, "1"); } catch (err) { /* private */ }
+  });
 
   // Touch acts on pointerdown/up, not on the click that follows (a click can lag or never come): the press takes control at once,
   // and the click that follows the same tap is swallowed so it doesn't let go again.
@@ -526,8 +610,11 @@ function install() {
     sphere: 0.3, // the camera's collision radius (its near plane is 0.2)
     stepM: 1.3, // the most the camera moves by turning, tilting or a pull-in in one frame, metres (the sensor's limit is 3)
     blendSecs: 0.6,
-    recenterAfter: 2, recenterRate: 5, touchSens: 420,
+    dipFrom: 2, dipBase: 0.1, dipPer: 0.03, dipMax: 0.25, dipDown: 0.09, dipUp: 0.35, // the landing dip (a fall over 2 m)
+    recenterAfter: 1.5, recenterRate: 5, touchSens: 420,
+    minDist: 2.2, liftMax: 0.9, easeOut: 10, // keep at least this much camera distance by lifting over the obstacle; ease-out spring rate
     castSecs: 1.8, castRise: 0.3, castFall: 0.5,
+    glanceSecs: 2.25, glanceRise: 0.35, glanceFall: 0.45,
     cast: {},
   }, C.camera || {});
   const CAST = Object.assign({
@@ -556,11 +643,111 @@ function install() {
   const cs = {
     aimA: null, shownA: null, shownB: null, // the yaw asked for (his heading, the player's drag) and the yaw drawn
     tp: null, tv: { x: 0, y: 0, z: 0 }, ahead: { x: 0, z: 0 },
-    appliedB: 0, lastFinalA: null, lastFinalB: null, lastMs: 0, lookAt: 0, lookDown: false,
+    appliedB: 0, liftB: 0, rv: 0, lastFinalA: null, lastFinalB: null, lastMs: 0, lookAt: 0, lookDown: false,
     blend: null, cast: null,
     fresh: true, // the next frame follows a cut (take, place): no yaw rate sample
   };
-  const camStats = { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], recentres: 0, lookDrags: 0 };
+  const camStats = { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], glances: [], lastGlanceCancelMs: null, recentres: 0, lookDrags: 0, dipMax: 0 };
+  const firstCastSeen = new Set();
+  const canonVerb = (id) => {
+    if (id === "storm" || id === "bolt") return "bolt";
+    if (id === "gust" || id === "gale" || id === "wind") return "wind";
+    return id || "default";
+  };
+  /* Pitch (camera.beta) that places a world reaction spot (gx, gy, gz) into the middle third of the screen above the controls. */
+  function glanceBeta(gx, gy, gz, rad) {
+    const r0 = rad || wantRadius || 5.6;
+    const d = Math.max(2, Math.hypot(gx - s.x, gz - s.z));
+    const dy = (s.y + 1.35) - (gy == null ? 0.06 : gy);
+    const thetaRay = Math.atan2(dy + r0 * Math.cos(1.28), d + r0 * Math.sin(1.28));
+    return clamp(Math.PI * 0.5 - thetaRay - 0.035, 1.02, 1.38);
+  }
+  /* Pick the spot that reacts to a cast: an open ask (or the cold open's park lawn, pots and pond), else the first cast of each power. */
+  function resolveGlanceSpot(id, aim) {
+    const canon = canonVerb(id);
+    const isFirst = !firstCastSeen.has(id) && !firstCastSeen.has(canon);
+    firstCastSeen.add(id);
+    firstCastSeen.add(canon);
+    const inCold = !!(day.coldopen && day.coldopen.active && day.coldopen.active());
+    const inFirstRain = !!(day.firstrain && day.firstrain.now && day.firstrain.now().active);
+    const streetOpen = (day.street && day.street.open && day.street.open()) || null;
+    const askMarks = (day.asks && day.asks.now && day.asks.now().marks) || [];
+    const curA = cs.aimA != null ? cs.aimA : camera.alpha;
+    if (canon === "rain") {
+      const hasRainAsk = inCold || inFirstRain || (streetOpen && streetOpen.verb === "rain") || askMarks.some((m) => m.verb === "rain");
+      if (hasRainAsk || (isFirst && s.x < 35 && s.z < 75)) {
+        const gx = s.y > 3 ? -1 : -3;
+        const gz = s.y > 3 ? 39 : 35;
+        const parkA = Math.atan2(gz - s.z, gx - s.x) + Math.PI;
+        const offA = Math.abs(wrapPi(parkA - curA));
+        if (inCold || inFirstRain || (streetOpen && streetOpen.verb === "rain") || offA <= 1.35) {
+          return {
+            glance: true, x: gx, y: 0.06, z: gz,
+            reason: inCold ? "coldopen" : hasRainAsk ? "ask" : "first-cast",
+            spots: [
+              { name: "lawn", x: -6, y: 0.06, z: 33 },
+              { name: "pond", x: 15, y: 0.07, z: 60 },
+              { name: "pots", x: -18.9, y: 0.4, z: 9.15 },
+            ],
+          };
+        }
+      }
+    }
+    const mk = askMarks.find((m) => m.verb === canon && m.place && Math.hypot(m.place.x - s.x, m.place.z - s.z) < 65);
+    if (mk && mk.place) {
+      const mkA = Math.atan2(mk.place.z - s.z, mk.place.x - s.x) + Math.PI;
+      if ((streetOpen && streetOpen.verb === canon) || Math.abs(wrapPi(mkA - curA)) <= 1.35) {
+        return {
+          glance: true, x: mk.place.x, y: mk.place.y || 0.4, z: mk.place.z, reason: "ask",
+          spots: [{ name: mk.key || (mk.who + "-" + canon), x: mk.place.x, y: mk.place.y || 0.4, z: mk.place.z }],
+        };
+      }
+    }
+    if (streetOpen && streetOpen.verb === canon) {
+      const places = (day.asks && day.asks.places && day.asks.places()) || {};
+      const pl = (places[streetOpen.who] && places[streetOpen.who][streetOpen.verb]) || { x: streetOpen.x, y: 0.4, z: streetOpen.z };
+      return {
+        glance: true, x: pl.x, y: pl.y || 0.4, z: pl.z, reason: "ask",
+        spots: [{ name: streetOpen.id || canon, x: pl.x, y: pl.y || 0.4, z: pl.z }],
+      };
+    }
+    const gy = aim.y == null ? s.y : aim.y;
+    if (isFirst) {
+      return {
+        glance: true, x: aim.x, y: gy, z: aim.z, reason: "first-cast",
+        spots: [{ name: id, x: aim.x, y: gy, z: aim.z }],
+      };
+    }
+    return { glance: false, x: aim.x, y: gy, z: aim.z, reason: "cast", spots: [] };
+  }
+  function cancelGlance(why, inputAt) {
+    if (!cs.cast || !cs.cast.glance) return false;
+    const c = cs.cast;
+    const nowMs = performance.now();
+    const cancelMs = Math.max(1, Math.round(nowMs - (inputAt || c.inputAt || nowMs)));
+    if (cs.shownA != null) cs.aimA = cs.shownA;
+    if (cs.shownB != null) {
+      camera.beta = clamp(cs.shownB, camera.lowerBetaLimit, camera.upperBetaLimit);
+      cs.appliedB = 0;
+    }
+    cs.cast = null;
+    cs.lookAt = nowMs;
+    const rec = {
+      power: c.power,
+      reason: c.reason || "glance",
+      spot: { x: c.x, y: c.y, z: c.z },
+      seconds: Math.round(c.t * 100) / 100,
+      framedSeconds: Math.round(c.best * 100) / 100,
+      cancelled: true,
+      cancelWhy: why || "input",
+      cancelMs,
+    };
+    camStats.glances.push(rec);
+    if (camStats.glances.length > 40) camStats.glances.shift();
+    camStats.lastGlanceCancelMs = cancelMs;
+    window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "glance-cancel", ...rec } }));
+    return true;
+  }
   function camReset() {
     cs.aimA = cs.shownA = cs.shownB = null;
     cs.tp = null;
@@ -574,7 +761,10 @@ function install() {
     cs.lookAt = performance.now();
   }
   function cameraTake() {
-    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit", "angularSensibilityX", "angularSensibilityY"].forEach((k) => (saved[k] = camera[k]));
+    // a hand-back still waiting on its limits keeps the day's own (saved) ones: the control's wider ones are on the camera now
+    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => { if (!limitsPending[k]) saved[k] = camera[k]; });
+    limitsPending = {};
+    ["angularSensibilityX", "angularSensibilityY"].forEach((k) => (saved[k] = camera[k]));
     const watch = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, x: camera.target.x, y: camera.target.y, z: camera.target.z };
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => ((saved[k] = kb[k]), (kb[k] = [])));
     camera.lowerRadiusLimit = 0.2; // a wall behind him may pull the camera in this close, inside his own head (the wheel stops at 1.5)
@@ -639,9 +829,26 @@ function install() {
     himVis = v;
     if (world.person) world.person.getChildMeshes(false).forEach((m) => (m.visibility = v));
   }
+  let limitsPending = {};
+  function settleLimits() {
+    const ok = {
+      lowerRadiusLimit: () => camera.radius >= saved.lowerRadiusLimit,
+      upperRadiusLimit: () => camera.radius <= saved.upperRadiusLimit,
+      lowerBetaLimit: () => camera.beta >= saved.lowerBetaLimit,
+      upperBetaLimit: () => camera.beta <= saved.upperBetaLimit,
+    };
+    for (const k of Object.keys(limitsPending)) {
+      if (saved[k] == null || ok[k]()) { camera[k] = saved[k]; delete limitsPending[k]; }
+    }
+  }
   function cameraGive() {
     if (himVis !== 1) setHimVis(1);
-    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit", "angularSensibilityX", "angularSensibilityY"].forEach((k) => (camera[k] = saved[k]));
+    ["angularSensibilityX", "angularSensibilityY"].forEach((k) => (camera[k] = saved[k]));
+    /* The day's camera limits (radius >= 2.5, beta 0.35..1.42) are tighter than the control's (0.2, 0.25..1.62). Babylon clamps
+       at once when a limit is restored under a camera outside it, which moved the camera metres in one frame (the feel sensor's
+       camera-jump on a Let go from a squeezed or low camera). Restore each when the damped day camera is inside it. */
+    limitsPending = { lowerRadiusLimit: 1, upperRadiusLimit: 1, lowerBetaLimit: 1, upperBetaLimit: 1 };
+    settleLimits();
     camReset();
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
     glidePull = 0;
@@ -653,10 +860,19 @@ function install() {
      target up on screen, smoothly, until his feet sit just above the top of that bottom stack. The reference is the
      damped target, not his feet, so a jump doesn't swing the shot. Phones keep the centre (their pads are at the sides). */
   function hudLiftGoal() {
-    if (touchMode()) return 0;
+    if (cs.cast && cs.cast.glance) return 0;
     const cv = world.scene.getEngine().getRenderingCanvas();
     const ch = cv ? cv.clientHeight : 0;
     const cw = cv ? cv.clientWidth : 0;
+    if (touchMode()) {
+      // Phone portrait: the verb arc and stick fill the lower half, so he sits in the upper-middle (chest at ~36% of the
+      // screen height), clear of the arc. Landscape keeps the centre (the arc is at the right edge, he is left of it).
+      if (ch < 300 || ch <= cw) return 0;
+      const tt = camera.target;
+      const dd = Math.max(1, B.Vector3.Distance(camera.globalPosition, new B.Vector3(tt.x, tt.y, tt.z)));
+      const ppm = ch / 2 / (dd * Math.tan((camera.fov || 0.78) / 2));
+      return (0.14 * ch) / ppm;
+    }
     if (ch < 300) return 0;
     const now = performance.now();
     if (hudTop == null || now - hudAt > 250) {
@@ -718,7 +934,8 @@ function install() {
     lastRadius = null;
   }
   /* A cast frames him and where it lands: the camera eases (rise, hold, fall: about 1.8 s) round behind him so the target is
-     ahead of it, and changes its angle by the power (a slight push for Lightning, low for a Tornado). */
+     ahead of it, and changes its angle by the power (a slight push for Lightning, low for a Tornado). On the first cast of each
+     power (and any cast aimed at an ask), it glances for ~1.5 s to the reacting spot in the world and eases back; any input cancels it. */
   window.addEventListener("day:power", (e) => {
     const d = e.detail || {};
     if (mode !== "control" || d.action === "denied" || cine()) return;
@@ -727,7 +944,27 @@ function install() {
     try { aim = pw && pw.now ? pw.now().aim : null; } catch (err) { aim = null; }
     const id = d.power || d.action || "default";
     if (!aim) aim = { x: s.x + Math.sin(s.yaw) * 6, z: s.z + Math.cos(s.yaw) * 6, y: s.y };
-    cs.cast = { t: 0, power: id, x: aim.x, y: aim.y == null ? s.y : aim.y, z: aim.z, run: 0, best: 0, frames: 0, framedFrames: 0 };
+    const gl = resolveGlanceSpot(id, aim);
+    const nowMs = performance.now();
+    if (cs.cast && cs.cast.frames > 0) {
+      camStats.casts.push({ power: cs.cast.power, framedSeconds: Math.round(cs.cast.best * 100) / 100, frames: cs.cast.frames, glance: !!cs.cast.glance });
+      if (camStats.casts.length > 40) camStats.casts.shift();
+    }
+    cs.cast = {
+      t: 0, power: id, x: gl.x, y: gl.y == null ? s.y : gl.y, z: gl.z,
+      glance: !!gl.glance, reason: gl.reason || "cast", spots: gl.spots || [],
+      aimBeta: gl.glance ? glanceBeta(gl.x, gl.y, gl.z, wantRadius) : null,
+      secs: gl.glance ? CAM.glanceSecs : CAM.castSecs,
+      rise: gl.glance ? CAM.glanceRise : CAM.castRise,
+      fall: gl.glance ? CAM.glanceFall : CAM.castFall,
+      startedAt: nowMs, inputAt: 0, inFrame: false, middleThird: false, framedEventSent: false,
+      run: 0, best: 0, frames: 0, framedFrames: 0,
+    };
+    if (gl.glance) {
+      window.dispatchEvent(new CustomEvent("day:camera", {
+        detail: { action: "glance-start", power: id, reason: gl.reason, spot: { x: gl.x, y: gl.y, z: gl.z } },
+      }));
+    }
   });
   const cine = () => !!(world.cineOn && world.cineOn());
   /* One-finger drag on the right half of the screen looks round; the left half is the stick's, so it does nothing there. */
@@ -791,23 +1028,38 @@ function install() {
   }
   /* The scene's own pick from his head to the camera (what the feel sensor casts): the colliders and clearRadius miss thin walls,
      small blocks and meshes with no collider, so the camera could sit behind one. Returns r pulled in until the head sees it. */
+  const HEAD_MARGIN = 0.45;
   const headPickRay = new B.Ray(new B.Vector3(), new B.Vector3(0, 1, 0), 1);
   const notHim = (m) => m.isPickable !== false && m.isEnabled() && m.isVisible !== false && !(world.person && m.isDescendantOf(world.person));
   function headClear(t, dx, dy, dz, r) {
     const hx = s.x, hy = s.y + 1.5, hz = s.z;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6; i++) { // each hit pulls the camera in front of it; more than one wall (a room's wall, then its furniture) needs more passes
       const cx = t.x + dx * r, cy = t.y + dy * r, cz = t.z + dz * r;
       const len = Math.hypot(cx - hx, cy - hy, cz - hz);
       if (len < 0.5) return r;
       headPickRay.origin.set(hx, hy, hz);
       headPickRay.direction.set((cx - hx) / len, (cy - hy) / len, (cz - hz) / len);
-      headPickRay.length = len;
-      const hit = world.scene.pickWithRay(headPickRay, notHim, true);
-      if (!hit || !hit.hit || hit.distance >= len - 0.3) return r;
+      // Cast past the camera: the sensor flags a wall 0.3 m short of it, and the drawn camera is a little off this frame's computed
+      // one (the screen-offset lift, shake, a frame of radius lag), so a wall just behind the camera counts as in the way too.
+      headPickRay.length = len + HEAD_MARGIN;
+      // nearest hit (fastCheck false): a fast check returns the first mesh found, not the closest, so a far hit read as "clear"
+      // while a nearer wall sat between his head and the camera (the feel sensor's camera-blocked)
+      const hit = world.scene.pickWithRay(headPickRay, notHim, false);
+      if (!hit || !hit.hit || hit.distance >= len + HEAD_MARGIN - 0.1) return r;
       r = Math.max(0.2, r * Math.max(0.1, (hit.distance - 0.6) / len));
     }
     return r;
   }
+  /* The camera's own input pass (a pinch's or wheel's inertia) runs after cameraFollow and used to push the radius past the wall-safe
+     one for a frame or more, so the camera sat behind a wall (the feel sensor's camera-blocked, on a phone's pinch). Keep it to what
+     cameraFollow found safe; the asked-for zoom is remembered (cs.zoomIn) and becomes wantRadius next frame. */
+  camera.onAfterCheckInputsObservable.add(() => {
+    if (mode !== "control" || lastRadius == null || cs.safeR == null || cs.blend || push.on) return;
+    if (camera.radius > lastRadius + 1e-3 && camera.radius > cs.safeR + 0.02) {
+      cs.zoomIn = camera.radius;
+      camera.radius = Math.min(camera.radius, Math.max(lastRadius, cs.safeR));
+    }
+  });
   function cameraFollow(dt, look) {
     if (cine()) return; // a moment's cut-away camera (js/moments.js) has the view
     const nowMs = performance.now();
@@ -822,11 +1074,18 @@ function install() {
     if (look.x || look.y) cs.lookAt = nowMs;
     cs.aimA -= look.x * 2.4 * dt;
     camera.beta = Math.max(camera.lowerBetaLimit, Math.min(camera.upperBetaLimit, camera.beta - look.y * 1.5 * dt));
+    if (cs.cast && cs.cast.glance && nowMs - (cs.cast.startedAt || 0) > 40) {
+      if (Math.abs(drag) > 1e-3 || Math.hypot(look.x, look.y) > 0.05 || keys.size > 0 || stick.id != null || Math.hypot(stick.x, stick.y) > 0.05 || touchJumpHeld || jumps > 0) {
+        cancelGlance("input", nowMs);
+      }
+    }
     // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
-    if (!push.on && lastRadius != null && !cs.blend && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
+    const zoomSeen = cs.zoomIn != null ? cs.zoomIn : camera.radius; // the zoom the player asked for, even if the input pass was held back from it
+    cs.zoomIn = null;
+    if (!push.on && lastRadius != null && !cs.blend && Math.abs(zoomSeen - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, zoomSeen - glidePull));
     if (cs.lookDown || Math.abs(stick.x) > 0.35 || keys.has("l") || keys.has("r")) cs.lookAt = nowMs; // steering sideways is turning, not idling (the camera would chase him round)
     const touch = touchMode();
-    if (touch && !push.on && !cs.cast && !cs.blend && nowMs - cs.lookAt > CAM.recenterAfter * 1000) {
+    if (!push.on && !cs.cast && !cs.blend && nowMs - cs.lookAt > CAM.recenterAfter * 1000) {
       // idle after a look: swing round behind him, and level the pitch
       const behind = Math.atan2(-Math.cos(s.yaw), -Math.sin(s.yaw));
       const k = Math.min(1, CAM.recenterRate * dt);
@@ -865,8 +1124,21 @@ function install() {
     [cs.tp.x, cs.tv.x] = spring1(cs.tp.x, cs.tv.x, s.x + cs.ahead.x, wxz, dt);
     [cs.tp.z, cs.tv.z] = spring1(cs.tp.z, cs.tv.z, s.z + cs.ahead.z, wxz, dt);
     [cs.tp.y, cs.tv.y] = spring1(cs.tp.y, cs.tv.y, s.y + 1.35, bl ? Math.min(wy, wxz) : wy, dt);
+    /* a light dip when he lands from over 2 m: the view sinks with the squash (down 0.09 s, back up over 0.35 s) */
+    if (s.landId !== cs.landSeen) {
+      if (cs.landSeen != null && s.landDrop > CAM.dipFrom) cs.dip = { t: 0, depth: Math.min(CAM.dipMax, CAM.dipBase + CAM.dipPer * (s.landDrop - CAM.dipFrom)) };
+      cs.landSeen = s.landId;
+    }
+    let dipY = 0;
+    if (cs.dip) {
+      cs.dip.t += dt;
+      const dd = cs.dip.t < CAM.dipDown ? smooth01(cs.dip.t / CAM.dipDown) : 1 - smooth01((cs.dip.t - CAM.dipDown) / CAM.dipUp);
+      dipY = cs.dip.depth * dd;
+      if (cs.dip.t >= CAM.dipDown + CAM.dipUp) cs.dip = null;
+    }
+    camStats.dipMax = Math.max(camStats.dipMax || 0, dipY);
     const t = camera.target;
-    t.set(cs.tp.x, cs.tp.y, cs.tp.z);
+    t.set(cs.tp.x, cs.tp.y - dipY, cs.tp.z);
     const pullWant = s.gliding ? (RIDE.cameraPull || 3.4) : 0;
     glidePull = damp(glidePull, pullWant, dt, 2.4);
     let r = wantRadius + glidePull;
@@ -878,24 +1150,47 @@ function install() {
       camera.fov = push.baseFov + push.fov * (1 - e);
       if (k >= 1) pushEnd();
     }
-    // ---- a cast frames him and the target ----
+    // ---- a cast frames him and the target (and a reaction glance eases to the reacting spot for ~1.5 s) ----
     let castA = 0, castB = 0, castR = 0;
     const cst = cs.cast;
     if (cst) {
       cst.t += dt;
-      if (cst.t >= CAM.castSecs) {
-        camStats.casts.push({ power: cst.power, framedSeconds: Math.round(cst.best * 100) / 100, frames: cst.frames });
+      const dur = cst.glance ? (cst.secs || CAM.glanceSecs) : CAM.castSecs;
+      const rise = cst.glance ? (cst.rise || CAM.glanceRise) : CAM.castRise;
+      const fall = cst.glance ? (cst.fall || CAM.glanceFall) : CAM.castFall;
+      if (cst.t >= dur) {
+        camStats.casts.push({ power: cst.power, framedSeconds: Math.round(cst.best * 100) / 100, frames: cst.frames, glance: !!cst.glance });
         if (camStats.casts.length > 40) camStats.casts.shift();
-        window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "cast-framed", power: cst.power, seconds: cst.best } }));
+        if (cst.glance) {
+          const rec = {
+            power: cst.power,
+            reason: cst.reason || "glance",
+            spot: { x: cst.x, y: cst.y, z: cst.z },
+            seconds: Math.round(cst.t * 100) / 100,
+            framedSeconds: Math.round(cst.best * 100) / 100,
+            cancelled: false,
+          };
+          camStats.glances.push(rec);
+          if (camStats.glances.length > 40) camStats.glances.shift();
+          window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "glance-end", ...rec } }));
+        }
+        window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "cast-framed", power: cst.power, seconds: cst.best, glance: !!cst.glance } }));
         cs.cast = null;
       } else {
-        const env = smooth01(cst.t / CAM.castRise) * (1 - smooth01((cst.t - (CAM.castSecs - CAM.castFall)) / CAM.castFall));
+        const env = smooth01(cst.t / rise) * (1 - smooth01((cst.t - (dur - fall)) / fall));
         const P = CAST[cst.power] || CAST.default;
         const wr = wrapPi(Math.atan2(cst.z - s.z, cst.x - s.x) + Math.PI - cs.aimA); // the heading that puts the target dead ahead
-        castA = clamp(wr, -2.4, 2.4) * smooth01((Math.abs(wr) - 0.12) / 0.4) * P.align * env;
-        castB = P.beta * env;
-        const D = Math.hypot(cst.x - s.x, cst.z - s.z);
-        castR = (P.rad + 0.16 * Math.max(0, D - 10)) * env;
+        if (cst.glance) {
+          castA = wr * (cst.align != null ? cst.align : 1.0) * env;
+          const wantBeta = cst.aimBeta != null ? cst.aimBeta : glanceBeta(cst.x, cst.y, cst.z, r);
+          castB = (wantBeta - camera.beta) * env;
+          castR = (cst.rad != null ? cst.rad : 0.4) * env;
+        } else {
+          castA = clamp(wr, -2.4, 2.4) * smooth01((Math.abs(wr) - 0.12) / 0.4) * P.align * env;
+          castB = P.beta * env;
+          const D = Math.hypot(cst.x - s.x, cst.z - s.z);
+          castR = (P.rad + 0.16 * Math.max(0, D - 10)) * env;
+        }
       }
     }
     r += Math.max(-1.2, Math.min(2.4, castR));
@@ -943,14 +1238,20 @@ function install() {
         }
         return rm;
       };
-      if (room(cs.aimA) < want - 0.3) {
+      const roomHere = room(cs.aimA);
+      if (roomHere < want - 0.3) {
         let pick = null;
+        let bestA = null;
+        let bestRoom = roomHere + 0.4; // a small room (the bedroom on the walk back) has no full-room heading: take the roomiest one that is clearly better
         for (let k = 1; k <= 12 && pick == null; k++) {
           for (const sg of [1, -1]) {
             const a = cs.aimA + sg * k * 0.2618;
-            if (room(a) >= want - 0.05) { pick = a; break; }
+            const ra = room(a);
+            if (ra >= want - 0.05) { pick = a; break; }
+            if (ra > bestRoom) { bestRoom = ra; bestA = a; }
           }
         }
+        if (pick == null) pick = bestA;
         if (pick != null) cs.aimA += Math.max(-2.2 * dt, Math.min(2.2 * dt, pick - cs.aimA));
       }
     }
@@ -976,8 +1277,31 @@ function install() {
       }
     }
     camera.alpha = cs.shownA;
-    camera.beta = cs.shownB;
-    cs.appliedB = cs.shownB - base;
+    /* Lift over what is close: when the camera would have to come in under CAM.minDist (a facade at his shoulder, a low wall),
+       raise it (a smaller beta) until the cast has room, so he stays in frame and the view is the street and the roof, not the
+       wall. The lift is rate-limited (the pitch cap) and eases back out when the room is there again. */
+    const needR = Math.min(r, CAM.minDist);
+    const castAt = (lift) => {
+      const b = Math.max(camera.lowerBetaLimit, cs.shownB - lift);
+      const sb = Math.sin(b);
+      return sphereClear(t.x, t.y, t.z, Math.cos(camera.alpha) * sb, Math.cos(b), Math.sin(camera.alpha) * sb, needR);
+    };
+    let liftWant = cs.liftB;
+    if (!push.on && !cs.blend && !cs.cast) {
+      if (castAt(cs.liftB) < needR - 0.05) {
+        liftWant = CAM.liftMax;
+        for (let L = cs.liftB + 0.12; L <= CAM.liftMax; L += 0.12) {
+          if (castAt(L) >= needR - 0.05) { liftWant = L; break; }
+        }
+      } else if (cs.liftB > 0.01 && castAt(Math.max(0, cs.liftB - 0.12)) >= needR - 0.05) {
+        liftWant = Math.max(0, cs.liftB - 0.12); // room again: ease down a step at a time
+      }
+    } else liftWant = 0;
+    const liftCap = (CAM.pitchCapDeg * 0.8 * Math.PI / 180) * dt;
+    cs.liftB += liftWant > cs.liftB ? Math.min(liftWant - cs.liftB, liftCap) : (liftWant - cs.liftB) * Math.min(1, 4 * dt);
+    cs.liftB = clamp(cs.liftB, 0, Math.max(0, cs.shownB - camera.lowerBetaLimit));
+    camera.beta = cs.shownB - cs.liftB;
+    cs.appliedB = camera.beta - base;
     // ---- the sphere cast, with the final heading ----
     const sbF = Math.sin(camera.beta);
     const dx = Math.cos(camera.alpha) * sbF;
@@ -985,18 +1309,30 @@ function install() {
     const dz = Math.sin(camera.alpha) * sbF;
     r = Math.min(r, sphereClear(t.x, t.y, t.z, dx, dy, dz, r));
     if (r > 0.3) r = headClear(t, dx, dy, dz, r);
+    cs.safeR = r; // the most the camera may sit out this frame: the input pass below must not push it past this
     /* Pull in fast but never in one jump: a thin edge entering the cast used to cut the radius by metres in a single frame, a
        visible camera snap. A slow frame (dt up to 0.1 s) is capped at 2.4 m so it stays under the feel sensor's 3 m, and it eases
        out slowly after. */
-    if (cs.blend) camera.radius = Math.min(r, cs.blend.r + (r - cs.blend.r) * smooth01(cs.blend.t / CAM.blendSecs));
-    else if (push.on) camera.radius = r;
+    /* The blend and the take-over push also pull in by at most CAM.stepM a frame: taking control in a room with the watch camera
+       at 10+ m used to set the radius straight to the wall's room (3+ m in one frame, the feel sensor's camera-jump). */
+    const stepDown = (to) => (to < camera.radius ? Math.max(to, camera.radius - Math.min(CAM.stepM, Math.max(0.5, 60 * dt))) : to);
+    if (cs.blend) camera.radius = stepDown(Math.min(r, cs.blend.r + (r - cs.blend.r) * smooth01(cs.blend.t / CAM.blendSecs)));
+    else if (push.on) camera.radius = stepDown(r);
     else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(CAM.stepM, Math.max(0.5, 60 * dt)));
-    else camera.radius = damp(camera.radius, r, dt, 2.2);
+    else { // eases out on a critically damped spring (about 0.4 s to settle), never overshooting the room there is
+      let nr;
+      [nr, cs.rv] = spring1(camera.radius, cs.rv, r, CAM.easeOut, dt);
+      camera.radius = Math.min(r, Math.max(camera.radius, nr));
+      if (camera.radius >= r) cs.rv = 0;
+    }
+    if (r < camera.radius || cs.blend || push.on) cs.rv = 0;
     lastRadius = camera.radius;
     screenLift = damp(screenLift, hudLiftGoal(), dt, 3);
     camera.targetScreenOffset.y = screenLift;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
-    const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5)); // 0.15 at 0.5 m and closer
+    // Fully gone at 0.7 m and closer, fully drawn from 1.4 m: a squeezed camera (the stair and bedroom on the walk back to bed)
+    // must never fill the view with his jacket (the playtest's camera-inside on wake-him).
+    const vis = Math.max(0, Math.min(1, (camera.radius - 0.7) / 0.7));
     if (world.person && Math.abs(vis - himVis) > 0.02) setHimVis(vis);
     // ---- what the playtest reads: the turn rate, the camera-inside frames, the cast framing ----
     const head = new B.Vector3(s.x, s.y + 1.35, s.z);
@@ -1021,12 +1357,31 @@ function install() {
       const rw = eng.getRenderWidth(), rh = eng.getRenderHeight();
       const m = world.scene.getTransformMatrix();
       const vp = camera.viewport.toGlobal(rw, rh);
+      const proj = (x, y, z) => B.Vector3.Project(new B.Vector3(x, y, z), B.Matrix.Identity(), m, vp);
       const on = (x, y, z) => {
-        const p = B.Vector3.Project(new B.Vector3(x, y, z), B.Matrix.Identity(), m, vp);
+        const p = proj(x, y, z);
         return p.z > 0 && p.z < 1 && p.x > rw * 0.02 && p.x < rw * 0.98 && p.y > rh * 0.04 && p.y < rh * 0.96;
       };
-      const both = on(s.x, s.y + 1.0, s.z) && on(cst.x, cst.y + 0.3, cst.z);
-      if (both) { cst.run += dt; cst.best = Math.max(cst.best, cst.run); cst.framedFrames++; } else cst.run = 0;
+      const mid = (x, y, z) => {
+        const p = proj(x, y, z);
+        return p.z > 0 && p.z < 1 && p.x > rw * 0.08 && p.x < rw * 0.92 && p.y >= rh * 0.25 && p.y <= rh * 0.68;
+      };
+      const spotOn = on(cst.x, cst.y + 0.3, cst.z) || (cst.spots && cst.spots.some((sp) => on(sp.x, (sp.y || 0) + 0.3, sp.z)));
+      const spotMid = mid(cst.x, cst.y + 0.3, cst.z) || (cst.spots && cst.spots.some((sp) => mid(sp.x, (sp.y || 0) + 0.3, sp.z)));
+      if (spotOn) cst.inFrame = true;
+      if (spotMid) cst.middleThird = true;
+      const both = on(s.x, s.y + 1.0, s.z) && spotOn;
+      if (both) {
+        cst.run += dt;
+        cst.best = Math.max(cst.best, cst.run);
+        cst.framedFrames++;
+        if (cst.glance && !cst.framedEventSent && spotMid && cst.run >= 0.05) {
+          cst.framedEventSent = true;
+          window.dispatchEvent(new CustomEvent("day:camera", {
+            detail: { action: "glance-framed", power: cst.power, reason: cst.reason, secondsToFrame: Math.round(cst.t * 100) / 100, spot: { x: cst.x, y: cst.y, z: cst.z } },
+          }));
+        }
+      } else cst.run = 0;
     }
   }
 
@@ -1170,6 +1525,9 @@ function install() {
           if (e.key === "Enter") e.preventDefault();
           return; // speeds, H and the rest still work
         }
+        if (cs.cast && cs.cast.glance && performance.now() - (cs.cast.startedAt || 0) > 25) {
+          cancelGlance("key:" + k, performance.now());
+        }
         if (k === "jump" && !e.repeat) jumps++;
         keys.add(k);
         if (e.shiftKey) keys.add("run");
@@ -1213,6 +1571,9 @@ function install() {
     stickEl.classList.remove("held");
   }
   stickEl.addEventListener("pointerdown", (e) => {
+    if (cs.cast && cs.cast.glance && performance.now() - (cs.cast.startedAt || 0) > 25) {
+      cancelGlance("touch:stick", performance.now());
+    }
     stick.id = e.pointerId;
     stickEl.classList.add("held");
     try {
@@ -1225,6 +1586,9 @@ function install() {
   window.addEventListener("pointerup", stickEnd);
   window.addEventListener("pointercancel", stickEnd);
   jumpBtn.addEventListener("pointerdown", (e) => {
+    if (cs.cast && cs.cast.glance && performance.now() - (cs.cast.startedAt || 0) > 25) {
+      cancelGlance("touch:jump", performance.now());
+    }
     jumps++;
     touchJumpHeld = true;
     jumpBtn.classList.add("held");
@@ -1340,6 +1704,7 @@ function install() {
   // Game seconds he has really been simulated as the player's (each control step's dt, which main.js caps at 0.1 s a
   // frame): the clock a playtest measures a climb in, so a slow browser doesn't read as a stuck one.
   let simT = 0;
+  let animOverride = null; // a staged beat (js/wakeup.js) names the clip he plays while it holds him
   const pilotFrame = (fr, dt) => {
     lastFrame = fr;
     const driving = !!(fr && fr.person.inCar);
@@ -1348,7 +1713,10 @@ function install() {
       syncUi();
     }
     const gp = readGamepad();
-    if (mode === "schedule") return null;
+    if (mode === "schedule") {
+      if (limitsPending.lowerRadiusLimit || limitsPending.upperRadiusLimit || limitsPending.lowerBetaLimit || limitsPending.upperBetaLimit) settleLimits();
+      return null;
+    }
     since += dt;
     let text;
     if (mode === "control") {
@@ -1365,6 +1733,14 @@ function install() {
       text = steeringLines[Math.floor(since / 9) % steeringLines.length];
     } else {
       const target = { x: fr.person.x, z: fr.person.z, room: fr.room, inCar: fr.person.inCar };
+      /* The day has him lying on the bed: walk to the floor beside it, not onto the mattress (he used to stand inside the bed
+         frame and the headboard). The day puts him into the pose from there. */
+      if (["lie", "side", "recline"].includes(fr.person.pose) && !target.inCar && mover.standSpot) {
+        const k = target.x.toFixed(2) + "," + target.z.toFixed(2);
+        if (!bedSide || bedSide.k !== k) bedSide = Object.assign({ k }, mover.standSpot(target.x, target.z, fr.person.yaw || 0));
+        target.x = bedSide.x;
+        target.z = bedSide.z;
+      }
       const r = catchUpAt ? "too-far" : mover.walkBack(dt, target);
       if (r === "arrived") {
         backOnDay("walk");
@@ -1406,10 +1782,16 @@ function install() {
     // The cast and throw poses stand still: on the move or in the air he keeps his walk, run, jump or float (a
     // standing pose sliding along the ground reads as gliding feet).
     const wantPose = day.powers && day.powers.pose ? day.powers.pose() : null;
-    const posed = wantPose && s.grounded && s.speed < 0.8 ? wantPose : null;
-    avatar.play(posed || s.anim, posed ? 1 : s.speed, dt);
+    /* The cast pose plays at 1x and stands still, so it may only show where the body is (nearly) still: the animation trace
+       counts boots under 30% of the body's speed from 0.5 m/s as foot slide, and a cast posed at 0.5-0.8 m/s slid. Above
+       POSE_MAX_SPEED he keeps his walk. */
+    const posed = wantPose && s.grounded && s.speed < POSE_MAX_SPEED ? wantPose : null;
+    // a turn of more than 90 deg is a step: he walks round (his feet move) instead of spinning on the spot
+    const stepping = s.face && s.face.step && s.grounded && s.speed < 0.8;
+    const shownAnim = (stepping ? "walk" : null) || posed || (animOverride && mode === "control" ? animOverride : null) || s.anim;
+    avatar.play(shownAnim, posed && !stepping ? 1 : stepping ? 1.6 : s.speed, dt);
     cameraFollow(dt, { x: gp.lx, y: gp.ly });
-    return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: posed || s.anim, text };
+    return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: shownAnim, text };
   };
   /* main.js runs this inside the render loop: a throw here stops the loop, so the clock freezes and the HUD is left in
      control mode for good. Give the day back to him instead (the error is still raised, on its own turn, so the
@@ -1446,15 +1828,39 @@ function install() {
       route: mover.route() ? mover.route().path.length : 0,
       updrafts: mover.updrafts().length,
       cameraPull: Math.round(glidePull * 100) / 100,
-      vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
+      jumpId: s.jumpId, landId: s.landId, landDrop: s.landDrop, vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
     }),
     move: mover.move,
-    /** Swing the camera so the point (x, z) is ahead of him (a tap on a neighbor's ask marker): the cast's own eased framing. */
-    frame: (x, z, y) => {
+    /** Movement input held right now, 1 or 0 (WASD / arrows, the touch stick, a gamepad's left stick): the feel sensor's `input`.
+     *  The sensor's own watcher only sees key and `touchstart` events, so a stick driven by pointer events (the phone playtest,
+     *  and real pointer-event touches) read as "no input" and a walk held with the stick was flagged stuck-state. */
+    moveInput: () => {
+      if (mode !== "control") return 0;
+      let m = Math.hypot((keys.has("f") ? 1 : 0) - (keys.has("b") ? 1 : 0), (keys.has("r") ? 1 : 0) - (keys.has("l") ? 1 : 0));
+      m = Math.max(m, Math.hypot(stick.x, stick.y));
+      const pads = (navigator.getGamepads && navigator.getGamepads()) || [];
+      for (const g of pads) if (g && g.connected) m = Math.max(m, Math.hypot(Math.abs(g.axes[0] || 0) < 0.15 ? 0 : g.axes[0] || 0, Math.abs(g.axes[1] || 0) < 0.15 ? 0 : g.axes[1] || 0));
+      return m > 0.1 ? 1 : 0; // held or not, like a key (a half-tilted stick is still a walk the player asked for)
+    },
+    /** Swing the camera so the point (x, z) is ahead of him (a tap on a neighbor's ask marker, or a world reaction): eased ~1.5 s glance. */
+    frame: (x, z, y, opts) => {
       if (mode !== "control" || cine()) return false;
-      cs.cast = { t: 0, power: "look", x, y: y == null ? s.y : y, z, run: 0, best: 0, frames: 0, framedFrames: 0 };
+      const o = opts || {};
+      // If a cast's own reaction glance just started (< 1.2 s ago) and this is a secondary automatic frame call (e.g. garden pots), keep the cast's sightline.
+      if (!o.force && cs.cast && cs.cast.glance && cs.cast.power !== "look" && cs.cast.t < 1.2) return true;
+      const gy = y == null ? 0.06 : y;
+      const nowMs = performance.now();
+      cs.cast = {
+        t: 0, power: "look", x, y: gy, z,
+        glance: true, reason: o.reason || "frame", spots: o.spots || [{ name: "frame", x, y: gy, z }],
+        aimBeta: glanceBeta(x, gy, z, wantRadius),
+        secs: o.secs || CAM.glanceSecs, rise: o.rise || CAM.glanceRise, fall: o.fall || CAM.glanceFall,
+        startedAt: nowMs, inputAt: 0, inFrame: false, middleThird: false, framedEventSent: false,
+        run: 0, best: 0, frames: 0, framedFrames: 0,
+      };
       return true;
     },
+    cancelGlance: (why) => cancelGlance(why || "api", performance.now()),
     /** Game seconds simulated while he's the player's (sum of the control steps' dt). */
     simTime: () => simT,
     /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */
@@ -1484,15 +1890,31 @@ function install() {
     ride: RIDE,
     /** The camera's own report (the playtest): turn rate, camera-inside frames, cast framing, the numbers it runs on. */
     camera: () => ({
-      ...camStats, casts: camStats.casts.slice(), yawCapDeg: CAM.yawCapDeg, blendSecs: CAM.blendSecs, recenterAfter: CAM.recenterAfter,
-      blending: !!cs.blend, casting: cs.cast ? cs.cast.power : null, alpha: camera.alpha, beta: camera.beta, radius: camera.radius,
+      ...camStats, casts: camStats.casts.slice(), glances: camStats.glances.slice(),
+      yawCapDeg: CAM.yawCapDeg, blendSecs: CAM.blendSecs, recenterAfter: CAM.recenterAfter,
+      blending: !!cs.blend, casting: cs.cast ? cs.cast.power : null,
+      glancing: !!(cs.cast && cs.cast.glance),
+      glance: cs.cast && cs.cast.glance ? {
+        power: cs.cast.power, reason: cs.cast.reason, t: Math.round(cs.cast.t * 100) / 100,
+        x: cs.cast.x, y: cs.cast.y, z: cs.cast.z, spots: cs.cast.spots || [],
+        inFrame: !!cs.cast.inFrame, middleThird: !!cs.cast.middleThird,
+        framedSeconds: Math.round(cs.cast.best * 100) / 100,
+      } : null,
+      alpha: camera.alpha, beta: camera.beta, radius: camera.radius,
       behind: Math.atan2(-Math.cos(s.yaw), -Math.sin(s.yaw)), lookDown: cs.lookDown || 0,
     }),
-    resetCameraStats: () => { Object.assign(camStats, { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], recentres: 0, lookDrags: 0 }); },
+    resetCameraStats: () => {
+      firstCastSeen.clear();
+      Object.assign(camStats, { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], glances: [], lastGlanceCancelMs: null, recentres: 0, lookDrags: 0, dipMax: 0 });
+    },
     log: () => log.slice(),
     take: () => take("console"),
     push: (spec) => pushStart(spec),
     hold: (on) => { holdIn = !!on; return holdIn; },
+    /** A staged beat shows this clip instead of his movement clip (null clears it). */
+    /** Turn in place toward a world yaw (js/powers.js before a cast). */
+    face: (yaw) => (mode === "control" ? mover.face(yaw) : null),
+    anim: (name) => { animOverride = name || null; return animOverride; },
     pushing: () => push.on,
     letGo: () => letGo("console"),
     spawnUpdraft: (x, z, opt) => {

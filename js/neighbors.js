@@ -1,4 +1,6 @@
 import { buildFigure, detectAnimProblems, FOOT_SLIDE_LIMIT } from "./peoplekit.js";
+import { fixStops, segLength, along } from "./placement.js";
+import { makeRouter } from "./pavement.js";
 import { buildArcProps, stepArcProps, nextBeat, powerMatches, clampBeat, emptyArcs } from "./neighbor-arcs.js";
 /* ==========================================================================
    Neighbors — three people on his avenue with their own look, home and day
@@ -25,6 +27,8 @@ export function hourOf(minutes) {
 
 const WALK_M_PER_MIN = 80; // sim metres per sim minute for the walks between stops
 const PERSONALITY = { birdie: "plants", dex: "phone", quill: "scope" };
+/* idle actions at a stop (stops' 5th item) -> the figure's own idle pose (js/peoplekit.js): the existing clips, no new ones */
+const ACTION_POSE = { water: "plants", phone: "phone", scope: "scope" };
 
 /** Where a neighbor is at hour h: { x, z, moving, inside, sit, yaw }. `stops` are [hour, x, z, "inside"|"sit"?]. */
 export function placeAt(stops, h) {
@@ -33,7 +37,7 @@ export function placeAt(stops, h) {
   const a = stops[i];
   const b = stops[(i + 1) % stops.length];
   const bh = b[0] > a[0] ? b[0] : b[0] + 24;
-  const dist = Math.hypot(b[1] - a[1], b[2] - a[2]);
+  const dist = segLength(a, b); // through a.via: the corners round a building
   const dur = Math.min(Math.max(0.3, dist / WALK_M_PER_MIN) / 60, (bh - a[0]) * 0.8); // hours
   const leave = bh - dur;
   const hh = h < a[0] ? h + 24 : h;
@@ -43,19 +47,22 @@ export function placeAt(stops, h) {
       z: a[2],
       moving: false,
       inside: a[3] === "inside",
-      sit: a[3] === "sit",
+      sit: a[3] === "sit" || a[4] === "sit",
       yaw: null,
+      stop: i,
+      action: a[4] || null,
     };
   }
   const f = Math.min(1, Math.max(0, (hh - leave) / dur));
-  return {
-    x: a[1] + (b[1] - a[1]) * f,
-    z: a[2] + (b[2] - a[2]) * f,
-    moving: f < 1,
-    inside: false,
-    sit: false,
-    yaw: Math.atan2(b[1] - a[1], b[2] - a[2]),
-  };
+  const pt = along(a, b, f);
+  return { x: pt.x, z: pt.z, moving: f < 1, inside: false, sit: false, yaw: pt.yaw, stop: f < 1 ? -1 : (i + 1) % stops.length, action: null };
+}
+
+/** The park's lawn as a footprint, so a walk never crosses its edge: [{ x, z, w, d }] ([] without a park). */
+export function lawnSolids(city) {
+  const p = city && city.park;
+  if (!p) return [];
+  return [{ x: (p.x0 + p.x1) / 2, z: (p.z0 + p.z1) / 2, w: p.x1 - p.x0, d: p.z1 - p.z0, lawn: true }];
 }
 
 function install() {
@@ -118,6 +125,20 @@ function install() {
 
   /* ---- figures + animation detectors ---- */
   const animStats = { footSlide: 0, mismatch: 0, samples: 0, dayKey: null };
+  /* placement: every stop on open ground (a stop in a building moves to the nearest door or pavement point) and each
+     walk routed round the footprints (js/placement.js) */
+  /* the pavement graph (js/pavement.js): walks go along the sidewalks and crosswalks; the park's lawn counts as a solid so
+     no leg crosses its edge */
+  const cityCfg = (window.DAY_CONFIG && window.DAY_CONFIG.city) || {};
+  const lawn = lawnSolids(cityCfg);
+  const routeSolids = (world.solids || []).concat(lawn);
+  const router = world.solids ? makeRouter(cityCfg, (window.DAY_CONFIG && window.DAY_CONFIG.street) || null, routeSolids) : null;
+  people.forEach((p) => {
+    if (p.__placed || !world.solids) return;
+    const fx = fixStops(p.stops, routeSolids, router || undefined);
+    p.stops = fx.stops;
+    p.__placed = { moved: fx.moved, detours: fx.detours };
+  });
   people.forEach((p) => {
     const fig = buildFigure(B, scene, p.id, p.look, p.scale || 1);
     p.__fig = fig;
@@ -209,6 +230,8 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
 
   const FADE_NEAR = 0.6; // m from the camera: fully faded
   const FADE_FAR = 1.4; // m from the camera: fully drawn
+  const LOOK_R = (cfg.awareness && cfg.awareness.look) || 6; // m: a neighbour notices him
+  const REACT_R = (cfg.awareness && cfg.awareness.react) || 8; // m: a cast this near is answered
   const PERSONAL = 1.1; // m between the player's centre and a neighbor's drawn centre
 
   /* ---- who is where ---- */
@@ -487,6 +510,29 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
     } catch (err) { /* */ }
   });
 
+  /* awareness: a cast within REACT_R of a neighbour is answered with their own small act (rain: a point at the sky and the
+     umbrella goes up; lightning: they duck; wind: a hand on the hat via the weather pose). They go back to their routine after. */
+  window.addEventListener("day:power", (e) => {
+    const d = (e && e.detail) || {};
+    const pw = d.power || d.action;
+    if (!pw || pw === "denied") return;
+    const kind = ["bolt", "lightning", "storm"].includes(pw) ? "duck"
+      : ["rain", "sunbreak", "sun", "fog"].includes(pw) ? "point"
+      : ["gust", "gale", "tornado", "wind"].includes(pw) ? "hat" : null;
+    if (!kind) return;
+    const here = hero();
+    if (!here) return;
+    const nowMs = performance.now();
+    people.forEach((p) => {
+      if (!p.__pos || p.__pos.inside) return;
+      const dd = Math.hypot(here.x - p.__pos.x, here.z - p.__pos.z);
+      if (dd > REACT_R) return;
+      if (kind !== "hat") p.__reactWant = { kind, until: nowMs + 350 };
+      p.__reactAt = nowMs;
+      emit("react", { id: p.id, kind, power: pw, d: +dd.toFixed(2), x: p.__pos.x, z: p.__pos.z });
+    });
+  });
+
   /* answering an ask: he calls its ability close to them */
   window.addEventListener("day:power", (e) => {
     const d = (e && e.detail) || {};
@@ -534,7 +580,7 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
         ? `<img class="bust" alt="" src="${art.bust(p.id || p.name)}"/>`
         : `<span class="dot" style="background:${p.color}"></span>`;
       const arcTitle = (arcsList[p.id] && arcsList[p.id].title) || "";
-      return `<div class="row" data-neighbor="${p.id}">${face}<div>${p.name}<small>${p.role}${arcTitle ? " · " + arcTitle : ""} · ${where}</small></div>${pipsHtml(p.id)}</div>`;
+      return `<div class="row" data-neighbor="${p.id}">${face}<div>${p.name}<small>${p.role}${arcTitle ? " · " + arcTitle : ""} · ${where}</small></div>${arcsList[p.id] ? pipsHtml(p.id) : ""}</div>`;
     }).join("") + `<div class="tally">${L.score || "Good neighbor"}: ${total}</div>`;
     if (art && art.applyFrame) art.applyFrame(panel);
   }
@@ -607,7 +653,7 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       const speed = jump || dt <= 0 ? 0 : Math.hypot(pl.x - prevX, pl.z - prevZ) / dt;
       // turn-before-walk: face the route first; during a beat gesture, face him
       let yawErr = 0;
-      const facingHim = !!(p.__gestureWant || (p.__fig.anim && p.__fig.anim.gesture)) && here;
+      const facingHim = !!(p.__gestureWant || (p.__fig.anim && p.__fig.anim.gesture) || (p.__wait && !pl.inside)) && here;
       if (pl.moving && !facingHim) {
         const yaw = pl.yaw != null ? pl.yaw : Math.atan2(pl.x - prevX, pl.z - prevZ);
         yawErr = Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw));
@@ -621,12 +667,66 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       root.position.set(dx, p.__gy, dz);
       root.rotation.y = p.__yaw;
 
+      // a chat stop: a short wave to whoever passes, every 9-15 s of standing there (the figure's own `ask` gesture)
+      if (pl.action === "chat" && !pl.moving && !pl.inside && !p.__gestureWant && !(p.__fig.anim && p.__fig.anim.gesture)) {
+        if (p.__chatAt == null) p.__chatAt = nowMs + 2500 + ((p.id.charCodeAt(0) * 37) % 6000);
+        if (nowMs >= p.__chatAt) { p.__gestureWant = "ask"; p.__chatAt = nowMs + 9000 + ((nowMs | 0) % 6000); }
+      } else if (pl.moving) p.__chatAt = null;
       const gest = p.__gestureWant;
       // work (Dex patching a turbine) stays held for the ending scene; other beats clear once played
       if (gest && gest !== "work" && p.__fig.anim.gesture === gest) p.__gestureWant = null;
       const react = !!(sky.manual && (weatherState === "storm" || weatherState === "rain" || weatherState === "wind")
         && here && Math.hypot(here.x - pl.x, here.z - pl.z) < 22 && !gest && !pl.moving);
+      /* awareness: inside LOOK_R he is noticed (the head turns to him, limited, even while they walk); a stopped neighbour
+         also gives a small hello once per visit; a cast near them is answered (point at rain, hat in wind, duck from a bolt) */
+      const dHim = here ? Math.hypot(here.x - pl.x, here.z - pl.z) : 1e9;
+      const aw = p.__aware || (p.__aware = { on: false, greetAt: -1e9, said: false, lookAt: 0, until: 0 });
+      if (!aw.on && dHim < LOOK_R && !pl.inside) {
+        aw.on = true;
+        aw.lookAt = nowMs;
+        aw.said = false;
+        emit("look", { id: p.id, d: +dHim.toFixed(2), x: pl.x, z: pl.z });
+      } else if (aw.on && (dHim > LOOK_R + 2 || pl.inside)) aw.on = false;
+      let look = null;
+      if (aw.on && here) {
+        const toHim = Math.atan2(here.x - pl.x, here.z - pl.z);
+        const rel = Math.atan2(Math.sin(toHim - p.__yaw), Math.cos(toHim - p.__yaw));
+        look = { yaw: rel, pitch: Math.max(-0.3, Math.min(0.3, -((here.y || 0) + 1.6 - (p.__gy + 1.6 * (p.scale || 1))) / Math.max(1.5, dHim))) };
+        p.__lookRel = rel;
+      }
+      /* waiting: she has asked and the verb is open. She stands where she is, faces him, looks UP (the roof, the sky he
+         calls from: pitch beyond the usual +-0.3) and gives the same small ask wave every few seconds until it's answered */
+      p.__lookUp = false;
+      if (p.__wait && here && !pl.inside && !pl.moving) {
+        const wt = p.__wait;
+        const toHim = Math.atan2(here.x - pl.x, here.z - pl.z);
+        const rel = Math.atan2(Math.sin(toHim - p.__yaw), Math.cos(toHim - p.__yaw));
+        const rise = Math.atan2((here.y || 0) + 1.6 - (p.__gy + 1.4 * (p.scale || 1)), Math.max(2, dHim));
+        look = { yaw: rel, pitch: -Math.max(0.4, Math.min(0.62, rise)), wide: true };
+        p.__lookUp = true;
+        wt.lookSecs += dt;
+        if (!wt.lookEmitted && wt.lookSecs > 0.25) {
+          wt.lookEmitted = true;
+          emit("look-up", { id: p.id, d: +dHim.toFixed(1), x: pl.x, z: pl.z, why: wt.why });
+        }
+        if (!gest && nowMs >= wt.nextWave) {
+          wt.nextWave = nowMs + 6500;
+          p.__gestureWant = "ask";
+          wt.waves++;
+          emit("wait-wave", { id: p.id, n: wt.waves, x: pl.x, z: pl.z });
+        }
+      }
+      let greet = null;
+      if (p.__reactWant && nowMs < p.__reactWant.until) greet = p.__reactWant.kind;
+      else if (aw.on && !aw.said && !pl.moving && !pl.sit && !gest && nowMs - aw.lookAt > 450 && nowMs - aw.greetAt > 25000) {
+        aw.said = true;
+        aw.greetAt = nowMs;
+        greet = (p.id.length + Math.round(nowMs / 1000)) % 2 ? "wave" : "nod";
+        emit("greet", { id: p.id, kind: greet, d: +dHim.toFixed(2) });
+      }
       const sample = p.__fig.step({
+        look,
+        greet,
         dt,
         speed: pl.moving && !jump ? Math.max(speed, 0.15) : 0,
         moving: !!pl.moving,
@@ -636,7 +736,7 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
         sunShield: sunK,
         gesture: gest || (p.__fig.anim.gesture && p.__fig.anim.gesture !== "react" ? p.__fig.anim.gesture : null),
         react,
-        personality: PERSONALITY[p.id] || null,
+        personality: (!pl.moving && pl.action && ACTION_POSE[pl.action]) || PERSONALITY[p.id] || null,
         jump,
       });
       // hip drop already applied inside step; keep feet on the surface
@@ -734,6 +834,9 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
           inside: p.__pos.inside,
           moving: p.__pos.moving,
           sit: !!p.__pos.sit,
+          stop: p.__pos.stop == null ? -1 : p.__pos.stop,
+          action: p.__pos.action || null,
+          routine: (p.stops || []).length,
           stage: st[p.id].stage,
           done: st[p.id].doneBeats.slice(),
           asking: st[p.id].askOpen,
@@ -768,6 +871,11 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
           state: s.state || "idle",
           speed: s.speed || 0,
           gesture: s.gesture || null,
+          look: s.look || 0,
+          waiting: !!p.__wait,
+          lookUp: !!p.__lookUp,
+          lookPitch: s.lookPitch || 0,
+          aware: !!(p.__aware && p.__aware.on),
           weather: s.weather || "clear",
           weatherK: s.weatherK || 0,
           sit: s.sit || 0,
@@ -778,6 +886,16 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
         };
       }),
     }),
+    /** Placement audit (js/placement.js): where neighbour `id` stands at hour h, the height it is drawn at (`surfaceAt`), and the fix log. */
+    placementAt: (id, h) => {
+      const p = people.find((q) => q.id === id);
+      if (!p) return null;
+      const pl = placeAt(p.stops, h);
+      return { x: pl.x, z: pl.z, inside: pl.inside, moving: pl.moving, stop: pl.stop, action: pl.action, y: world.surfaceAt ? world.surfaceAt(pl.x, pl.z) : 0 };
+    },
+    /** The solids a walk must keep out of (buildings and the lawn) and the pavement graph the routes follow. */
+    pavement: () => ({ graph: router ? router.graph : null, solids: routeSolids }),
+    placement: () => people.map((p) => ({ id: p.id, moved: (p.__placed && p.__placed.moved) || [], detours: (p.__placed && p.__placed.detours) || [], drawnY: p.__root.position.y, shown: p.__root.isEnabled() })),
     /** Reset detector counters (a new day also clears them). */
     resetAnim: () => {
       animStats.footSlide = 0;
@@ -799,6 +917,22 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       if (p) p.__gestureWant = kind;
       return !!p;
     },
+    /** Waiting for his answer (the street's open ask): she faces him, looks up at him and waves every few seconds. */
+    wait: (id, on, why) => {
+      const p = people.find((q) => q.id === id);
+      if (!p) return false;
+      if (on === false) {
+        if (p.__wait) emit("wait-end", { id, secs: +(p.__wait.lookSecs).toFixed(1), waves: p.__wait.waves });
+        p.__wait = null;
+        return true;
+      }
+      if (!p.__wait) {
+        p.__wait = { why: why || "ask", since: performance.now(), nextWave: performance.now() + 1200, waves: 0, lookSecs: 0, lookEmitted: false };
+        emit("waiting", { id, x: p.__pos.x, z: p.__pos.z, why: p.__wait.why });
+      }
+      return true;
+    },
+    waiting: (id) => !!(people.find((q) => q.id === id) || {}).__wait,
     /** Hold them at a spot for a staged scene (ending / finale). null clears the hold. */
     stand: (id, x, z) => {
       const p = people.find((q) => q.id === id);
@@ -851,6 +985,19 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       return true;
     },
   };
+  /* Birdie waits for the street's first ask (js/street.js, js/coldopen.js): from the moment Rain is open until the thanks. */
+  window.addEventListener("day:coldopen", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "prompt") api.wait("birdie", true, "rain-open"); // the prompt is Rain being available: she looks up at him
+    else if (d.action === "abort" || d.action === "failed") api.wait("birdie", false);
+  });
+  window.addEventListener("day:street", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "ask" && d.who === "birdie") api.wait("birdie", true, "rain-open");
+    else if (d.action === "answered" || d.action === "thanks" || d.action === "stop") {
+      if (api.waiting("birdie")) { api.wait("birdie", false); api.gesture("birdie", "thanks"); }
+    }
+  });
   window.neighbors = api;
   day.neighbors = api;
   renderPanel();

@@ -17,7 +17,7 @@ const cfg = globalThis.DAY_CONFIG;
 const nb = cfg.neighbors;
 ok(nb && Array.isArray(nb.list), "day.config.js has no neighbors.list");
 const list = (nb && nb.list) || [];
-ok(list.length === 3, `${list.length} neighbors, wanted 3`);
+ok(list.length === 4, `${list.length} neighbors, wanted 4 (Birdie, Dex, Ines, Fenn)`);
 ok(inWindow(23, 17, 5) && inWindow(3, 17, 5) && !inWindow(12, 17, 5) && inWindow(9, 7, 11.5) && !inWindow(12, 7, 11.5), "inWindow is wrong");
 ok(Math.abs(hourOf(1890) - 7.5) < 1e-9 && Math.abs(hourOf(450) - 7.5) < 1e-9, "hourOf is wrong");
 
@@ -37,14 +37,21 @@ for (const p of list) {
   colors.add(p.color);
   ok(p.look && p.look.hat !== undefined || p.look && p.look.hair, `${p.id}: no look`);
   const kinds = (p.beats || []).map((b) => b.kind);
-  ok((p.beats || []).length >= 2 && (p.beats || []).length <= 3, `${p.id}: ${kinds.length} beats, wanted 2 or 3`);
-  ok(kinds[0] === "ask" && kinds[1] === "thanks", `${p.id}: beats go ask, thanks, then surprise`);
+  const routineOnly = (p.beats || []).length === 0; // Fenn: a routine and no ask yet
+  ok(routineOnly || ((p.beats || []).length >= 2 && (p.beats || []).length <= 3), `${p.id}: ${kinds.length} beats, wanted 2 or 3`);
+  ok(routineOnly || (kinds[0] === "ask" && kinds[1] === "thanks"), `${p.id}: beats go ask, thanks, then surprise`);
   for (const b of p.beats || []) {
     ok(b.text && b.text.length < 140, `${b.id}: bubble text missing or long`);
     if (b.kind === "ask") ok(abilities.includes(b.ability), `${b.id}: ability ${b.ability} isn't a power`);
     if (b.kind !== "ask") ok(b.reward && b.reward.score > 0, `${b.id}: a completed beat pays a reward`);
   }
   const s = p.stops;
+  // the daily routine: 4 to 6 stops after the night at home, each with an idle action or a seat; three of them at 08:00, 12:00 and 18:00 are different
+  const away = s.filter((x) => x[3] !== "inside");
+  ok(away.length >= 4 && away.length <= 6, `${p.id}: ${away.length} stops away from home, wanted 4 to 6`);
+  away.forEach((x) => ok(["water", "phone", "scope", "chat", "eat", "sit"].includes(x[4]), `${p.id}: stop at hour ${x[0]} has no idle action (${x[4]})`));
+  const at = [8, 12, 18].map((h) => placeAt(s, h).stop);
+  ok(new Set(at).size === 3 && at.every((i) => i >= 0), `${p.id}: stops at 08:00, 12:00 and 18:00 are ${at.join(", ")}, wanted three different stops`);
   ok(s[0][0] === 0 && s.every((x, i) => i === 0 || x[0] > s[i - 1][0]), `${p.id}: stops must start at hour 0 and rise`);
   for (const [, x, z] of s) {
     ok(!inBlock(x, z) && !onStair(x, z), `${p.id}: stop ${x},${z} is inside a building or on a stair`);
@@ -100,7 +107,7 @@ for (const p of list) {
   const N = globalThis.day.neighbors;
   ok(!!N, "neighbors didn't install");
   const meshes = scene.transformNodes.filter((n) => n.name.startsWith("neighbor-"));
-  ok(meshes.length === 3, "three figures in the scene");
+  ok(meshes.length === 4, "four figures in the scene");
   const frames = async (n) => { for (let i = 0; i < n; i++) { scene.render(); await new Promise((r) => setTimeout(r, 20)); } };
   await frames(3);
   const by = (id) => N.now().people.find((p) => p.id === id);
@@ -116,10 +123,12 @@ for (const p of list) {
   await frames(70);
   ok(by("birdie").done.includes("birdie-thanks") && N.now().score === 50 && energy >= 25, "the thank-you pays score and Pressure: " + JSON.stringify([N.now().score, energy]));
   minutes = 17 * 60 + 20;
+  pos.x = -8; pos.z = 15; // Birdie waters the lawn from the pavement in the evening
   await frames(4);
   ok(by("birdie").done.includes("birdie-surprise") && N.now().score === 150, "the evening surprise pays more: " + N.now().score);
   const rewards = events.filter((e) => e.detail && e.detail.action === "reward");
   ok(rewards.length === 2, rewards.length + " reward events");
+  pos.x = -20; pos.z = 9.5;
   minutes += 1440 * 2; // the next day: fresh beats
   globalThis.day.now = () => ({ key: "d2", minutes: 8 * 60 + 10, frame: { person: { x: pos.x, z: pos.z } } });
   await frames(3);
@@ -157,7 +166,7 @@ for (const p of list) {
   ok(sunPose.weather === "sun" && sunPose.weatherK > 0.5, "sun shield posture blends in");
 
   // Birdie's park stop and Dex's plaza stop sit
-  ok(placeAt(list.find((p) => p.id === "birdie").stops, 12).sit, "Birdie sits on the park bench at noon");
+  ok(placeAt(list.find((p) => p.id === "birdie").stops, 12).sit, "Birdie sits on a plaza bench at noon");
   ok(placeAt(list.find((p) => p.id === "dex").stops, 12).sit, "Dex sits in the plaza at lunch");
 
   scene.dispose();

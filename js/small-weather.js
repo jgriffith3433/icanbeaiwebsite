@@ -20,7 +20,11 @@
    day.config.js `control.model` is the GLB's path; null = the box figure.
    ========================================================================== */
 import "@babylonjs/loaders/glTF/index.js"; // registers the .glb loader
+import { MeshoptCompression } from "@babylonjs/core/Meshes/Compression/meshoptCompression.js";
+/* the phone copy is meshopt-compressed: its decoder is served from this site (models/meshopt_decoder.js), never Babylon's CDN */
+MeshoptCompression.Configuration = { decoder: { url: "models/meshopt_decoder.js" } };
 import { clipAvatar } from "./avatar.js";
+import { powerPose } from "./power-poses.js";
 
 export const SKIN_CLIPS = [
   "idle", "walk", "run", "jump", "fall", "float", "cast", "throw",
@@ -43,6 +47,11 @@ const BOLTS = {
   idle: 0.3, lookup: 0.25, walk: 0.25, run: 0.35, shelter: 0.2,
 };
 
+/* one-shots that must hand back to idle on their end event (the wind-ups only while the hold is over) */
+const EXIT_CLIPS = new Set(["cast", "throw", "triumph", "windbolt", "windrain"]);
+const WINDUPS = new Set(["windbolt", "windrain"]);
+
+const TAKE_LEN = 0.1; // seconds of take-off anticipation
 const FOOT_SLIDE_LIMIT = 0.05; // 5 cm per planted step (acceptance)
 const FOOT_FLOAT_LIMIT = 0.03; // 3 cm sink/float
 
@@ -65,14 +74,20 @@ export async function loadSmallWeather(world, url, data, opts = {}) {
 
 async function loadExtraClipGroups(B, scene, extras) {
   const out = [];
-  for (const name of EXTRA_CLIPS) {
+  /* all the clip files are requested at once (they used to be fetched one after another: six round trips on a slow phone link,
+     which kept his model, and so the stand-in, on screen for tens of seconds); they are still decoded one at a time */
+  const payloads = await Promise.all(EXTRA_CLIPS.map(async (name) => {
     try {
-      let payload = extras && extras[name];
-      if (!payload && typeof fetch === "function") {
-        const r = await fetch(`models/clips/${name}.glb`, { cache: "force-cache" });
-        if (!r.ok) continue;
-        payload = await r.arrayBuffer();
-      }
+      if (extras && extras[name]) return extras[name];
+      if (typeof fetch !== "function") return null;
+      const r = await fetch(`models/clips/${name}.glb`, { cache: "force-cache" });
+      return r.ok ? await r.arrayBuffer() : null;
+    } catch (err) { return null; }
+  }));
+  for (let i = 0; i < EXTRA_CLIPS.length; i++) {
+    const name = EXTRA_CLIPS[i];
+    try {
+      const payload = payloads[i];
       if (!payload) continue;
       const c = await B.LoadAssetContainerAsync(new Uint8Array(payload), scene, { pluginExtension: ".glb" });
       const g = c.animationGroups[0];
@@ -255,9 +270,21 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
   let offset = standAnchor;
   let clip = "idle";
   let idleClear = 0;
+  let exitedAt = 0;
+  let exitLatch = false; // a cast clip has played out and handed back to idle: its pose isn't asked for again until a new cast
+  let exitAge = 0;
+  /* Playtest option (a bot's tab only): the idle clip is forced off, so after a cast he stays in the last non-locomotion clip.
+     The animation trace must then see a state held with no input (anim.stuckStateSeconds over 3). */
+  let idleOff = false;
+  let heldClip = "";
+  let traceFeet = null;
+  const traceWin = []; // [dt, boot speed] over the last TRACE_WIN seconds
   let landT = 0;
   let landDepth = 0;
-  let prevGrounded = true;
+  let seenJump = null;
+  let seenLand = null;
+  let landLen = 0.15;
+  let takeT = 0;
   let triumphLeft = 0;
   let ikWant = false;
   let ikLandK = 0;
@@ -317,18 +344,14 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
   function pickHeroClip(want, ctx) {
     const { st, wx, hour } = ctx;
     if (triumphLeft > 0) return "triumph";
-    if (landT > 0.18) return want; // keep locomotion; IK does the crouch
     // Distinct cast wind-ups while a power is winding
     // Trust powers.pose() / caller: windbolt and windrain stay as asked (don't remap a Lightning tap to rain).
     if (want === "windbolt" || want === "windrain") return named(want) ? want : "cast";
     if (want === "cast") {
       const pow = window.day && window.day.powers && window.day.powers.now ? window.day.powers.now() : null;
       const last = pow && pow.cast && (pow.cast.power || pow.cast.id);
-      if (last === "lightning" || last === "storm" || last === "bolt") return named("windbolt") ? "windbolt" : "cast";
-      if (last === "rain" || last === "fog" || last === "sun" || last === "gale" || last === "gust" || last === "tornado" || last === "wind") {
-        return named("windrain") ? "windrain" : "cast";
-      }
-      return "cast";
+      const posed = last ? powerPose(last) : "cast";
+      return posed !== "cast" && named(posed) ? posed : "cast";
     }
     if (want === "idle" && st && st.mode === "control" && st.grounded && st.speed < 0.15) {
       const raining = wx && (wx.rain > 0.25 || wx.state === "rain" || wx.state === "storm");
@@ -354,27 +377,82 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     boltMeshes: bolts.meshes,
     clips: SKIN_CLIPS.filter((c) => named(c)),
     clip: () => clip,
-    motion: () => Object.assign({}, motion, ik.stats()),
+    /* the state the animation trace reports: take-off and land are the short squash states over the clip underneath */
+    state: () => (landT > 0 ? "land" : takeT > 0 ? "takeoff" : clip),
+    /* seconds the current one-shot has sat on its last frame (0 while it plays or a loop runs): a pose that is held, not played */
+    held: () => player.heldSeconds(),
+    motion: () => Object.assign({}, motion, { exits: exitedAt }, ik.stats()),
     /* What his body is doing right now, in his own frame (+z forward, +x his left): how far the spine and neck lean
        from upright, the pelvis and shoulder lines' yaw, how far the knees bend, the hands' gap. The clip-poses playtest
        reads this on a real frame to flag a twisted torso, a hanging head or an arm through the body. */
     pose: () => bodyPose(B, wrap, nodeByShort),
+    forceIdleOff: (on) => { idleOff = !!on; if (!on) heldClip = ""; },
+    /* The playtest's animation trace for one frame: the clip, every clip's blend weight, how fast the boots move relative to him
+       (the cycle's own rate, not the world's: a planted foot is still in the world while the body moves), and whether the skeleton
+       reads as a T-pose (both hands straight out level with the shoulders) or the bind pose (the weights add up to under half). */
+    trace(dt) {
+      const w = player.weights();
+      let sum = 0;
+      Object.values(w).forEach((v) => (sum += v));
+      const root = wrap.getAbsolutePosition();
+      const feet = ["LeftFoot", "RightFoot"].map((n) => nodeByShort[n]);
+      let footSpeed = null;
+      if (feet.every(Boolean)) {
+        const now = feet.map((f) => { const p = f.getAbsolutePosition(); return { x: p.x - root.x, z: p.z - root.z }; });
+        if (traceFeet && dt > 0) {
+          const inst = (Math.hypot(now[0].x - traceFeet[0].x, now[0].z - traceFeet[0].z) + Math.hypot(now[1].x - traceFeet[1].x, now[1].z - traceFeet[1].z)) / 2 / dt;
+          /* One frame's reading dips whenever the two boots pass each other (each is mid-swing or mid-stance for that instant),
+             which at 20-30 fps on a phone fell under the slide ratio for whole frames of a clean run. The boots' pace is read
+             over a quarter of a cycle-ish window (0.25 s, time-weighted); a planted foot while he moves still reads near 0. */
+          traceWin.push([dt, Math.min(inst, 12)]);
+          let tw = 0, ts = 0;
+          for (let i = traceWin.length - 1; i >= 0; i--) {
+            tw += traceWin[i][0]; ts += traceWin[i][0] * traceWin[i][1];
+            if (tw >= 0.25) { traceWin.splice(0, i); break; }
+          }
+          footSpeed = ts / tw;
+        }
+        traceFeet = now;
+      }
+      let tpose = sum < 0.5;
+      const L = nodeByShort.LeftArm, R = nodeByShort.RightArm, LH = nodeByShort.LeftHand, RH = nodeByShort.RightHand;
+      if (!tpose && L && R && LH && RH) {
+        const inv = wrap.getWorldMatrix().clone().invert();
+        const at = (n) => B.Vector3.TransformCoordinates(n.getAbsolutePosition(), inv);
+        const [a, b, c, d] = [at(L), at(R), at(LH), at(RH)];
+        const out = (sh, h) => Math.abs(h.x) - Math.abs(sh.x) >= 0.45 && Math.abs(h.y - sh.y) < 0.15 && Math.abs(h.z - sh.z) < 0.2;
+        tpose = out(a, c) && out(b, d) && c.x * d.x < 0;
+      }
+      /* lookup (clear sky) and shelter (rain) are what standing still looks like in that weather: avatar.js maps both to
+         "idle". The trace reports them as idle so the stuck-state sensor only flags a state that fails to return to it
+         (a cast or jump pose held); `pose` keeps the real clip name. */
+      const idleVariant = clip === "lookup" || clip === "shelter";
+      return { state: landT > 0 ? "land" : takeT > 0 ? "takeoff" : idleVariant ? "idle" : clip, pose: clip, weights: w, footSpeed, tpose, held: player.heldSeconds() };
+    },
     /* clip, ground speed (m/s), dt; mine: the player has him (the lightning shows) */
     play(c, speed, dt, mine) {
       const ctx = readCtx();
       if (mine == null) mine = ctx.mine;
-      // Landing anticipation / recovery from hard impacts
+      /* Jump, fall and land are three states with a way out each. Take-off: the press (control's jumpId) starts a 0.1 s
+         anticipation, a quick crouch that springs into the jump clip. Land: each touchdown (landId) squashes the figure for
+         0.12-0.2 s (more for a longer fall) and hands back to idle or walk/run by his speed: the clip underneath is already
+         `want`, so the exit is the normal cross-fade. The trace reports them as "takeoff" and "land". */
       const grounded = ctx.st ? !!ctx.st.grounded : true;
-      const vy = ctx.st && ctx.st.vy != null ? ctx.st.vy : 0;
-      if (!prevGrounded && grounded && vy > -0.5) {
-        // just landed; impact was in airTime — use softLand flag or speed
-        const hard = ctx.st && (ctx.st.softLand === false) && (ctx.st.airTime > 0.35 || speed > 2);
-        landDepth = hard ? 1 : 0.45;
-        landT = hard ? 0.55 : 0.28;
-        motion.landings++;
+      if (ctx.st && ctx.st.jumpId != null) {
+        if (seenJump == null) seenJump = ctx.st.jumpId;
+        else if (ctx.st.jumpId !== seenJump) { seenJump = ctx.st.jumpId; takeT = TAKE_LEN; motion.takeoffs = (motion.takeoffs || 0) + 1; }
+        if (seenLand == null) seenLand = ctx.st.landId;
+        else if (ctx.st.landId !== seenLand) {
+          seenLand = ctx.st.landId;
+          const drop = ctx.st.landDrop || 0;
+          landDepth = Math.max(0.4, Math.min(1.2, 0.4 + drop * 0.18));
+          landLen = Math.min(0.2, 0.12 + drop * 0.02);
+          landT = landLen;
+          motion.landings++;
+        }
       }
-      prevGrounded = grounded;
       if (landT > 0) landT = Math.max(0, landT - dt);
+      if (takeT > 0) takeT = Math.max(0, takeT - dt);
 
       // Triumph after a big cast (storm / tornado)
       try {
@@ -389,10 +467,35 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       if (c === "idle" && ctx.wx && ctx.wx.state === "clear" && (ctx.wx.rain || 0) < 0.05) idleClear += dt;
       else if (c !== "lookup") idleClear = Math.max(0, idleClear - dt * 0.5);
 
-      let want = pickHeroClip(named(c) ? c : "idle", Object.assign(ctx, { mine }));
+      /* His own fidget (a look at the sky) plays once: when it has played out he is back to idle for a good while, not held
+         on its last frame for as long as the sky stays clear. */
+      if (clip === "lookup" && player.ended("lookup")) idleClear = -12;
+      /* Every cast clip has a defined exit: its end event. A one-shot that has played out (and, for the wind-ups, whose hold has
+         ended) hands back to idle, never left holding its last frame; the avatar blends out over 0.3 s. */
+      let asked = named(c) ? c : "idle";
+      const pw = window.day && window.day.powers && window.day.powers.now ? window.day.powers.now() : null;
+      const castAge = pw && pw.cast && pw.cast.age != null ? pw.cast.age : 1e9;
+      if (exitLatch && (!EXIT_CLIPS.has(asked) || castAge < exitAge)) exitLatch = false; // the ask ended, or a new cast began
+      if (!exitLatch && EXIT_CLIPS.has(clip) && player.ended(clip) && (EXIT_CLIPS.has(asked) || clip === "triumph")
+        && !(WINDUPS.has(clip) && pw && pw.windup)) {
+        exitLatch = true;
+        exitAge = castAge;
+        exitedAt++;
+      }
+      if (exitLatch) {
+        exitAge = Math.max(exitAge, castAge < 1e9 ? castAge : 0);
+        if (EXIT_CLIPS.has(asked)) asked = "idle";
+        triumphLeft = 0;
+      }
+      let want = pickHeroClip(asked, Object.assign(ctx, { mine }));
       // Force lookup once idleClear crosses the threshold
       if (want === "idle" && idleClear >= 4 && named("lookup") && mine) want = "lookup";
       clip = named(want) ? want : "idle";
+      if (idleOff) {
+        if (clip !== "idle" && clip !== "walk" && clip !== "run") heldClip = clip;
+        else if (clip === "idle" && heldClip) clip = heldClip;
+        else heldClip = "";
+      }
       if (clip === "lookup") {
         motion.lookupPlayed++;
         if (heroEvt !== "lookup") {
@@ -414,8 +517,9 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       player.play(clip, speed, dt);
       offset = clipAnchor(clip);
       // Landing crouch dips the whole figure slightly (anticipation) then recovers
-      const landK = landT > 0 ? Math.sin(Math.min(1, (0.55 - landT) / 0.2) * Math.PI) * landDepth * 0.06 : 0;
-      wrap.position.y = -offset - landK;
+      const landK = landT > 0 ? Math.sin((1 - landT / landLen) * Math.PI) * landDepth * 0.06 : 0;
+      const takeK = takeT > 0 ? Math.sin((1 - takeT / TAKE_LEN) * Math.PI) * 0.05 : 0; // the crouch before the spring
+      wrap.position.y = -offset - landK - takeK;
       bolts.update(mine ? BOLTS[clip] || 0.2 : 0, dt);
 
       // Rim light: behind him, aimed at him from the camera's opposite side

@@ -132,7 +132,10 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
   const captionBust = caption.querySelector(".bust");
 
   const captionWho = caption.querySelector("b");
-  function showCaption(text, who, secs) {
+  function showCaption(text, who, secs, lead) {
+    // A new player's first minute carries at most 40 words on screen (teach by doing): the cold open's one call is captioned,
+    // every other voiced line in it plays without a caption until js/coldopen.js drops `first-min`.
+    if (!lead && document.documentElement.classList.contains("first-min")) { live.caption = null; return; }
     if (captionTimer) clearTimeout(captionTimer);
     const name = who || "Small Weather";
     captionWho.textContent = name;
@@ -450,6 +453,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
    * Returns { id, file, secs } (file null when no clip is in the build or Sound is off: the caption still shows).
    */
   let audioCtx = null;
+  const neighborPlayedAt = {};
   function mixApi() {
     return day.mix || window.mix || day.audio || null;
   }
@@ -512,7 +516,12 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
     const id = lineId(who, text);
     const file = `audio/dialogue/${id}.mp3`;
     const have = dialogueFiles.has(file) && !missing[file];
-    const canPlay = have && soundOn() && voicesOn();
+    // The same clip never plays twice inside 60 s (a beat that repeats when the day key or clock jumps keeps its caption
+    // and text but stays silent the second time).
+    const nowS = performance.now() / 1000;
+    const recent = neighborPlayedAt[id] != null && nowS - neighborPlayedAt[id] < 60;
+    const canPlay = have && soundOn() && voicesOn() && !recent;
+    if (canPlay) neighborPlayedAt[id] = nowS;
     if (playing) stopCurrent();
     live.last = { id, group: "neighbor-" + String(who).toLowerCase(), text, file: have ? file : null, via: opts.via || "neighbor", at: performance.now() / 1000 };
     lastAt = performance.now() / 1000;
@@ -550,12 +559,12 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
         playPri = 9;
         live.playing = true;
         if (isFinite(a.duration) && a.duration > 0) secs = a.duration + 0.4;
-        else a.addEventListener("loadedmetadata", () => { if (!done && isFinite(a.duration)) showCaption(text, who, a.duration + 0.4); }, { once: true });
+        else a.addEventListener("loadedmetadata", () => { if (!done && isFinite(a.duration)) showCaption(text, who, a.duration + 0.4, opts.via === "coldopen"); }, { once: true });
       } catch (err) {
         a = null;
       }
     }
-    showCaption(text, who, secs);
+    showCaption(text, who, secs, opts.via === "coldopen");
     quietNote(`${who}: ${text}`);
     if (!a) setTimeout(finish, secs * 1000);
     emit({ action: "play", id, group: live.last.group, text, file: a ? file : null, who, via: opts.via || "neighbor", positional: true, gain: +where.gain.toFixed(2), pan: +where.pan.toFixed(2), caption: true });

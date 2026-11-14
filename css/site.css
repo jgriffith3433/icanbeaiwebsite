@@ -663,6 +663,8 @@ html.touch-ui.in-control .privacy-tag { display: none; }
   color: var(--accent);
   border-radius: 999px;
   padding: 10px 20px;
+  min-height: 44px;
+  min-width: 44px;
   font-size: 0.92rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -788,12 +790,15 @@ html.touch-ui .quality-btn {
   .in-control .control-btn {
     padding: 8px 16px;
     font-size: 0.82rem;
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 html.touch-ui.in-control .control-btn {
   padding: 8px 16px;
   font-size: 0.82rem;
   min-height: 44px;
+  min-width: 44px;
 }
 
 /* ---------- weather (js/weather.js): the state, and the wheel while he's the player's ---------- */

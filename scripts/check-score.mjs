@@ -1,5 +1,6 @@
 /* The score's day/night beds, layered weather soundscape, equal-power crossfades, and loop seam fixer (js/score.js). Run by npm test. */
-import { bedFor, isNightHour, equalPowerGains, fixLoopSeam, startScore } from "../js/score.js";
+import { bedFor, isNightHour, equalPowerGains, startScore } from "../js/score.js";
+import { fixLoopSeam } from "./loop-seam.mjs";
 import fs from "node:fs";
 
 let bad = 0;
@@ -39,7 +40,7 @@ for (const t of [0, 0.25, 0.5, 0.75, 1]) {
     numberOfChannels: 1,
     getChannelData: () => data,
   };
-  const fixed = fixLoopSeam(null, rawBuf, 0.5);
+  const fixed = fixLoopSeam(rawBuf, 0.5);
   ok(fixed.trimmedSamples >= sr * 0.8, `fixLoopSeam trimmed silent tail hole (${fixed.trimmedSamples} samples)`);
   ok(fixed.fadeSamples >= sr * 0.25, `fixLoopSeam applied equal-power crossfade overlap (${fixed.fadeSamples} samples)`);
   ok(fixed.jumpAfter < 0.09 && fixed.jumpAfter < fixed.jumpBefore * 0.15, `fixLoopSeam eliminated wrap jump (before ${fixed.jumpBefore}, after ${fixed.jumpAfter})`);
@@ -121,5 +122,13 @@ ok(!pr || (pr.from >= 0 && pr.from < 1 && pr.gain >= 0 && pr.gain <= 1 && pr.rat
 if (bad) {
   console.error(`check-score: ${bad} failed`);
   process.exit(1);
+}
+// No buffer rewrite in the browser: the seams are baked into the files (scripts/bake-loop-seams.mjs).
+for (const f of ["../js/score.js", "../js/daysound.js"]) {
+  ok(!/fixLoopSeam/.test(fs.readFileSync(new URL(f, import.meta.url), "utf8")), `${f} has no runtime fixLoopSeam`);
+}
+{
+  const r = (await import("node:child_process")).spawnSync(process.execPath, [new URL("./bake-loop-seams.mjs", import.meta.url).pathname, "--check"], { encoding: "utf8" });
+  ok(r.status === 0, `loop beds are baked and unchanged (${(r.stdout || r.stderr).trim()})`);
 }
 console.log("check-score: day/night beds, layered weather soundscape, equal-power crossfades and loop seams ok");

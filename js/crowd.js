@@ -543,7 +543,7 @@ export function installCrowd(world) {
       if (crossOpen(p) || p.wait > 40) { p.state = "walk"; p.wait = 0; }
       else { p.phase += dt * 2; return; }
     }
-    const reactK = rKind === "gale" ? 1 - 0.35 * rk : rKind === "fog" ? 1 - 0.2 * rk : (rKind === "sun" || dancing) ? 1 - 0.4 * rk : 1;
+    const reactK = galeAmt > 0.02 || fogAmt > 0.02 ? Math.max(0.4, 1 - 0.35 * galeAmt - 0.3 * fogAmt) * ((rKind === "sun" || dancing) ? 1 - 0.4 * rk : 1) : (rKind === "sun" || dancing) ? 1 - 0.4 * rk : 1;
     const hurry = wxK.raining && !run && !dancing ? 1.3 : 1; // rain: everyone walks quicker (dancers stroll)
     const sp = p.speed * hurry * (run ? 1.9 : 1) * reactK * (p.state === "door-in" || p.state === "door-out" ? 0.8 : 1);
     // step cadence from the speed they actually move at, so feet keep pace (a run takes longer strides)
@@ -627,6 +627,10 @@ export function installCrowd(world) {
   let wxK = { people: 1, cars: 1, speed: 1, raining: false, storm: false, lights: false };
   /* reaction to ability weather: "" | lookup | rain | gale | fog | sun */
   let rKind = "";
+  /* Gale and Fog linger: the street is still bent into the wind, or pulling its coat tight, 10-20 s after the cast.
+     galeAmt / fogAmt are 0..1, rise in about 0.3 s and fall with a time constant of GALE_TAU / FOG_TAU. */
+  const GALE_TAU = 5.5, FOG_TAU = 6;
+  let galeAmt = 0, fogAmt = 0;
   const REACT_SEC = 0.8; // how fast a person settles back to routine once the ability weather is gone
   let hourNow = 12;
   const lastPos = new Float32Array(MAXP * 2);
@@ -779,10 +783,20 @@ export function installCrowd(world) {
     try { window.dispatchEvent(new CustomEvent("day:crowd", { detail: { action: "reaction", kind } })); } catch (e) { /* node */ }
     for (let i = 0; i < MAXP; i++) {
       const p = people[i];
-      p.rdelay = rng() * 0.6;
+      p.rdelay = rng() * (kind === "rain" ? 0.25 : 0.6);
       p.look = kind === "lookup" ? 1.6 + rng() * 1.4 : 0;
       // under rain, the ones with no umbrella run for the nearest door
-      if (kind === "rain" && p.active && !p.hasUmb && !p.leaving && p.state === "walk" && rng() < 0.7) p.leaving = true;
+      if (kind === "rain" && p.active && !p.hasUmb && !p.leaving && p.state === "walk" && rng() < 0.7) {
+        p.leaving = true;
+        if (!p.door && p.edge && p.edge.kind === "walk" && p.edge.doors && p.edge.doors.length) {
+          let best = null, bestD = 1e9;
+          for (const d of p.edge.doors) {
+            const ahead = p.dir > 0 ? d.s - p.s : p.s - d.s;
+            if (ahead > 0.6 && ahead < bestD) { best = d; bestD = ahead; }
+          }
+          if (best) p.door = best;
+        }
+      }
     }
   }
 
@@ -909,7 +923,7 @@ export function installCrowd(world) {
 
     // frame-time guard: thin the crowd when frames run long, bring it back slowly
     ema = lerp(ema, dtReal * 1000, 0.05);
-    const floor = quality === "low" ? 0.6 : 0.5;
+    const floor = quality === "low" ? 0.3 : 0.5; // a phone may thin the crowd to 30% of its (already 0.4x) budget before it drops frames
     if (ema > 40) { slow += dtReal; fast = 0; } else if (ema < 22) { fast += dtReal; slow = 0; } else { slow = 0; fast = 0; }
     if (slow > 3) { guard = Math.max(floor, guard * 0.85); slow = 0; }
     if (fast > 10) { guard = Math.min(1, guard * 1.1); fast = 0; }
@@ -928,6 +942,18 @@ export function installCrowd(world) {
     if (hushLeft > 0) hushLeft = Math.max(0, hushLeft - dt);
     const d = densityAt(curve, hourNow);
     const w = weatherK();
+    {
+      const wf0 = (typeof window !== "undefined" && window.windfog) || null;
+      const ws = wf0 && wf0.strength ? Math.max(0, wf0.strength() - 0.25) / 0.75 : 0;
+      const gIn = Math.max(rKind === "gale" ? 1 : 0, Math.min(1, ws * 1.2));
+      const fIn = rKind === "fog" ? 1 : 0;
+      galeAmt = gIn > galeAmt ? Math.min(gIn, galeAmt + dt / 0.3) : galeAmt * Math.exp(-dt / GALE_TAU);
+      fogAmt = fIn > fogAmt ? Math.min(fIn, fogAmt + dt / 0.5) : fogAmt * Math.exp(-dt / FOG_TAU);
+      if (galeAmt < 0.005) galeAmt = 0;
+      if (fogAmt < 0.005) fogAmt = 0;
+      if (fogAmt > 0.2 || galeAmt > 0.2) wxK.speed = Math.min(wxK.speed, 1 - 0.4 * fogAmt - 0.2 * galeAmt);
+      if (fogAmt > 0.2) wxK.lights = true;
+    }
     const sc = budgetScale();
     targetP = Math.round(MAXP * d.people * w.people * sc);
     targetC = Math.round(MAXC * d.cars * w.cars * sc);
@@ -1052,17 +1078,21 @@ export function installCrowd(world) {
       const dancing = !!(p.celebrate && celebrateLeft > 0);
       const cheer = (rKind === "sun" || dancing) ? rk * 0.16 * Math.abs(Math.sin(p.phase * 0.9)) : 0;
       const bob = Math.abs(Math.sin(p.phase)) * 0.035 * (p.state === "wait" ? 0 : 1) + cheer;
-      const gale = rKind === "gale" ? rk : 0;
+      const gale = galeAmt;
+      const coat = fogAmt;
+      const turner = (i % 4) === 0 && gale > 0.45;
+      const tyaw = turner ? Math.min(1, (gale - 0.45) * 3) * 2.6 : 0; // some turn their backs to the wind
+      const syaw = p.yaw + tyaw;
       const sway = Math.sin(p.phase) * (p.state === "wait" ? 0 : 0.13) + gale * (0.16 + 0.1 * Math.sin(clock * 9 + p.phase));
       const y = PED_Y + bob;
-      const lean = gale * 0.07; // leaning into the wind
+      const lean = (turner ? -0.6 : 1) * gale * 0.07 - coat * 0.03; // leaning into the wind
       const hx = looking ? -Math.sin(p.yaw) * 0.07 * rk : 0;
       const hz = looking ? -Math.cos(p.yaw) * 0.07 * rk : 0;
       put(mLegs, i, p.x, PED_Y + 0.4 * h, p.z, p.yaw, p.scale, h); // feet stay on the ground; the bob is the upper body
       put(mShoes, i, p.x, PED_Y + 0.4 * h, p.z, p.yaw, p.scale, h);
-      put(mArms, i, p.x + Math.sin(p.yaw) * lean, y + 1.12 * h, p.z + Math.cos(p.yaw) * lean, p.yaw + sway, p.scale * looks[i].girth, h);
-      put(mTorso, i, p.x + Math.sin(p.yaw) * lean, y + 1.1 * h, p.z + Math.cos(p.yaw) * lean, p.yaw + sway, p.scale * looks[i].girth, h);
-      put(mHead, i, p.x + Math.sin(p.yaw) * lean * 1.6 + hx, y + (1.58 + (looking ? 0.05 * rk : 0)) * h, p.z + Math.cos(p.yaw) * lean * 1.6 + hz, p.yaw, p.scale, h);
+      put(mArms, i, p.x + Math.sin(p.yaw) * lean, y + 1.12 * h, p.z + Math.cos(p.yaw) * lean, syaw + sway, p.scale * looks[i].girth * (1 - 0.16 * coat), h * (1 - 0.04 * coat));
+      put(mTorso, i, p.x + Math.sin(p.yaw) * lean, y + 1.1 * h, p.z + Math.cos(p.yaw) * lean, syaw + sway, p.scale * looks[i].girth * (1 - 0.16 * coat), h * (1 - 0.04 * coat));
+      put(mHead, i, p.x + Math.sin(p.yaw) * lean * 1.6 + hx, y + (1.58 + (looking ? 0.05 * rk : 0) - 0.05 * coat) * h, p.z + Math.cos(p.yaw) * lean * 1.6 + hz, syaw, p.scale, h);
       const lk = looks[i];
       const near = !cam || (Math.abs(p.x - cam.x) < 45 && Math.abs(p.z - cam.z) < 45);
       // Keep hair/bags in to 32 m on low so nothing pops inside the 30 m seamless-transition bar.
@@ -1075,7 +1105,7 @@ export function installCrowd(world) {
       else put(mBag, i, p.x + Math.cos(p.yaw) * -0.26, y + 0.9 * h, p.z + Math.sin(p.yaw) * 0.26, p.yaw, p.scale, h);
       if (!lk.dog || quality === "low" || !near) hide(mDog, i);
       else put(mDog, i, p.x + Math.cos(p.yaw) * 0.65 + Math.sin(p.yaw) * 0.3, PED_Y + Math.abs(Math.sin(p.phase * 2)) * 0.015, p.z - Math.sin(p.yaw) * 0.65 + Math.cos(p.yaw) * 0.3, p.yaw, 1, 1);
-      if (gale > 0.3) { put(mHand, i, p.x + Math.sin(p.yaw) * lean * 1.6, y + 1.76 * h, p.z + Math.cos(p.yaw) * lean * 1.6, p.yaw, p.scale * 1.1, 1); hats++; }
+      if (gale > 0.3 && rKind !== "sun") { put(mHand, i, p.x + Math.sin(p.yaw) * lean * 1.6, y + 1.76 * h, p.z + Math.cos(p.yaw) * lean * 1.6, p.yaw, p.scale * 1.1, 1); hats++; }
       else if ((rKind === "sun" || dancing) && rk > 0.3) { put(mHand, i, p.x, y + 1.95 * h + cheer, p.z, p.yaw, p.scale * 2.2, 1); cheering++; }
       else hide(mHand, i);
       /* Umbrellas: up in the rain; a strong gust (js/windfog.js) snatches the ones carried open, then turns each inside out
@@ -1164,7 +1194,7 @@ export function installCrowd(world) {
         for (let i = 0; i < MAXP; i++) if (people[i]) people[i].umbForceClose = false;
       }
     }
-    handMesh.setEnabled(rKind === "gale" || rKind === "sun" || celebrateLeft > 0);
+    handMesh.setEnabled(rKind === "gale" || galeAmt > 0.3 || rKind === "sun" || celebrateLeft > 0);
     wiperMesh.setEnabled(wxK.raining);
     lampMatF.emissiveColor.set(lampK * 0.9, lampK * 0.85, lampK * 0.7);
     lampMatR.emissiveColor.set(lampK * 0.7, lampK * 0.07, lampK * 0.07);
@@ -1177,7 +1207,7 @@ export function installCrowd(world) {
     Object.assign(info, {
       people: active, cars: nCars, targetPeople: targetP, targetCars: targetC, walking, waiting, crossing, entering, leaving,
       moving: sampleMoved, stopped, near: { people: nearP, cars: nearC }, phase: phaseAt(phases, hourNow), scale: Math.round(budgetScale() * 100) / 100,
-      reaction: rKind, flinching, reacting, lookingUp, hats, cheering, running: rKind === "rain" ? reacting : 0,
+      reaction: rKind, galeAmt: Math.round(galeAmt * 100) / 100, fogAmt: Math.round(fogAmt * 100) / 100, flinching, reacting, lookingUp, hats, cheering, running: rKind === "rain" ? reacting : 0,
       umbrellasClosed, shopsOut,
       quality, umbrellas: umbs, flipped, flips: flipEvents, wipers: wxK.raining ? nCars : 0, carSpeed: nCars ? sumV / nCars : 0, hour: Math.round(hourNow * 100) / 100,
       flares: flareCount, lights: !!wxK.lights,
@@ -1221,6 +1251,10 @@ export function installCrowd(world) {
   if (typeof window.addEventListener === "function") {
     window.addEventListener("day:power", (e) => {
       const d = (e && e.detail) || {};
+      if (d.action === "denied") return;
+      const act = d.power || d.action || "";
+      if (act === "rain") startReaction("rain");
+      else if (act === "storm") startReaction("lookup");
       const P = window.day && window.day.powers;
       if (!P || !P.now || !/^(bolt|tornado|gust)$/.test(d.action || "")) return;
       let n = null;

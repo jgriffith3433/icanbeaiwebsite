@@ -136,7 +136,7 @@
     camera.attachControl(canvas, false); // false = the camera takes the wheel/pinch, the page doesn't
     // Babylon gives the canvas tabindex=1; the UI probe then counts the full-screen view as a control sitting under the
     // notch and home bar. The scene isn't a control (keys are read on window), so it isn't a tab stop.
-    canvas.removeAttribute("tabindex");
+    if (canvas.removeAttribute) canvas.removeAttribute("tabindex");
 
     const hemi = new B.HemisphericLight("sky", V3(0.1, 1, 0.3), scene);
     hemi.groundColor = new B.Color3(0.14, 0.13, 0.15);
@@ -157,7 +157,19 @@
        with zero extra scene render passes. */
     const glowing = (mesh) => mesh;
 
-    const pipeline = new B.DefaultRenderingPipeline("look", true, scene, [camera]);
+    /* Phone / low quality (same pick as js/look.js: url, saved, else narrow / coarse / <= 4 GB): an 8-bit pipeline, no HDR targets.
+       Tone mapping is still the image-processing pass; the bloom pass is off on low (js/look.js applyQuality). */
+    const lowAtBoot = (() => {
+      try {
+        const q = new URLSearchParams(location.search).get("quality") || localStorage.getItem("icanbe.quality");
+        if (q === "low" || q === "high") return q === "low";
+      } catch (e) { /* node, or no storage */ }
+      let narrow = false, coarse = false;
+      try { narrow = window.innerWidth <= 700; coarse = window.matchMedia("(pointer: coarse)").matches; } catch (e) { /* node */ }
+      const mem = typeof navigator !== "undefined" && navigator.deviceMemory;
+      return !!((mem && mem <= 4) || narrow || coarse);
+    })();
+    const pipeline = new B.DefaultRenderingPipeline("look", !lowAtBoot, scene, [camera]);
     pipeline.fxaaEnabled = true;
     pipeline.samples = 1;
     pipeline.imageProcessing.toneMappingEnabled = true;
@@ -676,10 +688,10 @@
       box("legL", 0.06, 0.74, 0.6, -(opts.w || 1.4) / 2 + 0.06, 0.45, 0, opts.m || wood, n);
       box("legR", 0.06, 0.74, 0.6, (opts.w || 1.4) / 2 - 0.06, 0.45, 0, opts.m || wood, n);
       if (opts.screen) {
-        box("stand", 0.08, 0.25, 0.08, 0, 0.98, 0.18, dark, n);
+        box("stand", 0.08, 0.25, 0.08, 0, 0.98, 0.28, dark, n);
         const sm = glowMat("#14181f");
-        const scr = box("screen", 0.72, 0.42, 0.04, 0, 1.25, 0.2, dark, n);
-        const face = box("screenface", 0.66, 0.37, 0.01, 0, 1.25, 0.177, sm, n, false);
+        const scr = box("screen", 0.72, 0.42, 0.04, 0, 1.25, 0.3, dark, n);
+        const face = box("screenface", 0.66, 0.37, 0.01, 0, 1.25, 0.277, sm, n, false);
         glowing(face);
         box("kbd", 0.45, 0.02, 0.15, 0, 0.86, -0.12, mat("#3a3e46"), n);
         scr.receiveShadows = true;
@@ -798,16 +810,16 @@
       const cm = mat("#7a5a49");
       const cm2 = mat("#6a4c3d");
       box("couchbase", 2.3, 0.4, 0.9, 0, 0.3, -0.12, cm2, n);
-      box("cushion1", 1.08, 0.14, 0.8, -0.56, 0.55, -0.1, cm, n);
-      box("cushion2", 1.08, 0.14, 0.8, 0.56, 0.55, -0.1, cm, n);
+      box("cushion1", 1.08, 0.14, 0.8, -0.56, 0.465, -0.1, cm, n); /* top 0.535 like the chair seat: his hips sit 0.62, thighs clear the cushion */
+      box("cushion2", 1.08, 0.14, 0.8, 0.56, 0.465, -0.1, cm, n);
       box("couchback", 2.3, 0.62, 0.22, 0, 0.8, -0.5, cm2, n);
-      box("armL", 0.2, 0.55, 0.9, -1.15, 0.5, -0.12, cm2, n);
-      box("armR", 0.2, 0.55, 0.9, 1.15, 0.5, -0.12, cm2, n);
+      box("armL", 0.2, 0.675, 0.9, -1.15, 0.4375, -0.12, cm2, n); /* down to the floor (bottom was 0.225: the outer 10 cm of each arm hung 12 cm in the air) */
+      box("armR", 0.2, 0.675, 0.9, 1.15, 0.4375, -0.12, cm2, n); /* down to the floor (bottom was 0.225: the outer 10 cm of each arm hung 12 cm in the air) */
       box("throwpillow", 0.38, 0.32, 0.12, 0.8, 0.75, -0.35, mat("#c9a04f"), n);
       box("rugL", 3.4, 0.015, 2.6, 0, FLOOR + 0.008, 1.4, mat("#6e5a48"), n).receiveShadows = true; /* cast true: joins the room lights' includedOnlyMeshes (false left it hemi-only and black); furnitureSet still skips it as a shadow caster */
-      box("ctable", 1.0, 0.06, 0.55, 0, 0.45, 1.3, woodLight, n);
-      [[-0.45, 1.1], [0.45, 1.1], [-0.45, 1.5], [0.45, 1.5]].forEach((p, i) => box("ctl" + i, 0.05, 0.4, 0.05, p[0], 0.23, p[1], woodLight, n));
-      const remote = box("remote", 0.05, 0.02, 0.18, 0.3, 0.49, 1.25, dark, n);
+      box("ctable", 1.0, 0.06, 0.55, 0, 0.45, 1.6, woodLight, n);
+      [[-0.45, 1.4], [0.45, 1.4], [-0.45, 1.8], [0.45, 1.8]].forEach((p, i) => box("ctl" + i, 0.05, 0.4, 0.05, p[0], 0.23, p[1], woodLight, n));
+      const remote = box("remote", 0.05, 0.02, 0.18, 0.3, 0.49, 1.55, dark, n);
       props.remote = remote;
       const tvN = anchor("couch", 4.05, 0, PI);
       if (tvN) {
@@ -951,10 +963,13 @@
       box("fruit", 0.25, 0.12, 0.25, 0.4, 0.88, 0.15, mat("#c9a04f"), n);
       const opp = new B.TransformNode("oppchair", scene);
       opp.parent = n;
-      opp.position.set(0, 0, 0.72);
+      /* Pulled out from the table: the table spans z 0.295..1.145 from the seat, so the back
+         (local -0.3, 0.06 thick) and the seat's front edge both stay clear of it. */
+      opp.position.set(0, 0, 1.35);
       opp.rotation.y = PI;
       box("oseat", 0.48, 0.07, 0.46, 0, 0.5, -0.05, wood, opp);
       box("oback", 0.48, 0.55, 0.06, 0, 0.8, -0.3, wood, opp);
+      [[-0.2, 0.15], [0.2, 0.15], [-0.2, -0.25], [0.2, -0.25]].forEach((p, i) => box("oleg" + i, 0.05, 0.46, 0.05, p[0], 0.27, p[1], wood, opp));
     }
 
     /* Wall clock in the kitchen */
@@ -1211,6 +1226,15 @@
         const e = sphere("eye" + i, 0.032, dark, head, 6);
         e.position.set(x, 0.14, 0.115);
       });
+      if (isMain) {
+        /* his glasses and the glowing blue seam down the jacket */
+        [-0.05, 0.05].forEach((x, i) => {
+          const g = box("lens" + i, 0.07, 0.05, 0.01, x, 0.14, 0.128, glowMat("#9cc6e8", "#3a5a78"), head, false);
+          glowing(g);
+        });
+        const seam = box("seam", 0.012, 0.5, 0.012, 0, 0.27, 0.125, glowMat("#58b8ff", "#58b8ff"), torso, false);
+        glowing(seam);
+      }
       const arm = (side, x) => {
         const sh = pivot("sh" + side, torso, x, 0.47, 0);
         const ua = capsule("ua" + side, 0.32, 0.055, top, sh);
@@ -1235,6 +1259,16 @@
         sh.position.y = -0.2;
         const foot = box("foot" + side, 0.1, 0.07, 0.24, 0, -0.43, 0.05, shoeM, kn);
         foot.position.y = -0.43;
+        if (isMain) {
+          /* the stand-in he wears until his model is on him reads as him, not a dark blank: a visible boot and its glowing sole */
+          foot.scaling.set(1.25, 1.3, 1.2);
+          foot.position.y = -0.42;
+          const sole = box("sole" + side, 0.135, 0.014, 0.3, 0, -0.4675, 0.055, glowMat("#58b8ff", "#58b8ff"), kn, false);
+          glowing(sole);
+          /* seen from behind (third person) the boot is a dark stub against dark pants: a glowing heel band shows the foot */
+          const heel = box("heel" + side, 0.13, 0.035, 0.012, 0, -0.43, -0.075, glowMat("#58b8ff", "#58b8ff"), kn, false);
+          glowing(heel);
+        }
       };
       leg("L", -0.095);
       leg("R", 0.095);
@@ -1539,18 +1573,20 @@
     }
     const boxProps = () => [me.phone, me.phone && me.phone.screen, me.cup, me.bag].filter(Boolean);
     let shadowProxy = null;
-    /* Small Weather is the only model he ever has. The box figure is never drawn: it is only the frame that places,
-       tilts and seats him. While his GLB is on its way nothing shows; if it never loads, nothing shows either
-       (setSkin(null) keeps him hidden). Only a config with no model (control.model null) draws the boxes. */
-    const figureDrawn = !(cfg.control && cfg.control.model);
+    /* Small Weather's GLB is his look. The box figure is the frame that places, tilts and seats him, and it is the stand-in:
+       drawn until the model is on him and again whenever setSkin(null) is called, so he is never hidden. */
+    const figureDrawn = true; // the stand-in is drawn until his model is on him, and again if it is ever lost (J, 2026-11-14)
     const figureMeshes = () => {
       const keep = boxProps();
       return me.root.getChildMeshes(false).filter((m) => m !== shadowProxy && !keep.includes(m) && !(skin && skin.meshes.includes(m)));
     };
-    if (!figureDrawn) {
+    /* While his model is on its way the stand-in stays hidden (app.js calls this at boot): the player never sees the box body swap
+       for the real one. setSkin(model) keeps it hidden; setSkin(null) (the load failed) draws it. */
+    function holdStandIn(on) {
+      if (skin) return;
       figureMeshes().forEach((m) => {
-        m.setEnabled(false);
-        shadows.removeShadowCaster(m, false);
+        m.setEnabled(!on && figureDrawn);
+        if (on) shadows.removeShadowCaster(m, false); else shadows.addShadowCaster(m, false);
       });
     }
     function setSkin(s) {
@@ -1559,7 +1595,8 @@
       figureMeshes().forEach((m) => {
         if (!s || !s.meshes.includes(m)) {
           m.setEnabled(!s && figureDrawn);
-          if (s || !figureDrawn) shadows.removeShadowCaster(m, false);
+          if (s) shadows.removeShadowCaster(m, false);
+          else shadows.addShadowCaster(m, false);
         }
       });
       skin = s;
@@ -1606,9 +1643,31 @@
       });
     }
 
+    /* What the player sees of him right now: the model, the stand-in figure, or (a bug) nothing. */
+    function heroDrawn() {
+      const cam = scene.activeCamera;
+      const fig = figureMeshes().filter((m) => m.isEnabled() && m.getTotalVertices && m.getTotalVertices() > 0);
+      const mod = skin ? skin.meshes.filter((m) => m !== shadowProxy && m.isEnabled() && m.getTotalVertices && m.getTotalVertices() > 0) : [];
+      const list = mod.length ? mod : fig;
+      let inFrustum = false;
+      if (cam && list.length) {
+        const planes = B.Frustum.GetPlanes(cam.getTransformationMatrix());
+        inFrustum = list.some((m) => { m.computeWorldMatrix(true); return m.getBoundingInfo().isInFrustum(planes); });
+      }
+      const rp = me.spin.getAbsolutePosition();
+      let screen = null;
+      const eng = scene.getEngine();
+      if (cam && eng) {
+        const v = B.Vector3.Project(new B.Vector3(rp.x, rp.y + 0.9, rp.z), B.Matrix.Identity(), scene.getTransformMatrix(), cam.viewport.toGlobal(eng.getRenderWidth(), eng.getRenderHeight()));
+        screen = { x: v.x / eng.getRenderWidth(), y: v.y / eng.getRenderHeight(), z: v.z };
+      }
+      return { kind: mod.length ? "model" : fig.length ? "figure" : "none", meshes: list.length, inFrustum, screen };
+    }
+
     /* ---------------- sky ---------------- */
     const SR = window.DayEngine.parseClock(((cfg.sky || {}).sunrise) || "6:45") / 60;
     const SS = window.DayEngine.parseClock(((cfg.sky || {}).sunset) || "18:45") / 60;
+    const NIGHT_FLOOR = { hemi: 1.0, exposure: 0.92 };
     function daylight(h) {
       if (h < SR - 1 || h > SS + 1.2) return 0.03;
       if (h < SR + 0.8) return 0.03 + 0.67 * ((h - (SR - 1)) / 1.8);
@@ -1750,8 +1809,26 @@
       const e = k * k * (3 - 2 * k);
       const lerp = (v) => v[0] + (v[1] - v[0]) * e;
       const tx = lerp(c.tx), ty = lerp(c.ty), tz = lerp(c.tz);
-      const a = lerp(c.alpha), b = lerp(c.beta);
+      const a = lerp(c.alpha);
       let r = lerp(c.radius);
+      /* The target can sweep over a roof (the cold open's glance eases from Birdie on the lawn to him on the apt roof) and the
+         camera, orbiting it, then skims the roof top with the near plane in the slab (the playtest's camera-inside). The
+         target may itself be inside a block, so shortening the ray can't help: lift the camera (a smaller beta) until it sits
+         at least 1 m above any solid it is over, or out beside it. */
+      let b = lerp(c.beta); // (lifted below when over a roof)
+      const overSolid = (px, py, pz) => {
+        for (let i = 0; i < solids.length; i++) {
+          const q = solids[i];
+          if (q.roll || q.yaw || q.pitch || q.h < 1) continue;
+          if (Math.abs(px - q.x) < q.w / 2 + 0.3 && Math.abs(pz - q.z) < q.d / 2 + 0.3 && py < q.y + q.h / 2 + 1 && py > q.y - q.h / 2 - 0.3) return true;
+        }
+        return false;
+      };
+      for (let n = 0; n < 16 && b > 0.35; n++) {
+        const sbn = Math.sin(b);
+        if (!overSolid(tx + Math.cos(a) * sbn * r, ty + Math.cos(b) * r, tz + Math.sin(a) * sbn * r)) break;
+        b -= 0.06;
+      }
       const sb = Math.sin(b);
       const dx = Math.cos(a) * sb, dy = Math.cos(b), dz = Math.sin(a) * sb;
       r = clearRadius(tx, ty, tz, dx, dy, dz, r, 0.9);
@@ -1931,6 +2008,58 @@
       }
       return Math.max(1.2, best);
     }
+    /* The camera's sphere cast against EVERY solid, not only the big boxes: the small ones (parapet lips, rooftop AC units,
+       kerb props), the rotated ones (the stair ramp, the Needle's turned box) and the stair's end wall. One ray from the target
+       against each box grown by `pad` (the camera's radius) is the sphere cast. Used by the damped camera after Let go, whose
+       old clearRadiusWide ignored anything under 2.5 m or 2 m wide and sat behind a roof lip with his legs hidden. Returns r
+       (clear) or the distance to the first hit minus `margin`, never under 1.2. */
+    const qInv = new B.Quaternion();
+    const vLoc = new B.Vector3();
+    const vDir = new B.Vector3();
+    function clearRadiusSolids(tx, ty, tz, dx, dy, dz, r, pad, margin) {
+      const reach = r + margin;
+      let best = reach;
+      for (let i = 0; i < solids.length; i++) {
+        const s = solids[i];
+        const ex = s.x - tx, ey = s.y - ty, ez = s.z - tz;
+        const big = Math.max(s.w, s.h, s.d) * 0.87 + pad + reach;
+        if (ex * ex + ey * ey + ez * ez > big * big) continue;
+        let ox, oy, oz, ddx = dx, ddy = dy, ddz = dz;
+        if (s.roll || s.yaw || s.pitch) {
+          if (!s._qi) s._qi = B.Quaternion.FromEulerAngles(s.pitch || 0, s.yaw || 0, s.roll || 0).invert();
+          qInv.copyFrom(s._qi);
+          vLoc.set(-ex, -ey, -ez).applyRotationQuaternionToRef(qInv, vLoc);
+          vDir.set(dx, dy, dz).applyRotationQuaternionToRef(qInv, vDir);
+          ox = vLoc.x; oy = vLoc.y; oz = vLoc.z;
+          ddx = vDir.x; ddy = vDir.y; ddz = vDir.z;
+        } else {
+          ox = -ex; oy = -ey; oz = -ez;
+        }
+        const hx = s.w / 2 + pad, hy = s.h / 2 + pad, hz = s.d / 2 + pad;
+        let t0 = 0, t1 = best, ok = true;
+        const o = [ox, oy, oz], d = [ddx, ddy, ddz], h = [hx, hy, hz];
+        for (let k = 0; k < 3 && ok; k++) {
+          if (Math.abs(d[k]) < 1e-6) {
+            if (o[k] < -h[k] || o[k] > h[k]) ok = false;
+          } else {
+            let a = (-h[k] - o[k]) / d[k];
+            let b = (h[k] - o[k]) / d[k];
+            if (a > b) { const x = a; a = b; b = x; }
+            if (a > t0) t0 = a;
+            if (b < t1) t1 = b;
+            if (t0 > t1) ok = false;
+          }
+        }
+        // a target already inside a (grown) box isn't something to pull in for: leave it, as clearRadius does
+        if (ok && t0 > 0.05 && t0 < best) best = t0;
+      }
+      return best >= reach ? r : Math.max(1.2, best - margin);
+    }
+    /* clearRadiusWide's five rays (centre, two sides, above, below) over the big boxes, plus the all-solids sphere cast. */
+    function cameraClear(tx, ty, tz, dx, dy, dz, r) {
+      const wide = clearRadiusWide(tx, ty, tz, dx, dy, dz, r, 0.6);
+      return Math.min(wide, clearRadiusSolids(tx, ty, tz, dx, dy, dz, r, 0.3, 0.3));
+    }
     function update(fr, dt, opts) {
       opts = opts || {};
       elapsed += dt;
@@ -1951,14 +2080,20 @@
       sun.direction.set(-Math.cos(ang) * 0.7, -Math.max(0.3, elev), -0.55);
       sun.intensity = hour > SR - 0.3 && hour < SS + 0.3 ? 0.18 + elev * 0.54 : 0.02;
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
-      hemi.intensity = 0.46 + day * 0.4; // dusk/night floor: the street and people must stay readable; the shaded faces of the city's buildings must still read in the morning
-      B.Color3.LerpToRef(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
+      // THE NIGHT FLOOR (the one place to tune it; weather.js and look.js read scene.metadata.nightFloor): the hemisphere light and the
+      // exposure never fall below these, so the street, roofs and Small Weather stay readable at 23:00 on both qualities. The
+      // blue tint (hemi colour) and the lit windows still make it night.
+      const NF = NIGHT_FLOOR;
+      scene.metadata = scene.metadata || {};
+      scene.metadata.nightFloor = NF;
+      hemi.intensity = Math.max(NF.hemi, 0.46 + day * 0.4);
+      B.Color3.LerpToRef(C("#7088c4"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
       // Vertical faces get half this ground colour: keep the dusk/night floor bright enough that brick facades and
       // the street beside the apt ramp don't go near-black before weather.js can lift it with cover.
-      B.Color3.LerpToRef(C("#586878"), C("#3a362c"), day, hemi.groundColor);
-      if (!scene.metadata || !scene.metadata.dayLook) {
+      B.Color3.LerpToRef(C("#6a7c92"), C("#3a362c"), day, hemi.groundColor);
+      if (!scene.metadata.dayLook) {
         const ipc = pipeline.imageProcessing && pipeline.imageProcessing.imageProcessingConfiguration;
-        if (ipc) ipc._exposure = 0.84 + day * 0.1;
+        if (ipc) ipc._exposure = Math.max(NF.exposure, 0.84 + day * 0.1);
       }
       const night = 1 - Math.min(1, day * 1.6);
       windows.forEach((w) => {
@@ -2183,10 +2318,14 @@
       /* person */
       if (!skin && state.lastOutfit !== things.outfit) {
         state.lastOutfit = things.outfit;
-        const outfit = outfits[things.outfit] || outfits.work || { top: "#c46b52", bottom: "#3a3e46" };
+        const outfit = outfits[things.outfit] || outfits.work || { top: "#1f2a44", bottom: "#1d222c" };
         me.top.diffuseColor.copyFrom(C(outfit.top));
         me.bottom.diffuseColor.copyFrom(C(outfit.bottom));
         me.shoes.diffuseColor.copyFrom(C(outfit.feet || P.shoes || "#241f1c"));
+        /* the stand-in is lit from inside a little: navy and charcoal under a dusk sky read as one black blob (phone-touch, 57 s) */
+        me.top.emissiveColor.copyFrom(me.top.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.1, 0.15, 0.26));
+        me.bottom.emissiveColor.copyFrom(me.bottom.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.07, 0.09, 0.14));
+        me.shoes.emissiveColor.copyFrom(me.shoes.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.16, 0.2, 0.3));
       }
       if (player) {
         // placed and posed by the player's controller
@@ -2377,6 +2516,7 @@
         if (cx < lo) alphaGoal = Math.acos(Math.max(-1, Math.min(1, (lo - cam.x) / reach)));
       }
       if (cam.user > 0) {
+        cam.clearR = null;
         cam.alpha = camera.alpha;
         cam.beta = camera.beta;
         cam.radius = camera.radius;
@@ -2396,9 +2536,14 @@
         /* outdoors (not in a cutaway), keep the camera out of the buildings: pull in rather than sit in a facade */
         if (!(bd && bd.bounds)) {
           const sb = Math.sin(camera.beta);
-          const r = clearRadiusWide(cam.x, cam.y, cam.z, Math.cos(camera.alpha) * sb, Math.cos(camera.beta), Math.sin(camera.alpha) * sb, camera.radius, 0.6);
-          if (r < camera.radius) camera.radius = r;
-        }
+          const r = cameraClear(cam.x, cam.y, cam.z, Math.cos(camera.alpha) * sb, Math.cos(camera.beta), Math.sin(camera.alpha) * sb, camera.radius);
+          /* the pull-in (and the ease back out) is limited per frame so the camera never jumps: in at most 1.3 m a frame, out at 4/s */
+          const prev = cam.clearR != null && !snap ? cam.clearR : camera.radius;
+          let applied = r < prev ? Math.max(r, prev - 1.3) : Math.min(r, prev + 4 * dt);
+          if (applied > camera.radius) applied = camera.radius;
+          cam.clearR = applied;
+          if (applied < camera.radius) camera.radius = applied;
+        } else cam.clearR = null;
       }
       let goalPose = null;
       if (cam.user <= 0) {
@@ -2514,15 +2659,28 @@
         bodies++;
       }
       /* a box around a mesh, turned the way it is turned; small things (cups, plates, rugs) aren't in the way */
-      function meshBox(add, m) {
+      function meshBox(add, m, indoor) {
         if (!m.getTotalVertices || !m.getTotalVertices()) return;
         m.computeWorldMatrix(true);
         const bb = m.getBoundingInfo().boundingBox;
         m.getWorldMatrix().decompose(scl, rot, pos);
         const size = new B.Vector3(bb.extendSize.x * 2 * Math.abs(scl.x), bb.extendSize.y * 2 * Math.abs(scl.y), bb.extendSize.z * 2 * Math.abs(scl.z));
-        const big = size.y >= 0.25 || (size.y >= 0.03 && Math.max(size.x, size.z) >= 1.5);
+        /* a raised top (coffee table, desk, counter) of half a square metre is in the way too: only its legs were, so he could stand
+           up, or walk, with the top through his shins */
+        const big = size.y >= 0.25 || (size.y >= 0.03 && (Math.max(size.x, size.z) >= 1.5 || (size.x * size.z >= 0.5 && bb.minimumWorld.y >= 0.3)));
         if (!big || Math.max(size.x, size.z) < 0.04) return;
-        add(B.Vector3.TransformCoordinates(bb.center, m.getWorldMatrix()), rot.clone(), size);
+        const c = B.Vector3.TransformCoordinates(bb.center, m.getWorldMatrix());
+        /* Tall furniture standing on the floor (shelf, fridge, shower glass) reaches the ceiling for the mover: his three
+           jumps clear 1.9 m, and standing on top of one left his legs through its edge. Only the collider grows. */
+        if (indoor && size.y >= 1.5 && size.y < 2.3 && Math.abs(rot.x) + Math.abs(rot.z) < 1e-3) {
+          const bottom = c.y - size.y / 2;
+          if (bottom < 0.35) {
+            const top = bottom + 2.6;
+            c.y = (bottom + top) / 2;
+            size.y = top - bottom;
+          }
+        }
+        add(c, rot.clone(), size);
       }
       body("ground", (add) => {
         // a thick slab under the ground plane: nothing tunnels through it
@@ -2530,7 +2688,7 @@
         streetMeshes.forEach((m) => meshBox(add, m));
       });
       body("town", (add) => solids.forEach((o) => add(V3(o.x, o.y, o.z), B.Quaternion.FromEulerAngles(o.pitch || 0, o.yaw || 0, o.roll || 0), V3(o.w, o.h, o.d))));
-      body("rooms", (add) => solidMeshes.forEach((m) => meshBox(add, m)));
+      body("rooms", (add) => solidMeshes.forEach((m) => meshBox(add, m, true)));
       physics = { plugin, bodies, colliders };
       return physics;
     }
@@ -2686,7 +2844,9 @@
          freeze the page on the first switch. The frame loop applies each set; resolves when done (or after maxMs). */
       async warmLights(maxMs) {
         const have = new Set(roomLights.map((rl) => rl.building));
-        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"], ["lamps"], ["home", "lamps"], ["office", "lamps"], ["car", "lamps"]].filter((g) => g.every((b) => b === "car" || b === "lamps" || have.has(b) || (b === "office" && officeLights.length)));
+        /* [] first: no room, car or lamp light (a clear noon). A page loaded at night starts with lamps and windows lit, so that set was never
+           compiled, and the first jump to day (the day bar, a scrub) recompiled every lit material at once: multi-second frames on a phone. */
+        const sets = [[], ["home"], ["office"], ["car"], ["home", "car"], ["office", "car"], ["lamps"], ["home", "lamps"], ["office", "lamps"], ["car", "lamps"]].filter((g) => g.every((b) => b === "car" || b === "lamps" || have.has(b) || (b === "office" && officeLights.length)));
         const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
         const t0 = Date.now(), budget = maxMs || 8000;
         /* maxMs is a real deadline: a shader compile or whenReadyAsync that never settles (a slow or software GL, a lost
@@ -2779,6 +2939,7 @@
       },
       surfaceAt,
       clearRadius,
+      cameraClear,
       groundAt,
       physics: () => physics,
       resize() {
@@ -2806,6 +2967,8 @@
       avatar, // the stand-in figure the player moves
       /* his rigged model (js/small-weather.js) over the figure; null takes it off */
       setSkin,
+      holdStandIn,
+      heroDrawn,
       skin: () => skin,
       skinHips: FOOT, // his hips' height standing: the model is scaled to it
       rooms,

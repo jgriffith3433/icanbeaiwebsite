@@ -40,7 +40,7 @@ export function startTitle() {
 
   let quiet = false;
   let autoTimer = 0;
-  const WARM_WAIT_MS = 12000; // the longest the auto-start waits for the shader warm-up
+  const WARM_WAIT_MS = (typeof window !== "undefined" && (window.innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches))) ? 4000 : 12000; // the longest the auto-start waits for the shader warm-up
   try {
     const id = new URLSearchParams(location.search).get("playtest");
     if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch" && id !== "audio-check") quiet = true;
@@ -55,7 +55,7 @@ export function startTitle() {
 .title-screen .logo{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;line-height:.9;opacity:0;transform:translateY(-8px);animation:t-in 1.2s ease 2.4s forwards}
 .title-screen .logo img{display:block;width:min(82vw,560px);height:auto;filter:drop-shadow(0 6px 28px rgba(0,0,0,.6))}
 .title-screen .logo .l1{font:600 clamp(.95rem,3.4vw,1.5rem)/1 Fraunces,Georgia,serif;letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#f0c27a;text-shadow:0 0 20px rgba(240,194,122,.55)}
-.title-screen .logo .l2{margin-top:6px;font:700 clamp(4.4rem,17vw,9rem)/.9 Fraunces,Georgia,serif;letter-spacing:.02em;color:transparent;background:linear-gradient(100deg,#f6dcaa 0%,#f0c27a 38%,#fff6e2 50%,#f0c27a 62%,#d9a24f 100%) 140% 0/260% 100% no-repeat;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 26px rgba(120,70,10,.6));animation:t-glint 5.2s ease-in-out 3.4s infinite}
+.title-screen .logo .l2{margin-top:6px;font:700 clamp(4.4rem,17vw,9rem)/.9 Fraunces,Georgia,serif;letter-spacing:.02em;color:transparent;background:linear-gradient(100deg,#f6dcaa 0%,#f0c27a 38%,#fff6e2 50%,#f0c27a 62%,#d9a24f 100%) 140% 0/260% 100% no-repeat,linear-gradient(#f0c27a,#f0c27a);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 26px rgba(120,70,10,.6));animation:t-glint 5.2s ease-in-out 3.4s infinite}
 .title-screen .logo.zap img{filter:drop-shadow(0 0 26px rgba(255,214,150,.95)) brightness(1.35)}
 .title-screen .logo.zap .l2{filter:drop-shadow(0 0 30px rgba(255,220,160,.95)) brightness(1.4)}
 @keyframes t-in{to{opacity:1;transform:none}}
@@ -63,7 +63,7 @@ export function startTitle() {
 .title-screen .daily{margin:14px 0 0;max-width:30em;color:#f0c27a;font:600 1rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen.fresh .clock{display:none}
 .title-screen .yday.left{color:#f0c27a}
-.title-screen .daily[hidden],.title-screen .left[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
+.title-screen .tally{margin:8px 0 0;padding:6px 14px;max-width:min(88vw,30em);border-radius:14px;background:linear-gradient(180deg,rgba(20,38,48,.7),rgba(10,18,24,.78));border:1px solid rgba(126,200,255,.45);color:#d6ecff;font:600 .9rem/1.35 Outfit,system-ui,sans-serif;text-shadow:0 1px 8px rgba(0,0,0,.9)}.title-screen .tally b{display:block;color:#9fd4ff;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;margin-bottom:2px}.title-screen .tally[hidden],.title-screen .daily[hidden],.title-screen .left[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
 .title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:linear-gradient(180deg,rgba(38,30,22,.62),rgba(16,12,9,.72));color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
 .title-screen .prog b{color:#f0c27a;letter-spacing:.12em;font-weight:700}
 .title-screen .nextgoal{margin:0;max-width:min(86vw,340px);color:#f0c27a;font:600 .95rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.9);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
@@ -98,7 +98,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   el.hidden = true;
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", `${cfg.logoText.join(" ")}`);
-  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p><p class="yday left" id="title-left" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
+  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p><p class="yday left" id="title-left" hidden></p><p class="tally" id="title-tally" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
   const logoEl = el.querySelector("#title-logo");
   logoEl.setAttribute("aria-label", cfg.logoText.join(" ")); // not a text node: a hidden-by-clip line still counts as words on screen
   if (cfg.logo) {
@@ -122,6 +122,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     logoEl.append(l1, l2);
   }
   const dailyEl = el.querySelector("#title-daily");
+  const tallyEl = el.querySelector("#title-tally");
   const ydayEl = el.querySelector("#title-yday");
   const leftEl = el.querySelector("#title-left");
   const progEl = el.querySelector("#title-prog");
@@ -177,11 +178,23 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     leftEl.hidden = !k;
   }
   /* Today's request (js/daily.js) in one line under the name, and yesterday's when it was answered. */
+  function paintTally() {
+    const t = day.memory && day.memory.tally ? day.memory.tally() : null;
+    if (!t || !t.total) { tallyEl.hidden = true; return; }
+    tallyEl.innerHTML = `<b>Your storm changed</b><span></span>`;
+    tallyEl.lastChild.textContent = t.text;
+    tallyEl.hidden = false;
+  }
   function paintDaily() {
     const d = day.daily;
     paintLeft();
+    paintTally();
     const t = d && d.line ? d.line() : "";
-    const y = d && d.yesterdayLine ? d.yesterdayLine() : "";
+    let y = d && d.yesterdayLine ? d.yesterdayLine() : "";
+    try {
+      const tl = day.memory && day.memory.tally ? day.memory.tally() : null;
+      if (tl && tl.summary) y = tl.summary; // what the storm changed stays on the title: the return hook
+    } catch (e) { /* memory not up */ }
     dailyEl.textContent = t;
     dailyEl.hidden = !t;
     ydayEl.textContent = y;
@@ -200,7 +213,9 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     nextEl.hidden = !(hasSave() || p.done > 0) && !started;
   }
   window.addEventListener("day:episode", () => { if (up && !el.classList.contains("fresh")) paintProgress(); });
+  window.addEventListener("day:memory", () => { if (up) paintTally(); });
   window.addEventListener("day:daily", () => { if (up && !el.classList.contains("fresh")) paintDaily(); });
+  window.addEventListener("day:memory", () => { if (up && !el.classList.contains("fresh")) paintDaily(); });
   function emit(action, extra) {
     const detail = Object.assign({ action }, extra || {});
     log.push(Object.assign({ t: performance.now() }, detail));
@@ -310,7 +325,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     // A stranger's first title is the name and the buttons: the day's request, progress, the clock and the key hint wait for a returning player.
     const fresh = !!(day.coldopen && day.coldopen.pending && day.coldopen.pending());
     if (fresh) {
-      dailyEl.hidden = true; ydayEl.hidden = true; leftEl.hidden = true; progEl.hidden = true; nextEl.hidden = true;
+      dailyEl.hidden = true; tallyEl.hidden = true; ydayEl.hidden = true; leftEl.hidden = true; progEl.hidden = true; nextEl.hidden = true;
       el.querySelector(".hint").textContent = "";
     }
     el.classList.toggle("fresh", fresh);
