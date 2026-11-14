@@ -28,6 +28,7 @@ export function startFirstCast() {
     const alreadyWaiting = !!(N && N.waiting && N.waiting("birdie"));
     try { day.slice && day.slice.firstCast && day.slice.firstCast(1.4); } catch (err) { /* no slice */ }
     try { if (N && N.wait && !alreadyWaiting) N.wait("birdie", true, "first-cast"); } catch (err) { /* no neighbors */ }
+    try { if (N && N.think) N.think("birdie", false); } catch (err) { /* the thought is answered */ }
     emit("react", { power: p, lawnSecs: 1.4, birdieLooking: !!(N && N.waiting && N.waiting("birdie")) });
     setTimeout(() => {
       try { if (N && N.gesture) N.gesture("birdie", "thanks"); } catch (err) { /* */ }

@@ -294,6 +294,7 @@ window.DAY_CONFIG = {
     camera: { alpha: -2.45, beta: 1.22, radius: 5.6, from: 9, secs: 1.0 }, // dives in from 9 m behind him
     sky: { state: "fog", intensity: 0.6, flash: [90, -0.3], flashAgainSecs: 2.2 }, // fog and far lightning: both read at night
     charge: 100,
+    birdie: { x: -13, z: 22 }, // Birdie on the park lawn, in view of the roof, waving up with a rain thought bubble (Birdie's usual wait spot)
     log: "Awake. The sky is open.",
   },
 
