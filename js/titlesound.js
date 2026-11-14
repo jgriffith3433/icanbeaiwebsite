@@ -176,6 +176,7 @@ function startTitleSound() {
     const g = r.c.createGain();
     g.gain.value = 0.16;
     o.connect(g); g.connect(r.out);
+    o.playbackRate.value = 0.96 + Math.random() * 0.08; // never the same rate twice in a row for the audio probe
     tag(o, "title/ui-click", "ui", 0.16);
     o.start(t);
     st.clicks++;
