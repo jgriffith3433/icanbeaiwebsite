@@ -1800,8 +1800,26 @@
       const e = k * k * (3 - 2 * k);
       const lerp = (v) => v[0] + (v[1] - v[0]) * e;
       const tx = lerp(c.tx), ty = lerp(c.ty), tz = lerp(c.tz);
-      const a = lerp(c.alpha), b = lerp(c.beta);
+      const a = lerp(c.alpha);
       let r = lerp(c.radius);
+      /* The target can sweep over a roof (the cold open's glance eases from Birdie on the lawn to him on the apt roof) and the
+         camera, orbiting it, then skims the roof top with the near plane in the slab (the playtest's camera-inside). The
+         target may itself be inside a block, so shortening the ray can't help: lift the camera (a smaller beta) until it sits
+         at least 1 m above any solid it is over, or out beside it. */
+      let b = lerp(c.beta); // (lifted below when over a roof)
+      const overSolid = (px, py, pz) => {
+        for (let i = 0; i < solids.length; i++) {
+          const q = solids[i];
+          if (q.roll || q.yaw || q.pitch || q.h < 1) continue;
+          if (Math.abs(px - q.x) < q.w / 2 + 0.3 && Math.abs(pz - q.z) < q.d / 2 + 0.3 && py < q.y + q.h / 2 + 1 && py > q.y - q.h / 2 - 0.3) return true;
+        }
+        return false;
+      };
+      for (let n = 0; n < 16 && b > 0.35; n++) {
+        const sbn = Math.sin(b);
+        if (!overSolid(tx + Math.cos(a) * sbn * r, ty + Math.cos(b) * r, tz + Math.sin(a) * sbn * r)) break;
+        b -= 0.06;
+      }
       const sb = Math.sin(b);
       const dx = Math.cos(a) * sb, dy = Math.cos(b), dz = Math.sin(a) * sb;
       r = clearRadius(tx, ty, tz, dx, dy, dz, r, 0.9);
