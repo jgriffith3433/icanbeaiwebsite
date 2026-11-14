@@ -13,7 +13,7 @@
 import * as boltFx from "./lightning.js";
 import { createAbilities, startAbilityBar, VERB_IDS } from "./abilities.js";
 import { powerPose } from "./power-poses.js";
-export { debrisCap, shellCount, inPlaza, plazaCourse, FUNNEL_LIFE } from "./tornado.js";
+/* tornado.js is NOT re-exported here: a static re-export keeps it in the first chunk and runs it before gameplay (js/late.js loads it). Import its helpers from "./tornado.js" directly. */
 
 /** All spendable effects (verbs + hold depths). The bar shows VERB_IDS only. */
 export const POWER_NAMES = ["bolt", "rain", "wind", "fog", "sunbreak", "storm", "gust", "gale", "tornado"];

@@ -1580,6 +1580,15 @@
       const keep = boxProps();
       return me.root.getChildMeshes(false).filter((m) => m !== shadowProxy && !keep.includes(m) && !(skin && skin.meshes.includes(m)));
     };
+    /* While his model is on its way the stand-in stays hidden (app.js calls this at boot): the player never sees the box body swap
+       for the real one. setSkin(model) keeps it hidden; setSkin(null) (the load failed) draws it. */
+    function holdStandIn(on) {
+      if (skin) return;
+      figureMeshes().forEach((m) => {
+        m.setEnabled(!on && figureDrawn);
+        if (on) shadows.removeShadowCaster(m, false); else shadows.addShadowCaster(m, false);
+      });
+    }
     function setSkin(s) {
       if (skin) skin.root.dispose();
       skin = null;
@@ -1800,8 +1809,26 @@
       const e = k * k * (3 - 2 * k);
       const lerp = (v) => v[0] + (v[1] - v[0]) * e;
       const tx = lerp(c.tx), ty = lerp(c.ty), tz = lerp(c.tz);
-      const a = lerp(c.alpha), b = lerp(c.beta);
+      const a = lerp(c.alpha);
       let r = lerp(c.radius);
+      /* The target can sweep over a roof (the cold open's glance eases from Birdie on the lawn to him on the apt roof) and the
+         camera, orbiting it, then skims the roof top with the near plane in the slab (the playtest's camera-inside). The
+         target may itself be inside a block, so shortening the ray can't help: lift the camera (a smaller beta) until it sits
+         at least 1 m above any solid it is over, or out beside it. */
+      let b = lerp(c.beta); // (lifted below when over a roof)
+      const overSolid = (px, py, pz) => {
+        for (let i = 0; i < solids.length; i++) {
+          const q = solids[i];
+          if (q.roll || q.yaw || q.pitch || q.h < 1) continue;
+          if (Math.abs(px - q.x) < q.w / 2 + 0.3 && Math.abs(pz - q.z) < q.d / 2 + 0.3 && py < q.y + q.h / 2 + 1 && py > q.y - q.h / 2 - 0.3) return true;
+        }
+        return false;
+      };
+      for (let n = 0; n < 16 && b > 0.35; n++) {
+        const sbn = Math.sin(b);
+        if (!overSolid(tx + Math.cos(a) * sbn * r, ty + Math.cos(b) * r, tz + Math.sin(a) * sbn * r)) break;
+        b -= 0.06;
+      }
       const sb = Math.sin(b);
       const dx = Math.cos(a) * sb, dy = Math.cos(b), dz = Math.sin(a) * sb;
       r = clearRadius(tx, ty, tz, dx, dy, dz, r, 0.9);
@@ -2817,7 +2844,9 @@
          freeze the page on the first switch. The frame loop applies each set; resolves when done (or after maxMs). */
       async warmLights(maxMs) {
         const have = new Set(roomLights.map((rl) => rl.building));
-        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"], ["lamps"], ["home", "lamps"], ["office", "lamps"], ["car", "lamps"]].filter((g) => g.every((b) => b === "car" || b === "lamps" || have.has(b) || (b === "office" && officeLights.length)));
+        /* [] first: no room, car or lamp light (a clear noon). A page loaded at night starts with lamps and windows lit, so that set was never
+           compiled, and the first jump to day (the day bar, a scrub) recompiled every lit material at once: multi-second frames on a phone. */
+        const sets = [[], ["home"], ["office"], ["car"], ["home", "car"], ["office", "car"], ["lamps"], ["home", "lamps"], ["office", "lamps"], ["car", "lamps"]].filter((g) => g.every((b) => b === "car" || b === "lamps" || have.has(b) || (b === "office" && officeLights.length)));
         const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
         const t0 = Date.now(), budget = maxMs || 8000;
         /* maxMs is a real deadline: a shader compile or whenReadyAsync that never settles (a slow or software GL, a lost
@@ -2938,6 +2967,7 @@
       avatar, // the stand-in figure the player moves
       /* his rigged model (js/small-weather.js) over the figure; null takes it off */
       setSkin,
+      holdStandIn,
       heroDrawn,
       skin: () => skin,
       skinHips: FOOT, // his hips' height standing: the model is scaled to it
