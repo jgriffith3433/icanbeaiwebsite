@@ -789,6 +789,25 @@ function install() {
     pl.plugin.raycast(head.add(dirv.scale(0.1)), pos, camRay, mover.rayQuery());
     return !!(camRay.hasHit && B.Vector3.Distance(head, camRay.hitPoint) < d - 0.12);
   }
+  /* The scene's own pick from his head to the camera (what the feel sensor casts): the colliders and clearRadius miss thin walls,
+     small blocks and meshes with no collider, so the camera could sit behind one. Returns r pulled in until the head sees it. */
+  const headPickRay = new B.Ray(new B.Vector3(), new B.Vector3(0, 1, 0), 1);
+  const notHim = (m) => m.isPickable !== false && m.isEnabled() && m.isVisible !== false && !(world.person && m.isDescendantOf(world.person));
+  function headClear(t, dx, dy, dz, r) {
+    const hx = s.x, hy = s.y + 1.5, hz = s.z;
+    for (let i = 0; i < 3; i++) {
+      const cx = t.x + dx * r, cy = t.y + dy * r, cz = t.z + dz * r;
+      const len = Math.hypot(cx - hx, cy - hy, cz - hz);
+      if (len < 0.5) return r;
+      headPickRay.origin.set(hx, hy, hz);
+      headPickRay.direction.set((cx - hx) / len, (cy - hy) / len, (cz - hz) / len);
+      headPickRay.length = len;
+      const hit = world.scene.pickWithRay(headPickRay, notHim, true);
+      if (!hit || !hit.hit || hit.distance >= len - 0.3) return r;
+      r = Math.max(0.2, r * Math.max(0.1, (hit.distance - 0.6) / len));
+    }
+    return r;
+  }
   function cameraFollow(dt, look) {
     if (cine()) return; // a moment's cut-away camera (js/moments.js) has the view
     const nowMs = performance.now();
@@ -965,6 +984,7 @@ function install() {
     const dy = Math.cos(camera.beta);
     const dz = Math.sin(camera.alpha) * sbF;
     r = Math.min(r, sphereClear(t.x, t.y, t.z, dx, dy, dz, r));
+    if (r > 0.3) r = headClear(t, dx, dy, dz, r);
     /* Pull in fast but never in one jump: a thin edge entering the cast used to cut the radius by metres in a single frame, a
        visible camera snap. A slow frame (dt up to 0.1 s) is capped at 2.4 m so it stays under the feel sensor's 3 m, and it eases
        out slowly after. */
