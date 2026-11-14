@@ -470,7 +470,19 @@ export function createBoltFx(B, scene, opts) {
     meshes: [core, halo, after],
     materials: [coreMat, haloMat, afterMat],
     warm() { // compile the shaders before the first cast
-      [[core, coreMat], [after, afterMat]].forEach(([m, mat]) => { try { mat.forceCompilationAsync && mat.forceCompilationAsync(m).catch(() => {}); } catch (e) { /* */ } });
+      const jobs = [];
+      [[core, coreMat], [halo, haloMat], [after, afterMat]].forEach(([m, mat]) => { try { if (mat.forceCompilationAsync) jobs.push(mat.forceCompilationAsync(m).catch(() => {})); } catch (e) { /* */ } });
+      // the scorch decal's material is made per strike: compile the same one on a hidden disc now, then drop it
+      try {
+        const d = scorchAt({ x: 0, y: -50, z: 0 }, null);
+        d.mesh.setEnabled(false);
+        jobs.push(d.mat.forceCompilationAsync(d.mesh).catch(() => {}).then(() => {
+          const i = decals.indexOf(d);
+          if (i >= 0) decals.splice(i, 1);
+          d.mesh.dispose(); d.mat.dispose();
+        }));
+      } catch (e) { /* */ }
+      return Promise.all(jobs);
     },
     info() {
       return {

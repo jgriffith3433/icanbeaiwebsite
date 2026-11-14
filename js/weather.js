@@ -1423,15 +1423,20 @@ export function startWeather(world, dayApi) {
           if (low && streetProbe && streetProbe.cubeTexture) {
             if (!streetProbeReady) fillStreetProbeList();
             const wantProbe = wetR > 0.15;
+            // bound once and left bound: assigning reflectionTexture on and off recompiled the road's PBR shader at the first rain
+            // (and every dry-wet change). Dry = environmentIntensity 0; wet = intensity up, the probe's refresh rate follows.
+            if (roadMat.reflectionTexture !== streetProbe.cubeTexture) {
+              if (roadMat.__dryEnv == null && roadMat.environmentIntensity != null) roadMat.__dryEnv = roadMat.environmentIntensity;
+              roadMat.reflectionTexture = streetProbe.cubeTexture;
+              if (roadMat.environmentIntensity != null) roadMat.environmentIntensity = 0;
+            }
             if (wantProbe !== streetProbeOn) {
               streetProbeOn = wantProbe;
-              roadMat.reflectionTexture = wantProbe ? streetProbe.cubeTexture : null;
               // metallic workflow: environmentIntensity lifts the probe; reflectivityColor alone is ignored
               if (roadMat.__dryMetallic == null && roadMat.metallic != null) roadMat.__dryMetallic = roadMat.metallic;
               if (roadMat.metallic != null) roadMat.metallic = wantProbe ? Math.max(roadMat.__dryMetallic || 0, 0.35) : (roadMat.__dryMetallic != null ? roadMat.__dryMetallic : 0.08);
               if (roadMat.environmentIntensity != null) {
-                if (roadMat.__dryEnv == null) roadMat.__dryEnv = roadMat.environmentIntensity;
-                roadMat.environmentIntensity = wantProbe ? Math.max(0.85, roadMat.__dryEnv) : roadMat.__dryEnv;
+                roadMat.environmentIntensity = wantProbe ? Math.max(0.85, roadMat.__dryEnv == null ? 0.85 : roadMat.__dryEnv) : 0;
               }
               streetProbe.refreshRate = wantProbe ? 12 : -1;
             }
@@ -1446,9 +1451,11 @@ export function startWeather(world, dayApi) {
                 }
               }
             }
-          } else if (streetProbeOn) {
+          } else if (streetProbeOn || (roadMat.reflectionTexture && roadMat.reflectionTexture === (streetProbe && streetProbe.cubeTexture))) {
+            // leaving low quality (high has SSR and its own IBL): restore the dry look, one recompile on a deliberate switch
             streetProbeOn = false;
             roadMat.reflectionTexture = null;
+            if (roadMat.__dryEnv != null && roadMat.environmentIntensity != null) roadMat.environmentIntensity = roadMat.__dryEnv;
             if (streetProbe) streetProbe.refreshRate = -1;
           }
         } else {
@@ -1686,8 +1693,12 @@ export function startWeather(world, dayApi) {
         const obs = scene.onAfterRenderObservable.add(() => { if (++i >= k) done(); });
         setTimeout(done, 1500); // a hidden tab or a lost context draws nothing: don't hang
       });
-      const steps = [["rain", 0.7, false], ["fog", 0.8, false], ["clear", 1, true], ["wind", 0.8, false]];
+      // snow too: the first snow (the switch the forecast makes ~24 s in on a snowy day) built its 5000 flakes, roof caps and road tint mid-play
+      const steps = [["rain", 0.7, false], ["fog", 0.8, false], ["clear", 1, true], ["wind", 0.8, false], ["snow", 0.8, false]];
       let ran = 0;
+      // the god-ray pass and the bolt's ribbons and scorch decal compile here too (no weather change, nothing shows)
+      try { if (window.day && window.day.sky && window.day.sky.warmGodRays) await window.day.sky.warmGodRays(); } catch (e) { /* */ }
+      try { const bf = window.powers && window.powers.boltFx; if (bf && bf.warm) await bf.warm(); } catch (e) { /* */ }
       for (const [state, intensity, sun] of steps) {
         if (!weather.warm({ state, intensity, sun })) break; // someone else already holds the sky
         await eachFrames(n);
