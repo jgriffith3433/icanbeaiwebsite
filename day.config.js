@@ -273,7 +273,7 @@ window.DAY_CONFIG = {
     dive: { from: 9, secs: 1.0 }, // Play from the title: the title's last shot is this pose at radius 9; the camera dives in over this long
     firstLine: 0.8, // seconds after he lands before he speaks
     reactDelay: 1.0, // seconds from the look-up to Birdie's call
-    prompt: { keys: "Press R for rain", touch: "Tap Rain" },
+    prompt: { keys: "Press R for rain", touch: "Tap Rain", goal: "Birdie needs rain" }, // the goal line names who and what; keys never show on touch
     lines: {
       he: ["He", "That storm isn't mine. That rod is."], // not spoken before the first cast (kept for later use)
       birdie: ["Birdie", "Small Weather! Send my tomatoes some rain."],
