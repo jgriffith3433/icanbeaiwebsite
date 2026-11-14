@@ -713,6 +713,8 @@ import { pickRate } from "./variety.js";
         const src = a.c.createBufferSource();
         src.buffer = pick.b;
         src.loop = true;
+        // Untagged it was named by length ("buf:1x44100") and always played at rate 1: a second Gale inside 60 s was an identical repeat.
+        try { const gid = "power-" + String(pick.url).split("/").pop(); src.__hawkesSampleId = gid; src.playbackRate.value = pickRate(gid, 1); } catch (e) { /* */ }
         const g = a.c.createGain();
         g.gain.value = 0.0001;
         src.connect(g);
