@@ -528,6 +528,7 @@ function install() {
     blendSecs: 0.6,
     recenterAfter: 2, recenterRate: 5, touchSens: 420,
     castSecs: 1.8, castRise: 0.3, castFall: 0.5,
+    glanceSecs: 2.25, glanceRise: 0.35, glanceFall: 0.45,
     cast: {},
   }, C.camera || {});
   const CAST = Object.assign({
@@ -560,7 +561,107 @@ function install() {
     blend: null, cast: null,
     fresh: true, // the next frame follows a cut (take, place): no yaw rate sample
   };
-  const camStats = { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], recentres: 0, lookDrags: 0 };
+  const camStats = { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], glances: [], lastGlanceCancelMs: null, recentres: 0, lookDrags: 0 };
+  const firstCastSeen = new Set();
+  const canonVerb = (id) => {
+    if (id === "storm" || id === "bolt") return "bolt";
+    if (id === "gust" || id === "gale" || id === "wind") return "wind";
+    return id || "default";
+  };
+  /* Pitch (camera.beta) that places a world reaction spot (gx, gy, gz) into the middle third of the screen above the controls. */
+  function glanceBeta(gx, gy, gz, rad) {
+    const r0 = rad || wantRadius || 5.6;
+    const d = Math.max(2, Math.hypot(gx - s.x, gz - s.z));
+    const dy = (s.y + 1.35) - (gy == null ? 0.06 : gy);
+    const thetaRay = Math.atan2(dy + r0 * Math.cos(1.28), d + r0 * Math.sin(1.28));
+    return clamp(Math.PI * 0.5 - thetaRay - 0.035, 1.02, 1.38);
+  }
+  /* Pick the spot that reacts to a cast: an open ask (or the cold open's park lawn, pots and pond), else the first cast of each power. */
+  function resolveGlanceSpot(id, aim) {
+    const canon = canonVerb(id);
+    const isFirst = !firstCastSeen.has(id) && !firstCastSeen.has(canon);
+    firstCastSeen.add(id);
+    firstCastSeen.add(canon);
+    const inCold = !!(day.coldopen && day.coldopen.active && day.coldopen.active());
+    const inFirstRain = !!(day.firstrain && day.firstrain.now && day.firstrain.now().active);
+    const streetOpen = (day.street && day.street.open && day.street.open()) || null;
+    const askMarks = (day.asks && day.asks.now && day.asks.now().marks) || [];
+    const curA = cs.aimA != null ? cs.aimA : camera.alpha;
+    if (canon === "rain") {
+      const hasRainAsk = inCold || inFirstRain || (streetOpen && streetOpen.verb === "rain") || askMarks.some((m) => m.verb === "rain");
+      if (hasRainAsk || (isFirst && s.x < 35 && s.z < 75)) {
+        const gx = s.y > 3 ? -1 : -3;
+        const gz = s.y > 3 ? 39 : 35;
+        const parkA = Math.atan2(gz - s.z, gx - s.x) + Math.PI;
+        const offA = Math.abs(wrapPi(parkA - curA));
+        if (inCold || inFirstRain || (streetOpen && streetOpen.verb === "rain") || offA <= 1.35) {
+          return {
+            glance: true, x: gx, y: 0.06, z: gz,
+            reason: inCold ? "coldopen" : hasRainAsk ? "ask" : "first-cast",
+            spots: [
+              { name: "lawn", x: -6, y: 0.06, z: 33 },
+              { name: "pond", x: 15, y: 0.07, z: 60 },
+              { name: "pots", x: -18.9, y: 0.4, z: 9.15 },
+            ],
+          };
+        }
+      }
+    }
+    const mk = askMarks.find((m) => m.verb === canon && m.place && Math.hypot(m.place.x - s.x, m.place.z - s.z) < 65);
+    if (mk && mk.place) {
+      const mkA = Math.atan2(mk.place.z - s.z, mk.place.x - s.x) + Math.PI;
+      if ((streetOpen && streetOpen.verb === canon) || Math.abs(wrapPi(mkA - curA)) <= 1.35) {
+        return {
+          glance: true, x: mk.place.x, y: mk.place.y || 0.4, z: mk.place.z, reason: "ask",
+          spots: [{ name: mk.key || (mk.who + "-" + canon), x: mk.place.x, y: mk.place.y || 0.4, z: mk.place.z }],
+        };
+      }
+    }
+    if (streetOpen && streetOpen.verb === canon) {
+      const places = (day.asks && day.asks.places && day.asks.places()) || {};
+      const pl = (places[streetOpen.who] && places[streetOpen.who][streetOpen.verb]) || { x: streetOpen.x, y: 0.4, z: streetOpen.z };
+      return {
+        glance: true, x: pl.x, y: pl.y || 0.4, z: pl.z, reason: "ask",
+        spots: [{ name: streetOpen.id || canon, x: pl.x, y: pl.y || 0.4, z: pl.z }],
+      };
+    }
+    const gy = aim.y == null ? s.y : aim.y;
+    if (isFirst) {
+      return {
+        glance: true, x: aim.x, y: gy, z: aim.z, reason: "first-cast",
+        spots: [{ name: id, x: aim.x, y: gy, z: aim.z }],
+      };
+    }
+    return { glance: false, x: aim.x, y: gy, z: aim.z, reason: "cast", spots: [] };
+  }
+  function cancelGlance(why, inputAt) {
+    if (!cs.cast || !cs.cast.glance) return false;
+    const c = cs.cast;
+    const nowMs = performance.now();
+    const cancelMs = Math.max(1, Math.round(nowMs - (inputAt || c.inputAt || nowMs)));
+    if (cs.shownA != null) cs.aimA = cs.shownA;
+    if (cs.shownB != null) {
+      camera.beta = clamp(cs.shownB, camera.lowerBetaLimit, camera.upperBetaLimit);
+      cs.appliedB = 0;
+    }
+    cs.cast = null;
+    cs.lookAt = nowMs;
+    const rec = {
+      power: c.power,
+      reason: c.reason || "glance",
+      spot: { x: c.x, y: c.y, z: c.z },
+      seconds: Math.round(c.t * 100) / 100,
+      framedSeconds: Math.round(c.best * 100) / 100,
+      cancelled: true,
+      cancelWhy: why || "input",
+      cancelMs,
+    };
+    camStats.glances.push(rec);
+    if (camStats.glances.length > 40) camStats.glances.shift();
+    camStats.lastGlanceCancelMs = cancelMs;
+    window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "glance-cancel", ...rec } }));
+    return true;
+  }
   function camReset() {
     cs.aimA = cs.shownA = cs.shownB = null;
     cs.tp = null;
@@ -653,7 +754,7 @@ function install() {
      target up on screen, smoothly, until his feet sit just above the top of that bottom stack. The reference is the
      damped target, not his feet, so a jump doesn't swing the shot. Phones keep the centre (their pads are at the sides). */
   function hudLiftGoal() {
-    if (touchMode()) return 0;
+    if (touchMode() || (cs.cast && cs.cast.glance)) return 0;
     const cv = world.scene.getEngine().getRenderingCanvas();
     const ch = cv ? cv.clientHeight : 0;
     const cw = cv ? cv.clientWidth : 0;
@@ -718,7 +819,8 @@ function install() {
     lastRadius = null;
   }
   /* A cast frames him and where it lands: the camera eases (rise, hold, fall: about 1.8 s) round behind him so the target is
-     ahead of it, and changes its angle by the power (a slight push for Lightning, low for a Tornado). */
+     ahead of it, and changes its angle by the power (a slight push for Lightning, low for a Tornado). On the first cast of each
+     power (and any cast aimed at an ask), it glances for ~1.5 s to the reacting spot in the world and eases back; any input cancels it. */
   window.addEventListener("day:power", (e) => {
     const d = e.detail || {};
     if (mode !== "control" || d.action === "denied" || cine()) return;
@@ -727,7 +829,27 @@ function install() {
     try { aim = pw && pw.now ? pw.now().aim : null; } catch (err) { aim = null; }
     const id = d.power || d.action || "default";
     if (!aim) aim = { x: s.x + Math.sin(s.yaw) * 6, z: s.z + Math.cos(s.yaw) * 6, y: s.y };
-    cs.cast = { t: 0, power: id, x: aim.x, y: aim.y == null ? s.y : aim.y, z: aim.z, run: 0, best: 0, frames: 0, framedFrames: 0 };
+    const gl = resolveGlanceSpot(id, aim);
+    const nowMs = performance.now();
+    if (cs.cast && cs.cast.frames > 0) {
+      camStats.casts.push({ power: cs.cast.power, framedSeconds: Math.round(cs.cast.best * 100) / 100, frames: cs.cast.frames, glance: !!cs.cast.glance });
+      if (camStats.casts.length > 40) camStats.casts.shift();
+    }
+    cs.cast = {
+      t: 0, power: id, x: gl.x, y: gl.y == null ? s.y : gl.y, z: gl.z,
+      glance: !!gl.glance, reason: gl.reason || "cast", spots: gl.spots || [],
+      aimBeta: gl.glance ? glanceBeta(gl.x, gl.y, gl.z, wantRadius) : null,
+      secs: gl.glance ? CAM.glanceSecs : CAM.castSecs,
+      rise: gl.glance ? CAM.glanceRise : CAM.castRise,
+      fall: gl.glance ? CAM.glanceFall : CAM.castFall,
+      startedAt: nowMs, inputAt: 0, inFrame: false, middleThird: false, framedEventSent: false,
+      run: 0, best: 0, frames: 0, framedFrames: 0,
+    };
+    if (gl.glance) {
+      window.dispatchEvent(new CustomEvent("day:camera", {
+        detail: { action: "glance-start", power: id, reason: gl.reason, spot: { x: gl.x, y: gl.y, z: gl.z } },
+      }));
+    }
   });
   const cine = () => !!(world.cineOn && world.cineOn());
   /* One-finger drag on the right half of the screen looks round; the left half is the stick's, so it does nothing there. */
@@ -822,6 +944,11 @@ function install() {
     if (look.x || look.y) cs.lookAt = nowMs;
     cs.aimA -= look.x * 2.4 * dt;
     camera.beta = Math.max(camera.lowerBetaLimit, Math.min(camera.upperBetaLimit, camera.beta - look.y * 1.5 * dt));
+    if (cs.cast && cs.cast.glance && nowMs - (cs.cast.startedAt || 0) > 40) {
+      if (Math.abs(drag) > 1e-3 || Math.hypot(look.x, look.y) > 0.05 || keys.size > 0 || stick.id != null || Math.hypot(stick.x, stick.y) > 0.05 || touchJumpHeld || jumps > 0) {
+        cancelGlance("input", nowMs);
+      }
+    }
     // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
     if (!push.on && lastRadius != null && !cs.blend && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
     if (cs.lookDown || Math.abs(stick.x) > 0.35 || keys.has("l") || keys.has("r")) cs.lookAt = nowMs; // steering sideways is turning, not idling (the camera would chase him round)
@@ -878,24 +1005,47 @@ function install() {
       camera.fov = push.baseFov + push.fov * (1 - e);
       if (k >= 1) pushEnd();
     }
-    // ---- a cast frames him and the target ----
+    // ---- a cast frames him and the target (and a reaction glance eases to the reacting spot for ~1.5 s) ----
     let castA = 0, castB = 0, castR = 0;
     const cst = cs.cast;
     if (cst) {
       cst.t += dt;
-      if (cst.t >= CAM.castSecs) {
-        camStats.casts.push({ power: cst.power, framedSeconds: Math.round(cst.best * 100) / 100, frames: cst.frames });
+      const dur = cst.glance ? (cst.secs || CAM.glanceSecs) : CAM.castSecs;
+      const rise = cst.glance ? (cst.rise || CAM.glanceRise) : CAM.castRise;
+      const fall = cst.glance ? (cst.fall || CAM.glanceFall) : CAM.castFall;
+      if (cst.t >= dur) {
+        camStats.casts.push({ power: cst.power, framedSeconds: Math.round(cst.best * 100) / 100, frames: cst.frames, glance: !!cst.glance });
         if (camStats.casts.length > 40) camStats.casts.shift();
-        window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "cast-framed", power: cst.power, seconds: cst.best } }));
+        if (cst.glance) {
+          const rec = {
+            power: cst.power,
+            reason: cst.reason || "glance",
+            spot: { x: cst.x, y: cst.y, z: cst.z },
+            seconds: Math.round(cst.t * 100) / 100,
+            framedSeconds: Math.round(cst.best * 100) / 100,
+            cancelled: false,
+          };
+          camStats.glances.push(rec);
+          if (camStats.glances.length > 40) camStats.glances.shift();
+          window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "glance-end", ...rec } }));
+        }
+        window.dispatchEvent(new CustomEvent("day:camera", { detail: { action: "cast-framed", power: cst.power, seconds: cst.best, glance: !!cst.glance } }));
         cs.cast = null;
       } else {
-        const env = smooth01(cst.t / CAM.castRise) * (1 - smooth01((cst.t - (CAM.castSecs - CAM.castFall)) / CAM.castFall));
+        const env = smooth01(cst.t / rise) * (1 - smooth01((cst.t - (dur - fall)) / fall));
         const P = CAST[cst.power] || CAST.default;
         const wr = wrapPi(Math.atan2(cst.z - s.z, cst.x - s.x) + Math.PI - cs.aimA); // the heading that puts the target dead ahead
-        castA = clamp(wr, -2.4, 2.4) * smooth01((Math.abs(wr) - 0.12) / 0.4) * P.align * env;
-        castB = P.beta * env;
-        const D = Math.hypot(cst.x - s.x, cst.z - s.z);
-        castR = (P.rad + 0.16 * Math.max(0, D - 10)) * env;
+        if (cst.glance) {
+          castA = wr * (cst.align != null ? cst.align : 1.0) * env;
+          const wantBeta = cst.aimBeta != null ? cst.aimBeta : glanceBeta(cst.x, cst.y, cst.z, r);
+          castB = (wantBeta - camera.beta) * env;
+          castR = (cst.rad != null ? cst.rad : 0.4) * env;
+        } else {
+          castA = clamp(wr, -2.4, 2.4) * smooth01((Math.abs(wr) - 0.12) / 0.4) * P.align * env;
+          castB = P.beta * env;
+          const D = Math.hypot(cst.x - s.x, cst.z - s.z);
+          castR = (P.rad + 0.16 * Math.max(0, D - 10)) * env;
+        }
       }
     }
     r += Math.max(-1.2, Math.min(2.4, castR));
@@ -1021,12 +1171,31 @@ function install() {
       const rw = eng.getRenderWidth(), rh = eng.getRenderHeight();
       const m = world.scene.getTransformMatrix();
       const vp = camera.viewport.toGlobal(rw, rh);
+      const proj = (x, y, z) => B.Vector3.Project(new B.Vector3(x, y, z), B.Matrix.Identity(), m, vp);
       const on = (x, y, z) => {
-        const p = B.Vector3.Project(new B.Vector3(x, y, z), B.Matrix.Identity(), m, vp);
+        const p = proj(x, y, z);
         return p.z > 0 && p.z < 1 && p.x > rw * 0.02 && p.x < rw * 0.98 && p.y > rh * 0.04 && p.y < rh * 0.96;
       };
-      const both = on(s.x, s.y + 1.0, s.z) && on(cst.x, cst.y + 0.3, cst.z);
-      if (both) { cst.run += dt; cst.best = Math.max(cst.best, cst.run); cst.framedFrames++; } else cst.run = 0;
+      const mid = (x, y, z) => {
+        const p = proj(x, y, z);
+        return p.z > 0 && p.z < 1 && p.x > rw * 0.08 && p.x < rw * 0.92 && p.y >= rh * 0.25 && p.y <= rh * 0.68;
+      };
+      const spotOn = on(cst.x, cst.y + 0.3, cst.z) || (cst.spots && cst.spots.some((sp) => on(sp.x, (sp.y || 0) + 0.3, sp.z)));
+      const spotMid = mid(cst.x, cst.y + 0.3, cst.z) || (cst.spots && cst.spots.some((sp) => mid(sp.x, (sp.y || 0) + 0.3, sp.z)));
+      if (spotOn) cst.inFrame = true;
+      if (spotMid) cst.middleThird = true;
+      const both = on(s.x, s.y + 1.0, s.z) && spotOn;
+      if (both) {
+        cst.run += dt;
+        cst.best = Math.max(cst.best, cst.run);
+        cst.framedFrames++;
+        if (cst.glance && !cst.framedEventSent && spotMid && cst.run >= 0.05) {
+          cst.framedEventSent = true;
+          window.dispatchEvent(new CustomEvent("day:camera", {
+            detail: { action: "glance-framed", power: cst.power, reason: cst.reason, secondsToFrame: Math.round(cst.t * 100) / 100, spot: { x: cst.x, y: cst.y, z: cst.z } },
+          }));
+        }
+      } else cst.run = 0;
     }
   }
 
@@ -1170,6 +1339,9 @@ function install() {
           if (e.key === "Enter") e.preventDefault();
           return; // speeds, H and the rest still work
         }
+        if (cs.cast && cs.cast.glance && performance.now() - (cs.cast.startedAt || 0) > 25) {
+          cancelGlance("key:" + k, performance.now());
+        }
         if (k === "jump" && !e.repeat) jumps++;
         keys.add(k);
         if (e.shiftKey) keys.add("run");
@@ -1213,6 +1385,9 @@ function install() {
     stickEl.classList.remove("held");
   }
   stickEl.addEventListener("pointerdown", (e) => {
+    if (cs.cast && cs.cast.glance && performance.now() - (cs.cast.startedAt || 0) > 25) {
+      cancelGlance("touch:stick", performance.now());
+    }
     stick.id = e.pointerId;
     stickEl.classList.add("held");
     try {
@@ -1225,6 +1400,9 @@ function install() {
   window.addEventListener("pointerup", stickEnd);
   window.addEventListener("pointercancel", stickEnd);
   jumpBtn.addEventListener("pointerdown", (e) => {
+    if (cs.cast && cs.cast.glance && performance.now() - (cs.cast.startedAt || 0) > 25) {
+      cancelGlance("touch:jump", performance.now());
+    }
     jumps++;
     touchJumpHeld = true;
     jumpBtn.classList.add("held");
@@ -1449,12 +1627,25 @@ function install() {
       vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
     }),
     move: mover.move,
-    /** Swing the camera so the point (x, z) is ahead of him (a tap on a neighbor's ask marker): the cast's own eased framing. */
-    frame: (x, z, y) => {
+    /** Swing the camera so the point (x, z) is ahead of him (a tap on a neighbor's ask marker, or a world reaction): eased ~1.5 s glance. */
+    frame: (x, z, y, opts) => {
       if (mode !== "control" || cine()) return false;
-      cs.cast = { t: 0, power: "look", x, y: y == null ? s.y : y, z, run: 0, best: 0, frames: 0, framedFrames: 0 };
+      const o = opts || {};
+      // If a cast's own reaction glance just started (< 1.2 s ago) and this is a secondary automatic frame call (e.g. garden pots), keep the cast's sightline.
+      if (!o.force && cs.cast && cs.cast.glance && cs.cast.power !== "look" && cs.cast.t < 1.2) return true;
+      const gy = y == null ? 0.06 : y;
+      const nowMs = performance.now();
+      cs.cast = {
+        t: 0, power: "look", x, y: gy, z,
+        glance: true, reason: o.reason || "frame", spots: o.spots || [{ name: "frame", x, y: gy, z }],
+        aimBeta: glanceBeta(x, gy, z, wantRadius),
+        secs: o.secs || CAM.glanceSecs, rise: o.rise || CAM.glanceRise, fall: o.fall || CAM.glanceFall,
+        startedAt: nowMs, inputAt: 0, inFrame: false, middleThird: false, framedEventSent: false,
+        run: 0, best: 0, frames: 0, framedFrames: 0,
+      };
       return true;
     },
+    cancelGlance: (why) => cancelGlance(why || "api", performance.now()),
     /** Game seconds simulated while he's the player's (sum of the control steps' dt). */
     simTime: () => simT,
     /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */
@@ -1484,11 +1675,23 @@ function install() {
     ride: RIDE,
     /** The camera's own report (the playtest): turn rate, camera-inside frames, cast framing, the numbers it runs on. */
     camera: () => ({
-      ...camStats, casts: camStats.casts.slice(), yawCapDeg: CAM.yawCapDeg, blendSecs: CAM.blendSecs, recenterAfter: CAM.recenterAfter,
-      blending: !!cs.blend, casting: cs.cast ? cs.cast.power : null, alpha: camera.alpha, beta: camera.beta, radius: camera.radius,
+      ...camStats, casts: camStats.casts.slice(), glances: camStats.glances.slice(),
+      yawCapDeg: CAM.yawCapDeg, blendSecs: CAM.blendSecs, recenterAfter: CAM.recenterAfter,
+      blending: !!cs.blend, casting: cs.cast ? cs.cast.power : null,
+      glancing: !!(cs.cast && cs.cast.glance),
+      glance: cs.cast && cs.cast.glance ? {
+        power: cs.cast.power, reason: cs.cast.reason, t: Math.round(cs.cast.t * 100) / 100,
+        x: cs.cast.x, y: cs.cast.y, z: cs.cast.z, spots: cs.cast.spots || [],
+        inFrame: !!cs.cast.inFrame, middleThird: !!cs.cast.middleThird,
+        framedSeconds: Math.round(cs.cast.best * 100) / 100,
+      } : null,
+      alpha: camera.alpha, beta: camera.beta, radius: camera.radius,
       behind: Math.atan2(-Math.cos(s.yaw), -Math.sin(s.yaw)), lookDown: cs.lookDown || 0,
     }),
-    resetCameraStats: () => { Object.assign(camStats, { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], recentres: 0, lookDrags: 0 }); },
+    resetCameraStats: () => {
+      firstCastSeen.clear();
+      Object.assign(camStats, { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], glances: [], lastGlanceCancelMs: null, recentres: 0, lookDrags: 0 });
+    },
     log: () => log.slice(),
     take: () => take("console"),
     push: (spec) => pushStart(spec),
