@@ -9,6 +9,8 @@ const B = typeof window !== "undefined" ? window.BABYLON : null;
 
 export const BAND = { x: -18, z: 41 };
 export const POND = { x: 15, z: 60 };
+export const SOUTH_POND = { x: 5, z: 33 };
+export const WEST_POND = { x: -14, z: 31 };
 
 export function installSlice(day, world) {
   if (!day || !world || !world.scene || !B) return null;
@@ -54,29 +56,103 @@ export function installSlice(day, world) {
   // lawn overlay (a thin cover on the park lawn: straw by day-key start, damp after the rain)
   const lawn = B.MeshBuilder.CreateBox("slice-lawn", { width: 62, height: 0.012, depth: 46 }, scene);
   lawn.position.set(-2, 0.057, 44);
-  const strawM = mat("slice-straw", "#8a7c45");
-  const dampM = mat("slice-damp", "#2f5a38");
+  const strawM = mat("slice-straw", "#a88938", 0.14);
+  const dampM = mat("slice-damp", "#2cb850", 0.32);
   lawn.material = strawM;
   lawn.isPickable = false;
-  lawn.visibility = 0.55;
+  lawn.visibility = 0.74;
   /* `k` (0..1) is how fresh the water is (js/memory.js fades it over three real days); `quiet` = a restore, no event. */
-  const blendM = mat("slice-blend", "#8a7c45");
-  const strawC = B.Color3.FromHexString("#8a7c45");
-  const dampC = B.Color3.FromHexString("#2f5a38");
+  const blendM = mat("slice-blend", "#a88938", 0.14);
+  const strawC = B.Color3.FromHexString("#a88938");
+  const dampC = B.Color3.FromHexString("#2cb850");
+  const waterLowC = B.Color3.FromHexString("#1a3f54");
+  const waterFullC = B.Color3.FromHexString("#2da8e0");
   /* The lawn greens and the pond fills over a few seconds (LAWN_SECS) toward `goal`; `instant` (a reload, a restore, a quality
      change) jumps. `quiet` = no event. The pond is a mud ring (the dry bed, 5 mm over the old water) with a water disc on
      top that grows from 78% to the full 5 m and rises 4 mm (planes 5 and 10 mm clear of each other: no z-fighting). */
   const LAWN_SECS = 5;
+  let cur = 0;
+  /* The wet layer: a Rain cast darkens the lawn and spreads the pond within DRENCH_SECS (0.8 s), wherever he stands, and it dries
+     off over DRENCH_DRY s once the player's rain is gone. It sits on top of the slower lawn above (the shown value is the larger). */
+  const DRENCH_SECS = 0.8;
+  const DRENCH_DRY = 24;
+  const DRENCH_LEVEL = 0.85;
+  let drench = 0;
+  let drenchOn = false;
+  const mudM = mat("slice-mud", "#6e5534");
+  mudM.alpha = 1;
+  const waterM = mat("slice-pond-water", "#1a3f54", 0.15);
+  const pondMud = B.MeshBuilder.CreateCylinder("slice-pond-mud", { diameter: 10, height: 0.004, tessellation: 40 }, scene);
+  pondMud.position.set(POND.x, 0.092, POND.z);
+  pondMud.material = mudM;
+  pondMud.isPickable = false;
+  const pondWater = B.MeshBuilder.CreateCylinder("slice-pond-water", { diameter: 10, height: 0.004, tessellation: 40 }, scene);
+  pondWater.position.set(POND.x, 0.1, POND.z);
+  pondWater.material = waterM;
+  pondWater.isPickable = false;
+  // Foreground park pond basins in direct sightline of the apartment roof and the title crane
+  const pondMudS = B.MeshBuilder.CreateCylinder("slice-pond-south-mud", { diameter: 10.4, height: 0.004, tessellation: 40 }, scene);
+  pondMudS.position.set(SOUTH_POND.x, 0.092, SOUTH_POND.z);
+  pondMudS.material = mudM;
+  pondMudS.isPickable = false;
+  const pondWaterS = B.MeshBuilder.CreateCylinder("slice-pond-south-water", { diameter: 10.4, height: 0.004, tessellation: 40 }, scene);
+  pondWaterS.position.set(SOUTH_POND.x, 0.1, SOUTH_POND.z);
+  pondWaterS.material = waterM;
+  pondWaterS.isPickable = false;
+  const pondMudW = B.MeshBuilder.CreateCylinder("slice-pond-west-mud", { diameter: 7.4, height: 0.004, tessellation: 36 }, scene);
+  pondMudW.position.set(WEST_POND.x, 0.092, WEST_POND.z);
+  pondMudW.material = mudM;
+  pondMudW.isPickable = false;
+  const pondWaterW = B.MeshBuilder.CreateCylinder("slice-pond-west-water", { diameter: 7.4, height: 0.004, tessellation: 36 }, scene);
+  pondWaterW.position.set(WEST_POND.x, 0.1, WEST_POND.z);
+  pondWaterW.material = waterM;
+  pondWaterW.isPickable = false;
+  // Lily pads & blossoms that bloom across the ponds when Rain fills them
+  const lilyM = mat("slice-lily-m", "#38c962", 0.3);
+  const blossomM = mat("slice-blossom-m", "#ff9ec4", 0.45);
+  const lilies = [];
+  [
+    [SOUTH_POND.x - 1.8, SOUTH_POND.z - 1.2], [SOUTH_POND.x + 1.9, SOUTH_POND.z - 0.8], [SOUTH_POND.x + 0.4, SOUTH_POND.z + 1.8],
+    [WEST_POND.x - 1.1, WEST_POND.z - 0.7], [WEST_POND.x + 1.2, WEST_POND.z + 0.9],
+    [POND.x - 1.7, POND.z - 1.1], [POND.x + 1.8, POND.z + 1.0],
+  ].forEach(([lx, lz], i) => {
+    const pad = B.MeshBuilder.CreateCylinder("slice-lily-" + i, { diameter: 0.95, height: 0.004, tessellation: 14 }, scene);
+    pad.position.set(lx, 0.112, lz);
+    pad.material = lilyM;
+    pad.isPickable = false;
+    const bloom = B.MeshBuilder.CreateSphere("slice-blossom-" + i, { diameter: 0.28, segments: 4 }, scene);
+    bloom.position.set(lx, 0.15, lz);
+    bloom.material = blossomM;
+    bloom.isPickable = false;
+    lilies.push({ pad, bloom });
+  });
   const paint = (f) => {
     st.lawnShown = +f.toFixed(3);
     if (f >= 1) lawn.material = dampM;
     else if (f <= 0) lawn.material = strawM;
-    else { blendM.diffuseColor = B.Color3.Lerp(strawC, dampC, f); lawn.material = blendM; }
-    lawn.visibility = 0.55 + (0.3 - 0.55) * f;
+    else {
+      blendM.diffuseColor = B.Color3.Lerp(strawC, dampC, f);
+      blendM.emissiveColor = B.Color3.Lerp(strawC.scale(0.14), dampC.scale(0.32), f);
+      lawn.material = blendM;
+    }
+    lawn.visibility = 0.74 + 0.14 * f;
     const e = f * f * (3 - 2 * f);
-    pondWater.scaling.set(0.78 + 0.22 * e, 1, 0.78 + 0.22 * e);
-    pondWater.position.y = 0.1 + 0.004 * e;
-    mudM.alpha = 1 - 0.85 * e;
+    const ws = 0.62 + 0.44 * e;
+    const wy = 0.1 + 0.004 * e;
+    [pondWater, pondWaterS, pondWaterW].forEach((pw) => {
+      pw.scaling.set(ws, 1, ws);
+      pw.position.y = wy;
+    });
+    waterM.diffuseColor = B.Color3.Lerp(waterLowC, waterFullC, e);
+    waterM.emissiveColor = B.Color3.Lerp(waterLowC.scale(0.15), waterFullC.scale(0.42), e);
+    mudM.alpha = 1 - 0.88 * e;
+    const ls = Math.max(0.001, Math.min(1, (e - 0.25) / 0.75));
+    lilies.forEach(({ pad, bloom }) => {
+      pad.scaling.set(ls, 1, ls);
+      bloom.scaling.setAll(ls);
+      pad.setEnabled(e > 0.26);
+      bloom.setEnabled(e > 0.35);
+    });
     st.pond = +(0.78 + 0.22 * e).toFixed(3);
   };
   const setLawn = (s, k, quiet, instant) => {
@@ -84,28 +160,11 @@ export function installSlice(day, world) {
     st.lawn = s === "damp" && f > 0 ? "damp" : "straw";
     st.lawnK = +f.toFixed(2);
     st.goal = f;
-    if (instant || scene.getEngine().getDeltaTime == null) { cur = f; paint(f); }
+    if (s !== "damp" && instant) { drench = 0; drenchOn = false; }
+    if (instant || scene.getEngine().getDeltaTime == null) { cur = f; paint(Math.max(f, drench)); }
     else if (!quiet || Math.abs(cur - f) > 1e-3) st.easing = true;
     if (!quiet) emit("lawn", { state: st.lawn });
   };
-  let cur = 0;
-  /* The wet layer: a Rain cast darkens the lawn and spreads the pond within DRENCH_SECS (1.6 s), wherever he stands, and it dries
-     off over DRENCH_DRY s once the player's rain is gone. It sits on top of the slower lawn above (the shown value is the larger). */
-  const DRENCH_SECS = 1.6;
-  const DRENCH_DRY = 24;
-  const DRENCH_LEVEL = 0.85;
-  let drench = 0;
-  let drenchOn = false;
-  const mudM = mat("slice-mud", "#5a4a30");
-  mudM.alpha = 1;
-  const pondMud = B.MeshBuilder.CreateCylinder("slice-pond-mud", { diameter: 10, height: 0.004, tessellation: 40 }, scene);
-  pondMud.position.set(15, 0.092, 60);
-  pondMud.material = mudM;
-  pondMud.isPickable = false;
-  const pondWater = B.MeshBuilder.CreateCylinder("slice-pond-water", { diameter: 10, height: 0.004, tessellation: 40 }, scene);
-  pondWater.position.set(15, 0.1, 60);
-  pondWater.material = mat("slice-pond-water", "#1d4a63", 0.25);
-  pondWater.isPickable = false;
   paint(0);
   // fuller tomato wall after Birdie's rain: a second set of fruit between the first (js/memory.js sets how many by freshness)
   const extra = [];
@@ -123,15 +182,17 @@ export function installSlice(day, world) {
     st.tomatoes = n;
   };
 
-  // pond ripples: rings that grow and fade
+  // pond ripples: rings that grow and fade across all three park pond basins
   const rings = [];
-  const ringM = mat("slice-ring", "#9fd2e8", 0.6);
-  for (let i = 0; i < 3; i++) {
+  const ringM = mat("slice-ring", "#9fd2e8", 0.65);
+  const POND_BASINS = [POND, SOUTH_POND, WEST_POND];
+  for (let i = 0; i < 6; i++) {
     const r = B.MeshBuilder.CreateTorus("slice-ripple", { diameter: 1, thickness: 0.06, tessellation: 20 }, scene);
     r.material = ringM.clone("slice-ring" + i);
     r.material.alpha = 0;
     r.isPickable = false;
-    rings.push({ m: r, t: i * 1.4, ox: 0, oz: 0 });
+    const basin = POND_BASINS[i % POND_BASINS.length];
+    rings.push({ m: r, t: i * 0.9, ox: 0, oz: 0, cx: basin.x, cz: basin.z });
   }
 
   // pigeons on the bandstand rail
@@ -200,31 +261,33 @@ export function installSlice(day, world) {
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
     t += dt;
-    if (st.easing) {
-      const d = st.goal - cur;
-      const stp = dt / LAWN_SECS;
-      cur = Math.abs(d) <= stp ? st.goal : cur + Math.sign(d) * stp;
-      paint(Math.max(cur, drench));
-      if (cur === st.goal) { st.easing = false; emit("lawn-done", { k: st.goal }); }
-    }
     const w = (window.weather && window.weather.now && window.weather.now()) || { state: "clear" };
     const wet = w.state === "rain" || w.state === "storm";
     if (drenchOn && !(w.manual && wet)) drenchOn = false;
     const dGoal = drenchOn ? DRENCH_LEVEL : 0;
+    let dirty = false;
     if (drench !== dGoal) {
       const stp = (dt / (drenchOn ? DRENCH_SECS : DRENCH_DRY)) * DRENCH_LEVEL;
       drench = Math.abs(dGoal - drench) <= stp ? dGoal : drench + Math.sign(dGoal - drench) * stp;
-      if (!st.easing) paint(Math.max(cur, drench));
       st.drench = +drench.toFixed(3);
+      dirty = true;
     }
+    if (st.easing) {
+      const d = st.goal - cur;
+      const stp = dt / LAWN_SECS;
+      cur = Math.abs(d) <= stp ? st.goal : cur + Math.sign(d) * stp;
+      dirty = true;
+      if (cur === st.goal) { st.easing = false; emit("lawn-done", { k: st.goal }); }
+    }
+    if (dirty) paint(Math.max(cur, drench));
     // ripples
     rings.forEach((r) => {
-      r.t += dt * (wet ? 1.6 : 0.7);
+      r.t += dt * (wet ? 1.8 : 0.85);
       const k = (r.t % 3) / 3;
-      if (k < dt * 0.7 && r.t > 1) { r.ox = (Math.random() - 0.5) * 6; r.oz = (Math.random() - 0.5) * 6; st.ripples++; }
-      r.m.position.set(POND.x + r.ox, 0.11, POND.z + r.oz);
-      r.m.scaling.set(0.4 + k * 2.6, 1, 0.4 + k * 2.6);
-      r.m.material.alpha = (1 - k) * 0.7;
+      if (k < dt * 0.85 && r.t > 1) { r.ox = (Math.random() - 0.5) * 4.6; r.oz = (Math.random() - 0.5) * 4.6; st.ripples++; }
+      r.m.position.set(r.cx + r.ox, 0.114, r.cz + r.oz);
+      r.m.scaling.set(0.4 + k * 2.8, 1, 0.4 + k * 2.8);
+      r.m.material.alpha = (1 - k) * (st.lawnShown > 0.3 ? 0.85 : 0.65);
     });
     if (t > nextRipple) { nextRipple = t + 6; emit("ripple", {}); }
     // pigeons
@@ -272,11 +335,12 @@ export function installSlice(day, world) {
   window.addEventListener("keydown", (e) => {
     if (e.code !== "KeyY" || e.repeat) return;
     const s = me();
-    if (!s || Math.hypot(s.x - POND.x, s.z - POND.z) > 9) return;
+    const nearPond = s && POND_BASINS.find((b) => Math.hypot(s.x - b.x, s.z - b.z) <= 9);
+    if (!nearPond) return;
     st.coins++;
     sfx("chimeUp");
     const r = rings[st.coins % rings.length];
-    r.t = 0; r.ox = (s.x - POND.x) * 0.4; r.oz = (s.z - POND.z) * 0.4;
+    r.t = 0; r.cx = nearPond.x; r.cz = nearPond.z; r.ox = (s.x - nearPond.x) * 0.4; r.oz = (s.z - nearPond.z) * 0.4;
     emit("coin", { n: st.coins });
   });
 
@@ -284,11 +348,17 @@ export function installSlice(day, world) {
   window.addEventListener("day:power", (e) => {
     const d = e.detail || {};
     if (d.action === "denied") return;
-    const p = d.power || d.id || d.name;
+    const p = d.power || d.action || d.id || d.name;
+    if (p === "rain" || p === "storm") { drenchOn = true; emit("drench", { on: true }); }
     if (p === "gust" || p === "bolt" || p === "lightning" || p === "storm") {
       const c = me();
       if (c && Math.hypot(c.x - BAND.x, c.z - BAND.z) < 40) scatter(p);
     }
+    if (p === "rain" && me() && st.goal < 1) setLawn("damp", 1);
+  });
+  window.addEventListener("day:coldopen", (e) => {
+    const d = e.detail || {};
+    if (d.action === "start") { drenchOn = false; drench = 0; st.drench = 0; setLawn("straw", 0, true, true); }
   });
   window.addEventListener("day:neighbor", (e) => {
     const d = e.detail || {};
@@ -307,8 +377,14 @@ export function installSlice(day, world) {
     land,
     setLawn,
     setTomatoes,
-    /** A Rain cast: the lawn darkens and the pond spreads within 1.6 s (js/powers.js `weatherCall`). */
-    drench: (on) => { drenchOn = on !== false; if (drenchOn) emit("drench", {}); },
+    /** A Rain cast: the lawn darkens and the pond spreads within 1.6 s (js/powers.js `weatherCall`), and eases to full green/full pond. */
+    drench: (on) => {
+      drenchOn = on !== false;
+      if (drenchOn) {
+        if (st.goal < 1) setLawn("damp", 1);
+        emit("drench", {});
+      }
+    },
   };
   day.slice = api;
   return api;

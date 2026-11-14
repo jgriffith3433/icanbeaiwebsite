@@ -267,6 +267,7 @@ export function installMemory(day, world) {
     } catch (e) { /* slice not up */ }
     try { day.slice && day.slice.setTomatoes && day.slice.setTomatoes(tom); } catch (e) { /* slice not up */ }
     nowInfo = { lawn: +lawn.toFixed(2), tomatoes: +tom.toFixed(2), decals: list.length, quality: low ? "low" : "high", date: t, ...counts };
+    paintTally();
     emit("apply", Object.assign({ why }, nowInfo));
   }
 
@@ -290,6 +291,7 @@ export function installMemory(day, world) {
     save();
     emit("deed", { kind, zone, power, mark: mark ? mark.kind : null });
     if (mark || kind === "birdieRain" || (kind === "power" && power === "rain")) apply(kind);
+    else paintTally();
   }
   const sidewalkZ = (z) => (z < AVENUE_Z ? AVENUE_Z - 2.8 : AVENUE_Z + 2.8);
 
@@ -308,6 +310,15 @@ export function installMemory(day, world) {
     } else if (p === "rain") {
       const zone = zoneOf(me.x, me.z);
       record("power", zone, p, zone === "park" ? null : { kind: "puddle", x: +(me.x + 1.2).toFixed(2), z: +me.z.toFixed(2), r: 1.4 });
+      if (zone !== "park") {
+        const d0 = dayOf(store, today());
+        const zp = d0.zones.park || (d0.zones.park = {});
+        zp.rain = (zp.rain || 0) + 1;
+        addSession("power", "park", "rain");
+        factsCache = null;
+        save();
+        apply("rain");
+      }
     } else if (p === "gale" || p === "tornado") {
       const tn = p === "tornado" && pw && pw.tornado ? pw.tornado : null;
       const x = tn ? tn.x : me.x, z = tn ? tn.z : me.z;
@@ -390,6 +401,107 @@ export function installMemory(day, world) {
     if (roofSecs >= 12) { roofSecs = 0; record("roofRide", zoneOf(me.x, me.z)); }
   });
 
+  /* ---- Visible Storm Tally & Return Hook (HUD + Title) ---- */
+  function tally() {
+    const sl = day.slice && day.slice.now ? day.slice.now() : null;
+    const gd = day.garden && day.garden.now ? day.garden.now() : null;
+    const lawn = nowInfo.lawn > 0 || !!(sl && (sl.lawn === "damp" || sl.lawnShown > 0.35));
+    const pond = nowInfo.lawn > 0 || !!(sl && sl.pond > 0.85);
+    const garden = nowInfo.tomatoes > 0 || !!(gd && (gd.revived || gd.k > 0.5));
+    const scorch = nowInfo.scorch || 0;
+    const wind = (nowInfo.bin || 0) + (nowInfo.sign || 0) + (nowInfo.chair || 0) + (nowInfo.cone || 0)
+      + (nowInfo.planter || 0) + (nowInfo.awning || 0) + (nowInfo.debris || 0);
+    const puddle = nowInfo.puddle || 0;
+    const d0 = store.days[today()] || { deeds: {} };
+    const casts = d0.deeds.power || 0;
+    const helped = (d0.deeds.askAnswered || 0) + (nowInfo.tomatoes > 0 ? 1 : 0) + (d0.deeds.rescue || 0);
+    const items = [];
+    if (lawn) items.push("Park lawn green");
+    if (pond) items.push("Pond full");
+    if (garden) items.push("Garden revived");
+    if (scorch > 0) items.push(`${scorch} ${scorch === 1 ? "scorch" : "scorches"}`);
+    if (wind > 0) items.push(`${wind} toppled`);
+    if (puddle > 0 && !lawn) items.push(`${puddle} ${puddle === 1 ? "puddle" : "puddles"}`);
+    const changed = (lawn ? 1 : 0) + (pond ? 1 : 0) + (garden ? 1 : 0) + scorch + wind + puddle;
+    let nextAsk = "";
+    try {
+      const tmrwKey = dateKey(Date.now(), shift + 1);
+      const tmrw = day.daily && day.daily.forDate ? day.daily.forDate(tmrwKey) : null;
+      if (tmrw && tmrw.title) nextAsk = tmrw.title;
+    } catch (e) { /* daily not up */ }
+    const hook = nextAsk
+      ? `Holds 3 days · Tomorrow: ${nextAsk}`
+      : "City keeps your marks 3 days · New request tomorrow";
+    const summary = items.length ? `World changed (${changed}): ${items.slice(0, 4).join(" · ")}` : "";
+    return { lawn, pond, garden, scorch, wind, puddle, casts, helped, changed, items, hook, summary };
+  }
+
+  let tallyEl = null;
+  let tallyItemsEl = null;
+  let tallyHookEl = null;
+  let tallyBadgeEl = null;
+  function buildTallyDom() {
+    if (typeof document === "undefined" || !document.body || !document.body.appendChild || document.getElementById("storm-tally")) return;
+    const st = document.createElement("style");
+    st.textContent = `
+.storm-tally{appearance:none;box-sizing:border-box;min-height:44px;min-width:44px;max-width:min(460px,calc(100vw - 24px));padding:6px 14px;border-radius:14px;border:1px solid rgba(240,194,122,.5);background:linear-gradient(180deg,rgba(14,20,30,.88),rgba(8,12,18,.92));box-shadow:0 6px 20px rgba(0,0,0,.45),inset 0 1px 0 rgba(240,194,122,.22);color:#f6f1e8;font:600 .78rem/1.25 Outfit,system-ui,sans-serif;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:2px;z-index:11;touch-action:manipulation;transition:transform .15s,border-color .15s}
+.storm-tally[hidden]{display:none}
+.storm-tally:hover{border-color:rgba(240,194,122,.85)}
+.storm-tally:active{transform:scale(.97)}
+.storm-tally .st-row{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.storm-tally .st-kicker{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:999px;background:rgba(44,184,80,.24);border:1px solid rgba(68,214,104,.6);color:#8ef5a8;font:700 .68rem/1.2 Outfit,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0}
+.storm-tally .st-items{color:#f6f1e8;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.storm-tally .st-hook{color:#f0c27a;font:500 .7rem/1.2 Outfit,system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:700px){.storm-tally{max-width:calc(100vw - 108px);padding:5px 11px}.storm-tally .st-items{font-size:.73rem}.storm-tally .st-hook{font-size:.66rem}}
+`;
+    document.head.appendChild(st);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "storm-tally";
+    btn.className = "storm-tally";
+    btn.dataset.hawkesUi = "1";
+    btn.hidden = true;
+    btn.setAttribute("aria-label", "Storm tally: tap to look at the park lawn and pond");
+    btn.innerHTML = `<span class="st-row"><b class="st-kicker" id="storm-tally-badge">World changed</b><span class="st-items" id="storm-tally-items"></span></span><span class="st-hook" id="storm-tally-hook"></span>`;
+    let tapAt = 0;
+    const onAct = (via) => {
+      try {
+        if (day.control && day.control.mode && day.control.mode() !== "control" && day.control.take) day.control.take("tally");
+        if (day.control && day.control.frame) day.control.frame(0, 33, 1);
+      } catch (e) { /* no control */ }
+      emit("tally-tap", { via, x: 0, z: 33 });
+    };
+    btn.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+      tapAt = performance.now();
+      onAct("touch");
+    });
+    btn.addEventListener("click", () => { if (performance.now() - tapAt > 800) onAct("click"); });
+    document.body.appendChild(btn);
+    tallyEl = btn;
+    tallyBadgeEl = btn.querySelector("#storm-tally-badge");
+    tallyItemsEl = btn.querySelector("#storm-tally-items");
+    tallyHookEl = btn.querySelector("#storm-tally-hook");
+  }
+  function paintTally() {
+    if (!tallyEl) buildTallyDom();
+    if (!tallyEl) return;
+    const tl = tally();
+    if (!tl.items.length) {
+      tallyEl.hidden = true;
+      return;
+    }
+    tallyBadgeEl.textContent = `Changed · ${tl.changed}`;
+    tallyItemsEl.textContent = tl.items.slice(0, 4).join(" · ");
+    tallyHookEl.textContent = tl.hook;
+    tallyEl.hidden = false;
+  }
+  window.addEventListener("day:slice", () => paintTally());
+  window.addEventListener("day:garden", () => paintTally());
+  window.addEventListener("day:power", () => setTimeout(paintTally, 60));
+  window.addEventListener("day:control", () => paintTally());
+  window.addEventListener("day:daily", () => paintTally());
+
   const api = {
     today: () => {
       const d = store.days[today()] || { deeds: {}, zones: {}, marks: [] };
@@ -403,7 +515,8 @@ export function installMemory(day, world) {
     },
     since: (days) => sinceDays(store, today(), Math.max(1, days || 1)),
     marks: () => liveMarks(store, today(), CAP),
-    now: () => Object.assign({}, nowInfo, { shift, total: Object.keys(store.days).reduce((n, k) => n + store.days[k].marks.length, 0) }),
+    tally,
+    now: () => Object.assign({}, nowInfo, { shift, total: Object.keys(store.days).reduce((n, k) => n + store.days[k].marks.length, 0), tally: tally() }),
     /** The playtest's clock: today is `n` real days on (kept for the session, so a reload keeps it). Rebuilds the marks. */
     shiftDays(n) {
       factsCache = null;

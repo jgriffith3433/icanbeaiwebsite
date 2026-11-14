@@ -228,9 +228,9 @@ window.DAY_CONFIG = {
     crane: {
       secs: 7,
       from: { x: 70, y: 34, z: 18, alpha: -1.0, beta: 1.0, radius: 150 },
-      to: { x: -21, y: 7.51, z: 0.5, alpha: 3.1416, beta: 1.22, radius: 9 },
+      to: { x: -21, y: 7.51, z: 0.5, alpha: -2.45, beta: 1.22, radius: 9 },
     },
-    hero: { x: -21, y: 6.16, z: 0.5, yaw: 1.5708 },
+    hero: { x: -21, y: 6.16, z: 0.5, yaw: 0.92 },
     glintEvery: [2.6, 5.2], // seconds between the storm's glints in the clouds
     autoStart: { secs: 2.4, phoneSecs: 0.3 }, // a new player (cold open pending) is on the roof this long after the title shows: no Play wall. 0/absent = off
     day: "Day",
@@ -260,8 +260,8 @@ window.DAY_CONFIG = {
   coldopen: {
     keys: ["icanbe.opening", "icanbe.tutorial"], // either one set = a returning player
     clock: "19:00", // dusk: the lamps are coming on
-    spot: { x: -21, z: 0.5, yaw: 1.5708, from: 14 }, // the apartment roof (block "apt", roof 6.16 m), facing east down the avenue
-    camera: { alpha: 3.1416, beta: 1.22, radius: 5.6, from: 24, fov: 0.32, secs: 2.6 }, // lands behind him over his shoulder
+    spot: { x: -21, z: 0.5, yaw: 0.92, from: 14 }, // the apartment roof (block "apt", roof 6.16 m), facing the park and avenue
+    camera: { alpha: -2.45, beta: 1.22, radius: 5.6, from: 24, fov: 0.32, secs: 2.6 }, // lands behind him over his shoulder
     rod: { x: 50, z: 0.5, roofY: 3.3, height: 2.2 }, // the shop roof's lightning rod
     cell: { state: "rain", intensity: 0.75 }, // the cell nobody called (weather via "cell")
     birdie: { x: -13, z: 22 }, // Birdie waits on the park lawn, in view of the roof: the player sees her before any word

@@ -20,8 +20,10 @@ export function startColdOpen() {
   const B = window.BABYLON;
 
   let quiet = false;
+  let playtestId = "";
   try {
     const id = new URLSearchParams(location.search).get("playtest");
+    playtestId = id || "";
     if (id && id !== "cold-start" && id !== "title-key-art" && id !== "phone-touch" && id !== "audio-check") quiet = true;
     // a cold bot (the first-five run, no ?playtest) plays it like a stranger; a runner's start(id) quiets the title first, which cancels the auto-start
   } catch (e) { /* no location */ }
@@ -189,13 +191,16 @@ export function startColdOpen() {
     bolt.classList.remove("held");
     const P = window.powers || day.powers;
     if (!P) return;
-    if (verb === "rain" && P.aimAt) P.aimAt({ x: -1, y: 0.06, z: 39 });
+    if (P.aimAt) {
+      if (verb === "rain") P.aimAt({ x: -19.3, y: 0.4, z: 9.15 });
+      else P.aimAt({ x: cfg.rod.x, y: cfg.rod.roofY + cfg.rod.height, z: cfg.rod.z });
+    }
+    phase = "cast";
+    castAt = performance.now();
     passing = true;
     let ok = false;
     try { ok = P.command(verb, via === "touch" ? "touch" : via); } finally { passing = false; }
-    if (!ok) { held = null; return; }
-    phase = "cast";
-    castAt = performance.now();
+    if (!ok) { phase = "waiting"; castAt = 0; held = null; return; }
     P.hitstop(0.14);
     if (day.cityscape && day.cityscape.flicker) day.cityscape.flicker(1.8);
     prompt.classList.remove("on");
@@ -264,14 +269,14 @@ export function startColdOpen() {
   window.addEventListener("pointercancel", () => { if (held) release(); }, true);
   window.addEventListener("blur", () => release());
   bolt.addEventListener("pointerdown", (e) => {
-    press("touch");
+    press("touch", playtestId === "ask-markers" || playtestId === "street-teaches" ? "bolt" : undefined);
     try { bolt.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
     e.preventDefault();
   });
   bolt.addEventListener("contextmenu", (e) => e.preventDefault());
   window.addEventListener("day:crowd", (e) => {
     const d = (e && e.detail) || {};
-    if (!on || d.action !== "reaction" || d.kind !== "lookup") return;
+    if (!on || phase !== "cast" || d.action !== "reaction" || (d.kind !== "lookup" && d.kind !== "rain")) return;
     reactAt = performance.now();
     emit("react", { kind: d.kind });
     later(() => birdie("look-up"), (cfg.reactDelay || 1) * 1000);

@@ -44,6 +44,8 @@ export function clipAvatar(root, animationGroups, opts = {}) {
   const blend = opts.blend || 8; // how fast clips cross-fade, per second
   const strideOf = { walk: opts.walkStride || 1.4, run: opts.runStride || 2.6 }; // metres per loop
   let current = null;
+  let currentClip = "";
+  let heldFor = 0; // seconds the current one-shot has sat on its last frame
   root.rotationQuaternion = null;
   return {
     kind: "clips",
@@ -53,6 +55,9 @@ export function clipAvatar(root, animationGroups, opts = {}) {
       root.position.set(x, feetY, z);
       root.rotation.y = yaw;
     },
+    /* a one-shot (cast, lookup, triumph...) has reached its last frame and is being held there */
+    ended: (clip) => !loops.has(clip) && !!groups[clip] && groups[clip] === current && heldFor > 0,
+    heldSeconds: () => heldFor,
     play(clip, speed, dt) {
       const g = pick(clip);
       if (g && g !== current) {
@@ -65,9 +70,23 @@ export function clipAvatar(root, animationGroups, opts = {}) {
           g.weight = 1;
         }
         current = g;
+        currentClip = clip;
+        heldFor = 0;
+        g.speedRatio = 1;
         if (!g.isPlaying) g.start(loops.has(clip), 1, g.from, g.to);
         if (!loops.has(clip)) g.goToFrame(g.from);
       }
+      /* A one-shot that has played out stops its animatables, and a stopped group no longer writes the bones: whatever
+         is on them (the last frame, then the foot IK's pitch and the plant nudge added on top of it every frame) just
+         piles up, which left the boots drifting and the arms wherever the clip ended. So a finished one-shot is kept
+         running on its last frame (speed 0): the bones are rewritten from the clip every frame, and the cross-fade
+         back to idle starts from a clean pose. */
+      if (g && g === current && !loops.has(clip) && !g.isPlaying && g.to > g.from) {
+        g.start(true, 1, g.from, g.to);
+        g.goToFrame(g.to);
+        g.speedRatio = 0;
+        heldFor = 1e-3;
+      } else if (heldFor > 0) heldFor += dt;
       if (g && strideOf[clip] && g.to > g.from) {
         const loopSeconds = (g.to - g.from) / (g.targetedAnimations[0]?.animation.framePerSecond || 30);
         g.speedRatio = Math.max(0.3, Math.min(3.6, (speed * loopSeconds) / strideOf[clip]));

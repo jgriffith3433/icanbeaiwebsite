@@ -136,7 +136,7 @@
     camera.attachControl(canvas, false); // false = the camera takes the wheel/pinch, the page doesn't
     // Babylon gives the canvas tabindex=1; the UI probe then counts the full-screen view as a control sitting under the
     // notch and home bar. The scene isn't a control (keys are read on window), so it isn't a tab stop.
-    if (canvas && canvas.removeAttribute) canvas.removeAttribute("tabindex");
+    if (canvas.removeAttribute) canvas.removeAttribute("tabindex");
 
     const hemi = new B.HemisphericLight("sky", V3(0.1, 1, 0.3), scene);
     hemi.groundColor = new B.Color3(0.14, 0.13, 0.15);
