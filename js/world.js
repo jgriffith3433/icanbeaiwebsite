@@ -2193,6 +2193,9 @@
         if (skin) skin.play(skinClip(myPose, myHand), pp.walking && dt > 0 ? Math.min(moved / dt, 3) : 0, dt, false);
       }
       if (me.bag) me.bag.setEnabled(String(things.carrying || "").includes("bag") && !pp.inCar);
+      /* Under control his model is bare: the day's held box props (the bag's tan slab across his back, the phone's
+         square on his hip) belong to the autopilot's hands and would clip through the jacket and trousers. */
+      if (player && skin) boxProps().forEach((m) => m.setEnabled(false));
 
       npcs.forEach((n) => {
         let show = true;
