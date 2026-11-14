@@ -50,7 +50,7 @@
   --toast-top: max(64px, calc(env(safe-area-inset-top) + 56px));
   --toast-top-px: 64;
 }
-html.touch-ui { --toast-top: max(148px, calc(env(safe-area-inset-top) + 140px)); --toast-top-px: 148; }
+html.touch-ui { --toast-top: max(184px, calc(env(safe-area-inset-top) + 176px)); --toast-top-px: 184; } /* below the status card / clock in the top-left and the Episodes strip, never over them */
 @media (orientation: landscape) and (max-height: 520px) { html.touch-ui { --toast-top: calc(var(--safe-t) + 76px); --toast-top-px: 88; } }
 
 /* ---------- side panel ---------- */

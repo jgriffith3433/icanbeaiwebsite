@@ -501,6 +501,15 @@ function install() {
     }
   }
   let lastDriving = null;
+  // The hint is a first-time pill: once he has cast anything it has done its job, so it goes away for good.
+  window.addEventListener("day:power", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "denied" || d.action === "unlock") return;
+    hint.classList.add("hint-faded");
+    hint.hidden = true;
+    clearTimeout(hint._fade);
+    try { localStorage.setItem(HINT_SEEN_KEY, "1"); } catch (err) { /* private */ }
+  });
 
   // Touch acts on pointerdown/up, not on the click that follows (a click can lag or never come): the press takes control at once,
   // and the click that follows the same tap is swallowed so it doesn't let go again.
