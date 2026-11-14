@@ -2689,7 +2689,7 @@ async function model(options, t) {
 /* ---------------- idle-pose: the default state holds a clean pose for 10 s and after every other clip ---------------- */
 // Acceptance: standing still for 10 s his hands hang at his sides in FRONT of the hip line (never behind his back), the
 // boots are flat and straight (pitch near the rest pose's, no roll), nothing pops; after a walk, a run, a jump and a
-// Lightning and a Rain cast he is back in the same pose within 2 s. A screenshot of the default state, on the roof with
+// Lightning and a Rain cast, and after Wind (tap and hold) followed by 10 s standing under the clear sky, he is back in the same pose within 2 s. A screenshot of the default state, on the roof with
 // control (desktop, and {"touch":true} at 390x844). The numbers come from skin.pose() on real frames.
 async function idlePose(options, t) {
   const touch = !!(options && options.touch);
@@ -2814,6 +2814,64 @@ async function idlePose(options, t) {
     pressKey("r");
     await sleep(1200);
   });
+  t.progress(0.8);
+
+  // Wind (a tap = Gust, a hold = Gale), then 10 s standing still under the clear sky Wind leaves behind (his look at the
+  // sky plays once, then he is idle again): the hands in front of the hips, the boots flat, no pop, nothing held on its
+  // last frame. Desktop presses V; the phone taps and holds the Wind button.
+  const windPress = async (ms) => {
+    if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+    const el = touch ? document.getElementById("ability-wind") : null;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      touchOn(el, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 11);
+      await sleep(ms);
+      touchOn(el, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 11);
+    } else {
+      keyDown("v");
+      await sleep(ms);
+      keyUp("v");
+    }
+  };
+  for (const [label, ms] of [["tap", 120], ["hold", 1500]]) {
+    if (WX && WX.set) WX.set("clear", 0, "key");
+    await windPress(ms);
+    await sleep(2000); // the 2 s he has to settle
+    t.scene(`Wind ${label}: standing`);
+    judge(`Idle after Wind ${label}`, read(), false);
+    const w = { fwd: 9, out: 9, pitch: [99, -99], roll: 0, held: 0 };
+    let wPrev = null;
+    let wPop = 0;
+    const w0 = performance.now();
+    let shot = false;
+    while (performance.now() - w0 < 10000) {
+      const r = read();
+      if (r) {
+        w.fwd = Math.min(w.fwd, r.fwd);
+        w.out = Math.min(w.out, r.out);
+        w.pitch = [Math.min(w.pitch[0], r.pitch[0]), Math.max(w.pitch[1], r.pitch[1])];
+        w.roll = Math.max(w.roll, r.roll);
+        if (sk().held) w.held = Math.max(w.held, sk().held());
+        if (wPrev && sk().clip() === "idle") wPop = Math.max(wPop, Math.abs(r.lean - wPrev.lean), Math.abs(r.neck - wPrev.neck), Math.abs(r.m.hipYaw - wPrev.m.hipYaw), Math.abs(r.m.shoulderYaw - wPrev.m.shoulderYaw));
+        wPrev = sk().clip() === "idle" ? r : null;
+      }
+      if (!shot && performance.now() - w0 > 5000) {
+        shot = true;
+        t.scene(`Wind ${label}: 5 s later`);
+      }
+      await sleep(100);
+    }
+    judge(`Wind ${label} then 10 s still`, w, false);
+    t.metric(`idle.wind.${label}.handFwdMinM`, Math.round(w.fwd * 100) / 100);
+    t.metric(`idle.wind.${label}.bootPitchMin`, Math.round(w.pitch[0]));
+    t.metric(`idle.wind.${label}.bootPitchMax`, Math.round(w.pitch[1]));
+    t.metric(`idle.wind.${label}.bootRollMaxDeg`, Math.round(w.roll * 10) / 10);
+    t.metric(`idle.wind.${label}.popDeg`, Math.round(wPop * 10) / 10);
+    t.metric(`idle.wind.${label}.heldSec`, Math.round(w.held * 10) / 10);
+    if (wPop > 6) t.problem("bug", `quality.animation: after Wind ${label} the idle popped ${wPop.toFixed(1)} deg between two 100 ms samples`);
+    if (w.held > 0.3) t.problem("bug", `quality.animation: after Wind ${label} a clip stayed held on its last frame for ${w.held.toFixed(1)} s`);
+    t.scene(`Wind ${label}: 10 s later`);
+  }
   t.progress(1);
 }
 
@@ -13015,7 +13073,7 @@ installPlaytest({
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
-    { id: "idle-pose", title: "Idle pose: in the default state his hands hang at his sides (not behind his back), boots flat and straight for 10 s with no pop, and he returns to that pose after a walk, a run, a jump and Lightning and Rain casts; the phone (390x844) the same", seconds: 45, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=idle-pose ({\"touch\":true} for 390x844). Takes control outside, stands 10 s (screenshots at the start and the end), then walk, run, jump, E and R, each followed by 2 s of idle and a screenshot. skin.pose() reads each hand's distance in front of the hip line and each boot's pitch and roll; metrics idle.handFwdMinM, idle.bootPitchMin/Max, idle.bootRollMaxDeg, idle.popDeg." },
+    { id: "idle-pose", title: "Idle pose: in the default state his hands hang at his sides (not behind his back), boots flat and straight for 10 s with no pop, and he returns to that pose after a walk, a run, a jump, Lightning and Rain casts and Wind (tap and hold, then 10 s standing under a clear sky); the phone (390x844) the same", seconds: 80, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=idle-pose ({\"touch\":true} for 390x844). Takes control outside, stands 10 s (screenshots at the start and the end), then walk, run, jump, E and R, each followed by 2 s of idle and a screenshot; then V (the Wind button on a phone) as a tap and as a hold under a clear sky, each followed by 10 s standing with screenshots. skin.pose() reads each hand's distance in front of the hip line and each boot's pitch and roll; metrics idle.handFwdMinM, idle.bootPitchMin/Max, idle.bootRollMaxDeg, idle.popDeg and idle.wind.<tap|hold>.* (same, plus heldSec)." },
     { id: "clip-poses", title: "Clip poses: idle at two times, walk, run, jump, float, Lightning and Rain casts and his day's clips each read upright and untwisted at mid-clip; switching clips never snaps the pose; the phone (390x844) the same", seconds: 70, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=clip-poses ({\"touch\":true} for 390x844). Takes control outside, stands (idle early, idle later), W, Shift+W, back to idle, Space jump and hold to float, E then R casts, then his day (sit, type, window). Each scene is a screenshot at mid-clip; skin.pose() reads spine/neck lean, pelvis/shoulder yaw, knees and hand gap on the frame and files quality.animation problems; metric quality.clipPopDeg is the worst pose change between two 33 ms samples." },
     { id: "hero-move", title: "Hero move: feet plant on the apt stairs and ramp (slide under 5 cm, float under 3 cm), Lightning and Rain show distinct wind-up clips, idle under a clear sky looks up; on phone IK and clips run on low quality at ≥30 fps", seconds: 150, tags: ["model", "control", "feel", "phone", "quality"], description: "Load with ?playtest=hero-move ({\"touch\":true} for 390x844). Setup: day bar outside, clear sky, full Charge, control.place at the apt ramp. Real WASD up the ramp and across the roof, E then R for wind-ups, stand still 20 s for look-up. Events foot-plant / windups-distinct / lookup-ok / phone-fps-ok; metrics quality.footSlideM, quality.footFloatM, phone.fpsAvg." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
