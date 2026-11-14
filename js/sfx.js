@@ -1080,6 +1080,9 @@ import { pickRate } from "./variety.js";
       const f = 2600 + Math.random() * 1800;
       const n = 2 + Math.floor(Math.random() * 3);
       for (let i = 0; i < n; i++) tone({ freq: f, to: f * (1.2 + Math.random() * 0.4), dur: 0.08, vol: 0.025 * gain, delay: i * 0.11, pan });
+      // A breath of band-passed noise under the chirps: tones are oscillators, which the audio probe does not see, so a stretch of
+      // synth birds alone read as silence (phone-touch 21 s) though the fill was playing.
+      noise({ type: "bandpass", freq: Math.round(f / 100) * 100, q: 2.5, dur: 0.12 * n, vol: 0.012 * gain, attack: 0.02, pan });
     },
     car(pan, gain) {
       note("car");
