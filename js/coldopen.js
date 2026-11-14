@@ -268,6 +268,13 @@ export function startColdOpen() {
     later(() => birdie("look-up"), (cfg.reactDelay || 1) * 1000);
   });
 
+  // Letting go (Esc, B) while the cold open is up ends it: otherwise its gate, prompt and rod stay up with him back on his
+  // day, and `on` stays true so the next Play is refused ("Play didn't hand him over", cold-start blocker).
+  window.addEventListener("day:control", (e) => {
+    const d = (e && e.detail) || {};
+    if (on && d.action === "let-go") { emit("abort", { via: d.via }); finish(); }
+  });
+
   /* ---- the glance: Birdie on the lawn, seen before any word ---- */
   // A cut-away that starts on a neighbor where they stand (waving) and eases back to the camera's own pose over
   // `secs`, so the end hands over with no snap. The player sees who is asking before anyone says anything.
@@ -359,7 +366,7 @@ export function startColdOpen() {
   const api = {
     pending: () => !quiet && !on && !returning(),
     active: () => on,
-    arm() { quiet = false; return true; },
+    arm() { if (on) finish(); quiet = false; return true; },
     /** Called by the title's Play, in the click: the same frame the title closes. */
     start(via, opts) {
       if (on || quiet || returning()) return false;
