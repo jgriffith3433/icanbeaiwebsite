@@ -81,7 +81,7 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(-
 @media (max-width: 700px) {
   .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
 }
-html.touch-ui.in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
+html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
 
 /* ---------- Settings popover (top-right cluster, under the Settings button) ---------- */
 .tools { position: relative; }
@@ -256,8 +256,8 @@ html.touch-ui.in-control .voice-caption {
 .preview-public .hud.bottom { left: auto; right: var(--safe-r); bottom: 40px; width: auto; }
 .preview-public .time-drawer { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; width: min(560px, calc(100vw - var(--safe-l) - var(--safe-r))); }
 html.preview-public:not(.in-control) .hud-left { top: auto; bottom: 40px; left: var(--safe-l); flex-direction: column-reverse; }
-html.touch-ui.preview-public:not(.in-control) .control-btn { bottom: 92px; }
-@media (max-width: 700px) { html.preview-public:not(.in-control) .control-btn { bottom: 92px; } }
+html.touch-ui.preview-public:not(.in-control) .control-btn { bottom: max(92px, calc(env(safe-area-inset-bottom) + 80px)); max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 24px); }
+@media (max-width: 700px) { html.preview-public:not(.in-control) .control-btn { bottom: max(92px, calc(env(safe-area-inset-bottom) + 80px)); } }
 html.preview-public.in-control:not(.touch-ui) .control-btn { bottom: calc(var(--pub-a) + 8px); }
 html.preview-public.in-control:not(.touch-ui) .control-hint { bottom: calc(var(--pub-a) + 56px); }
 html.preview-public.in-control:not(.touch-ui) .voice-caption { bottom: calc(var(--pub-a) + 104px); }

@@ -11010,6 +11010,35 @@ async function checkCharacterClear(t, label) {
 /* ---------------- phone-touch: cold phone session on the roof, Take control and five casts, all by touch ---------------- */
 // Real input only: touch pointer events (tapEl) on Take control / the Bolt prompt / the ability buttons. Setup (named): a full
 // Charge before each cast. Works at 390x844 and 844x390 (the runner sets the window); reports every control's size and any overlap.
+/* phone-touch: the one Take control / Let go button, whole (44x44), inside the safe-area insets, clear of the stick, Jump and the ability ring. */
+function controlButtonCheck(t, label) {
+  const btn = $("control");
+  const r = btn && hudVisible(btn);
+  if (!r) { t.problem("bug", `${label}: the Take control / Let go button isn't visible`); return; }
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const ins = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
+  probe.remove();
+  const name = btn.textContent.trim();
+  const inside = r.left >= ins.l - 0.5 && r.top >= ins.t - 0.5 && r.right <= innerWidth - ins.r + 0.5 && r.bottom <= innerHeight - ins.b + 0.5;
+  const big = r.width >= 43.5 && r.height >= 43.5;
+  const hit = [];
+  const others = [...document.querySelectorAll(".abilitybar .ab, .abilitybar .charge, .touchpad .jump, .touchpad .stick, #stick")];
+  others.forEach((el) => {
+    const o = hudVisible(el);
+    if (o && !(r.right <= o.left || o.right <= r.left || r.bottom <= o.top || o.bottom <= r.top)) hit.push(el.id || el.className);
+  });
+  const key = label.replace(/\W+/g, "-");
+  t.metric(`phone.control.${key}.w`, Math.round(r.width));
+  t.metric(`phone.control.${key}.h`, Math.round(r.height));
+  t.event("phone-control-button", `${label}: "${name}" ${Math.round(r.width)}x${Math.round(r.height)} at ${Math.round(r.left)},${Math.round(r.top)}; insets t${Math.round(ins.t)} r${Math.round(ins.r)} b${Math.round(ins.b)} l${Math.round(ins.l)}; ${inside ? "inside the safe area" : "OUTSIDE the safe area"}; ${hit.length ? "overlaps " + hit.join(", ") : "clear of the stick, Jump and ability ring"}`);
+  if (!big) t.problem("bug", `${label}: "${name}" is ${Math.round(r.width)}x${Math.round(r.height)} (44x44 needed) at ${innerWidth}x${innerHeight}`);
+  if (!inside) t.problem("bug", `${label}: "${name}" is outside the safe-area insets at ${innerWidth}x${innerHeight}`);
+  if (hit.length) t.problem("bug", `${label}: "${name}" overlaps ${hit.join(", ")} at ${innerWidth}x${innerHeight}`);
+}
+
 async function phoneTouch(options, t) {
   const land = innerWidth > innerHeight;
   t.scene(land ? "Phone touch (landscape)" : "Phone touch (portrait)");
@@ -11058,6 +11087,7 @@ async function phoneTouch(options, t) {
   if (D.now().mode === "pause") { const pl = document.getElementById("play"); if (pl) pl.click(); }
   let drive = 0;
   while (btn.disabled && drive++ < 20) { if (D.jump) D.jump("19:00"); await sleep(400); } // he can't be taken while driving: setup shortcut
+  controlButtonCheck(t, (land ? "landscape" : "portrait") + " Take control");
   const tTap = performance.now();
   await tapEl(btn);
   const took = await t.until(() => C.mode() === "control", 3000, "Take control by tap").then(() => true).catch(() => false);
@@ -11107,6 +11137,7 @@ async function phoneTouch(options, t) {
   t.metric("phone.minControlPx", Math.round(minPx));
   t.event("phone-controls", `${innerWidth}x${innerHeight}: smallest control ${Math.round(minPx)} px${small.length ? ", SMALL: " + small.join(", ") : ""}`);
   if (small.length) t.problem("bug", `Controls under 44 px at ${innerWidth}x${innerHeight}: ${small.join(", ")}`);
+  controlButtonCheck(t, (land ? "landscape" : "portrait") + " Let go");
   checkHud(t, land ? "phone landscape" : "phone portrait");
   await checkCharacterClear(t, land ? "phone landscape" : "phone portrait");
   // 3b. The ability arc: every verb whole inside the safe area, none touching the Charge ring, none touching a neighbour.
