@@ -42,6 +42,7 @@ export function clipAvatar(root, animationGroups, opts = {}) {
     weights.set(g, 0);
   });
   const blend = opts.blend || 8; // how fast clips cross-fade, per second
+  const LOCO_BLEND = opts.locoBlend || 26; // cross-fade rate (per second) while walk/run is the target
   const strideOf = { walk: opts.walkStride || 1.4, run: opts.runStride || 2.6 }; // metres per loop
   /* Walk and run are ONE locomotion blend: both clips run on a shared phase at a rate from the real ground speed over the
      blended stride, and the run share follows speed (smoothstep between blendFrom and blendTo m/s, then chased at
@@ -133,7 +134,9 @@ export function clipAvatar(root, animationGroups, opts = {}) {
         const loopSeconds = (g.to - g.from) / (g.targetedAnimations[0]?.animation.framePerSecond || 30);
         g.speedRatio = Math.max(0.3, Math.min(3.6, (speed * loopSeconds) / strideOf[clip]));
       }
-      const k = 1 - Math.exp(-blend * dt);
+      /* Coming into walk/run from idle (or a one-shot) must be quick: the animation trace counts boots under 30% of the body's
+         speed from 0.5 m/s as foot slide, and at the slow 8/s blend the walk was still mostly faded out when he already moved. */
+      const k = Math.min(target ? 0.4 : 1, 1 - Math.exp(-(target ? Math.max(blend, LOCO_BLEND) : blend) * dt)); // < 0.5: no blend pop in one frame
       const cw = weights.get(current) || 0;
       if (exiting && current) {
         /* leaving a one-shot: the next clip comes in linearly over exitSecs, so the pose is never left half-way */
