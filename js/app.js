@@ -160,8 +160,11 @@ if (skinWorld) {
     chunks.forEach((c) => { out.set(c, at); at += c.length; });
     return out.buffer;
   };
-  /* ?blockmodel=1 or window.__blockModel (the playtest's "GLB blocked" option): the model's fetch fails, as on a bad network */
-  const blocked = () => window.__blockModel || /[?&]blockmodel=1/.test(location.search);
+  /* ?blockmodel=1 or window.__blockModel (the playtest's "GLB blocked" option) or ?block=model: the model's fetch fails, as on a bad network */
+  const blocked = () => {
+    if (window.__blockModel) return true;
+    try { return /[?&]blockmodel=1/.test(location.search) || new URLSearchParams(location.search).get("block") === "model"; } catch (e) { return false; }
+  };
   const fetchBytes = () => (blocked() ? Promise.resolve(null) : typeof fetch === "function"
     ? fetch(control.model, { cache: "no-cache" }).then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
     : Promise.resolve(null));

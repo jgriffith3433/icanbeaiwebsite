@@ -30,7 +30,10 @@
   const heard = {}; // name -> count, for info()
   const clockMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
   let lastHeardMs = clockMs();
-  const note = (name) => { lastHeardMs = clockMs(); return (heard[name] = (heard[name] || 0) + 1); };
+  /* note() only counts. lastHeardMs is stamped where a source really starts (started()): a note() for an event whose sound never
+     started (a muted bus, a clip not decoded yet, a one-shot gated off) must not hold the ambient fill back. */
+  const started = () => { lastHeardMs = clockMs(); };
+  const note = (name) => { return (heard[name] = (heard[name] || 0) + 1); };
 
   /* ---------------- the audio graph ---------------- */
   let audio = null;
@@ -179,7 +182,7 @@
     f.connect(g);
     const bus = o.bus || "sfx";
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
-    src.start(t, Math.random() * 1.5);
+    src.start(t, Math.random() * 1.5); started();
     src.stop(t + o.dur + 0.05);
   }
   /** One oscillator note, optionally gliding. Pass x/z for HRTF+occlusion via mix. */
@@ -209,7 +212,7 @@
     node.connect(g);
     const bus = o.bus || "sfx";
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
-    osc.start(t);
+    osc.start(t); started();
     osc.stop(t + o.dur + 0.05);
     // An oscillator isn't a buffer source, so the audio probe can't see it: say so through the sound kit's event.
     try {
@@ -291,7 +294,7 @@
     src.connect(g);
     const bus = o.bus || (String(kind).startsWith("ui-") ? "ui" : "sfx");
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
-    src.start(a.c.currentTime + (o.delay || 0));
+    src.start(a.c.currentTime + (o.delay || 0)); started();
     const tag = groupOf(kind) === "move" ? (kind === "jump" ? "jump" : "landing") : kind.split("-")[0] === "crowd" || kind === "umbrella-pop" ? "crowd" : kind.startsWith("car") || kind === "siren-far" ? "car" : kind === "bird" || kind === "pigeon" ? "bird" : "ui";
     bank.sources[tag] = "file";
     bank.plays.push({ kind, file: pick.url, rate: +rate.toFixed(3), t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
@@ -395,6 +398,7 @@
     node.connect(g);
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, "sfx") : out(a, o.pan, "sfx"));
     src.start(t);
+    started();
     if (o.dur) try { src.stop(t + o.dur + 0.05); } catch (err) { /* ok */ }
     power.plays.push({ kind: o.kind || "power", file: pick.url, t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
     if (power.plays.length > 40) power.plays.shift();
@@ -638,6 +642,7 @@
       src.connect(g);
       g.connect(out(a, 0, "sfx"));
       src.start(a.c.currentTime);
+      started();
       note("press-" + id);
       return true;
     } catch (e) { return false; }
@@ -1036,6 +1041,7 @@
         p.connect(a.master);
       } else g.connect(a.master);
       src.start(t, Math.random());
+      started();
       src.stop(t + 2.5);
     },
     siren() {
