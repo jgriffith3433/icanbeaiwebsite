@@ -1483,6 +1483,18 @@ import { pickRate } from "./variety.js";
       return;
     }
     if (d.action === "flinch") { S.gasp(0, 0.7); return; }
+    if (d.action === "car-alarm") {
+      // a parked car's alarm: two-tone whoops (square, band-limited) from where the car is, ~4 s, fading with distance
+      const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
+      note("car-alarm");
+      synthTag("car");
+      const n = Math.max(3, Math.round((d.secs || 4) / 0.5));
+      for (let i = 0; i < n; i++) {
+        const hi = i % 2 === 0;
+        tone({ freq: hi ? 980 : 720, to: hi ? 760 : 940, dur: 0.46, vol: 0.05 * at.gain * (1 - i / (n * 1.6)), wave: "square", band: 1500, q: 1.2, pan: at.pan, delay: i * 0.5 });
+      }
+      return;
+    }
     if (d.action === "scatter" || d.action === "scream") {
       const at = d.x != null && d.z != null ? place(d.x, d.z) : { pan: 0, gain: 1 };
       S.scream(at.pan, at.gain);
