@@ -11736,6 +11736,27 @@ async function audioCheck(options, t) {
   t.metric("audioCastsDistinct", sig.size);
   t.event("audio-casts", `${keys.length}/5 casts heard, ${sig.size} distinct sounds`);
   if (sig.size < 5) t.problem("bug", `The five casts must each play a distinct sound (${sig.size} distinct)`);
+  // The same power three times in a row: three different takes or rates (js/variety.js logs every one-shot's rate).
+  { const log = () => (window.__varietyLog || []);
+    const results = [];
+    for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"]]) {
+      const l0 = log().length;
+      for (let k = 0; k < 3; k++) {
+        refill();
+        if (C.mode() !== "schedule" || ($("control") && $("control").disabled)) await ensureControl(t, touch, `repeat ${name}`);
+        P.command(id, touch ? "touch" : "key");
+        await sleep(450);
+      }
+      const got = log().slice(l0).filter((e) => /^(power|castclip|press)-/.test(e.id));
+      const byId = {};
+      got.forEach((e) => { (byId[e.id] = byId[e.id] || []).push(e.r); });
+      Object.keys(byId).forEach((k) => { if (byId[k].length > 1 && new Set(byId[k]).size < byId[k].length) results.push(`${name}: ${k} repeated a rate ${byId[k].join(",")}`); });
+      t.event("audio-repeat-" + name, `${name} x3: ${Object.keys(byId).map((k) => k + " " + byId[k].join("/")).join("; ") || "no logged one-shots"}`);
+      await settleToIdle(t, name);
+    }
+    t.metric("audioRepeatedRates", results.length);
+    if (results.length) t.problem("bug", "Casting the same power three times repeated a sample at the same rate: " + results.join(" | "));
+  }
   t.progress(0.6);
 
   // a voiced line over the bed: the bed ducks, the line is louder, and it comes back
