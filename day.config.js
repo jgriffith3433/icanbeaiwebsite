@@ -866,6 +866,8 @@ window.DAY_CONFIG = {
       sunbreak: "The clouds split. Warm light.",
       dry: "Not enough charge.",
       locked: "Not unlocked yet.",
+      takeover: "He's yours now. Esc lets him go.",
+      takeoverTouch: "He's yours now. Tap Let go to give him back.",
     },
     // Havok debris for the tornado (and bolt/gust shove): street near home plus a dense set on the plaza
     // so a plaza cast lifts 8+. Caps: 30 desktop, 12 low/phone (js/tornado.js).

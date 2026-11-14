@@ -11122,6 +11122,43 @@ function controlButtonCheck(t, label) {
   if (hit.length) t.problem("bug", `${label}: "${name}" overlaps ${hit.join(", ")} at ${innerWidth}x${innerHeight}`);
 }
 
+/* Watching, a tap on each power takes control and casts it (nothing refused). Real touch on the ring's buttons; the only
+   setup shortcut is the clock to dusk when he happens to be driving. Ends with him the player's. */
+async function watchPressCheck(t, label) {
+  const D = window.day;
+  const C = D.control;
+  const btn = $("control");
+  let hit = 0;
+  for (const id of ["bolt", "rain", "wind", "fog", "sunbreak"]) {
+    if (C.mode() === "control") await tapEl(btn);
+    await t.until(() => C.mode() === "schedule", 40000, "him back on his day").catch(() => {});
+    if (C.mode() !== "schedule") { t.problem("bug", `${label}: he never went back to his day before the ${id} tap`); continue; }
+    let drive = 0;
+    while (D.now().frame && D.now().frame.person.inCar && drive++ < 20) { if (D.jump) D.jump("19:00"); await sleep(400); }
+    await sleep(300);
+    const el = $("ability-" + id);
+    const vis = el && hudVisible(el);
+    if (!vis) { t.problem("bug", `${label}: the ${id} button isn't on screen while watching`); continue; }
+    let cast = null;
+    const on = (e) => { const d = e.detail || {}; if (!cast && d.action !== "denied" && d.power) cast = d.power; };
+    window.addEventListener("day:power", on);
+    const t0 = performance.now();
+    await tapEl(el);
+    const took = await t.until(() => C.mode() === "control", 3000, "control after the tap").then(() => true).catch(() => false);
+    await t.until(() => cast, 9000, `the ${id} cast`).catch(() => {});
+    window.removeEventListener("day:power", on);
+    const toast = $("take-toast");
+    const blocked = window.powers && window.powers.now && window.powers.now().blocked;
+    t.event("watch-press-" + id, `${label}: a tap on ${id} while watching: ${took ? "control" : "NOT taken"}, cast ${cast || "NONE"} after ${Math.round(performance.now() - t0)} ms, toast "${toast && toast.classList.contains("show") ? toast.textContent : "none"}"${blocked && blocked.reason ? ", last refusal " + blocked.reason : ""}`);
+    if (!took) t.problem("bug", `${label}: a tap on ${id} while watching didn't take control`);
+    else if (!cast) t.problem("bug", `${label}: a tap on ${id} while watching took control but cast nothing (refused)`);
+    else hit++;
+    await sleep(900);
+  }
+  t.metric("watchPress.casts", hit);
+  return hit;
+}
+
 async function phoneTouch(options, t) {
   const land = innerWidth > innerHeight;
   t.scene(land ? "Phone touch (landscape)" : "Phone touch (portrait)");
@@ -11170,6 +11207,13 @@ async function phoneTouch(options, t) {
   if (D.now().mode === "pause") { const pl = document.getElementById("play"); if (pl) pl.click(); }
   let drive = 0;
   while (btn.disabled && drive++ < 20) { if (D.jump) D.jump("19:00"); await sleep(400); } // he can't be taken while driving: setup shortcut
+  // 2a. Watching, a tap on each power takes control and casts it (the refusal this replaces: audio-check heard 0 of 5).
+  await watchPressCheck(t, land ? "phone landscape" : "phone portrait");
+  if (C.mode() === "control") await tapEl(btn);
+  await t.until(() => C.mode() === "schedule", 40000, "him back on his day").catch(() => {});
+  await sleep(400);
+  drive = 0;
+  while (btn.disabled && drive++ < 20) { if (D.jump) D.jump("19:00"); await sleep(400); }
   controlButtonCheck(t, (land ? "landscape" : "portrait") + " Take control");
   const tTap = performance.now();
   await tapEl(btn);
@@ -11640,7 +11684,8 @@ async function audioCheck(options, t) {
   const seen = {};
   for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"], ["gale", "gale"], ["fog", "fog"], ["sunbreak", "sunbreak"]]) {
     refill();
-    await ensureControl(t, touch, `before ${name}`);
+    // watching, the press itself takes control (js/powers.js pressWatching); only a driving or returning him needs the setup
+    if (C.mode() !== "schedule" || ($("control") && $("control").disabled)) await ensureControl(t, touch, `before ${name}`);
     const n0 = D.sfx.info().casts.length;
     const ok = P.command(id, touch ? "touch" : "key");
     const bl = P.now && P.now().blocked;

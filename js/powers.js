@@ -818,9 +818,61 @@ export function startPowers(world, dayApi) {
   ["rain", "gale", "fog", "sunbreak"].forEach((id) => (commands[id] = (via) => weatherCall(id, via)));
   function command(name, via) {
     const fn = commands[name];
-    if (!fn || mode() !== "control") return false;
+    if (!fn) return false;
+    if (mode() !== "control") return pressWatching(name, via || "key");
     if (gateFn && !gateFn(name, via || "key")) return false;
     return fn(via || "key");
+  }
+
+  /* A power pressed while only watching is never refused: the first press takes control (the Take control button's own
+     path, so the night wake runs too) and then casts that power, with a one-line toast on how to give him back. */
+  let watchCast = null; // a cast waiting for the night wake to land him on the roof
+  function takeToast() {
+    if (!canDom) return;
+    const touch = !!(day.control.state && day.control.state().touch);
+    const text = touch ? line("takeoverTouch") : line("takeover");
+    if (!text) return;
+    let el = document.getElementById("take-toast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "take-toast";
+      el.className = "take-toast";
+      el.setAttribute("role", "status");
+      document.body.append(el);
+    }
+    el.textContent = text;
+    el.classList.remove("show");
+    void el.offsetWidth;
+    el.classList.add("show");
+    clearTimeout(takeToast.h);
+    takeToast.h = setTimeout(() => el.classList.remove("show"), 3600);
+    note(text);
+  }
+  function pressWatching(name, via) {
+    if (!canDom || !day.control || !day.control.take || mode() !== "schedule") return false;
+    const cls = document.documentElement.classList;
+    if (cls.contains("title-up") || cls.contains("cold-open")) return false;
+    if (!day.control.take(via)) return false; // driving: the one case he can't be taken
+    takeToast();
+    const cast = () => {
+      if (mode() !== "control") return;
+      const ok = gateFn && !gateFn(name, via) ? false : commands[name](via);
+      if (!ok) refuseBar(name);
+    };
+    const wk = day.wake && day.wake.now ? day.wake.now() : null;
+    if (wk && wk.active) {
+      // asleep: he stretches and is put on the roof first; cast the moment he is ready
+      const h = (e) => {
+        const a = e.detail && e.detail.action;
+        if (a !== "ready" && a !== "abort") return;
+        window.removeEventListener("day:wake", h);
+        clearTimeout(watchCast);
+        if (a === "ready") setTimeout(cast, 60);
+      };
+      window.addEventListener("day:wake", h);
+      watchCast = setTimeout(() => window.removeEventListener("day:wake", h), 8000);
+    } else cast();
+    return true;
   }
 
   /* A bolt prefers a tall conductor (an antenna, the Needle) within 3 m of where it was aimed. */
@@ -1137,6 +1189,11 @@ html.touch-ui.in-control .side{display:none}
   }, {
     verbs: VERB_IDS,
     onHold(id, down) {
+      // watching: the press takes control and casts the tap (Lightning / Gust); holds start from the next press
+      if (mode() === "schedule") {
+        if (down && !pressWatching(id === "wind" ? "gust" : "bolt", "touch")) refuseBar(id === "wind" ? "gust" : "bolt");
+        return;
+      }
       if (id === "bolt") touchBolt = !!down;
       if (id === "wind") touchWind = !!down;
     },
@@ -1145,7 +1202,10 @@ html.touch-ui.in-control .side{display:none}
   function paintMeter() {
     if (!canDom) return;
     const on = mode() === "control";
-    bar.paint(on);
+    // watching, the ring is there too: a tap on a power takes control and casts it (not while he drives or the cold open runs)
+    const fr = day.control && day.control.mode && !on && day.now ? day.now().frame : null;
+    const watching = !on && mode() === "schedule" && !!fr && !(fr.person && fr.person.inCar) && !document.documentElement.classList.contains("cold-open");
+    bar.paint(on || watching);
     meter.hidden = true;
     pad.hidden = true;
     if (!on) reticle.hidden = true;
@@ -1210,6 +1270,13 @@ html.touch-ui.in-control .side{display:none}
   window.addEventListener("keydown", (e) => {
     if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
     const name = keyName[(e.key || "").toLowerCase()];
+    if (name && mode() === "schedule" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && commands[name === "wind" ? "gust" : name === "bolt" ? "bolt" : name]) {
+      if (pressWatching(name === "wind" ? "gust" : name, "key")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+      return;
+    }
     if (!name || mode() !== "control") return;
     if (name === "bolt") {
       if (!e.repeat) keyBolt = true;
