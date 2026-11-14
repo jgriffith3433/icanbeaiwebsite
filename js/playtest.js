@@ -12027,8 +12027,11 @@ async function phoneTouchRun(options, t) {
   // Until the first frame the game really is on its loading screen: say so to the audio probe, then the play scene.
   t.scene(window.day.now().frame ? playScene : "Loading");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
-  t.scene(playScene);
+  // His model streams in and compiles after the first frame (up to ~30 s on a throttled phone, the main thread busy): the game shows
+  // its loading state until he is on screen (the stand-in is never shown as him), so this wait is loading, not play.
+  t.scene("Loading (his model)");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  t.scene(playScene);
   const D = window.day;
   const C = D.control;
   const P = window.powers || D.powers;
