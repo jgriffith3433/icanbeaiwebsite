@@ -62,6 +62,7 @@ export function createMover(world, cfg) {
     x: 0, y: 0, z: 0, yaw: 0, vx: 0, vy: 0, vz: 0,
     grounded: true, coyote: 0, airTime: 0, jumpsLeft: M.airJumps, jumps: 0, takeoffY: 0, peak: 0,
     floating: false, gliding: false, softLand: false, lift: 0, anim: "idle", speed: 0,
+    jumpId: 0, landId: 0, landDrop: 0, // counters the skin and the camera read: each take-off press, each touchdown and how far it fell
     flights: 0, lastFlight: null, // { jumps, height, soft?, glide? } of the last time he was in the air
   };
   let cc = null;
@@ -167,6 +168,7 @@ export function createMover(world, cfg) {
     }
 
     if (onGround) {
+      if (!s.grounded && s.airTime > 0.08) { s.landId++; s.landDrop = Math.max(0, s.peak - s.y); }
       if (!s.grounded && s.jumps) {
         s.lastFlight = {
           jumps: s.jumps,
@@ -191,7 +193,7 @@ export function createMover(world, cfg) {
       s.jumpsLeft = M.airJumps;
       s.jumps = 0;
     } else {
-      if (s.grounded) s.takeoffY = s.y; // walked off an edge
+      if (s.grounded) { s.takeoffY = s.y; s.peak = s.y; } // walked off an edge
       s.grounded = false;
       s.coyote = Math.max(0, s.coyote - h);
       s.airTime += h;
@@ -202,6 +204,7 @@ export function createMover(world, cfg) {
         s.vy = jumpVel;
         s.takeoffY = s.y;
         s.peak = s.y;
+        s.jumpId++;
         s.jumps = 1;
         s.airTime = 0;
         s.grounded = false;
@@ -526,6 +529,7 @@ function install() {
     sphere: 0.3, // the camera's collision radius (its near plane is 0.2)
     stepM: 1.3, // the most the camera moves by turning, tilting or a pull-in in one frame, metres (the sensor's limit is 3)
     blendSecs: 0.6,
+    dipFrom: 2, dipBase: 0.1, dipPer: 0.03, dipMax: 0.25, dipDown: 0.09, dipUp: 0.35, // the landing dip (a fall over 2 m)
     recenterAfter: 1.5, recenterRate: 5, touchSens: 420,
     minDist: 2.2, liftMax: 0.9, easeOut: 10, // keep at least this much camera distance by lifting over the obstacle; ease-out spring rate
     castSecs: 1.8, castRise: 0.3, castFall: 0.5,
@@ -562,7 +566,7 @@ function install() {
     blend: null, cast: null,
     fresh: true, // the next frame follows a cut (take, place): no yaw rate sample
   };
-  const camStats = { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], glances: [], lastGlanceCancelMs: null, recentres: 0, lookDrags: 0 };
+  const camStats = { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], glances: [], lastGlanceCancelMs: null, recentres: 0, lookDrags: 0, dipMax: 0 };
   const firstCastSeen = new Set();
   const canonVerb = (id) => {
     if (id === "storm" || id === "bolt") return "bolt";
@@ -1002,8 +1006,21 @@ function install() {
     [cs.tp.x, cs.tv.x] = spring1(cs.tp.x, cs.tv.x, s.x + cs.ahead.x, wxz, dt);
     [cs.tp.z, cs.tv.z] = spring1(cs.tp.z, cs.tv.z, s.z + cs.ahead.z, wxz, dt);
     [cs.tp.y, cs.tv.y] = spring1(cs.tp.y, cs.tv.y, s.y + 1.35, bl ? Math.min(wy, wxz) : wy, dt);
+    /* a light dip when he lands from over 2 m: the view sinks with the squash (down 0.09 s, back up over 0.35 s) */
+    if (s.landId !== cs.landSeen) {
+      if (cs.landSeen != null && s.landDrop > CAM.dipFrom) cs.dip = { t: 0, depth: Math.min(CAM.dipMax, CAM.dipBase + CAM.dipPer * (s.landDrop - CAM.dipFrom)) };
+      cs.landSeen = s.landId;
+    }
+    let dipY = 0;
+    if (cs.dip) {
+      cs.dip.t += dt;
+      const dd = cs.dip.t < CAM.dipDown ? smooth01(cs.dip.t / CAM.dipDown) : 1 - smooth01((cs.dip.t - CAM.dipDown) / CAM.dipUp);
+      dipY = cs.dip.depth * dd;
+      if (cs.dip.t >= CAM.dipDown + CAM.dipUp) cs.dip = null;
+    }
+    camStats.dipMax = Math.max(camStats.dipMax || 0, dipY);
     const t = camera.target;
-    t.set(cs.tp.x, cs.tp.y, cs.tp.z);
+    t.set(cs.tp.x, cs.tp.y - dipY, cs.tp.z);
     const pullWant = s.gliding ? (RIDE.cameraPull || 3.4) : 0;
     glidePull = damp(glidePull, pullWant, dt, 2.4);
     let r = wantRadius + glidePull;
@@ -1665,7 +1682,7 @@ function install() {
       route: mover.route() ? mover.route().path.length : 0,
       updrafts: mover.updrafts().length,
       cameraPull: Math.round(glidePull * 100) / 100,
-      vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
+      jumpId: s.jumpId, landId: s.landId, landDrop: s.landDrop, vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
     }),
     move: mover.move,
     /** Swing the camera so the point (x, z) is ahead of him (a tap on a neighbor's ask marker, or a world reaction): eased ~1.5 s glance. */
@@ -1731,7 +1748,7 @@ function install() {
     }),
     resetCameraStats: () => {
       firstCastSeen.clear();
-      Object.assign(camStats, { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], glances: [], lastGlanceCancelMs: null, recentres: 0, lookDrags: 0 });
+      Object.assign(camStats, { frames: 0, inside: 0, blocked: 0, maxYawDegPerSec: 0, maxPitchDegPerSec: 0, minClear: 99, casts: [], glances: [], lastGlanceCancelMs: null, recentres: 0, lookDrags: 0, dipMax: 0 });
     },
     log: () => log.slice(),
     take: () => take("console"),

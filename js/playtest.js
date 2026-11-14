@@ -1986,7 +1986,7 @@ async function warmStart(options, t) {
     window.addEventListener("day:land-sound", hl);
     let air = false, down = 0;
     const poll = setInterval(() => { if (!C.state().grounded) air = true; else if (air && !down) down = performance.now(); }, 8);
-    await tapKey(" ", 150);
+    await jumpStatesProbe(t, "warm-start jump", () => tapKey(" ", 150));
     await t.until(() => lands.length > 0, 4000, "a landing sound").catch(() => {});
     clearInterval(poll);
     window.removeEventListener("day:land-sound", hl);
@@ -2387,6 +2387,41 @@ async function holdKeys(list, ms) {
   await sleep(ms);
   list.slice().reverse().forEach((k) => keyUp(k));
 }
+/** One jump, played through real input (`press`: a key or a touch on the Jump button), read frame by frame from his skin's own
+ *  state: take-off, air (jump/fall/float) and land must each show, in that order, and he must end on idle, walk or run.
+ *  Logs `jump-states` with the sequence; the metric `jump.<label>Land` is 1 when it was clean. */
+async function jumpStatesProbe(t, label, press) {
+  const C = window.day.control;
+  const sk = () => { try { return skinNow(); } catch (e) { return null; } };
+  const seq = [];
+  let air = false, landedAt = 0, stop = false;
+  const frame = () => {
+    if (stop) return;
+    const k = sk();
+    const st = k && k.state ? k.state() : "";
+    if (st && seq[seq.length - 1] !== st) seq.push(st);
+    const g = C.state().grounded;
+    if (!g) air = true;
+    else if (air && !landedAt) landedAt = performance.now();
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  await sleep(500); // settle on the ground first
+  seq.length = 0;
+  await press();
+  await t.until(() => landedAt > 0, 4000, "him to land after the jump").catch(() => {});
+  await sleep(1100);
+  stop = true;
+  const end = seq[seq.length - 1] || "";
+  const iT = seq.indexOf("takeoff");
+  const iA = seq.findIndex((s) => s === "jump" || s === "fall" || s === "float");
+  const iL = seq.indexOf("land");
+  const clean = iT >= 0 && iA > iT && iL > iA && ["idle", "walk", "run"].includes(end);
+  t.metric(`jump.${label.replace(/\W+/g, "")}Clean`, clean ? 1 : 0);
+  t.event("jump-states", `${label}: ${seq.join(" > ") || "no states"}; ends ${end || "?"}; ${clean ? "take-off, air, land, exit" : "INCOMPLETE"}`);
+  if (!clean) t.problem("bug", `${label}: the jump showed ${seq.join(" > ") || "no states"} (wanted takeoff, air, land, then idle/walk/run)`);
+}
+
 async function tapKey(key, ms = 120) {
   keyDown(key);
   await sleep(ms);
@@ -11442,6 +11477,12 @@ async function phoneTouch(options, t) {
       t.metric("phone.stickPeakSpeed", Math.round(peak * 100) / 100);
       t.event("phone-stick-walk", `stick half then full tilt then half: peak ${Math.round(peak * 10) / 10} m/s`);
     }
+  }
+
+  // 2c. One jump by tapping the Jump button: take-off, air and land states, then back to idle or run (the trace reads stuckState).
+  {
+    const jb = document.querySelector(".touchpad .jump");
+    if (jb && hudVisible(jb) && C.mode() === "control") await jumpStatesProbe(t, land ? "phone landscape jump" : "phone portrait jump", () => tapEl(jb));
   }
 
   // 3. Every control: 44 px, on screen, no overlap.
