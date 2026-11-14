@@ -335,6 +335,12 @@ export function installLook(world) {
   mats.rampLit.emissiveColor = new B.Color3(0.16, 0.19, 0.22);
   mats.rampLit.albedoColor = new B.Color3(1.1, 1.12, 1.14);
 
+  /* The wedge under the ramp is a building's own wall (a buttress down its north face), so it wears the block's brick,
+     with the same faint emissive as the ramp so it isn't a black slab after dusk. Flat concrete read as an untextured
+     placeholder prism at that size (a 6 m tall slab, the playtest's missing-texture). */
+  mats.rampWall = mats.brick.clone("rampWall");
+  mats.rampWall.emissiveColor = new B.Color3(0.1, 0.075, 0.075);
+
   function dress(mesh, mat, tile) {
     if (!mesh) return;
     mesh.material = mat;
@@ -348,6 +354,7 @@ export function installLook(world) {
     const n = mesh.name || "";
     if (n === "ground") dress(mesh, mats.ground, 4);
     else if (roadName(n)) dress(mesh, mats.asphalt, 2.8);
+    else if (/rampside-?[\d.]+$/.test(n)) dress(mesh, mats.rampWall, 2.4);
     else if (rampName(n)) dress(mesh, mats.rampLit, 2.4);
     else if (walkName(n)) dress(mesh, mats.concrete, 2.4);
   });
