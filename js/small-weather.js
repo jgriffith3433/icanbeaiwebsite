@@ -472,7 +472,7 @@ function bodyPose(B, wrap, byShort) {
   const inv = wrap.getWorldMatrix().clone().invert();
   const at = (n) => (byShort[n] ? B.Vector3.TransformCoordinates(byShort[n].getAbsolutePosition(), inv) : null);
   const P = {};
-  ["Hips", "Neck", "Head", "LeftArm", "RightArm", "LeftHand", "RightHand", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg", "LeftFoot", "RightFoot"].forEach((n) => (P[n] = at(n)));
+  ["Hips", "Neck", "Head", "LeftArm", "RightArm", "LeftHand", "RightHand", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg", "LeftFoot", "RightFoot", "LeftToeBase", "RightToeBase"].forEach((n) => (P[n] = at(n)));
   if (Object.values(P).some((v) => !v)) return null;
   const d = (a, b) => P[b].subtract(P[a]);
   const deg = (r) => (r * 180) / Math.PI;
@@ -493,6 +493,16 @@ function bodyPose(B, wrap, byShort) {
     kneeL: bend("LeftUpLeg", "LeftLeg", "LeftFoot"),
     kneeR: bend("RightUpLeg", "RightLeg", "RightFoot"),
     handsApart: P.LeftHand.x - P.RightHand.x,
+    /* the idle-pose playtest: how far each hand is in front of the hip line (negative = behind his back), how far out
+       from the midline, and each boot's pitch (ankle to toe, deg) and roll (turned off straight ahead, deg) */
+    handFwdL: P.LeftHand.z - P.Hips.z,
+    handFwdR: P.RightHand.z - P.Hips.z,
+    handOutL: Math.abs(P.LeftHand.x),
+    handOutR: Math.abs(P.RightHand.x),
+    bootPitchL: deg(Math.atan2(d("LeftFoot", "LeftToeBase").y, Math.hypot(d("LeftFoot", "LeftToeBase").x, d("LeftFoot", "LeftToeBase").z))),
+    bootPitchR: deg(Math.atan2(d("RightFoot", "RightToeBase").y, Math.hypot(d("RightFoot", "RightToeBase").x, d("RightFoot", "RightToeBase").z))),
+    bootRollL: deg(Math.atan2(d("LeftFoot", "LeftToeBase").x, d("LeftFoot", "LeftToeBase").z)),
+    bootRollR: deg(Math.atan2(d("RightFoot", "RightToeBase").x, d("RightFoot", "RightToeBase").z)),
   };
 }
 
