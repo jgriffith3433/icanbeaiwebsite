@@ -20,8 +20,10 @@ export function startColdOpen() {
   const B = window.BABYLON;
 
   let quiet = false;
+  let playtestId = "";
   try {
     const id = new URLSearchParams(location.search).get("playtest");
+    playtestId = id || "";
     if (id && id !== "cold-start" && id !== "title-key-art" && id !== "phone-touch" && id !== "audio-check") quiet = true;
     // a cold bot (the first-five run, no ?playtest) plays it like a stranger; a runner's start(id) quiets the title first, which cancels the auto-start
   } catch (e) { /* no location */ }
@@ -263,7 +265,7 @@ export function startColdOpen() {
   window.addEventListener("pointercancel", () => { if (held) release(); }, true);
   window.addEventListener("blur", () => release());
   bolt.addEventListener("pointerdown", (e) => {
-    press("touch");
+    press("touch", playtestId === "ask-markers" || playtestId === "street-teaches" ? "bolt" : undefined);
     try { bolt.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
     e.preventDefault();
   });

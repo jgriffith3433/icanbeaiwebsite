@@ -310,3 +310,15 @@ html:not(.cold-open.touch-ui):has(.voice-caption:not([hidden]):not(.leaving), .c
 /* The episode offer: a small non-blocking corner toast, top right under the top row, clear of the ability bar (bottom). */
 .ep-offer { position: fixed; top: calc(var(--safe-t, env(safe-area-inset-top, 0px)) + 64px); right: max(10px, var(--safe-r, 0px)); left: auto; bottom: auto; inset-inline-start: auto; }
 @media (max-width: 700px) { .ep-offer { top: calc(var(--tr-ep) + 56px); } }
+
+/* ---------- Storm tally & return hook (js/memory.js): top-centre on desktop; under status card on phone portrait; under Let go on landscape ---------- */
+.storm-tally { position: fixed; left: 50%; transform: translateX(-50%); top: var(--safe-t); }
+@media (max-width: 700px) {
+  .storm-tally { left: max(12px, env(safe-area-inset-left)); transform: none; top: max(104px, calc(env(safe-area-inset-top) + 96px)); }
+}
+html.touch-ui .storm-tally { left: max(12px, env(safe-area-inset-left)); transform: none; top: max(104px, calc(env(safe-area-inset-top) + 96px)); }
+@media (orientation: landscape) and (max-height: 520px) {
+  html.touch-ui .storm-tally { left: 50%; transform: translateX(-50%); top: max(62px, calc(env(safe-area-inset-top) + 56px)); }
+}
+html.title-up .storm-tally, html.ep-menu-up .storm-tally, html.cold-open .storm-tally, html.first-rain .storm-tally, html.cine-up .storm-tally,
+html:has(.ep-hud:not([hidden]), .side:not([hidden]), #neighbors-panel:not([hidden]), .settings-pop:not([hidden]), #update-pill:not([hidden])) .storm-tally { visibility: hidden; }

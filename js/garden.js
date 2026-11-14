@@ -112,7 +112,9 @@ export function installGarden(day, world) {
   const apply = () => {
     const base = gardenPose(st.k);
     leafM.diffuseColor.set(base.color[0], base.color[1], base.color[2]);
+    leafM.emissiveColor.set(base.color[0] * 0.24 * st.k, base.color[1] * 0.24 * st.k, base.color[2] * 0.24 * st.k);
     tuftM.diffuseColor.set(base.color[0] + 0.04, base.color[1] + 0.02, base.color[2]);
+    tuftM.emissiveColor.set((base.color[0] + 0.04) * 0.26 * st.k, (base.color[1] + 0.02) * 0.26 * st.k, base.color[2] * 0.26 * st.k);
     plants.forEach((p, i) => {
       const k = staggerK(st.k, i, plants.length);
       const q = gardenPose(k);
