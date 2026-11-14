@@ -164,7 +164,7 @@ html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; botto
 html:not(.preview-public):not(.touch-ui) .abilitybar { bottom: var(--row-a); }
 /* phone: verb arc on the right edge above the thumb zone (Jump), clear of the character */
 html.touch-ui .abilitybar {
-  left: auto; right: max(8px, env(safe-area-inset-right));
+  left: auto; right: max(16px, env(safe-area-inset-right));
   bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); transform: none;
 }
 .powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; display: none !important; }
@@ -310,3 +310,11 @@ html:not(.cold-open.touch-ui):has(.voice-caption:not([hidden]):not(.leaving), .c
 /* The episode offer: a small non-blocking corner toast, top right under the top row, clear of the ability bar (bottom). */
 .ep-offer { position: fixed; top: calc(var(--safe-t, env(safe-area-inset-top, 0px)) + 64px); right: max(10px, var(--safe-r, 0px)); left: auto; bottom: auto; inset-inline-start: auto; }
 @media (max-width: 700px) { .ep-offer { top: calc(var(--tr-ep) + 56px); } }
+
+/* ---------- phone menu (js/phonemenu.js): Neighbors and Episodes sit behind one 44 px Menu button ---------- */
+.pm-btn { display: none; z-index: 7; appearance: none; align-items: center; justify-content: center; min-width: 88px; height: 48px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(240,194,122,.55); background: rgba(14,16,22,.78); color: #f6f1e8; font: 700 .95rem Outfit, system-ui, sans-serif; cursor: pointer; backdrop-filter: blur(12px); touch-action: manipulation; }
+.pm-btn:active, .hud-left.menu-open .pm-btn { background: rgba(240,194,122,.25); transform: scale(.97); }
+html.touch-ui .pm-btn { display: inline-flex; order: 0; }
+html.touch-ui .hud-left:not(.menu-open) .ep-btn, html.touch-ui .hud-left:not(.menu-open) .nb-btn { display: none !important; }
+html.touch-ui .hud-left.menu-open .ep-btn, html.touch-ui .hud-left.menu-open .nb-btn { display: inline-flex !important; min-width: 120px; height: 48px; font-size: .95rem; }
+html.touch-ui.preview-public .hud-left.menu-open .nb-btn { display: none !important; }

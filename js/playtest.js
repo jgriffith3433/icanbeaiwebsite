@@ -11136,9 +11136,32 @@ async function audioCheck(options, t) {
   // menus-ui: while he is the player's, Let go, Rain (weather), Neighbors (a phone shows it as a pip) and Episodes are in the thumb's reach
   // (the lower 55% of a portrait phone), each at least 44 px, and nothing scrolls sideways
   if (touch && innerHeight > innerWidth) {
-    const reach = [["#control", "Let go"], ["#weather-btn", "Rain"], ["#neighbors-btn", "Neighbors"], ["#episodes", "Episodes"]];
+    // Neighbors and Episodes sit behind one Menu button (js/phonemenu.js): tap it, they must show, in reach, 44 px
+    const reach = [["#control", "Let go"], ["#weather-btn", "Rain"], ["#phone-menu-btn", "Menu"]];
     const out = [];
     let seen = 0;
+    const pm = document.getElementById("phone-menu-btn");
+    if (!pm || !hudVisible(pm)) out.push("the Menu button isn't on screen");
+    else {
+      if (hudVisible(document.getElementById("episodes"))) out.push("Episodes is still on screen outside the menu");
+      await tapEl(pm);
+      await sleep(250);
+      if (!hudVisible(document.getElementById("episodes"))) out.push("tapping Menu didn't show Episodes");
+      reach.push(["#episodes", "Episodes in the menu"]);
+      if (!isPublicView()) reach.push(["#neighbors-btn", "Neighbors in the menu"]);
+      t.event("phone-menu-open", "Menu tapped: Episodes" + (isPublicView() ? "" : " and Neighbors") + " shown");
+    }
+    // the five verbs: one arc at the bottom right, each 44 px or more with its cost label at least 12 px
+    const verbs = [...document.querySelectorAll(".abilitybar .ab[data-verb]")].filter((b) => hudVisible(b));
+    verbs.forEach((b) => {
+      const r = b.getBoundingClientRect();
+      if (r.left < innerWidth * 0.45 || r.top < innerHeight * 0.4) out.push(`verb ${b.dataset.ability} is outside the bottom-right thumb arc`);
+      if (r.width < 43.5 || r.height < 43.5) out.push(`verb ${b.dataset.ability} is ${Math.round(r.width)}x${Math.round(r.height)}px`);
+      const c = b.querySelector(".c");
+      if (c && hudVisible(c) && parseFloat(getComputedStyle(c).fontSize) < 12) out.push(`verb ${b.dataset.ability}'s cost label is under 12 px`);
+    });
+    if (verbs.length) t.event("verb-arc", `${verbs.length} verbs in the bottom-right arc, 44 px or more, labels 12 px or more`);
+    t.metric && t.metric("phoneRenderScale", window.day.look && window.day.look.info ? (window.day.look.info().scaling || 0) : 0);
     reach.forEach(([sel, name]) => {
       const el = document.querySelector(sel);
       if (!el || !hudVisible(el)) return;
@@ -11150,6 +11173,7 @@ async function audioCheck(options, t) {
     if (document.documentElement.scrollWidth > innerWidth + 1) out.push("the page scrolls sideways");
     out.forEach((m) => t.problem("bug", "Menus (phone): " + m));
     if (!out.length) t.event("menus-thumb-reach", `${seen} controls in the lower 55%, all 44 px or more, no sideways scroll`);
+    if (window.day.phoneMenu) window.day.phoneMenu.close();
     checkHud(t, "audio-check: phone controls");
   }
   const fin = audioReport();
