@@ -397,7 +397,7 @@ export function startColdOpen() {
     },
     glance: (id, secs) => glance(id || "birdie", secs || ((cfg.glance && cfg.glance.secs) || 2.6)),
     glancing: () => glancing,
-    now: () => ({ on, phase, glancing, held: !!held, firstInput: firstInputAt ? (firstInputAt - t0) / 1000 : null, cast: castAt ? (castAt - t0) / 1000 : null, react: reactAt ? (reactAt - t0) / 1000 : null, log: log.slice() }),
+    now: () => ({ on, phase, startedAt: t0, glancing, held: !!held, firstInput: firstInputAt ? (firstInputAt - t0) / 1000 : null, cast: castAt ? (castAt - t0) / 1000 : null, react: reactAt ? (reactAt - t0) / 1000 : null, log: log.slice() }),
   };
   day.coldopen = api;
   window.coldopen = api;

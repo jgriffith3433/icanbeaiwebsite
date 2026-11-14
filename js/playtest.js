@@ -11024,16 +11024,22 @@ async function coldStart(options, t) {
   const D = window.day;
   const phone = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
   t.event("cold-start-setup", `${innerWidth}x${innerHeight}, ${phone ? "touch" : "keyboard and mouse"}`);
-  if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
-  // setup: a new player (no icanbe.* keys), the title up, the cold open armed
-  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
-  if (!D.coldopen) { t.problem("blocker", "There's no cold open (js/coldopen.js didn't install)"); return; }
-  D.coldopen.arm();
-  if (D.tutorial && D.tutorial.reset) { /* the cold open replaces its card: a new player must not get both */ }
-  D.title.show("playtest");
-  await sleep(700);
-  if (D.coldopen.now().on) t.problem("blocker", "A cold open from before the setup is still running (letting go must end it)");
-  if (!D.coldopen.pending()) t.problem("blocker", "A player with no saved keys isn't pending the cold open");
+  // A stranger's desktop session isn't asked to click Play: the title auto-starts the cold open (title.js autoStart.secs), and the
+  // model's load can take longer than that, so by the time this scenario is ready he may already be on the roof. That IS the run:
+  // measure it from that moment (letting go of it and walking back to re-run it by Play is what stalled in "returning").
+  const auto = !!(D.coldopen && D.coldopen.now().on && D.control.mode() === "control");
+  if (!auto) {
+    if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+    // setup: a new player (no icanbe.* keys), the title up, the cold open armed
+    Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+    if (!D.coldopen) { t.problem("blocker", "There's no cold open (js/coldopen.js didn't install)"); return; }
+    D.coldopen.arm();
+    if (D.tutorial && D.tutorial.reset) { /* the cold open replaces its card: a new player must not get both */ }
+    D.title.show("playtest");
+    await sleep(700);
+    if (D.coldopen.now().on) t.problem("blocker", "A cold open from before the setup is still running (letting go must end it)");
+    if (!D.coldopen.pending()) t.problem("blocker", "A player with no saved keys isn't pending the cold open");
+  } else t.event("cold-start-auto", "no Play click: the title started the cold open by itself and he is on the roof");
 
   const T = {}; // seconds since Play, by name
   let tPlay = 0;
@@ -11084,14 +11090,23 @@ async function coldStart(options, t) {
 
   // Play: the real click (or tap)
   const playBtn = $("title-play");
-  tPlay = performance.now();
+  tPlay = auto ? D.coldopen.now().startedAt : performance.now();
+  if (auto) {
+    // what already happened before the listeners were up, from the cold open's own log (seconds since its start)
+    T.control = 0;
+    D.coldopen.now().log.forEach((l) => {
+      if (l.action === "landed") T.landed = l.t;
+      if (l.action === "prompt") T.prompt = l.t;
+      if (l.action === "input") T.input = l.t;
+    });
+  }
   // the +5 / +15 / +30 s shots (the runner takes a frame at each event)
-  [5, 15, 30].forEach((s) => setTimeout(() => {
+  [5, 15, 30].forEach((s) => since() < s && setTimeout(() => {
     t.event(`cold-start-play-plus-${s}`, `${s}s after Play: ${D.control.mode()}, cold open ${D.coldopen.now().phase}, ${wordsOnScreen().length} words, crowd ${D.crowd && D.crowd.info ? D.crowd.info().reaction || "no reaction" : "?"}`);
-  }, s * 1000));
+  }, s * 1000 - since() * 1000));
 
-  if (phone) await tapEl(playBtn); else await clickEl(playBtn);
-  t.event("cold-start-play", phone ? "tapped Play" : "clicked Play");
+  if (!auto) { if (phone) await tapEl(playBtn); else await clickEl(playBtn); }
+  t.event("cold-start-play", auto ? "auto-started (no click)" : phone ? "tapped Play" : "clicked Play");
   const gotControl = await waitFor(() => T.control != null, 4000);
   if (!gotControl) { t.problem("blocker", `Play didn't hand him over (control mode ${D.control.mode()})`); return; }
   t.event("cold-start-control", `he is the player's ${T.control}s after Play; title ${D.title.showing() ? "STILL UP" : "closed"}`);
