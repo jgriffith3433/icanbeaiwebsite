@@ -469,6 +469,22 @@ power.follow('2026-10-19', 600, 1, false, 'control');
 ok(power.now().state === 'storm' && power.now().manual, 'a power did not bring a storm');
 for (let i = 0; i < 40; i++) power.follow('2026-10-19', 600, 0.25, false, 'control');
 ok(!power.now().manual && power.now().state === 'clear' && power.now().wet < 0.1, `power weather didn't clear within seconds (wet ${power.now().wet.toFixed(2)})`);
+{
+  // the loading warm-up: rain, a sun break, snapped on, then back to the forecast; a real call takes over
+  const w = createWeather({ blend: wx.blend || 3.4, forecast: wx.forecast });
+  w.follow('2026-10-19', 600, 0, true, 'schedule');
+  ok(w.warm({ state: 'rain', intensity: 0.7 }) && w.warming(), 'warm-up did not start');
+  w.follow('2026-10-19', 600, 0.016, false, 'schedule');
+  ok(w.now().state === 'rain' && w.now().rain > 0.4, 'warm-up rain was not on at once');
+  ok(w.warm({ state: 'clear', intensity: 1, sun: true }) && w.now().sun > 0.9, 'warm-up sun break did not open');
+  w.warm(null);
+  ok(!w.warming() && !w.now().manual && w.now().state === 'clear' && w.now().rain < 0.01 && w.now().sun < 0.01, 'warm-up did not snap back to the forecast');
+  w.warm({ state: 'fog', intensity: 0.8 });
+  w.set('rain', 0.75, 'cell');
+  ok(!w.warming() && w.now().manual && w.now().state === 'rain', 'a real set did not take over from the warm-up');
+  ok(!w.warm(null) && w.now().state === 'rain', 'the warm-up ended a real call');
+  ok(!w.warm({ state: 'fog', intensity: 1 }), 'the warm-up took over a real call');
+}
 const sim = createWeather({ blend: wx.blend || 3.4, forecast: wx.forecast });
 sim.set('clear', 1, 'key');
 sim.step(1, true);

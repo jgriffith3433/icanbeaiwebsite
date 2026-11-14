@@ -165,6 +165,7 @@ export function createWeather(opt) {
   let steamHold = 0; // aftermath can hold steam for ~20 s (js/aftermath.js boostSteam)
   let wasRainWet = false;
   let snowCover = 0; // 0..1 snow layer accumulation on upward faces, melts afterwards
+  let warming = null; // the loading warm-up's `{ state, intensity, sun }` while it holds the sky (see warm())
 
   function step(dt, snap) {
     const dtPos = Math.max(0, dt || 0);
@@ -278,6 +279,7 @@ export function createWeather(opt) {
 
   function set(state, intensity, via) {
     if (!STATES.includes(state)) return false;
+    if (via !== "forecast") warming = null; // a real call ends the loading warm-up and keeps what it set
     target = state;
     targetIntensity = intensity == null || !Number.isFinite(intensity) ? 1 : Math.max(0, Math.min(1, intensity));
     sunFlag = false;
@@ -319,7 +321,36 @@ export function createWeather(opt) {
       targetIntensity = lastForecast.intensity;
       holdLeft = 0;
     }
-    step(dt, snap);
+    step(dt, snap || !!warming);
+  }
+
+  /** The loading warm-up (startWeather's warmCasts): hold `{ state, intensity, sun }` as an ability's weather, snapped on, with no
+   *  log line, event or react line, so each effect draws once behind the card. `warm(null)` snaps back to the forecast. A real
+   *  `set()` (the cold open's storm cell, a cast) takes over: the warm-up then stops touching the sky. */
+  function warm(spec) {
+    if (!spec) {
+      if (!warming) return false;
+      warming = null;
+      manual = false;
+      powerLeft = 0;
+      holdLeft = 0;
+      sunFlag = false;
+      target = lastForecast.state;
+      targetIntensity = lastForecast.intensity;
+      step(0, true);
+      return true;
+    }
+    if (manual && !warming) return false;
+    if (!STATES.includes(spec.state)) return false;
+    warming = spec;
+    manual = true;
+    powerLeft = 0;
+    holdLeft = 0;
+    target = spec.state;
+    targetIntensity = Math.max(0, Math.min(1, spec.intensity == null ? 1 : spec.intensity));
+    sunFlag = !!spec.sun;
+    step(0, true);
+    return true;
   }
 
   /** Sun break: the sky clears and the light turns warm, for as long as an ability's weather lasts. */
@@ -336,7 +367,7 @@ export function createWeather(opt) {
     steamLeft = Math.max(steamLeft, Math.min(4, s * 0.2));
   }
 
-  return { set, sunbreak, boostSteam, step, follow, now, look, blendSec, holdSec };
+  return { set, sunbreak, boostSteam, step, follow, now, look, blendSec, holdSec, warm, warming: () => !!warming };
 }
 
 /* ---------------- the page: sky, particles, wet roads, wind, sound, the wheel ---------------- */
@@ -1591,7 +1622,7 @@ export function startWeather(world, dayApi) {
     }
     weather.follow(c.key, c.minutes, snap ? 0 : wall, snap, c.mode);
     const n = weather.now();
-    tickReact(c.mode, n, snap ? 0 : wall);
+    if (!weather.warming()) tickReact(c.mode, n, snap ? 0 : wall);
     const L = weather.look();
     try {
       applyLook(L, wall, snap);
@@ -1644,6 +1675,28 @@ export function startWeather(world, dayApi) {
     sunbreak: () => weather.sunbreak(),
     boostSteam: (sec) => weather.boostSteam(sec),
     triggerFlash: (dist, pan) => scheduleFlash(dist, pan),
+    /** Behind the loading card: hold rain, fog, a sun break and wind for a few frames each so every effect they bring in (particles,
+     *  ripples, curtains, fog slices, god rays, wet-road variants) compiles and allocates now, not on the first cast. Silent (no log,
+     *  event, voice or bark), then snaps back to the forecast. Stops at once if a real call sets the weather. */
+    async warmCasts(frames) {
+      const n = Math.max(2, frames || 12);
+      const eachFrames = (k) => new Promise((res) => {
+        let i = 0;
+        const done = () => { scene.onAfterRenderObservable.remove(obs); res(); };
+        const obs = scene.onAfterRenderObservable.add(() => { if (++i >= k) done(); });
+        setTimeout(done, 1500); // a hidden tab or a lost context draws nothing: don't hang
+      });
+      const steps = [["rain", 0.7, false], ["fog", 0.8, false], ["clear", 1, true], ["wind", 0.8, false]];
+      let ran = 0;
+      for (const [state, intensity, sun] of steps) {
+        if (!weather.warm({ state, intensity, sun })) break; // someone else already holds the sky
+        await eachFrames(n);
+        if (!weather.warming()) break; // a real call took over mid-way
+        ran++;
+      }
+      weather.warm(null);
+      return ran;
+    },
     thunderDelay,
     forecast: (dateKey, minutes) => forecastAt(dateKey, minutes, cfg.forecast),
     /** The wheel, for a phone tap the playtest sends as a pointer. */
