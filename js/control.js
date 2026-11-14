@@ -526,7 +526,8 @@ function install() {
     sphere: 0.3, // the camera's collision radius (its near plane is 0.2)
     stepM: 1.3, // the most the camera moves by turning, tilting or a pull-in in one frame, metres (the sensor's limit is 3)
     blendSecs: 0.6,
-    recenterAfter: 2, recenterRate: 5, touchSens: 420,
+    recenterAfter: 1.5, recenterRate: 5, touchSens: 420,
+    minDist: 2.2, liftMax: 0.9, easeOut: 10, // keep at least this much camera distance by lifting over the obstacle; ease-out spring rate
     castSecs: 1.8, castRise: 0.3, castFall: 0.5,
     glanceSecs: 2.25, glanceRise: 0.35, glanceFall: 0.45,
     cast: {},
@@ -557,7 +558,7 @@ function install() {
   const cs = {
     aimA: null, shownA: null, shownB: null, // the yaw asked for (his heading, the player's drag) and the yaw drawn
     tp: null, tv: { x: 0, y: 0, z: 0 }, ahead: { x: 0, z: 0 },
-    appliedB: 0, lastFinalA: null, lastFinalB: null, lastMs: 0, lookAt: 0, lookDown: false,
+    appliedB: 0, liftB: 0, rv: 0, lastFinalA: null, lastFinalB: null, lastMs: 0, lookAt: 0, lookDown: false,
     blend: null, cast: null,
     fresh: true, // the next frame follows a cut (take, place): no yaw rate sample
   };
@@ -962,7 +963,7 @@ function install() {
     if (!push.on && lastRadius != null && !cs.blend && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
     if (cs.lookDown || Math.abs(stick.x) > 0.35 || keys.has("l") || keys.has("r")) cs.lookAt = nowMs; // steering sideways is turning, not idling (the camera would chase him round)
     const touch = touchMode();
-    if (touch && !push.on && !cs.cast && !cs.blend && nowMs - cs.lookAt > CAM.recenterAfter * 1000) {
+    if (!push.on && !cs.cast && !cs.blend && nowMs - cs.lookAt > CAM.recenterAfter * 1000) {
       // idle after a look: swing round behind him, and level the pitch
       const behind = Math.atan2(-Math.cos(s.yaw), -Math.sin(s.yaw));
       const k = Math.min(1, CAM.recenterRate * dt);
@@ -1135,8 +1136,31 @@ function install() {
       }
     }
     camera.alpha = cs.shownA;
-    camera.beta = cs.shownB;
-    cs.appliedB = cs.shownB - base;
+    /* Lift over what is close: when the camera would have to come in under CAM.minDist (a facade at his shoulder, a low wall),
+       raise it (a smaller beta) until the cast has room, so he stays in frame and the view is the street and the roof, not the
+       wall. The lift is rate-limited (the pitch cap) and eases back out when the room is there again. */
+    const needR = Math.min(r, CAM.minDist);
+    const castAt = (lift) => {
+      const b = Math.max(camera.lowerBetaLimit, cs.shownB - lift);
+      const sb = Math.sin(b);
+      return sphereClear(t.x, t.y, t.z, Math.cos(camera.alpha) * sb, Math.cos(b), Math.sin(camera.alpha) * sb, needR);
+    };
+    let liftWant = cs.liftB;
+    if (!push.on && !cs.blend && !cs.cast) {
+      if (castAt(cs.liftB) < needR - 0.05) {
+        liftWant = CAM.liftMax;
+        for (let L = cs.liftB + 0.12; L <= CAM.liftMax; L += 0.12) {
+          if (castAt(L) >= needR - 0.05) { liftWant = L; break; }
+        }
+      } else if (cs.liftB > 0.01 && castAt(Math.max(0, cs.liftB - 0.12)) >= needR - 0.05) {
+        liftWant = Math.max(0, cs.liftB - 0.12); // room again: ease down a step at a time
+      }
+    } else liftWant = 0;
+    const liftCap = (CAM.pitchCapDeg * 0.8 * Math.PI / 180) * dt;
+    cs.liftB += liftWant > cs.liftB ? Math.min(liftWant - cs.liftB, liftCap) : (liftWant - cs.liftB) * Math.min(1, 4 * dt);
+    cs.liftB = clamp(cs.liftB, 0, Math.max(0, cs.shownB - camera.lowerBetaLimit));
+    camera.beta = cs.shownB - cs.liftB;
+    cs.appliedB = camera.beta - base;
     // ---- the sphere cast, with the final heading ----
     const sbF = Math.sin(camera.beta);
     const dx = Math.cos(camera.alpha) * sbF;
@@ -1150,7 +1174,13 @@ function install() {
     if (cs.blend) camera.radius = Math.min(r, cs.blend.r + (r - cs.blend.r) * smooth01(cs.blend.t / CAM.blendSecs));
     else if (push.on) camera.radius = r;
     else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(CAM.stepM, Math.max(0.5, 60 * dt)));
-    else camera.radius = damp(camera.radius, r, dt, 2.2);
+    else { // eases out on a critically damped spring (about 0.4 s to settle), never overshooting the room there is
+      let nr;
+      [nr, cs.rv] = spring1(camera.radius, cs.rv, r, CAM.easeOut, dt);
+      camera.radius = Math.min(r, Math.max(camera.radius, nr));
+      if (camera.radius >= r) cs.rv = 0;
+    }
+    if (r < camera.radius || cs.blend || push.on) cs.rv = 0;
     lastRadius = camera.radius;
     screenLift = damp(screenLift, hudLiftGoal(), dt, 3);
     camera.targetScreenOffset.y = screenLift;
