@@ -154,6 +154,13 @@ export function startAftermath(world, dayApi) {
     birds.push({ root, t: -1, from: null, to: null });
   }
 
+  // The rainbow, steam, sparkle and bird shaders were first compiled when Sun break followed rain (a stall on a throttled phone).
+  setTimeout(() => {
+    [rainbowMesh, steamB && steamB.mesh, sparkB && sparkB.mesh, birds[0] && birds[0].root.getChildMeshes()[0]].forEach((m) => {
+      try { if (m && m.material && m.material.forceCompilationAsync) m.material.forceCompilationAsync(m).catch(() => {}); } catch (e) { /* headless */ }
+    });
+  }, 3000);
+
   const ROOFS = [
     { x: -24, y: 12.2, z: 0.5 }, // apt
     { x: 50, y: 12.2, z: 0.5 },  // shop
