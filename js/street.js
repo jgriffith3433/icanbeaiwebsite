@@ -16,8 +16,8 @@
 export function stagesOf(teach) {
   const out = [];
   ((teach && teach.steps) || []).forEach((st) => {
-    out.push({ id: st.id, who: st.who, unlock: st.unlock, answer: st.answer, color: st.color, spot: st.spot, ask: st.ask || null, call: st.call || null, thanks: st.thanks, followUp: !!st.then });
-    if (st.then) out.push({ id: st.then.unlock, who: st.who, unlock: st.then.unlock, answer: st.then.answer, color: st.then.color || st.color, spot: st.spot, ask: null, call: null, thanks: st.then.thanks, followUp: false, spokenBy: st.id });
+    out.push({ id: st.id, who: st.who, unlock: st.unlock, answer: st.answer, color: st.color, spot: st.spot, range: st.range || null, ask: st.ask || null, call: st.call || null, thanks: st.thanks, followUp: !!st.then });
+    if (st.then) out.push({ id: st.then.unlock, who: st.who, unlock: st.then.unlock, answer: st.then.answer, color: st.then.color || st.color, spot: st.spot, range: st.range || null, ask: null, call: null, thanks: st.then.thanks, followUp: false, spokenBy: st.id });
   });
   return out;
 }
@@ -220,6 +220,7 @@ html.street-wait .abilitybar .ab.locked:not(.st-teaser){display:none}
   }
   function open(s, spokenAlready) {
     phase = "open";
+    if (s.id === "rain") lawnBefore = lawnK(); // the dry lawn, before the cast
     openFor = 0;
     nagged = false;
     placeCue(s);
@@ -254,11 +255,11 @@ html.street-wait .abilitybar .ab.locked:not(.st-teaser){display:none}
     if (phase !== "open" || n < 0) return false;
     const s = stages[n];
     if (!s.answer.includes(power)) return false;
-    if (dist(hero(), target(s)) > range) return false;
+    if (dist(hero(), target(s)) > (s.range || range)) return false;
     phase = "thanks";
     thanksIn = 1.1;
     dropCue();
-    emit("answered", { verb: s.unlock, power });
+    emit("answered", { verb: s.unlock, power, who: s.who, lawn: lawnBefore });
     return true;
   }
   window.addEventListener("day:power", (e) => {
@@ -267,10 +268,23 @@ html.street-wait .abilitybar .ab.locked:not(.st-teaser){display:none}
     answer(d.power || d.action);
   });
 
+  /* The lawn is the proof: Birdie's rain greens it over the slice's 5 s (js/slice.js) while the cast's own glance frames it
+     (js/control.js resolveGlanceSpot) and she says her thanks; the change is logged once it has settled. */
+  const lawnK = () => { const sl = day.slice && day.slice.now && day.slice.now(); return sl && typeof sl.lawnK === "number" ? sl.lawnK : null; };
+  let lawnBefore = null;
+  function lawnShot(s) {
+    if (s.id !== "rain" || s.who !== "birdie") return;
+    setTimeout(() => {
+      const to = lawnK();
+      emit("lawn-change", { from: lawnBefore, to, changed: lawnBefore != null && to != null ? to - lawnBefore > 0.4 : null });
+    }, 5400);
+  }
+
   function thank() {
     const s = stages[n];
     const t = target(s);
     emit("thanks", { who: s.who, text: s.thanks });
+    lawnShot(s);
     const next = stages[n + 1];
     if (s.followUp && next) {
       // the thanks is also the next ask (Ines: the fog is too good, a gust to clear a window): it opens the next verb

@@ -187,7 +187,7 @@ Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather end
 ### Birdie Alvarez
 - Want: rain for her tomatoes, and the block's garden-show ribbon.
 - Arc: dying pots on the stoop → rain that greens them → tomatoes win the block show (ribbon on her balcony, a basket at his door). Same-day ask/thanks/surprise still loop; the arc persists across real days in `icanbe.memory` `arcs.birdie`.
-- Moment: Rain near her pots; then the ribbon and basket standing after beat 3 (same-day reload keeps them).
+- Moment: Birdie on the lawn **waiting** — from the cold open's prompt until her thanks she stands on the park lawn (-13, 22) facing him, her head lifted to the roof he stands on, and gives the small ask wave every ~6.5 s (`day.neighbors.wait`, events `waiting` / `look-up` / `wait-wave` / `wait-end`); one tap on Rain (from the roof, 26 m reach) answers her, she thanks him in her voice with the thanks gesture, and the lawn greens over 5 s while the cast's own camera glance frames it (`day:street` `lawn-change`). Then the ribbon and basket standing after beat 3 (same-day reload keeps them).
 - Personality: warm, plain, grateful.
 - Voice: dialogue cast `Birdie` `EXAVITQu4vr4xnSDxMaL` (Sarah).
 - Animations: idle, walk, talk (peoplekit; Gen model later).
@@ -301,7 +301,7 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 
 | # | Beat | Where / when | How it is lived (must have ≥1 of: gameplay, camera/prop event, sfx, voice) | Text allowed |
 |---|---|---|---|---|
-| 0 | **Birdie on the lawn** (opening) | Cold open, apt roof at dusk; Birdie stands on the park lawn at (-13, 22), in view of the roof (`coldopen.birdie`, `coldopen.glance`) | The page opens on the day already running; after the push-in the camera finds Birdie on the lawn, waving up (her `ask` gesture), then eases back to him with no snap; only then does he speak. She stays there for her rain call, so the ring and the walk to her are the first goal. | none before his line |
+| 0 | **Birdie on the lawn** (opening) | Cold open, apt roof at dusk; Birdie stands on the park lawn at (-13, 22), in view of the roof (`coldopen.birdie`, `coldopen.glance`) | The page opens on the day already running; after the push-in the camera finds Birdie on the lawn, waving up (her `ask` gesture), then eases back to him with no snap; only then does he speak. She stays there, waiting: once Rain is open her head lifts to him and she waves every few seconds until her rain comes (a tap on Rain from the roof reaches her), then the lawn greens as she thanks him. | none before his line |
 | 1 | Title and first Play | every visit / first Play | Title skyline orbit + title bed; opening five beats on his model spoken (Eric) or Skip/cut — never a silent text wall | Skip label only |
 | 2 | You take over | on `day:control` take | Camera push to shoulder + one first-person line + control sting | none beyond the line if voiced |
 | 3 | Learn the weather | under control, first offer | Lock→unlock five abilities; real casts E/R/V/C/X; toast ≤1 line | prompt ≤1 line |

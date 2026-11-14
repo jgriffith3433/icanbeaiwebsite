@@ -627,7 +627,7 @@ export function buildFigure(B, scene, id, look, scale = 1) {
       anim.lookK += (want - anim.lookK) * Math.min(1, dt * 7);
       if (ctx.look) {
         anim.lookY += (Math.max(-1.08, Math.min(1.08, ctx.look.yaw)) - anim.lookY) * Math.min(1, dt * 10);
-        anim.lookX += (Math.max(-0.3, Math.min(0.3, ctx.look.pitch || 0)) - anim.lookX) * Math.min(1, dt * 10);
+        anim.lookX += (Math.max(ctx.look.wide ? -0.66 : -0.3, Math.min(0.3, ctx.look.pitch || 0)) - anim.lookX) * Math.min(1, dt * 10);
       }
       const lk = anim.lookK * (anim.gesture === "duck" || anim.gesture === "point" ? 0.2 : 1);
       head.rotation.y += anim.lookY * 0.68 * lk;
@@ -652,6 +652,7 @@ export function buildFigure(B, scene, id, look, scale = 1) {
       speed,
       gesture: anim.gesture,
       look: anim.lookNow,
+      lookPitch: anim.lookX * anim.lookK,
       weather: anim.weather,
       weatherK: anim.weatherK,
       sit: anim.sitBlend,
