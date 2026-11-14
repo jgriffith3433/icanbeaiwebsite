@@ -151,12 +151,20 @@
     const t = a.c.currentTime + (o.delay || 0);
     const src = a.c.createBufferSource();
     src.buffer = a.white;
-    src.playbackRate.value = o.rate || 1;
+    // Tagged for the audio probe (hawkes-audio.js): the id names the voicing, the rate carries the pitch jitter, so
+    // the shared white-noise buffer isn't read as one sample repeating.
+    const pj = 0.94 + Math.random() * 0.12;
+    src.playbackRate.value = (o.rate || 1) * (0.97 + Math.random() * 0.06);
+    try {
+      src.__hawkesSampleId = "syn-noise-" + (o.type || "lowpass") + "-" + Math.round(o.freq || 0) + (o.to ? ">" + Math.round(o.to) : "");
+      src.__hawkesBus = o.bus || "sfx";
+      src.__hawkesGain = Math.max(0.0002, o.vol);
+      src.__hawkesDur = o.dur;
+    } catch (e) { /* */ }
     const f = a.c.createBiquadFilter();
     f.type = o.type || "lowpass";
     f.Q.value = o.q || 0.8;
     // Every synthesized hit varies a little (pitch ~+-6%, level ~+-8%) so repeats never sound identical.
-    const pj = 0.94 + Math.random() * 0.12;
     f.frequency.setValueAtTime(o.freq * pj, t);
     if (o.to) f.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
     const g = a.c.createGain();
@@ -201,6 +209,10 @@
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
     osc.start(t);
     osc.stop(t + o.dur + 0.05);
+    // An oscillator isn't a buffer source, so the audio probe can't see it: say so through the sound kit's event.
+    try {
+      window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { type: "sound-start", sample: "syn-tone-" + o.freq + (o.to ? ">" + o.to : "") + "-" + (o.wave || "sine"), bus: o.bus || "sfx", rate: Math.round(pj * 1000) / 1000, gain: o.vol, dur: o.dur } }));
+    } catch (e) { /* */ }
   }
   const notes = (freqs, gap, vol, wave, dur) => freqs.forEach((f, i) => tone({ freq: f, dur: dur || 0.5, vol, wave: wave || "triangle", delay: i * gap }));
 

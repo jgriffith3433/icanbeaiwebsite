@@ -11134,6 +11134,23 @@ async function coldStart(options, t) {
   const cast = await waitFor(() => T.bolt != null, 4000);
   if (!cast) { t.problem("blocker", `Pressing the prompted rain never cast it (${cueText})`); return; }
   t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
+  // sound: the context woke on that first click/tap/key, the cast made a sound (rain bed up, a cast clip), a step and a UI tick follow
+  {
+    const ar = audioReport();
+    await sleep(600);
+    const ar2 = audioReport();
+    const rainBed = (ar2.ambience.rain || 0) > 0.01 || (ar2.music.rain || 0) > 0.01 || ar2.casts.length > 0;
+    t.event("cold-start-sound", `context ${ar2.unlocked ? "running" : "SUSPENDED"}, Sound ${ar2.on ? "on" : "off"}, casts heard: ${ar2.casts.join(",") || "none"}, rain bed ${JSON.stringify(ar2.ambience)}`);
+    t.metric("coldStartSoundUnlocked", ar2.unlocked ? 1 : 0);
+    if (!ar2.unlocked && ar2.on) t.problem("bug", "The audio context was still suspended after the first click or tap");
+    if (!rainBed) t.problem("bug", "Casting Rain on the roof made no cast sound or rain bed");
+    // a step: walk a moment with real input, the foley bank or the synthesis answers
+    const x0 = window.day.sfx && window.day.sfx.info ? window.day.sfx.info() : null;
+    if (phone) { /* the stick is exercised by phone-touch; the cast and the tap above are the inputs here */ }
+    else { keyDown("w"); await sleep(900); keyUp("w"); }
+    const x1 = window.day.sfx && window.day.sfx.info ? window.day.sfx.info() : null;
+    if (x0 && x1) t.event("cold-start-sound-step", `plays ${JSON.stringify(x0.plays != null ? x0.plays : "?")} -> ${JSON.stringify(x1.plays != null ? x1.plays : "?")}`);
+  }
   // the street answers within 2 s: the lawn darkens, the pond spreads, people run for cover
   {
     const t0 = performance.now();
