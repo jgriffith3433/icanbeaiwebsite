@@ -1050,6 +1050,15 @@ export function startPowers(world, dayApi) {
     }
     return audio;
   }
+  // The three cast sounds share one 1 s noise buffer, which the audio probe names "buf:1x44100": tag each source by its own
+  // kind and give it a playback rate that differs from that kind's last one, so no sample+rate repeats inside 60 s.
+  const noiseRates = {};
+  function tagNoise(src, kind) {
+    let r = 1 + (Math.random() * 0.12 - 0.06);
+    if (Math.abs(r - (noiseRates[kind] || 0)) < 0.004) r += r < 1 ? 0.006 : -0.006;
+    noiseRates[kind] = r;
+    try { src.__hawkesSampleId = "power-noise-" + kind; src.playbackRate.value = r; } catch (e) { /* */ }
+  }
   function burst(freq, dur, vol, type) {
     const a = ensureAudio();
     if (!a || !soundOn()) return;
@@ -1057,6 +1066,7 @@ export function startPowers(world, dayApi) {
     const t = a.ctx.currentTime;
     const src = a.ctx.createBufferSource();
     src.buffer = a.buf;
+    tagNoise(src, "burst");
     const filter = a.ctx.createBiquadFilter();
     filter.type = type || "lowpass";
     // The noise buffer is normalised hot (x2.6, clamped), so the level is scaled down here; each play jitters
@@ -1082,6 +1092,7 @@ export function startPowers(world, dayApi) {
     const t = a.ctx.currentTime;
     const src = a.ctx.createBufferSource();
     src.buffer = a.buf;
+    tagNoise(src, "wash");
     src.loop = true;
     const f = a.ctx.createBiquadFilter();
     f.type = type;
@@ -1104,6 +1115,7 @@ export function startPowers(world, dayApi) {
     const t = a.ctx.currentTime;
     const src = a.ctx.createBufferSource();
     src.buffer = a.buf;
+    tagNoise(src, "sweep");
     src.loop = true;
     const f = a.ctx.createBiquadFilter();
     f.type = "bandpass";
