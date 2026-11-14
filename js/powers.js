@@ -821,8 +821,11 @@ export function startPowers(world, dayApi) {
     if (!fn) return false;
     if (mode() !== "control") return pressWatching(name, via || "key");
     if (gateFn && !gateFn(name, via || "key")) return false;
+    if (releaseCast) return fn(via || "key");
     return windUp(name, via || "key", fn);
   }
+  // A Gust/Gale/Lightning tap fires on release: the press itself was the wind-up, so no second pause before the effect.
+  let releaseCast = false;
 
   /* The wind-up: a cast made standing still turns him to face the aim (a step when it is over 90 deg: js/control.js `face`)
      and plays the raise-the-hands pose before the effect fires, 0.12-0.22 s after the press, so the first visible effect
@@ -1304,18 +1307,22 @@ html.touch-ui.in-control .side{display:none}
   function releaseBolt(via) {
     if (boltResolved) return;
     if (boltCharge < (cfg.tapMax || 0.28)) {
-      if (!command("bolt", via)) refuseBar("bolt");
+      releaseCast = true;
+      try { if (!command("bolt", via)) refuseBar("bolt"); } finally { releaseCast = false; }
     }
     // held past Storm threshold already fired; mid-hold with no Storm = no bolt
   }
   function releaseWind(via) {
     // Exclusive depths (same idea as Lightning): tap Gust, mid hold Gale on release, full charge Tornado while held.
     if (windResolved === "tornado") return;
-    if (windCharge >= (cfg.windHold || 0.55)) {
-      if (!command("gale", via)) refuseBar("gale");
-      return;
-    }
-    if (!command("gust", via)) refuseBar("gust");
+    releaseCast = true;
+    try {
+      if (windCharge >= (cfg.windHold || 0.55)) {
+        if (!command("gale", via)) refuseBar("gale");
+        return;
+      }
+      if (!command("gust", via)) refuseBar("gust");
+    } finally { releaseCast = false; }
   }
   window.addEventListener("keydown", (e) => {
     if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;
