@@ -12773,6 +12773,9 @@ async function titleKeyArt(options, t) {
     if (mbb.height > Math.max(lh * 2 + 8, 70)) t.problem("bug", "The title's Music pill wraps to two lines");
     if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The title scrolls sideways");
   }
+  const logoFont = logo ? getComputedStyle(logo.querySelector(".l2") || logo).fontFamily : "";
+  t.event("title-lockup", `${logo && logo.querySelector("img") ? "image" : "type"}, ${logoFont.split(",")[0]}`);
+  if (logo && logo.querySelector("img")) t.problem("bug", "The title shows an image logo (the old blue-metal one); canon is the amber Fraunces type lockup");
   const pb = boxOf(play), lb = boxOf(logo);
   if (!pb || !lb) t.problem("blocker", "No Play button or logo on the title");
   else {
