@@ -2732,9 +2732,10 @@
             const ok = await within(Promise.all(todo.slice(at, at + BATCH).map((m) => m.material.forceCompilationAsync(m).catch(() => {}))), left);
             if (!ok) { at += BATCH; break; }
           }
+          let leftovers = null;
           if (at < todo.length) {
             const rest = todo.slice(at);
-            (async () => {
+            leftovers = (async () => {
               for (let i = 0; i < rest.length; i += 2) {
                 await nextFrame();
                 try { await Promise.all(rest.slice(i, i + 2).map((m) => (m.isDisposed() || !m.material ? null : m.material.forceCompilationAsync(m).catch(() => {})))); } catch (e) { /* head start only */ }
@@ -2754,6 +2755,9 @@
             info.sets.push({ set: g.join("+"), ms: Date.now() - t0, ok });
             if (!ok) { info.how = "budget"; break; }
           }
+          /* The leftovers (2 a frame) are part of the warm-up: this promise, and so js/app.js's `__warmIdle` that holds a phone's
+             auto-started cold open, settles only once they are drained (or 12 s more), never while they still compile under play. */
+          if (leftovers) await within(leftovers, 12000);
         } catch (e) { /* a warm-up is only a head start */ }
         warmGroups = null;
         warmHooks.forEach((h) => { try { h(null); } catch (e) { /* */ } });
