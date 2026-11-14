@@ -10891,9 +10891,9 @@ async function phoneTouch(options, t) {
     t.metric("phone.chargeClearPx", Math.round(clear));
     t.event("phone-ability-arc", `${rects.length} verbs; nearest screen edge ${Math.round(edge)} px, nearest the Charge ring ${Math.round(clear)} px, nearest each other ${Math.round(gap)} px`);
     if (rects.length < 5) t.problem("bug", `Only ${rects.length} of 5 ability buttons are laid out on the phone`);
-    if (edge < 4) t.problem("bug", `An ability icon is cut off or hard against the screen edge (${Math.round(edge)} px) at ${innerWidth}x${innerHeight}`);
-    if (clear < 2) t.problem("bug", `The Charge disc overlaps an ability icon (${Math.round(clear)} px) at ${innerWidth}x${innerHeight}`);
-    if (gap < 4) t.problem("bug", `Two ability icons touch (${Math.round(gap)} px) at ${innerWidth}x${innerHeight}`);
+    if (edge < 8) t.problem("bug", `An ability icon is cut off or hard against the screen edge (${Math.round(edge)} px) at ${innerWidth}x${innerHeight}`);
+    if (clear < 12) t.problem("bug", `An ability icon is under 12 px from the Charge ring (${Math.round(clear)} px) at ${innerWidth}x${innerHeight}`);
+    if (gap < 12) t.problem("bug", `Two ability icons are under 12 px apart (${Math.round(gap)} px) at ${innerWidth}x${innerHeight}`);
     if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The page scrolls sideways on the phone");
   }
 
