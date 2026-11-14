@@ -965,6 +965,9 @@ import { pickRate } from "./variety.js";
     },
     denied() {
       note("denied");
+      /* A locked or too-costly press (a teaser slot on the ability bar) answers with the tagged UI click at once, so the press is never
+         silent even when the pointerdown tick was skipped or late; the low buzz follows. */
+      try { synthTag("ui"); uiClick(0.12); } catch (err) { /* the buzz still plays */ }
       tone({ freq: 220, to: 180, dur: 0.16, vol: 0.06, wave: "square", band: 600 });
     },
     chimeUp() { note("goal"); fx("ui-goal", "ui", {}, () => notes([660, 990], 0.1, 0.09)); },
