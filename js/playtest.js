@@ -13779,6 +13779,60 @@ async function chargeLogPause(options, t) {
   t.progress(1);
 }
 
+/* ---------------- the shared gameplay guard ---------------- */
+// Every scenario records when gameplay starts. Gameplay = the loading card is gone, a frame is drawn, and nothing sits between
+// the player and the day: no title, opening text, first-visit card or him asleep in bed, or he is the player's, or the scenario
+// itself reported t.milestone("gameplay"). Past the budget (10 s desktop, 20 s phone, counted from the loading card going)
+// the run stops with ONE problem naming the wall on screen, not empty metrics from a page that never played.
+// Scenarios about the title / opening start on those screens by design: for them the title and opening are not walls.
+// Option {"noGameplay":true}: the title is kept up and control is ignored, so every scenario must end on the guard (the proof).
+const GATE_AT_TITLE = new Set(["title", "title-key-art", "title-progress", "cold-start", "first-minute", "opening", "street-teaches", "ask-markers", "phone-touch", "stem-score", "storm-tally", "audio-check"]);
+const GUARD_SECS = { desktop: 10, phone: 20 };
+function gameplayWall(id) {
+  const D = window.day;
+  if (!D || !D.now || !D.now().frame) return "no frame drawn yet";
+  if (window.__loading && window.__loading.state() === "loading") return "loading card";
+  const words = (el) => ((el && hudVisible(el) && el.textContent) || "").trim().replace(/\s+/g, " ").slice(0, 70);
+  const gate = GATE_AT_TITLE.has(id);
+  if (!gate && D.title && D.title.showing && D.title.showing()) return `title: "${words($("title")) || "Play / Episodes"}"`;
+  if (!gate && D.opening && D.opening.showing && D.opening.showing()) return "opening text";
+  if (D.tutorial && D.tutorial.now && D.tutorial.now().showing && id !== "first-visit") return "first-visit card";
+  const fr = D.now().frame;
+  if (fr && fr.person && ["lie", "side", "recline"].includes(fr.person.pose) && !fr.person.inCar && D.control && D.control.mode() !== "control") return "bed: he is asleep, nobody has taken control";
+  const say = ["episode-say", "moment-line", "voice-caption"].map((i) => words($(i))).find(Boolean);
+  if (say) return `dialog text: "${say}"`;
+  return "";
+}
+function armGameplayGuard(id, options, t) {
+  const forced = !!(options && options.noGameplay);
+  const D = window.day;
+  const phone = D && D.control && D.control.state ? !!D.control.state().touch || innerWidth <= 700 : innerWidth <= 700;
+  const budget = (options && Number(options.gameplaySeconds)) || (phone ? GUARD_SECS.phone : GUARD_SECS.desktop);
+  let reached = false;
+  let carded = null; // when the loading card let go (the budget counts from there)
+  const t0 = performance.now();
+  const wasMilestone = t.milestone;
+  if (wasMilestone) t.milestone = (name, note) => { if (String(name).toLowerCase() === "gameplay" && !forced) reached = true; return wasMilestone.call(t, name, note); };
+  t.event("gameplay-guard", `${forced ? "forced off, " : ""}${budget} s budget (${phone ? "phone" : "desktop"})`);
+  const iv = setInterval(() => {
+    const st = window.hawkesPlaytest && window.hawkesPlaytest.state ? window.hawkesPlaytest.state().status : "running";
+    if (st !== "running" || reached) { if (reached) t.event("gameplay-reached", `${((performance.now() - t0) / 1000).toFixed(1)} s after the run began`); clearInterval(iv); return; }
+    if (forced && D.title && D.title.show && !(D.title.showing && D.title.showing())) { try { D.title.show("load"); } catch (e) { /* none */ } }
+    const taken = !forced && D && D.control && D.control.mode() === "control";
+    const wall = forced && !gameplayWall(id) ? (D.title && D.title.showing && D.title.showing() ? `title: "${(($("title") || {}).textContent || "Play / Episodes").trim().replace(/\s+/g, " ").slice(0, 70)}"` : "forced") : gameplayWall(id);
+    if (!forced && (taken || !wall)) { reached = true; t.milestone && t.milestone("gameplay", "the shared guard saw him playing"); return; }
+    if (wall !== "loading card" && wall !== "no frame drawn yet" && carded == null) carded = performance.now();
+    if (carded == null && !forced) return;
+    if (forced && carded == null) carded = t0;
+    if ((performance.now() - carded) / 1000 > budget) {
+      clearInterval(iv);
+      t.problem("blocker", `never reached gameplay: ${wall || "nothing playable on screen"} (${budget} s budget, ${forced ? "forced off" : "scenario " + id})`);
+      t.metric("gameplay.neverReached", 1);
+      t.finish("stuck");
+    }
+  }, 250);
+}
+
 installPlaytest({
   product: "icanbe",
   feel: {
@@ -13912,6 +13966,7 @@ installPlaytest({
      as "hidden in Live mode" and screenshots of a full loading bar. A failed load counts (the run then reports it). */
   isReady: () => !!(window.day && window.day.now().frame && !(window.__loading && window.__loading.state() === "loading")),
   async start(id, options, t) {
+    armGameplayGuard(id, options || {}, t);
     const errFrom = consoleErrors.length;
     // shader compile failures count as console errors even when Babylon's logger didn't reach console.error
     try {
