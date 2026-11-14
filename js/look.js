@@ -684,7 +684,8 @@ export function installLook(world) {
     w.day /= s;
     w.dusk /= s;
     w.night /= s;
-    const defaultExp = 0.94 * w.day + 0.85 * w.dusk + 0.78 * w.night;
+    const nfExp = (scene.metadata && scene.metadata.nightFloor && scene.metadata.nightFloor.exposure) || 0.78;
+    const defaultExp = 0.94 * w.day + 0.88 * w.dusk + Math.max(0.78, nfExp) * w.night;
     const defaultFog = 0.0045 + w.night * 0.0038 + w.dusk * 0.0015;
     // Weather overrides (lightning flash, storm) snap; only the clock's own exposure/fog crossfades on a scrub.
     const hourNow = clockHour();
