@@ -1405,12 +1405,12 @@ import { pickRate } from "./variety.js";
   }
 
   /* ---------------- the foley scheduler: the street heard now and then ----------------
-     Event-driven, no polling: each one-shot's own `ended` (or, for a synth stand-in, its length) arms ONE timer for the next, 6-15 s
+     Event-driven, no polling: each one-shot's own `ended` arms ONE timer for the next, 6-15 s
      later. Kinds are chosen by the hour and the weather (birds and pigeons by day, cars when the crowd has any, a far siren at night,
      doors, a dog, chatter from a person near him, rain on the awnings when wet), each placed in the world (x, z around the camera) so
      it pans and fades by distance. A file is never played twice within 60 s (`fresh`), the pick avoids the kind just heard, and at most
-     3 are alive at once (a phone's voice budget). Clips for door, dog, chatter and awning-rain are recipes in scripts/sync-sfx.mjs;
-     until they're on disk a door is a synth knock and awning rain a few drip ticks, and a dog/chatter turn is skipped. */
+     3 are alive at once (a phone's voice budget). All nine kinds play real clips
+     (audio/foley, recipes in scripts/sync-sfx.mjs); a kind with no file on disk simply fails to play and the next turn is armed. */
   const folley = { on: false, timer: null, live: 0, count: 0, last: null, plays: [], gaps: [], lastEnd: 0, min: 6, max: 15 };
   function camXZ() {
     const cam = scene.activeCamera, p = cam && (cam.globalPosition || cam.position);
@@ -1437,23 +1437,11 @@ import { pickRate } from "./variety.js";
     { id: "car", w: (c) => (c.cars > 0 ? 2 + Math.min(2, c.cars / 20) : c.night ? 0.5 : 0), play: (c, pos) => sample("car-pass", { gain: 0.7, ...pos, fresh: true }) },
     { id: "siren", w: (c) => (c.night ? 2 : c.h > 17 ? 0.5 : 0), play: (c, pos) => sample("siren-far", { gain: 0.6, ...foleyAt(60, 90), fresh: true }) },
     { id: "horn", w: (c) => (c.cars > 8 ? 0.8 : 0), play: (c, pos) => sample("car-horn", { gain: 0.5, ...foleyAt(30, 60), fresh: true }) },
-    { id: "door", w: (c) => (c.h > 6 && c.h < 23 ? 1.5 : 0.3), play: (c, pos) => sample("door", { gain: 0.8, ...foleyAt(8, 22), fresh: true }) || foleySynth("door", pos) },
+    { id: "door", w: (c) => (c.h > 6 && c.h < 23 ? 1.5 : 0.3), play: (c, pos) => sample("door", { gain: 0.8, ...foleyAt(8, 22), fresh: true }) },
     { id: "dog", w: (c) => (c.wet ? 0.3 : 1), play: (c, pos) => sample("dog", { gain: 0.7, ...foleyAt(25, 50), fresh: true }) },
     { id: "chatter", w: (c) => (c.people.length ? 2.5 : 0), play: (c) => { const q = c.people[Math.floor(Math.random() * c.people.length)]; return sample("chatter", { gain: 0.7, x: q.x, z: q.z, fresh: true }); } },
-    { id: "awning", w: (c) => (c.wet ? 4 : 0), play: (c, pos) => sample("awning-rain", { gain: 0.8, ...foleyAt(6, 18), fresh: true }) || foleySynth("awning", pos) },
+    { id: "awning", w: (c) => (c.wet ? 4 : 0), play: (c, pos) => sample("awning-rain", { gain: 0.8, ...foleyAt(6, 18), fresh: true }) },
   ];
-  function foleySynth(kind, pos) {
-    synthTag(kind === "door" ? "crowd" : "city");
-    if (kind === "door") {
-      noise({ type: "lowpass", freq: 380, dur: 0.14, vol: 0.09, ...pos });
-      noise({ type: "bandpass", freq: 2200, dur: 0.05, vol: 0.03, delay: 0.1, q: 2, ...pos });
-      bank.lastSrc = null; bank.lastDur = 0.4;
-    } else {
-      for (let i = 0; i < 5; i++) S.dripTick(Math.random() * 1.2 - 0.6, 0.5);
-      bank.lastSrc = null; bank.lastDur = 1.2;
-    }
-    return true;
-  }
   function foleyNext(delaySec) {
     if (folley.timer) clearTimeout(folley.timer);
     folley.timer = setTimeout(foleyPlay, Math.max(0, delaySec) * 1000);
