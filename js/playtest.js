@@ -3983,6 +3983,51 @@ async function nightGlow(options, t) {
   t.progress(1);
 }
 
+/* ---------------- npc-spots: every NPC stands in open ground, with room to walk up and talk ---------------- */
+// Setup shortcut: the spots come from the config (neighbors' stops, daily citizens, rescue people) and are checked against
+// world.solids with js/npc-spots.js (the same audit `npm test` runs); real input: Enter, then he is put 1.6 m from each
+// spot (touch: C.place, as the other scenarios) and the scene is a screenshot. Neighbors' name tags are read at the hour
+// they stand there: on screen, inside the window, not clipped. Events: npc-spots, npc-spot-<who>; metric npcSpotFailures.
+async function npcSpots(options, t) {
+  t.scene("Avenue");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const C = window.day.control;
+  const cfg = window.DAY_CONFIG;
+  const mod = await import("./npc-spots.js");
+  const world = window.day.world();
+  const spots = mod.collectNpcSpots(cfg);
+  const rep = mod.auditNpcSpots(spots, world.solids || []);
+  t.metric("npcSpotFailures", rep.failures.length);
+  t.event("npc-spots", `${spots.length} spots, ${rep.failures.length} in a building collider or without an approach`);
+  rep.failures.forEach((f) => t.problem("bug", "NPC spot: " + f));
+  if (!C) { t.problem("bug", "There's no Take control"); return; }
+  if (options && options.touch) { try { C.touch(true); } catch (e) { /* desktop */ } }
+  pressKey("Enter");
+  await t.until(() => C.mode() === "control", 3000, "Take control (Enter)");
+  const N = window.day.neighbors;
+  const stops = (cfg.neighbors.list || []).flatMap((p) => p.stops.map((s, i) => ({ who: p.id, hour: s[0] + 0.3, x: s[1], z: s[2], inside: s[3] === "inside" }))).filter((s) => !s.inside);
+  let seen = 0;
+  for (const sp of spots) {
+    t.progress(seen++ / spots.length);
+    const nb = stops.find((s) => s.who === sp.who && s.x === sp.x && s.z === sp.z);
+    if (nb) { scrubTo(nb.hour * 60); await sleep(500); }
+    C.place(sp.x - 1.6, sp.z, Math.PI / 2);
+    t.scene(`${sp.who} at ${sp.x},${sp.z}`);
+    await sleep(700);
+    const st = C.state();
+    if (Math.hypot(st.x - (sp.x - 1.6), st.z - sp.z) > 1.2) t.problem("bug", `${sp.who}: he could not stand 1.6 m from the spot (at ${st.x.toFixed(1)},${st.z.toFixed(1)}): no approach`);
+    if (nb) {
+      const tag = $("nb-" + sp.who);
+      const r = tag && tag.getBoundingClientRect();
+      const on = r && r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+      t.event(`npc-spot-${sp.who}`, `${sp.x},${sp.z}: tag ${on ? "on screen" : "not visible"}${r ? ` ${Math.round(r.left)},${Math.round(r.top)}` : ""}`);
+      if (!on) t.problem("bug", `${sp.who}: the name tag isn't fully on screen next to the NPC at ${innerWidth}x${innerHeight}`);
+    } else t.event(`npc-spot-${sp.who}`, `${sp.x},${sp.z}: open ground`);
+  }
+  pressKey("Escape");
+}
+
 /* ---------------- city-audit: props sit on their roofs and pavements; no flicker; he walks every roof ---------------- */
 // Setup shortcuts: the audit runs on the built scene, and six probe cameras (three rooftops, three street spots) are put
 // where a player's camera could be for two frames each, the second 2 cm to the side. Real input: Enter, then WASD with
@@ -12421,6 +12466,7 @@ installPlaytest({
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
     { id: "photos", title: "Photos of the dense city: noon at five spots along the avenue, dusk (windows and street lamps come on), night; frame rate at each", seconds: 120, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, then WASD with Shift east along the avenue. Events photo-noon / photo-dusk / photo-night / photo-fps; metrics photoFpsMin, photoFpsAvg, cityFillers, cityLamps." },
     { id: "crowd", title: "The street's people and cars follow the clock: quiet at 3 AM, busy at the 8:30 rush, full at lunch and dinner, thin again late; they walk, cross, go in and out of buildings; rain opens umbrellas; Quality: low thins them; frame rate at each", seconds: 90, tags: ["crowd", "photos"], description: "Day bar beside the car and to each hour (setup), then 1x. Enter, WASD with Shift to the shops, key 3, the quality button. Events crowd-night / crowd-rush / crowd-lunch / crowd-dinner / crowd-late / crowd-follows-clock / crowd-rain / crowd-quality-low / photo-fps; metrics crowd<Hour>People, crowd<Hour>Cars, photoFpsMin, photoFpsAvg." },
+    { id: "npc-spots", title: "NPC spots: every neighbor, daily citizen and rescue person stands in open ground (none inside a building collider, each with room to walk up); a screenshot of each spot; neighbors' name tags fully on screen; the phone (390x844) the same", seconds: 120, tags: ["control", "quality", "phone"], description: "Load with ?playtest=npc-spots ({\"touch\":true} for 390x844). Runs the js/npc-spots.js audit on world.solids, takes control, then stands 1.6 m from each NPC spot (neighbors at the hour they are there) with a screenshot per spot. Events npc-spots / npc-spot-<who>; metric npcSpotFailures." },
     { id: "city-audit", title: "City audit: every prop from props.js and cityscape.js sits on its roof or pavement (nothing floating, sunk, coplanar or inside out); six probe cameras (three rooftops, three streets) show no flicker between two frames; he walks each walkable roof along its AC units; shots at desktop and 844x390", seconds: 240, tags: ["look", "photos"], description: "Setup: scrubs to noon, runs day.cityscape.audit(), places six probe cameras for two frames each (the second moved 2 cm). Real input: Enter, WASD with Shift up each walkable roof's ramp and along its row of units, Esc. Events city-audit / city-shots-size / flicker-<spot> / roof-walk-<block>; metrics cityAuditFailures, flickerBlocks." },
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
     { id: "night-glow", title: "District glow after dusk: windows light on schedules with interior-mapped rooms, neon flickers, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares; wet street uses SSR on high and a reflection probe on low; a bolt flickers windows", seconds: 160, tags: ["look", "photos", "phone", "feel"], description: "Day bar beside the car (setup), Enter / Take control tap, scrub 17→01 for window counts, walk the avenue at 22:00, key 3 for rain reflections. Events night-glow-schedule / -street / -reflect / -fps / -flicker; metrics windowOnDusk, windowOnNight, windowOnLate, dynamicLights, nightNeonSigns, nightReflect, nightFps. Option {\"touch\":true} for 390x844 low quality." },
@@ -12524,6 +12570,7 @@ installPlaytest({
       else if (id === "fill-out") await fillOut(options, t);
       else if (id === "night-glow") await nightGlow(options, t);
       else if (id === "city-audit") await cityAudit(options, t);
+      else if (id === "npc-spots") await npcSpots(options, t);
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "cast-feel") await castFeel(options, t);

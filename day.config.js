@@ -1611,8 +1611,8 @@ window.DAY_CONFIG = {
             limit: 70,
             people: [
               { id: "odile", name: "Odile", x: 109.5, z: 27, color: "#d9604a", thanks: "Odile: Go on, go on. The chairs can drown." },
-              { id: "pim", name: "Pim", x: 118, z: 31, color: "#4a7fc0", thanks: "Pim: My noodles. My dry noodles." },
-              { id: "gus", name: "Gus", x: 126.5, z: 25.5, color: "#a65bb5", thanks: "Gus: Forty years. Never saw it come in sideways." },
+              { id: "pim", name: "Pim", x: 118, z: 28.6, color: "#4a7fc0", thanks: "Pim: My noodles. My dry noodles." },
+              { id: "gus", name: "Gus", x: 125.5, z: 28.5, color: "#a65bb5", thanks: "Gus: Forty years. Never saw it come in sideways." },
             ],
           },
           {
@@ -1633,8 +1633,8 @@ window.DAY_CONFIG = {
             limit: 70,
             debris: true,
             people: [
-              { id: "nell", name: "Nell", x: 78, z: 9.6, color: "#4f9a5b", thanks: "Nell: There. There's the crosswalk." },
-              { id: "ravi", name: "Ravi", x: 90, z: 15.6, color: "#d9a05a", thanks: "Ravi: I couldn't see my own umbrella." },
+              { id: "nell", name: "Nell", x: 79.8, z: 9.6, color: "#4f9a5b", thanks: "Nell: There. There's the crosswalk." },
+              { id: "ravi", name: "Ravi", x: 91.8, z: 15.6, color: "#d9a05a", thanks: "Ravi: I couldn't see my own umbrella." },
             ],
           },
         ],
@@ -2677,11 +2677,11 @@ window.DAY_CONFIG = {
     /* Citizens from the episodes stand at `stand` with this look all day while theirs is the ask. */
     citizens: {
       odile: { name: "Odile", x: 109.5, z: 27, scale: 1, color: "#d9604a", look: { skin: "#c58b68", top: "#d9604a", pants: "#2a2a34", shoes: "#2a2a34", hair: "#3a2a22", bun: true } },
-      pim: { name: "Pim", x: 118, z: 31, scale: 0.95, color: "#4a7fc0", look: { skin: "#e3c4a8", top: "#4a7fc0", pants: "#24262c", shoes: "#e8e8e8", hair: "#1c1c2a" } },
-      gus: { name: "Gus", x: 126.5, z: 25.5, scale: 1, color: "#a65bb5", look: { skin: "#d2a584", top: "#a65bb5", pants: "#4a4a52", shoes: "#5a3a22", hair: "#cfcfd6", hat: { type: "straw", brim: 0.5, color: "#b8a070", band: "#a65bb5" } } },
+      pim: { name: "Pim", x: 118, z: 28.6, scale: 0.95, color: "#4a7fc0", look: { skin: "#e3c4a8", top: "#4a7fc0", pants: "#24262c", shoes: "#e8e8e8", hair: "#1c1c2a" } },
+      gus: { name: "Gus", x: 125.5, z: 28.5, scale: 1, color: "#a65bb5", look: { skin: "#d2a584", top: "#a65bb5", pants: "#4a4a52", shoes: "#5a3a22", hair: "#cfcfd6", hat: { type: "straw", brim: 0.5, color: "#b8a070", band: "#a65bb5" } } },
       hollis: { name: "Hollis", x: 51.5, z: 9.6, scale: 1.05, color: "#e0a53c", look: { skin: "#a8734f", top: "#e0a53c", pants: "#3a3a2a", shoes: "#5a3a22", hat: { type: "helmet", color: "#e0a53c" } } },
-      nell: { name: "Nell", x: 78, z: 9.6, scale: 0.95, color: "#4f9a5b", look: { skin: "#e0b794", top: "#4f9a5b", pants: "#2a2a34", shoes: "#2a2a34", hair: "#6a3a22" } },
-      ravi: { name: "Ravi", x: 90, z: 15.6, scale: 1, color: "#d9a05a", look: { skin: "#a8734f", top: "#d9a05a", pants: "#24262c", shoes: "#24262c", hair: "#1c1c2a" } },
+      nell: { name: "Nell", x: 79.8, z: 9.6, scale: 0.95, color: "#4f9a5b", look: { skin: "#e0b794", top: "#4f9a5b", pants: "#2a2a34", shoes: "#2a2a34", hair: "#6a3a22" } },
+      ravi: { name: "Ravi", x: 91.8, z: 15.6, scale: 1, color: "#d9a05a", look: { skin: "#a8734f", top: "#d9a05a", pants: "#24262c", shoes: "#24262c", hair: "#1c1c2a" } },
     },
     pool: [
       /* Birdie (the apt block's stoop, -21, 9.5): bunting */
@@ -2757,12 +2757,12 @@ window.DAY_CONFIG = {
         title: "Gus wants fog on the plaza at dawn", did: "you brought Gus the old fog",
         ask: "Forty years back the plaza woke up in fog like soup. Could you? Early?",
         thanks: "There it is. Forty years, gone in a breath.",
-        reward: { kind: "lanterns", at: [126.5, 25.5], color: "#d8e4ea" } },
+        reward: { kind: "lanterns", at: [125.5, 28.5], color: "#d8e4ea" } },
       { id: "gus-wind-kite", who: "gus", name: "Gus", power: "wind", from: 13, to: 18, place: { x: 118, z: 26, r: 22, name: "over the plaza" }, rewardWhere: "the bench",
         title: "Gus wants wind over the plaza for his kite", did: "you flew Gus's kite",
         ask: "I've a kite that hasn't left the ground since March. Wind over the plaza this afternoon?",
         thanks: "Up she goes! Look at her climb!",
-        reward: { kind: "pinwheels", at: [126.5, 25.5], color: "#a65bb5" } },
+        reward: { kind: "pinwheels", at: [125.5, 28.5], color: "#a65bb5" } },
       { id: "hollis-rain-shop", who: "hollis", name: "Hollis", power: "rain", from: 7, to: 13, place: { x: 50, z: 3, r: 22, name: "on the shop roof" }, rewardWhere: "the shop",
         title: "Hollis wants rain on the shop roof this morning", did: "you tested Hollis's roof",
         ask: "I patched the shop roof last week. I need to know it holds. Rain on the shop, please.",
