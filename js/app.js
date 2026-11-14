@@ -118,6 +118,7 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
      js/title.js holds a phone's auto-started cold open until then, so the warm-up's light-set switches and compiles never land on frames
      the player is already playing (the cold-start phone's 1.5 s hitch: the cold open began behind the loading card at +0.3 s). */
   let running = false;
+  let castsWarmed = false;
   let again = false;
   const idle = () => {
     window.__warmIdle = true;
@@ -135,8 +136,12 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
       if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
     /* then rain, fog, a sun break and wind drawn for a few frames each (weather.warmCasts): the first cast of each used to pay
        its compile and allocation as a 400-1000 ms frame */
-    w.warmLights(8000).catch(() => {})
-      .then(() => (window.weather && window.weather.warmCasts ? window.weather.warmCasts() : null)).catch(() => {})
+    /* The casts go FIRST and once: warmLights can run for 8 s plus its leftovers, past the card's cap, and a player (or the bot) who
+       casts meanwhile takes the sky over (weather.warm yields to any real call), which left fog, sun break and wind cold: their
+       first casts were 400-2900 ms frames. The casts are short, and the light sets that follow compile the materials they made. */
+    const casts = !castsWarmed && window.weather && window.weather.warmCasts ? (castsWarmed = true, window.weather.warmCasts()) : null;
+    Promise.resolve(casts).catch(() => {})
+      .then(() => w.warmLights(8000)).catch(() => {})
       .finally(() => lightsDone("the warm-up")); // the card waits for it, up to LIGHTS_CAP_MS
   };
   window.__warmLights = () => (function afterFrame() {
