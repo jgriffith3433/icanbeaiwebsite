@@ -11602,6 +11602,14 @@ async function wakeHim(options, t) {
 async function hourHints(options, t) {
   t.scene("Hour hints");
   checkBasics(t);
+  // A visitor's first gesture arms Sound (js/main.js arm); this bot's first input was a synthetic click on Take control, after the
+  // frame and model waits and the jump to 03:00, so the audio context sat unstarted and the probe read that setup as silence.
+  // Press once on the Sound button first (a pointerdown arms, it doesn't toggle), as wake-him and the other scenarios do.
+  const snd0 = $("sound");
+  if (snd0 && snd0.getAttribute("aria-pressed") === "true") {
+    const r0 = snd0.getBoundingClientRect();
+    snd0.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r0.left + 4, clientY: r0.top + 4, pointerId: 4, pointerType: (options && options.touch) || innerWidth <= 700 ? "touch" : "mouse" }));
+  }
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
   const D = window.day;
