@@ -1527,9 +1527,12 @@ html.touch-ui.in-control .side{display:none}
       const p = who();
       cloud.scaling.set(cloudR * 2, cloudR * 0.85, cloudR * 2);
       // The sphere's underside (centre - 0.425R) stays 7 m over his feet at any size, so the camera and he are never inside it.
-      cloud.position.set(p.x, (p.y || 0) + 7 + cloudR * 0.425, p.z);
+      // ...and never under or around the camera: a high / zoomed-out orbit camera (phone landscape) sat inside it, a dark orb over his head.
+      const camY = world.camera && world.camera.position ? world.camera.position.y : 0;
+      const under = Math.max((p.y || 0) + 7, camY + 3);
+      cloud.position.set(p.x, under + cloudR * 0.425, p.z);
       shelf.scaling.set(cloudR * 2.4, 1, cloudR * 2.4);
-      shelf.position.set(p.x, (p.y || 0) + 7.2, p.z);
+      shelf.position.set(p.x, under + 0.2, p.z);
       cloudMat.alpha = Math.min(0.84, 0.35 + cloudR / 40);
     }
     if (rainPs) {
