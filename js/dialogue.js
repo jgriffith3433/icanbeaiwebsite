@@ -201,6 +201,9 @@ export function startDialogue(dayApi, opts) {
     const a = new AudioCtor(L.file);
     a.volume = volume;
     current = a;
+    // the duck (js/mix.js) lets go when the line ends, not on a timer
+    const done = () => { if (current === a) { current = null; emit({ action: "end", id: L.id, who }); } };
+    if (a.addEventListener) { a.addEventListener("ended", done); a.addEventListener("error", done); }
     const p = a.play && a.play();
     if (p && p.catch) p.catch(() => {});
     live.played++;

@@ -234,16 +234,21 @@
     paintSound();
     ensureAudio();
   });
-  // The mute choice is remembered. A saved "on" shows as on and starts the audio at the first gesture
-  // (browsers won't play before one); a saved "off" stays off, and the title's Play leaves it off.
+  // Sound is on by default; only a saved "off" (the player's own mute) keeps it off. Browsers won't play before a gesture,
+  // so the first tap, key press or touch (capture, before any other handler) creates and resumes the context: the city
+  // ambience (js/score.js, js/mix.js) starts from that one input. No polling: the gesture listeners fire once.
   let savedSound = null;
   try { savedSound = localStorage.getItem("icanbe.sound"); } catch (e) { /* none */ }
   window.__soundSaved = savedSound;
-  if (savedSound === "on") {
+  if (savedSound !== "off") {
     soundOn = true;
     paintSound();
-    const arm = () => ensureAudio();
-    ["pointerdown", "keydown", "touchstart"].forEach((t) => window.addEventListener(t, arm, { once: true, capture: true }));
+    const arm = () => {
+      ensureAudio();
+      ["pointerdown", "keydown", "touchstart", "mousedown", "click"].forEach((t) => window.removeEventListener(t, arm, true));
+      window.dispatchEvent(new CustomEvent("day:sound", { detail: { action: "first-gesture", on: soundOn } }));
+    };
+    ["pointerdown", "keydown", "touchstart", "mousedown", "click"].forEach((t) => window.addEventListener(t, arm, { capture: true }));
   }
   // M mutes and unmutes (not while typing, or with a modifier).
   window.addEventListener("keydown", (e) => {

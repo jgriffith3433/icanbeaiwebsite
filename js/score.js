@@ -496,6 +496,8 @@ export function startScore(dayApi) {
 
   async function loadAll() {
     const c = cfg();
+    // The city hum first, alone: it is the ambience bed heard from the first tap, so it must not queue behind the beds.
+    if (c.ambience.air) await loadUrl(c.ambience.air);
     const urls = new Set();
     BEDS.forEach((b) => c.music[b] && urls.add(c.music[b]));
     urls.add(c.music.wind);
@@ -1210,13 +1212,7 @@ export function startScore(dayApi) {
       if (soundOn()) unlock();
     });
   }
-  window.addEventListener(
-    "pointerdown",
-    () => {
-      if (soundOn()) unlock();
-    },
-    true
-  );
+  ["pointerdown", "keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, () => { if (soundOn()) unlock(); }, true));
 
   // His spoken lines (js/voice.js): the music dips under them for a couple of seconds.
   // When js/mix.js is up it owns the −8 dB / −4 dB duck on the shared buses — skip the
