@@ -1809,6 +1809,17 @@ async function warmStart(options, t) {
   t.metric("firstCastWorstMs", Math.round(worstCast));
   // the first 30 s as a whole, then (phone) 60 s
   const total = touch ? 60000 : 30000;
+  // the switch to snow near 24 s (a named setup shortcut: the forecast does it on snowy days): its flakes and roof caps must already be warm
+  const toSnow = 24000 - (performance.now() - t0);
+  if (toSnow > 0) await sleep(toSnow);
+  const snowAt = performance.now();
+  try { if (window.weather && window.weather.set) window.weather.set("snow", 0.8, "power"); } catch (e) { /* */ }
+  await sleep(2500);
+  const snowWorst = worstIn(snowAt, performance.now());
+  t.metric("snowSwitchWorstMs", Math.round(snowWorst));
+  if (snowWorst > (touch ? 150 : 100)) t.problem("bug", `The switch to snow cost a ${Math.round(snowWorst)} ms frame (limit ${touch ? 150 : 100})`);
+  else t.event("snow-switch", `worst frame ${Math.round(snowWorst)} ms`);
+  try { if (window.weather && window.weather.set) window.weather.set("clear", 0.5, "power"); } catch (e) { /* */ }
   const rest = total - (performance.now() - t0);
   if (rest > 0) await sleep(rest);
   const end = performance.now();
@@ -1833,6 +1844,12 @@ async function warmStart(options, t) {
   t.metric("shaderErrors", bad.length);
   if (bad.length) t.problem("bug", `Shader compile errors in the console: ${bad[0]}`);
   else t.event("shaders-clean", "no shader compile errors");
+  if (window.__compilesAfterLoad) {
+    const n = window.__compilesAfterLoad();
+    t.metric("perf.compilesAfterLoad", n);
+    if (n > 0) t.problem("bug", `${n} shader effects compiled after the loading card (the casts, snow and god rays must be warm)`);
+    else t.event("compiles-after-load", "0 shader effects compiled after the loading card");
+  }
   // let go inside the first minute: the way back into control must be on screen (a phone has no stick then)
   if (touch) await tapEl($("control")); else pressKey("Escape");
   await t.until(() => C.mode() === "schedule", 8000, "back on the day").catch(() => {});

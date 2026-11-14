@@ -311,23 +311,24 @@ export function installSky(world) {
     st.god.active = !!st.god.post;
   }
 
-  /* Warm the god-ray pass once, early (title screen / first seconds), then drop it. Its post and occluder shaders compile on the
-     first frame they run; built for the first time at a Sun break that was a ~1.5 s stall mid-play. Babylon caches the compiled
-     effects, so the real build later is cheap. Exposure 0 and the disc off: nothing shows while it warms. */
-  if (st.god.supported && st.quality !== "low") {
-    setTimeout(() => {
-      if (st.god.post || st.quality === "low" || !scene.activeCamera) return;
+  /* Warm the god-ray pass once (behind the loading card: js/app.js awaits `sky.warmGodRays()`), then drop it. Its post and occluder
+     shaders compile on the first frame they run; built for the first time at a Sun break that was a ~1.5 s stall mid-play. Babylon
+     caches the compiled effects, so the real build later is cheap. Exposure 0: nothing shows while it warms. Resolves when done. */
+  let godWarmed = null;
+  api.warmGodRays = function warmGodRays() {
+    if (godWarmed) return godWarmed;
+    godWarmed = new Promise((res) => {
+      if (!st.god.supported || st.quality === "low" || !scene.activeCamera || st.god.post) { res(false); return; }
       godRaysOn(true);
       const warm = st.god.post;
-      if (!warm) return;
+      if (!warm) { res(false); return; }
       let n = 0;
-      const obs = scene.onAfterRenderObservable.add(() => {
-        if (++n < 12) return;
-        scene.onAfterRenderObservable.remove(obs);
-        if (st.god.post === warm && st.gap <= 0.04) godRaysOn(false);
-      });
-    }, 4000);
-  }
+      const finish = () => { scene.onAfterRenderObservable.remove(obs); if (st.god.post === warm && st.gap <= 0.04) godRaysOn(false); res(true); };
+      const obs = scene.onAfterRenderObservable.add(() => { if (++n >= 6) finish(); });
+      setTimeout(() => { if (n < 6) finish(); }, 1500); // a hidden tab draws nothing: don't hang
+    });
+    return godWarmed;
+  };
 
   /* ---- reflections of the sky ---- */
   function ensureProbe() {
