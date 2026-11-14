@@ -1265,6 +1265,9 @@
           foot.position.y = -0.42;
           const sole = box("sole" + side, 0.135, 0.014, 0.3, 0, -0.4675, 0.055, glowMat("#58b8ff", "#58b8ff"), kn, false);
           glowing(sole);
+          /* seen from behind (third person) the boot is a dark stub against dark pants: a glowing heel band shows the foot */
+          const heel = box("heel" + side, 0.13, 0.035, 0.012, 0, -0.43, -0.075, glowMat("#58b8ff", "#58b8ff"), kn, false);
+          glowing(heel);
         }
       };
       leg("L", -0.095);
@@ -2295,7 +2298,7 @@
         /* the stand-in is lit from inside a little: navy and charcoal under a dusk sky read as one black blob (phone-touch, 57 s) */
         me.top.emissiveColor.copyFrom(me.top.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.1, 0.15, 0.26));
         me.bottom.emissiveColor.copyFrom(me.bottom.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.07, 0.09, 0.14));
-        me.shoes.emissiveColor.copyFrom(me.shoes.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.05, 0.06, 0.09));
+        me.shoes.emissiveColor.copyFrom(me.shoes.diffuseColor).scaleInPlace(0.5).addInPlace(new B.Color3(0.16, 0.2, 0.3));
       }
       if (player) {
         // placed and posed by the player's controller
