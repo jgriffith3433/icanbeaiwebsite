@@ -1516,7 +1516,11 @@ import { pickRate } from "./variety.js";
   /* The cold open's start, landing and end, and every take/let-go, are the moments a throttled phone compiles shaders and parks the
      main thread (phone-touch read 42.64 s between two sound starts). Each hands the city one street fill 0.5 s after, so the next
      stretch begins with a sound start whatever the 1 s timer did during the block. */
-  const fillSoon = () => setTimeout(() => { try { if (ctx() && clockMs() - lastHeardMs > 1500) playFill(hour() % 24); } catch (err) { /* ambience only */ } }, 500);
+  /* And one right now, in the same dispatch: take/let-go and the cold open's steps start the synchronous work that parks a
+     throttled phone (material compiles, a scene rebuild), so a fill queued with setTimeout only ran after the block and the whole
+     block counted as silence. A sound started here sits at the front of the block instead of after it. */
+  const fillNow = () => { try { if (ctx() && clockMs() - lastHeardMs > 1500) playFill(hour() % 24); } catch (err) { /* ambience only */ } };
+  const fillSoon = () => { fillNow(); setTimeout(() => { try { if (ctx() && clockMs() - lastHeardMs > 1500) playFill(hour() % 24); } catch (err) { /* ambience only */ } }, 500); };
   window.addEventListener("day:coldopen", (e) => { const a = e && e.detail && e.detail.action; if (a === "start" || a === "landed" || a === "end" || a === "prompt") fillSoon(); });
   window.addEventListener("day:control", fillSoon);
 
