@@ -166,6 +166,16 @@ export function startColdOpen() {
     const cam = meshes.scene.activeCamera;
     if (cam) meshes.beam.visibility = Math.max(0, Math.min(1, (Math.hypot(cam.position.x - meshes.beam.position.x, cam.position.z - meshes.beam.position.z) - 9) / 13));
     promptBar.style.width = Math.round(prog * 100) + "%";
+    syncTouch();
+  }
+  // The touch mode can switch after the landing (a phone-sized window, control.touch(true)): the key hint and the Rain
+  // button follow it every frame, so a touch player never reads "Press R" or lacks the button while the prompt is up.
+  function syncTouch() {
+    if (phase !== "landing" && phase !== "waiting") return;
+    const t = touchy();
+    const want = t ? cfg.prompt.touch : cfg.prompt.keys;
+    if (promptTxt.textContent !== want) promptTxt.textContent = want;
+    if (bolt.hidden === t) bolt.hidden = !t;
   }
 
   /* ---- the hold ---- */
