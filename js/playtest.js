@@ -12255,8 +12255,13 @@ async function stormTally(options, t) {
   const rc = cv.getBoundingClientRect();
   const x = rc.left + rc.width / 2, y = rc.top + rc.height * 0.62;
   const sendPtr = (type) => cv.dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: touch ? "touch" : "mouse", isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true }));
+  const tTap = performance.now();
   sendPtr("pointerdown"); await sleep(90); sendPtr("pointerup");
   const toast = await t.until(() => D.tally.now().on, 6000, "the tally card").then(() => true).catch(() => false);
+  const cardMs = Math.round(performance.now() - tTap);
+  t.metric("castCardMs", cardMs);
+  t.event("cast-visible", `rain toast after ${cardMs} ms; lawn drench ${D.slice.now().drench}; umbrellas ${D.crowd && D.crowd.info ? D.crowd.info().umbrellas : "?"}`);
+  if (toast && cardMs > 1000) t.problem("bug", `The Rain toast took ${cardMs} ms (1000 ms maximum)`);
   const tn = D.tally.now();
   const el = $("storm-toast");
   const r = el ? el.getBoundingClientRect() : null;
