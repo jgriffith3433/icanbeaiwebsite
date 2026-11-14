@@ -1155,6 +1155,23 @@
      under a 4x CPU throttle in cold-start) a 5 s fill took 25-50 s of real time and play went silent that long. Capped at
      2 s so a tab coming back from the background plays one thing, not a burst. */
   const cityDt = () => Math.min(2, Math.max(0, scene.getEngine().getDeltaTime() / 1000));
+  /* One ambient fill: a drip tick in rain or storm, a bird by day in fair weather, else a car. */
+  function playFill(h) {
+    let state = "clear";
+    try { state = (day.weather && day.weather.now().state) || "clear"; } catch (err) { /* default */ }
+    const fair = state === "clear" || state === "clouds";
+    amb.fill = 4.5 + Math.random() * 2.5;
+    const pan = Math.random() * 1.6 - 0.8;
+    if (state === "rain" || state === "storm") S.dripTick(pan, 0.7);
+    else if (fair && h > 5.5 && h < 20) S.bird(pan, 1);
+    else S.car(pan < 0 ? -0.8 : 0.8, 0.5);
+  }
+  /* A render frame can stall for many seconds (shader compiles, a software-GL machine, a background tab), and the fill above
+     runs in the frame loop, so it stalled too (18 s of silence in cold-start). A plain 1 s timer (no network) covers that. */
+  const fillTimer = setInterval(() => {
+    try { if (ctx() && clockMs() - lastHeardMs > 7000) playFill(hour() % 24); } catch (err) { /* ambience only */ }
+  }, 1000);
+  if (fillTimer && fillTimer.unref) fillTimer.unref(); // Node checks must be able to exit
   function watchCity(dt) {
     if (!ctx()) return; // ambience only with the Sound button on
     const h = hour() % 24;
@@ -1178,13 +1195,7 @@
     amb.fill -= dt;
     // Real time since anything was heard (note() stamps every sound): a fill is due after 7 s whatever the frame timing did to
     // the timers above, so a stall or a throttled tab can't leave play silent for 20 s.
-    if (amb.fill <= 0 || clockMs() - lastHeardMs > 7000) {
-      amb.fill = 4.5 + Math.random() * 2.5;
-      const pan = Math.random() * 1.6 - 0.8;
-      if (state === "rain" || state === "storm") S.dripTick(pan, 0.7);
-      else if (fair && h > 5.5 && h < 20) S.bird(pan, 1);
-      else S.car(pan < 0 ? -0.8 : 0.8, 0.5);
-    }
+    if (amb.fill <= 0 || clockMs() - lastHeardMs > 7000) playFill(h);
     amb.siren -= dt;
     if (amb.siren <= 0) {
       amb.siren = 90 + Math.random() * 120;
