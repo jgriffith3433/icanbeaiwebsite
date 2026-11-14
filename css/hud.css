@@ -281,7 +281,7 @@ html.cold-open .ep-btn, html.cold-open .power-reticle, html.cold-open .pressure,
 html.first-min .hud, html.first-min .side, html.first-min .hud-left, html.first-min .control-btn, html.first-min .control-hint,
 html.first-min .public-toggle, html.first-min .version-tag, html.first-min .privacy-tag, html.first-min .update-pill,
 html.first-min .quality-btn, html.first-min .voices-btn, html.first-min .tutorial, html.first-min .nb-btn, html.first-min .ep-btn,
-html.first-min .pressure, html.first-min #weather-btn, html.first-min #episode-offer, html.first-min #episodes,
+html.first-min .pressure, html.first-min #weather-btn, html.first-min #episodes,
 html.first-min .abilitybar .et, html.first-min .abilitybar .cd, html.first-min .abilitybar .c { visibility: hidden; }
 .co-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); z-index: 37; }
 .co-bolt { position: fixed; right: var(--safe-r); bottom: calc(var(--safe-b) + 124px); z-index: 37; }
@@ -292,3 +292,7 @@ html.title-up .co-prompt, html.title-up .co-bolt, html.title-up .co-say { visibi
 
 /* ---- the rain's lens: drops on the camera (js/rain.js). Not a control: it never takes a touch or a click. ---- */
 #rain-lens { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; display: none; }
+
+/* The episode offer: a small non-blocking corner toast, top right under the top row, clear of the ability bar (bottom). */
+.ep-offer { position: fixed; top: calc(var(--safe-t, env(safe-area-inset-top, 0px)) + 64px); right: max(10px, var(--safe-r, 0px)); left: auto; bottom: auto; inset-inline-start: auto; }
+@media (max-width: 700px) { .ep-offer { top: calc(var(--tr-ep) + 56px); } }

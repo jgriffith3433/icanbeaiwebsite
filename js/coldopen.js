@@ -53,8 +53,8 @@ export function startColdOpen() {
   bolt.className = "co-bolt";
   bolt.id = "coldopen-bolt";
   bolt.hidden = true;
-  bolt.textContent = "Bolt";
-  bolt.setAttribute("aria-label", "Bolt");
+  bolt.textContent = "Rain";
+  bolt.setAttribute("aria-label", "Rain");
   const say = document.createElement("div");
   say.className = "co-say";
   say.id = "coldopen-say";
@@ -153,8 +153,10 @@ export function startColdOpen() {
   }
 
   /* ---- the hold ---- */
-  function press(via) {
+  let castVerb = "rain"; // the verb the press asked for: Rain is the prompted first cast, the rod's bolt still works
+  function press(via, name) {
     if (phase !== "waiting" && phase !== "landing") return;
+    castVerb = name === "bolt" ? "bolt" : "rain";
     if (!firstInputAt) {
       firstInputAt = performance.now();
       emit("input", { via, kind: "hold" });
@@ -174,13 +176,14 @@ export function startColdOpen() {
     if (phase === "waiting" || phase === "landing") emit("release", { via: was.via, held: Math.round(was.t * 100) / 100 });
   }
   function fire(via) {
+    const verb = castVerb;
     held = null;
     bolt.classList.remove("held");
     const P = window.powers || day.powers;
     if (!P) return;
     passing = true;
     let ok = false;
-    try { ok = P.command("bolt", via === "touch" ? "touch" : via); } finally { passing = false; }
+    try { ok = P.command(verb, via === "touch" ? "touch" : via); } finally { passing = false; }
     if (!ok) { held = null; return; }
     phase = "cast";
     castAt = performance.now();
@@ -303,11 +306,12 @@ export function startColdOpen() {
     const P = window.powers || day.powers;
     if (P) {
       P.abilities.reset(100);
+      if (P.abilities.unlock) P.abilities.unlock("rain"); // the street's lessons lock the verbs from the start: the first cast is Rain
       P.aimAt({ x: cfg.rod.x, y: cfg.rod.roofY + cfg.rod.height, z: cfg.rod.z });
       P.gate((name, via) => {
         if (passing) return true;
-        if (name === "bolt") press(via);
-        return false; // nothing but the bolt, and the bolt only as a hold
+        if (name === "rain" || name === "bolt") press(via, name);
+        return false; // nothing but Rain (the prompted gesture) and the rod's bolt
       });
     }
     meshes = build();
