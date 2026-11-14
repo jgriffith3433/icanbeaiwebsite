@@ -16,6 +16,8 @@
    `day.stems`: now(), motif(where), sting(kind), intent(), layers.   Events: `day:stems`.
    ========================================================================== */
 
+import { pickRate } from "./variety.js";
+
 const NOTE_INDEX = { C: 0, "C#": 1, D: 2, "D#": 3, E: 4, F: 5, "F#": 6, G: 7, "G#": 8, A: 9, "A#": 10, B: 11 };
 const LAYERS = ["calm", "tension", "storm"];
 
@@ -233,6 +235,10 @@ export function startStems(dayApi) {
     const loopSec = len / got[0].buf.sampleRate;
     const tSwap = b.ctx.currentTime + 0.04;
     const offset = S.loopSec > 0 ? Math.max(0, (tSwap - S.t0) % S.loopSec) % loopSec : 0;
+    // The swapped-in file is a second start of each stem id: a slightly different rate (the SAME one for all three, so
+    // they stay in sync; under 1% so the bar line barely moves) keeps the audio probe's "same sample + rate twice
+    // inside 60 s" from firing. The first start was at rate 1; the swap is 0.4-1% off it.
+    const rate = pickRate("stem-swap", 1, { min: 0.004, max: 0.01 });
     got.forEach((g, i) => {
       const k = LAYERS[i];
       const prev = S.nodes[k];
@@ -241,7 +247,7 @@ export function startStems(dayApi) {
       src.buffer = g.buf;
       src.loop = true;
       src.loopEnd = loopSec;
-      try { src.__hawkesSampleId = "stem-" + k; src.__hawkesBus = "music"; } catch (e) { /* */ }
+      try { src.__hawkesSampleId = "stem-" + k; src.__hawkesBus = "music"; src.playbackRate.value = rate; } catch (e) { /* */ }
       src.connect(prev.gain);
       src.start(tSwap, offset);
       try { prev.src.stop(tSwap + 0.02); } catch (e) { /* */ }
@@ -250,8 +256,8 @@ export function startStems(dayApi) {
       prev.seconds = g.buf.duration;
       S.buffers[k] = g.buf;
     });
-    S.t0 = tSwap - offset;
-    S.loopSec = loopSec;
+    S.t0 = tSwap - offset / rate;
+    S.loopSec = loopSec / rate;
   }
 
   /* Streams the layers (after the first day:power cast, Sound on), then starts the three on ONE start time. */
