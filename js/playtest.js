@@ -11135,7 +11135,7 @@ async function phoneTouch(options, t) {
     if (fx) ok++; else t.problem("bug", `A tap on ${id} didn't cast it (events: ${got.map((g) => g.power + ":" + g.action).join(", ") || "none"})`);
     await sleep(1800); // the effect on screen: the recording shows the sky, bolt, rain, wind or sun
     el.dispatchEvent(new PointerEvent("pointerup", { pointerId: 9, pointerType: "touch", bubbles: true })); // release any hold
-    await sleep(300);
+    await settleToIdle(t, "phone-" + id);
     checkHud(t, "phone cast " + id);
   }
   t.metric("phone.castsWithEffect", ok);
@@ -11349,6 +11349,23 @@ async function stormTally(options, t) {
   if (!(lw.lawnShown >= 0.99)) t.problem("bug", "The lawn is not green on the title screen");
   t.progress(1);
 }
+/** After a cast: once the power has stopped asking for a pose (powers.pose() is null), his model must be in idle (or walk, if he is moving)
+ *  within 0.5 s and every clip must have let go (anim.stuckStateSeconds stays 0). Logs `settle-<label>` and the metric `settle.<label>Ms`. */
+async function settleToIdle(t, label) {
+  const P = window.powers || (window.day && window.day.powers);
+  const quiet = () => { try { return !P || !P.pose || P.pose() == null; } catch (e) { return true; } };
+  await t.until(quiet, 5000, `the ${label} pose to end`).catch(() => {});
+  const t0 = performance.now();
+  const back = () => { const s = skinNow(); const c = s && s.clip(); return !s || c === "idle" || c === "walk" || c === "run" || c === "lookup" || c === "shelter"; };
+  const ok = await t.until(back, 1500, `idle after ${label}`).then(() => true).catch(() => false);
+  const ms = Math.round(performance.now() - t0);
+  const s = skinNow();
+  t.metric(`settle.${label}Ms`, ok ? ms : -1);
+  t.event(`settle-${label}`, `${label}: ${ok ? "back to " + (s ? s.clip() : "idle") + " " + ms + " ms after the pose ended" : "STILL in " + (s ? s.clip() : "?") + " 1.5 s after the pose ended"}`);
+  if (!ok || ms > 500) t.problem("bug", `${label}: he did not settle to idle within 0.5 s of the cast ending (${ok ? ms + " ms" : "still " + (s ? s.clip() : "?")})`);
+  await sleep(1000); // the recording's frame 1 s after the cast: a relaxed idle
+}
+
 async function audioCheck(options, t) {
   const touch = !!(options && options.touch);
   t.scene(touch ? "Phone: first tap" : "First tap");
@@ -11516,7 +11533,7 @@ async function audioCheck(options, t) {
     t.event("audio-cast-" + name, c ? `${name}: ${c.source}${c.file ? " " + c.file : ""}` : `${name}: no cast sound (command ${ok ? "accepted" : "refused: " + (C.mode() !== "control" ? "not in control, mode " + C.mode() : "ability or gate")})`);
     if (!c) t.problem("bug", `${name} played no cast sound`);
     else if (c.source !== "file") t.problem("warning", `${name}'s cast sound was the synth stand-in, not a clip (the clip hadn't decoded yet)`);
-    await sleep(900);
+    await settleToIdle(t, name);
   }
   const keys = Object.keys(seen).filter((k) => seen[k]);
   const sig = new Set(keys.map((k) => seen[k].file || k));

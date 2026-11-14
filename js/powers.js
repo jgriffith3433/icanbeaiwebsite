@@ -1344,6 +1344,9 @@ html.touch-ui.in-control .side{display:none}
     padWind = padState.windHold;
 
     wantStorm = boltDown && !boltResolved && boltCharge >= (cfg.tapMax || 0.28);
+    /* `charge` drives pose(): it must never outlive the hold (a key release used to leave it above 0, so the wind-up pose
+       was asked for until Let go and he never settled back to idle). */
+    if (!boltDown) charge = 0;
     if (boltDown) {
       boltCharge += dt;
       charge = boltCharge;
