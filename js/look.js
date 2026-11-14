@@ -325,6 +325,10 @@ export function installLook(world) {
   /* The lawn is the largest dark surface after dusk (albedo ~0.1 under a blue-grey light came out near black on a phone):
      a faint self-light, like the ramp's, keeps it readable as grass at night without lifting the day. */
   mats.ground.emissiveColor = new B.Color3(0.035, 0.06, 0.045);
+  /* Same for the roofs: the apartment roof he stands on is the nearest big surface after dusk, and its slab and lip faces
+     (lit only by the weak night hemisphere) filled the lower half of the phone view with a flat near-black navy void
+     (phone-touch, bad lighting). A faint cool self-light keeps the gravel and the parapet faces readable. */
+  mats.roof.emissiveColor = new B.Color3(0.05, 0.058, 0.075);
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
      overwrite world.js's StandardMaterial (which already had an emissive) with the shared sidewalk concrete
      (emissive 0), so after dusk the vertical rampend/rampside read as a black slab in smoke. */
