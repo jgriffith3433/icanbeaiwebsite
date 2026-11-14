@@ -131,7 +131,7 @@ function roof(u, v) {
 function park(u, v) {
   const n = fbm(u + 8, v);
   const blade = noise(u, v, 16);
-  const c = lerpRgb(rgb(30, 52, 40), rgb(44, 70, 48), n * 0.7 + blade * 0.3);
+  const c = lerpRgb(rgb(42, 72, 52), rgb(60, 94, 62), n * 0.7 + blade * 0.3);
   return { r: c.r, g: c.g, b: c.b, h: blade * 0.4 + n * 0.2 };
 }
 
@@ -325,6 +325,9 @@ export function installLook(world) {
     roof: pbr("roof", maps.roof, { roughness: 0.8, bump: 0.04 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
+  /* The lawn is the largest dark surface after dusk (albedo ~0.1 under a blue-grey light came out near black on a phone):
+     a faint self-light, like the ramp's, keeps it readable as grass at night without lifting the day. */
+  mats.ground.emissiveColor = new B.Color3(0.035, 0.06, 0.045);
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
      overwrite world.js's StandardMaterial (which already had an emissive) with the shared sidewalk concrete
      (emissive 0), so after dusk the vertical rampend/rampside read as a black slab in smoke. */
