@@ -11021,8 +11021,17 @@ async function coldStart(options, t) {
   t.scene("Cold start");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  // the title holds the auto-started cold open until the shader warm-up (js/app.js, once his model is on) is over, so this setup
+  // doesn't race it: wait for the same signal the title waits for (it starts anyway after title.js WARM_WAIT_MS)
+  await t.until(() => window.__warmIdle === true || !window.__warmLights, 20000, "the shader warm-up to end").catch(() => {});
   const D = window.day;
   const phone = D.control && D.control.state ? !!D.control.state().touch : innerWidth <= 700;
+  {
+    // the auto-start's own delay after that (title.js autoStart) has to pass for `auto` below to be true
+    const as = (window.DAY_CONFIG && window.DAY_CONFIG.title && window.DAY_CONFIG.title.autoStart) || {};
+    const secs = phone && as.phoneSecs != null ? as.phoneSecs : as.secs || 0;
+    if (secs && D.coldopen && D.coldopen.pending() && D.title && D.title.showing()) await sleep(secs * 1000 + 400);
+  }
   t.event("cold-start-setup", `${innerWidth}x${innerHeight}, ${phone ? "touch" : "keyboard and mouse"}`);
   // A stranger's desktop session isn't asked to click Play: the title auto-starts the cold open (title.js autoStart.secs), and the
   // model's load can take longer than that, so by the time this scenario is ready he may already be on the roof. That IS the run:
