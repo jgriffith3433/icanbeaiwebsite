@@ -306,6 +306,9 @@ export function startDaySound(dayApi) {
     const src = b.ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
+    // Name the bed by its id (the synth beds are all 2.4 s, so the probe's "buf:<secs>x<len>" would read them as one sample) and
+    // start it a little off 1 so a restart is never identical.
+    try { src.__hawkesSampleId = "daysound-loop-" + id; src.playbackRate.value = jitterRate(id); } catch (e) { /* */ }
     const g = b.ctx.createGain();
     g.gain.value = 0.0001;
     let node = g;
