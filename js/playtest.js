@@ -1759,6 +1759,76 @@ async function castFeel(options, t) {
   pressKey("Escape");
 }
 
+/* ---------------- he is always on screen: the model or, until it is on him, the stand-in figure ---------------- */
+function heroSeen() {
+  const w = world();
+  const h = w && w.heroDrawn ? w.heroDrawn() : null;
+  if (!h) return { ok: false, why: "no world.heroDrawn" };
+  const sc = h.screen;
+  const onScreen = !!sc && sc.z >= 0 && sc.z <= 1 && sc.x > 0 && sc.x < 1 && sc.y > 0 && sc.y < 1;
+  const ok = h.kind !== "none" && h.inFrustum && onScreen;
+  return { ok, kind: h.kind, meshes: h.meshes, inFrustum: h.inFrustum, onScreen, why: ok ? "" : h.kind === "none" ? "nothing is drawn for him" : !h.inFrustum ? "culled out of the frustum" : "off the screen" };
+}
+function heroCheck(t, label) {
+  const r = heroSeen();
+  if (r.ok) t.event("hero-visible", `${label}: he is on screen (${r.kind})`);
+  else t.problem("bug", `${label}: he is not visible (${r.why})`);
+  return r.ok;
+}
+/** Samples him every second until stop() is called; the first miss is a bug, the counts are metrics. */
+function watchHero(t, label) {
+  let n = 0, miss = 0, said = false;
+  const kinds = {};
+  const id = setInterval(() => {
+    const r = heroSeen();
+    n++; kinds[r.kind] = (kinds[r.kind] || 0) + 1;
+    if (!r.ok) { miss++; if (!said) { said = true; t.problem("bug", `${label}: he was not visible at sample ${n} (${r.why})`); } }
+  }, 1000);
+  return () => { clearInterval(id); t.metric("hero.samples", n); t.metric("hero.missing", miss); t.event("hero-watch", `${label}: visible in ${n - miss} of ${n} samples (${Object.entries(kinds).map(([k, v]) => `${k} ${v}`).join(", ")})`); };
+}
+
+/* ---------------- model-blocked: the GLB can't load; the stand-in stays and play continues ---------------- */
+async function modelBlocked(options, t) {
+  const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  t.scene("Loading");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to settle").catch(() => {});
+  const D = window.day, w = D.world(), C = D.control;
+  if (touch) { try { D.look.quality("low"); } catch (e) { /* */ } if (C.touch) C.touch(true); }
+  D.title && D.title.quiet && D.title.quiet();
+  // named setup: the network refuses the GLB from here on and the model he has is dropped, as after a failed load
+  window.__blockModel = true;
+  w.setSkin(null);
+  t.event("model-blocked", "the GLB is blocked and he wears the stand-in");
+  if (C.mode() !== "control") { if (touch) await tapEl($("control")); else pressKey("Enter"); }
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  { const o = $("episode-offer"); if (o && !o.hidden) { const d = o.querySelector(".decline"); if (d) d.click(); } }
+  C.place(-21, 0.5, 1.5708, { from: 14, alpha: 4.1, beta: 1.15, radius: 11 });
+  const P = window.powers || D.powers;
+  const stop = watchHero(t, "GLB blocked");
+  await sleep(1500);
+  heroCheck(t, "GLB blocked, standing");
+  for (const [id, key, slot] of [["rain", "r", "rain"], ["bolt", "e", "bolt"]]) {
+    if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+    await sleep(400);
+    if (touch) await tapEl($("ability-" + slot)); else pressKey(key);
+    await sleep(1600);
+    heroCheck(t, `GLB blocked, after ${id}`);
+  }
+  const f0 = C.state().x;
+  const a = performance.now();
+  while (performance.now() - a < 2000) { if (!touch) pressKey("ArrowRight"); await sleep(100); }
+  t.event("play-continues", `control ${C.mode()}, x ${Number(f0).toFixed(1)} -> ${Number(C.state().x).toFixed(1)}`);
+  if (C.mode() !== "control") t.problem("bug", "Play did not continue with the GLB blocked");
+  // the network comes back: the background retry puts the real model on him
+  window.__blockModel = false;
+  if (window.__retryModelNow) window.__retryModelNow();
+  await t.until(() => D.engineInfo().model === "small-weather", 40000, "the model to arrive on retry").catch(() => t.problem("bug", "The model never arrived on the background retry"));
+  await sleep(500);
+  heroCheck(t, "after the model arrived");
+  stop();
+}
+
 /* ---------------- warm-start: the longest frame after loading, each power's first-use cost, shader compile errors ---------------- */
 async function warmStart(options, t) {
   const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
@@ -1803,6 +1873,7 @@ async function warmStart(options, t) {
     const w = worstIn(a, performance.now());
     worstCast = Math.max(worstCast, w);
     t.metric(`firstCastWorstMs.${id}`, Math.round(w));
+    heroCheck(t, `after ${id}`);
     if (w > (touch ? 150 : 100)) t.problem("bug", `The first ${id} cast cost a ${Math.round(w)} ms frame (limit ${touch ? 150 : 100})`);
     else t.event(`first-cast-${id}`, `worst frame ${Math.round(w)} ms`);
   }
@@ -11790,6 +11861,7 @@ async function coldStart(options, t) {
   if (!gotControl) { t.problem("blocker", `Play didn't hand him over (control mode ${D.control.mode()})`); return; }
   t.scene("Cold start");
   if (t.milestone) t.milestone("gameplay", "on the roof");
+  { const stopHero = watchHero(t, "cold start"); t.onEnd ? t.onEnd(stopHero) : setTimeout(stopHero, 90000); }
   t.event("cold-start-control", `he is the player's ${T.control}s after Play; title ${D.title.showing() ? "STILL UP" : "closed"}`);
   if (D.title.showing()) t.problem("bug", "The title is still up after Play");
   if (D.tutorial && D.tutorial.blocking && D.tutorial.blocking()) t.problem("bug", "The first-visit card shows during the cold open");
@@ -13244,6 +13316,7 @@ installPlaytest({
     { id: "sun-aftermath", title: "Sun break after rain: steam off wet roofs and a rainbow at 42° within 3 s, gutters drip for 20+ s, at least 3 walkers close umbrellas and pigeons land on a roof; on phone half steam/drips, rainbow on, fps ≥ 30", seconds: 70, tags: ["powers", "weather", "phone", "feel", "crowd"], description: "Day bar to lunch (setup), Sound on, Enter / Take control tap, control.place by the shop (setup), tap R then X (or #ability-rain / #ability-sunbreak). Events aftermath-rain / -steam / -rainbow / -drips / -umbrellas / -birds / -fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
+    { id: "model-blocked", title: "Model blocked: with the GLB refused the stand-in stays visible through casts and walking, play continues, and the model arrives on the background retry", seconds: 90, tags: ["phone", "characters"], description: "Load with ?playtest=model-blocked ({\"touch\":true} for 390x844). The model is dropped and blocked (window.__blockModel, or ?blockmodel=1 from load); real input: Take control, Rain and Lightning, walk; he must be on screen each time; then the block lifts and the retry brings the real model." },
     { id: "warm-start", title: "Warm start: no frame over 100 ms (phone 150) in the first 30 s after the loading bar, the first cast of each of the five powers costs no long frame, no shader compile errors, phone median fps >= 30 over 60 s", seconds: 90, tags: ["performance", "phone", "powers"], description: "Load with ?playtest=warm-start ({\"touch\":true} for 390x844 low quality). Real input: Take control, the five verb buttons one by one. Frame times by the render observable; metrics worstFrame30sMs, firstCastWorstMs.<power>, medianFps, shaderErrors, lightCapWorst." },
     { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
     { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
@@ -13301,6 +13374,7 @@ installPlaytest({
       else if (id === "phone-touch") await phoneTouch(options, t);
       else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "warm-start") await warmStart(options, t);
+      else if (id === "model-blocked") await modelBlocked(options, t);
       else if (id === "title-key-art") await titleKeyArt(options, t);
       else if (id === "title-progress") await titleProgress(options, t);
       else if (id === "street-teaches") await streetTeaches(options, t);

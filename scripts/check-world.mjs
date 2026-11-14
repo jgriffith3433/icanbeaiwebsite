@@ -56,13 +56,12 @@ ok(!theyLines.length, `lines that still say "they": ${theyLines.slice(0, 5).join
 
 const world = sandbox.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 ok(world && world.person, 'the world has no person');
-// Small Weather or nothing: with a model configured, the box figure is never drawn, not before his model is on and
-// not after a failed load (setSkin(null)).
+// The stand-in figure is drawn until his model is on him and again after a failed load (setSkin(null)): never hidden.
 const figureShowing = () => world.person.getChildMeshes(false).filter((m) => m.isEnabled() && !/phone|cup|bag|shadowproxy/i.test(m.name));
 if (cfg.control && cfg.control.model) {
-  ok(figureShowing().length === 0, `the box stand-in shows before his model loads: ${figureShowing().slice(0, 4).map((m) => m.name).join(', ')}`);
+  ok(figureShowing().length > 0, "the box stand-in is drawn before his model loads (never hidden)");
   world.setSkin(null);
-  ok(figureShowing().length === 0, 'the box stand-in comes back after a failed model load');
+  ok(figureShowing().length > 0, "the box stand-in comes back after a failed model load");
 }
 const { installLook } = await import(new URL('js/look.js', root).href);
 installLook(world);

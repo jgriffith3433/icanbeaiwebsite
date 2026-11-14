@@ -46,7 +46,7 @@ levels get redone over time. The page is the day playing on its own until someon
 - **His look:** a rigged 3D model made in Hawkes Gen from his Dose Of Destruction art (below, "His 3D model"): black
   messy hair, glasses, the navy tech jacket with glowing blue seams, cargo pants, glowing boots; lightning coils his
   arms while he's the player's. It's the same him all day (no pyjamas or towel colours: `person.outfits` only colours
-  the box figure, which is never drawn while `control.model` is set: he shows as Small Weather or not at all. His GLB loads
+  the box figure, which is never drawn while `control.model` is set: he shows as Small Weather, or as the box stand-in until the model is on him (and again if it is lost; js/app.js retries the GLB in the background with backoff, `?blockmodel=1` / `window.__blockModel` block it for the `model-blocked` playtest; `world.heroDrawn()` says model, figure or none). His GLB loads
   into an asset container and joins the scene only once it is on him; a failed load tries twice more, then he stays hidden).
 
 - **The city:** a few blocks in `day.config.js` `city` (avenues, crosses, the park, solid blocks). Three of the blocks have a stair up the north face onto the roof (`stair`). His rooms and the office stay the cutaway interiors; the office origin is a few blocks east on the main avenue (`street`). Untextured shapes; the art pass is later.
