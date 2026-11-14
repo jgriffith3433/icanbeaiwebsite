@@ -101,7 +101,7 @@
         var html = document.documentElement, card = document.getElementById("loading"), bar = document.getElementById("loading-bar");
         var msg = document.getElementById("loading-msg"), retry = document.getElementById("loading-retry");
         var W = { scripts: 0.5, model: 0, frame: 0.25, title: 0.25 }, got = { scripts: 0, model: 0, frame: 0, title: 0 };
-        var t0 = performance.now(), MIN_MS = 700, state = "loading", log = [], slowT = 0;
+        var t0 = performance.now(), MIN_MS = 700, state = "loading", log = [], slowT = 0, deadlineT = 0, DEADLINE_MS = 15000;
         var TEXT = { scripts: "Loading…", model: "Loading…", frame: "Loading…", title: "Loading…" }; /* one fixed line: each new line counts as more words on screen in the first minute */
         function emit(action, extra) {
           var d = { action: action, t: Math.round(performance.now() - t0), pct: pct() };
@@ -124,6 +124,7 @@
           frac = Math.max(0, Math.min(1, frac));
           if (frac <= got[part]) return;
           got[part] = frac; paint(frac < 1 ? part : null);
+          if (part === "scripts" && frac >= 1) armDeadline();
           emit("progress", { part: part, frac: Math.round(frac * 100) / 100 });
         }
         function finish() {
@@ -154,7 +155,15 @@
         // Scripts: capture-phase load/error events on <script> elements (they don't bubble).
         document.addEventListener("load", function (e) {
           var el = e.target; if (!el || el.tagName !== "SCRIPT" || !el.src) return;
-          if (/app\.js|index-.*\.js|\/assets\//.test(el.src)) set("scripts", 1);
+          if (/app\.js|index-.*\.js|\/assets\//.test(el.src)) { set("scripts", 1); armDeadline(); }
+        }, true);
+        /* Real download progress for the bundle: the build lists every chunk as <link rel="modulepreload">; each one's load event
+           moves the bar through the first part of "scripts" (up to .9 of it; the entry module evaluating is the last .1). On Slow 4G
+           the bar now moves chunk by chunk instead of sitting at 4% until everything lands. */
+        var pre = document.querySelectorAll('link[rel="modulepreload"]'), preGot = 0;
+        if (pre.length) document.addEventListener("load", function (e) {
+          var el = e.target; if (!el || el.tagName !== "LINK" || el.rel !== "modulepreload") return;
+          preGot++; set("scripts", 0.9 * Math.min(1, preGot / pre.length));
         }, true);
         document.addEventListener("error", function (e) {
           var el = e.target; if (el && el.tagName === "SCRIPT" && el.src && /app\.js|\/assets\//.test(el.src)) fail("script " + el.src, "the game");
@@ -170,17 +179,22 @@
         window.addEventListener("error", function (e) { if (e.target && e.target !== window) return; bootError((e.error && e.error.message) || e.message, e.filename); });
         window.addEventListener("unhandledrejection", function (e) { var r = e.reason; bootError((r && r.message) || r, (r && r.stack) || ""); });
         slowT = setTimeout(function () { if (state === "loading") { card.classList.add("slow"); msg.textContent = "Still loading… this is taking longer than usual."; emit("slow"); } }, 30000);
-        /* Hard deadline (one timer, no polling): the card never outlives DEADLINE_MS. If a gate (first frame, title, shader warm-up) never
-           reports, either the game is already drawing, so hand off to play, or it isn't, so show Try again. */
-        var DEADLINE_MS = 15000;
-        setTimeout(function () {
-          if (state !== "loading") return;
-          var up = false;
-          try { up = !!(window.day && window.day.now && window.day.now().frame); } catch (e) {}
-          emit("deadline", { up: up });
-          if (up) { got = { scripts: 1, model: 1, frame: 1, title: 1 }; finish(); }
-          else fail("no first frame within " + DEADLINE_MS + " ms", "the game");
-        }, DEADLINE_MS);
+        /* Hard deadline (one timer, no polling), counted from the moment the scripts are in, not from the page opening: on a slow
+           phone connection the bundle alone can take longer than 15 s, and the old clock declared "Couldn't load" (or a stall) while
+           bytes were still arriving. Once the code is in, the card never outlives DEADLINE_MS: if a gate (first frame, title, shader
+           warm-up) never reports, either the game is already drawing, so hand off to play, or it isn't, so show Try again.
+           While the bundle downloads, the "slow" note and Try again at 30 s are the only change. */
+        function armDeadline() {
+          if (deadlineT || state !== "loading") return;
+          deadlineT = setTimeout(function () {
+            if (state !== "loading") return;
+            var up = false;
+            try { up = !!(window.day && window.day.now && window.day.now().frame); } catch (e) {}
+            emit("deadline", { up: up });
+            if (up) { got = { scripts: 1, model: 1, frame: 1, title: 1 }; finish(); }
+            else fail("no first frame within " + DEADLINE_MS + " ms of the code arriving", "the game");
+          }, DEADLINE_MS);
+        }
         window.__loading = { set: set, done: done, fail: fail, state: function () { return state; }, pct: pct, log: function () { return log.slice(); } };
         emit("show");
       })();
