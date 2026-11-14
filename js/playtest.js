@@ -11559,6 +11559,11 @@ async function wakeHimRun(options, t) {
   if (D.transition && D.transition.wipe) await D.transition.wipe(() => D.jump("03:00"), { kind: "wake-setup", id: "wake-him" }).catch(() => {});
   else D.jump("03:00");
   await t.until(() => { const f = D.now().frame; return f && ["lie", "side", "recline"].includes(f.person.pose); }, 8000, "him asleep in bed").catch(() => {});
+  // The day must have him again and the Take control button must be live before the tap. The setup's tutorial skip can take him,
+  // so the let-go above leaves him "Walking back…" (button disabled, mode returning) when the 20 s wait runs out; the jump to 03:00
+  // then shows him in bed while the walk-back is still catching up. A tap in that window did nothing, the stretch never started and
+  // the first cast (a power press takes control by itself) came ~11 s later (12.19 s after the tap).
+  await t.until(() => C.mode() === "schedule" && !!$("control") && !$("control").disabled, 30000, "Take control to be live again").catch(() => {});
   await sleep(600);
   t.scene(phone ? "Wake him (phone, 03:00)" : "Wake him (03:00)");
   await sleep(300);
