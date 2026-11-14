@@ -535,7 +535,7 @@
     }
 
     function windowPane(x, z, w, y, h, rotY) {
-      const frameM = mat("#f3efe6");
+      const frameM = mat("#6b5a44");
       const n = new B.TransformNode("win", scene);
       n.position.set(x, 0, z);
       n.rotation.y = rotY || 0;
@@ -564,9 +564,9 @@
         const W = x1 - x0;
         const D = z1 - z0;
         const H = 2.75;
-        const wallM = mat(b.wall || "#e6dfd2");
-        const outM = mat("#c9bfb0");
-        const floorM = mat(b.floor || "#c6aa7c");
+        const wallM = mat(b.wall || "#4b5168", { emissive: "#1c1812" }); // dusk navy, a faint lamp-warm lift so lit rooms never go black
+        const outM = mat("#3a3d4a");
+        const floorM = mat(b.floor || "#5e4636", { emissive: "#120d08" });
         const fl = box(bid + "-floor", W, 0.1, D, x0 + W / 2, FLOOR / 2, z0 + D / 2, floorM, null, false);
         fl.receiveShadows = true;
         box(bid + "-plinth", W + 0.4, 0.1, D + 0.4, x0 + W / 2, 0.03, z0 + D / 2, outM, null, false).receiveShadows = true;
@@ -576,7 +576,7 @@
         left.receiveShadows = true;
         const right = box(bid + "-right", 0.16, H, D, x1, H / 2, z0 + D / 2, wallM);
         right.receiveShadows = true;
-        const trimM = mat(bid === "office" ? "#59636e" : "#8d5a45");
+        const trimM = mat(bid === "office" ? "#3b4552" : "#5a3a2c");
         box(bid + "-crown", W + 0.3, 0.14, 0.3, x0 + W / 2, H + 0.07, z0, trimM);
         const crownL = box(bid + "-crownL", 0.3, 0.14, D, x0, H + 0.07, z0 + D / 2, trimM);
         const crownR = box(bid + "-crownR", 0.3, 0.14, D, x1, H + 0.07, z0 + D / 2, trimM);
@@ -584,6 +584,11 @@
         innerWalls.push({ mesh: left, extra: [crownL], x0, z0, x1: x0, z1 });
         innerWalls.push({ mesh: right, extra: [crownR], x0: x1, z0, x1, z1 });
         box(bid + "-base", W, 0.12, 0.05, x0 + W / 2, FLOOR + 0.06, z0 + 0.1, trimM, null, false);
+        /* the same dusk language as the street: a darker wainscot with a brass picture rail so the cutaway reads as part of the city */
+        const brassM = mat("#b8934a", { emissive: "#2a2008" });
+        box(bid + "-dado", W - 0.16, 0.9, 0.04, x0 + W / 2, FLOOR + 0.5, z0 + 0.1, mat("#2f3445"), null, false).receiveShadows = true;
+        box(bid + "-dadorail", W - 0.16, 0.05, 0.07, x0 + W / 2, FLOOR + 0.97, z0 + 0.1, brassM, null, false);
+        box(bid + "-picrail", W - 0.16, 0.04, 0.06, x0 + W / 2, H - 0.25, z0 + 0.1, brassM, null, false);
         /* the open front of the cutaway: a trimmed post where each side wall ends, so the cut isn't a raw edge */
         box(bid + "-postL", 0.3, H, 0.3, x0, H / 2, z1, trimM);
         box(bid + "-postR", 0.3, H, 0.3, x1, H / 2, z1, trimM);
@@ -1102,7 +1107,7 @@
     fronts.forEach(({ id, b, dx, win, trimC }) => {
       const [fx0, , fx1, fz] = b;
       const H = 2.75;
-      const outer = mat("#c9bfb0");
+      const outer = mat("#3a3d4a");
       const trim = mat(trimC);
       const part = (name, w, h, d, x, y, z, m) => {
         const mesh = box(id + "front-" + name, w, h, d, x, y, z, m, null, false);
