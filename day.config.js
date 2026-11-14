@@ -2519,6 +2519,24 @@ window.DAY_CONFIG = {
     near: 9, // m: how close for a beat to start
     range: 16, // m: how close he must be when he answers an ask
     tagRange: 90, // m: name tags show this far
+    /* STREET BARKS (js/npcbarks.js): passing a named neighbour (inside `awareness.look`) or casting near them (inside
+       `awareness.react`) gets one short voiced line from them. Every line below is an EXISTING clip (audio/dialogue,
+       same words as a beat, a story line or a remember line; scripts/check-npc-barks.mjs fails on one without a clip),
+       so nothing is generated. `repeat` s: a line is not used again inside it. `gap` s: any two barks. `person` s: one
+       neighbour's pass barks. An empty pool stays quiet. */
+    barks: {
+      delay: 0.6, gap: 7, person: 25, repeat: 180,
+      pass: {
+        birdie: ["A little rain. Not a lot. A little.", "Picked these for you. Don't tell the pigeons."],
+        dex: ["Parcel for you. No return address. It hums a bit.", "Some of that was perfect. Some of that was weather.", "Best seat on the avenue. Keep the beat."],
+        quill: ["The sky is keeping time. So are we.", "Whatever you do, do it on time. The sky keeps a beat."],
+      },
+      cast: {
+        birdie: { rain: ["Look at them drink. Bless you."] },
+        dex: { sun: ["Dry as a bone. I owe you a delivery."], wind: ["The stalls! Mind the stalls!"], rain: ["Parcels, produce, everything's gone soft. You can't sell soft."] },
+        quill: { bolt: ["Got it. Look at that blue."], wind: ["They're turning. Do you see how they turn?"] },
+      },
+    },
     lines: {
       open: "Neighbors",
       title: "Your neighbors",
@@ -2574,7 +2592,7 @@ window.DAY_CONFIG = {
       {
         id: "birdie", name: "Birdie Alvarez", role: "Gardener, apt block", home: "the apt block, west end", scale: 0.88, color: "#f2c230",
         look: { skin: "#e0b794", top: "#f2c230", pants: "#4a5a3a", shoes: "#5a3a22", hair: "#7a5a3a", bun: true, coat: 0.5, hat: { type: "straw", brim: 0.62, color: "#c9a85a", band: "#4f9a5b" }, carry: "basket" },
-        stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5], [11.8, -6, 22.5, "sit"], [16.6, -21, 9.5], [20, -26.5, 9.2, "inside"]],
+        stops: [[0, -26.5, 9.2, "inside"], [7, -21, 9.5, null, "water"], [11.5, 109.7, 24.4, "sit", "eat"], [14.8, 44.4, 10.6, null, "chat"], [17, -6, 17.2, null, "water"], [20, -26.5, 9.2, "inside"]],
         /* What she remembers when he walks up (voiced; once a day each): `helped` after he answered her ask, `botched` after he left it. */
         remember: { helped: "Small Weather. My tomatoes are still talking about that rain.", botched: "The tomatoes got by without you. Barely." },
         beats: [
@@ -2586,7 +2604,7 @@ window.DAY_CONFIG = {
       {
         id: "dex", name: "Dex Moreno", role: "Courier, the shop", home: "the shop, mid avenue", scale: 1, color: "#ff7a1a",
         look: { skin: "#8a5a3c", top: "#ff7a1a", pants: "#24262c", shoes: "#e8e8e8", build: 1.1, hat: { type: "helmet", color: "#e8e8e8" }, carry: "parcel" },
-        stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8], [11.4, 110, 17.5, "sit"], [15.4, 46, 9.8], [20, 47, 9.8, "inside"]],
+        stops: [[0, 47, 9.8, "inside"], [7, 46, 9.8, null, "phone"], [9.3, -21, 9.8, null, "chat"], [11.6, 126.3, 24.4, "sit", "eat"], [14.4, 151.6, 10.4, null, "chat"], [17.2, 75, 14.6, null, "phone"], [19.8, 47, 9.8, "inside"]],
         remember: { helped: "Hey, sun break. The parcels stayed dry. I haven't forgotten.", botched: "The parcels came out soggy. No hard feelings. Some." },
         beats: [
           { id: "dex-ask", kind: "ask", from: 7, to: 15, ability: "sunbreak", text: "Parcels sat out in the damp all night. Any chance of a sun break? Two minutes.", reward: null },
@@ -2597,13 +2615,23 @@ window.DAY_CONFIG = {
       {
         id: "quill", name: "Ines Quill", role: "Stargazer, the annex", home: "the annex, east end", scale: 1.1, color: "#7a5cd6",
         look: { skin: "#e3c4a8", top: "#7a5cd6", pants: "#1c1c2a", shoes: "#1c1c2a", hair: "#2a2038", glasses: "#9fd4ff", coat: 0.55, carry: "telescope" },
-        stops: [[0, 154, 9.8], [6.5, 154, 9.8, "inside"], [16.5, 154, 9.8]],
+        stops: [[0, 154, 9.8, null, "scope"], [6, 126.3, 28.4, "sit", "eat"], [10, 154, 9.8, null, "chat"], [16.8, 60, 78.6, null, "scope"], [21.8, 154, 9.8, null, "scope"]],
         remember: { helped: "That blue is still on my sensor. Thank you.", botched: "No bolt, no photograph. I stayed up anyway." },
         beats: [
           { id: "quill-ask", kind: "ask", from: 17, to: 5, ability: "bolt", text: "Thirty nights and no lightning in my lens. One bolt, if you would. Not at me.", reward: null },
           { id: "quill-thanks", kind: "thanks", text: "Got it. Look at that blue.", reward: { score: 50, pressure: 25, label: "for the photograph" } },
           { id: "quill-surprise", kind: "surprise", from: 20.5, to: 5, text: "Look up. My charts and your weather agree: tonight you're the brightest thing out.", reward: { score: 100, pressure: 60, label: "and a star named for him" } },
         ],
+      },
+      /* A routine-only neighbour (no ask, no beats yet): the bread. Rises early, sells from a plaza stall, lunches on a bench,
+         chats on the shop stoop, locks up at his own door. Stops are [hour, x, z, mode?, idle action?]: `mode` "inside" (drawn
+         nowhere) or "sit"; `action` is what the figure does there: water, phone, scope, chat, eat. Walked on the pavement
+         graph (js/pavement.js), never over the lawn or through a house. */
+      {
+        id: "fenn", name: "Fenn Adeyemi", role: "Baker, the mid block", home: "the mid block, mid avenue", scale: 0.97, color: "#2fa8a0",
+        look: { skin: "#b9825a", top: "#2fa8a0", pants: "#3a3a44", shoes: "#2a2420", hair: "#2a1e18", coat: 0.2 },
+        stops: [[0, 86, 9.6, "inside"], [5.8, 118, 18.4, null, "chat"], [11.8, 109.7, 28.4, "sit", "eat"], [14.6, 47.4, 10.6, null, "chat"], [17.4, 86, 9.8, null, "chat"], [20, 86, 9.6, "inside"]],
+        beats: [],
       },
     ],
     /* PERSONAL ARCS (3 beats each, persisted in js/memory.js `arcs` across real days). Beat kinds:

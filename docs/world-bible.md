@@ -138,13 +138,16 @@ Home Block landmark is a vertical-slice deliverable (crown light strip + tomato 
 Same storm caller as Dose Of Destruction (`AllTheCharacters/SmallWeather`). Black messy hair, glasses, navy tech jacket with glowing blue seams, cargo pants, glowing boots. Lives a developer's day on autopilot (`day.config.js` spine); player Take control for third-person walk/run/jump/float and weather powers. Voice: DoD Eric, short first-person; log/barks say "He", never "they". Spoken barks (`voice.spoken`, director in `js/voice.js`): take control, let go, each power's first use, rooftop rescue, neighbour thanks, day end, idle — caption clear of the ability bar, no overlap, ~5 min per-line cooldown; Voices mute separate from Sound. **Five verbs, one Charge:** Lightning (E; hold → Storm), Rain (R), Wind (V; tap Gust, hold Gale, full Tornado; G aliases Gust), Fog (C), Sun (X). Only Charge shows on the ability bar (amber bolt); the old Pressure chip is gone; Body panel **Energy** is fatigue only. Keys 1–7 and hold Q are **Sky studio** in Settings (off by default). On a phone the five verbs sit in an arc on the right with Charge as a ring; the Storm/Bolt/Gust/Tornado pad is gone. Strain ("Sky") is what the district absorbs in the arc. Reacts with barks to needs and sky changes; crowd answers his *manual* weather. Main character model is always Small Weather, never a placeholder while loading. Live log shows only what has happened; when the clock is held, status and clock say Paused.
 
 ### Birdie Alvarez
-Gardener, yellow raincoat and straw hat; apt block. Stops: inside overnight, pots at −21,9.5 from 7, park bench −6,22.5 at noon, home by 20. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). **Personal arc (3 beats):** dying pots → rain saves them → garden-show ribbon on her balcony + basket at his door (`neighbors.arcs.birdie`, persisted in memory). Canon: she asks him for rain for her tomatoes. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* 3–4 idle barks/gestures after the ask; readable hat silhouette before Gen model.
+Gardener, yellow raincoat and straw hat; apt block. **Routine (stops, idle action):** home overnight → pots 7:00 (water) → a plaza bench 11:30 (sit, lunch) → the shop stoop 14:48 (chat with Fenn) → the park's south edge on the pavement 17:00 (water the lawn) → home 20:00. Ask: rain for tomatoes; thanks; evening surprise (tomatoes). **Personal arc (3 beats):** dying pots → rain saves them → garden-show ribbon on her balcony + basket at his door (`neighbors.arcs.birdie`, persisted in memory). Canon: she asks him for rain for her tomatoes. *Short:* box figure until GPU neighbor pass. *Build (queue 5):* 3–4 idle barks/gestures after the ask; readable hat silhouette before Gen model.
 
 ### Dex Moreno
-Courier, orange jacket, white helmet, parcel on his back; lives over the shop. Stoop by day, plaza at lunch. Ask: sun break for damp parcels; thanks; evening humming parcel surprise. Briefs and closes the lunch rescue. **Personal arc (3 beats):** stalled shop turbines → Gust keeps them spinning → lit OPEN sign + wave from the doorway (`neighbors.arcs.dex`). *Short:* box figure until GPU neighbor pass. *Build (queue 5):* idle route jokes and helmet silhouette; parcel-carry handoff as a non-weather verb.
+Courier, orange jacket, white helmet, parcel on his back; lives over the shop. **Routine:** home → stoop 7:00 (phone) → the apt door 9:18 (delivery, chat) → a plaza bench 11:36 (lunch) → the annex door 14:24 (delivery, chat) → the avenue corner at 75,14.6 17:12 (phone, last parcel) → home 19:48. Ask: sun break for damp parcels; thanks; evening humming parcel surprise. Briefs and closes the lunch rescue. **Personal arc (3 beats):** stalled shop turbines → Gust keeps them spinning → lit OPEN sign + wave from the doorway (`neighbors.arcs.dex`). *Short:* box figure until GPU neighbor pass. *Build (queue 5):* idle route jokes and helmet silhouette; parcel-carry handoff as a non-weather verb.
 
 ### Ines Quill
-Stargazer, violet coat, glasses, telescope; annex. Inside by day, out from 16:30 through the night. Ask: one bolt for her lens (not at her); thanks; night surprise. Reads the sky in Part 2; names the lunch cell as something "clearing its throat." **Personal arc (3 beats):** blank charts under streetlights → Fog for one reading → chart in her window + violet roof beacon (`neighbors.arcs.quill`). *Short:* box figure until GPU neighbor pass. *Build (queue 5):* dusk star-point gesture and chart mutter; scope silhouette readable at range.
+Stargazer, violet coat, glasses, telescope; annex. Out all night, scope on the annex pavement (21:48 to 6:00); dawn coffee on a plaza bench 6:00, doorstep nap-and-chat at the annex 10:00, then the Needle's foot (north avenue) for the sunset sky 16:48 (scope). Ask: one bolt for her lens (not at her); thanks; night surprise. Reads the sky in Part 2; names the lunch cell as something "clearing its throat." **Personal arc (3 beats):** blank charts under streetlights → Fog for one reading → chart in her window + violet roof beacon (`neighbors.arcs.quill`). *Short:* box figure until GPU neighbor pass. *Build (queue 5):* dusk star-point gesture and chart mutter; scope silhouette readable at range.
+
+### Fenn Adeyemi
+Baker, the mid block (door at 86,9.8). A routine-only neighbour so far: no ask or beats yet. **Routine:** up at 5:48 to the plaza stall (chat) → lunch on a plaza bench 11:48 → the shop stoop 14:36 (chat) → his own door 17:24 (chat, locks up) → home 20:00. Warm, unhurried, a little floury; teal apron-jacket so his silhouette reads at range. Why he exists: the street needs a fourth person out on a routine at noon (phone check: four neighbours visible).
 
 ### The District Board *(candidate loudspeaker faction)*
 Utilities voice on the Storm Tank speaker. Plain official tone; does not name him. Reservoir advisories and Weather Warning. *Not settled as full canon* until J answers beat-sheet Q3; lines already play in Parts 1/3 dialogue data. *Build:* physical speaker staging (queue 3).
@@ -196,6 +199,14 @@ Crowd reacts to weather he sets, not to his face (half-know in Heavy Weather end
 - Personality: brisk, practical, upbeat.
 - Voice: dialogue cast `Dex` `TX3LPaxmHKxFdv7VOQHJ` (Liam).
 - Animations: idle, walk, talk (peoplekit; Gen model later).
+
+### Fenn Adeyemi
+- Want: a street where the bread is gone by noon and everyone says hello.
+- Arc: a routine today (stall, bench, stoop, door); an ask for the weather bakery bread (sun for the plaza market) is the next beat.
+- Moment: at 08:00 he is at the plaza stall waving to whoever passes; at noon on a bench; at 18:00 locking his door.
+- Personality: warm, unhurried, floury.
+- Voice: `Bill` `pqHfZKP75CvOlQylNhV4` (no lines yet; add to dialogue cast with his first line).
+- Animations: idle, walk, talk (peoplekit chat wave, sit, eat; Gen model later).
 
 ### Ines Quill
 - Want: a clean sky reading for her lens and charts.
@@ -427,3 +438,7 @@ Birdie's ask is shown before it is spoken. Four planters on the apt stoop (x -20
 ## The morning told in play (story through play)
 
 - **What happens:** the alarm rings (red face, beeps), he snoozes it with a slap on the nightstand, rings again, off with a click; feet on the floor with a soft thud; up, in the 7:46 block he stretches both arms overhead and yawns; the coffee machine gurgles and the toaster pops; a sip; before the car he climbs the apt stair to the roof (`aptStairFoot` -> `aptStairTop` -> `aptRoof`), stands there a few seconds reading the sky (door, steps, wind), and walks back down. Each step has its own sound (`js/sfx.js` "the morning told in sound", event `day:beat`). Taking control no longer shows a speech pill: his voice says the line and the camera pushes in.
+
+## Street barks (js/npcbarks.js, `neighbors.barks` in day.config.js)
+
+The street talks back. Birdie, Dex and Ines each say one short line when Small Weather comes within 6 m (a pass bark: Birdie's tomato talk, Dex's parcel with no return address, Ines's sky keeping time) and a fitting one when he casts within 8 m (Birdie's "Look at them drink" for Rain, Dex's "Dry as a bone" for Sun break, Ines's "Look at that blue" for Lightning). Every line is an existing voiced clip; no line repeats within 3 minutes, a quiet pool stays quiet, and the music ducks under them (speakAs).
