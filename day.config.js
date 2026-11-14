@@ -258,7 +258,7 @@ window.DAY_CONFIG = {
     reactDelay: 1.0, // seconds from the look-up to Birdie's call
     prompt: { keys: "Press R for rain", touch: "Tap Rain" },
     lines: {
-      he: ["He", "That storm isn't mine. That rod is."],
+      he: ["He", "That storm isn't mine. That rod is."], // not spoken before the first cast (kept for later use)
       birdie: ["Birdie", "Small Weather! Send my tomatoes some rain."],
       after: ["He", "Rain. I can do that."],
     },
