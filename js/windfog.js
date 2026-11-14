@@ -891,7 +891,8 @@ export function createWindFog(B, scene, deps) {
   // The fog's meshes are hidden until Fog is cast, so their shaders (opacity texture, vertex alpha, thin instances)
   // used to compile on the first fogged frame: a multi-second stall on a throttled phone (the wind-fog phone run's
   // fps p5 of 4). Compile them in the background once the page has settled instead.
-  setTimeout(() => {
+  FOG.warmLeft = 0;
+  const warmFog = () => {
     const warm = (m, inst) => {
       try { if (m && m.material && m.material.forceCompilationAsync) m.material.forceCompilationAsync(m, inst ? { useInstances: true } : undefined).catch(() => {}); } catch (err) { /* headless */ }
     };
@@ -900,7 +901,9 @@ export function createWindFog(B, scene, deps) {
     warm(FOG.shaft, true);
     warm(FOG.cone, true);
     warm(FOG.halo, true);
-  }, 4000);
+    FOG.warmLeft = 4; // then a hidden draw of each (stepFog); the chunk itself loads behind a quiet moment (js/late.js)
+  };
+  warmFog();
 
   let lastShaftAt = -9;
   const fogCol = new B.Color3();
@@ -1023,6 +1026,20 @@ export function createWindFog(B, scene, deps) {
     FOG.cone.thinInstanceBufferUpdated("matrix");
     FOG.cone.material.emissiveColor.set(headA * 0.6, headA * 0.57, headA * 0.48);
     stats.cones = cn;
+    /* The first draw of each fog mesh (shader link, texture and buffer upload) used to land inside the first Fog cast: the meshes
+       are hidden until then. Draw each for a few frames at near-zero alpha, right after the chunk loads, then put it back. */
+    if (FOG.warmLeft > 0) {
+      FOG.warmLeft--;
+      const live = FOG.warmLeft > 0;
+      const tiny = 0.002;
+      if (!show) {
+        FOG.slices.forEach((s) => { s.mesh.isVisible = live; if (live) s.mat.alpha = tiny; });
+        FOG.veils.forEach((v) => { v.mesh.isVisible = live; if (live) v.mesh.material.alpha = tiny; });
+      }
+      if (shaftA <= 0.02) { FOG.shaft.isVisible = live; }
+      if (haloA <= 0.02) { FOG.halo.isVisible = live; FOG.halo.material.alpha = live ? tiny : 0; }
+      if (!(headA > 0.02 && cn > 0)) { FOG.cone.isVisible = live; FOG.cone.material.alpha = live ? tiny : 0; }
+    }
   }
 
   /* ---- the frame ---- */
