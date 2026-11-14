@@ -53,6 +53,8 @@ export function clipAvatar(root, animationGroups, opts = {}) {
   let current = null;
   let currentClip = "";
   let heldFor = 0; // seconds the current one-shot has sat on its last frame
+  const exitSecs = opts.exitSecs || 0.3; // a one-shot's way out: a straight 0.3 s blend to what comes next
+  let exiting = false; // the clip we are leaving was a one-shot
   root.rotationQuaternion = null;
   return {
     kind: "clips",
@@ -87,6 +89,7 @@ export function clipAvatar(root, animationGroups, opts = {}) {
           weights.forEach((w, grp) => weights.set(grp, grp === g ? 1 : 0));
           g.weight = 1;
         }
+        exiting = !!current && !loops.has(currentClip);
         current = g;
         currentClip = clip;
         heldFor = 0;
@@ -131,11 +134,18 @@ export function clipAvatar(root, animationGroups, opts = {}) {
         g.speedRatio = Math.max(0.3, Math.min(3.6, (speed * loopSeconds) / strideOf[clip]));
       }
       const k = 1 - Math.exp(-blend * dt);
-      weights.forEach((w, grp) => {
-        const goal = target ? target.get(grp) || 0 : grp === current ? 1 : 0;
-        const next = w + (goal - w) * k;
-        weights.set(grp, next);
-      });
+      const cw = weights.get(current) || 0;
+      if (exiting && current) {
+        /* leaving a one-shot: the next clip comes in linearly over exitSecs, so the pose is never left half-way */
+        weights.forEach((w, grp) => weights.set(grp, grp === current ? Math.min(1, w + dt / exitSecs) : w * (1 - Math.min(1, dt / exitSecs / Math.max(0.05, 1 - cw)))));
+        if (cw >= 0.999) exiting = false;
+      } else {
+        weights.forEach((w, grp) => {
+          const goal = target ? target.get(grp) || 0 : grp === current ? 1 : 0;
+          const next = w + (goal - w) * k;
+          weights.set(grp, next);
+        });
+      }
       /* The weights always add up to 1: the share that is missing would be filled by the node's stale "original"
          value (a half-faded pose, or the bind pose), and an idle at 0.97 lets that leak into the hands and boots. */
       let sum = 0;

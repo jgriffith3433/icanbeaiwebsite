@@ -47,6 +47,10 @@ const BOLTS = {
   idle: 0.3, lookup: 0.25, walk: 0.25, run: 0.35, shelter: 0.2,
 };
 
+/* one-shots that must hand back to idle on their end event (the wind-ups only while the hold is over) */
+const EXIT_CLIPS = new Set(["cast", "throw", "triumph", "windbolt", "windrain"]);
+const WINDUPS = new Set(["windbolt", "windrain"]);
+
 const FOOT_SLIDE_LIMIT = 0.05; // 5 cm per planted step (acceptance)
 const FOOT_FLOAT_LIMIT = 0.03; // 3 cm sink/float
 
@@ -259,6 +263,9 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
   let offset = standAnchor;
   let clip = "idle";
   let idleClear = 0;
+  let exitedAt = 0;
+  let exitLatch = false; // a cast clip has played out and handed back to idle: its pose isn't asked for again until a new cast
+  let exitAge = 0;
   /* Playtest option (a bot's tab only): the idle clip is forced off, so after a cast he stays in the last non-locomotion clip.
      The animation trace must then see a state held with no input (anim.stuckStateSeconds over 3). */
   let idleOff = false;
@@ -362,7 +369,7 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     clip: () => clip,
     /* seconds the current one-shot has sat on its last frame (0 while it plays or a loop runs): a pose that is held, not played */
     held: () => player.heldSeconds(),
-    motion: () => Object.assign({}, motion, ik.stats()),
+    motion: () => Object.assign({}, motion, { exits: exitedAt }, ik.stats()),
     /* What his body is doing right now, in his own frame (+z forward, +x his left): how far the spine and neck lean
        from upright, the pelvis and shoulder lines' yaw, how far the knees bend, the hands' gap. The clip-poses playtest
        reads this on a real frame to flag a twisted torso, a hanging head or an arm through the body. */
@@ -427,7 +434,24 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       /* His own fidget (a look at the sky) plays once: when it has played out he is back to idle for a good while, not held
          on its last frame for as long as the sky stays clear. */
       if (clip === "lookup" && player.ended("lookup")) idleClear = -12;
-      let want = pickHeroClip(named(c) ? c : "idle", Object.assign(ctx, { mine }));
+      /* Every cast clip has a defined exit: its end event. A one-shot that has played out (and, for the wind-ups, whose hold has
+         ended) hands back to idle, never left holding its last frame; the avatar blends out over 0.3 s. */
+      let asked = named(c) ? c : "idle";
+      const pw = window.day && window.day.powers && window.day.powers.now ? window.day.powers.now() : null;
+      const castAge = pw && pw.cast && pw.cast.age != null ? pw.cast.age : 1e9;
+      if (exitLatch && (!EXIT_CLIPS.has(asked) || castAge < exitAge)) exitLatch = false; // the ask ended, or a new cast began
+      if (!exitLatch && EXIT_CLIPS.has(clip) && player.ended(clip) && (EXIT_CLIPS.has(asked) || clip === "triumph")
+        && !(WINDUPS.has(clip) && pw && pw.windup)) {
+        exitLatch = true;
+        exitAge = castAge;
+        exitedAt++;
+      }
+      if (exitLatch) {
+        exitAge = Math.max(exitAge, castAge < 1e9 ? castAge : 0);
+        if (EXIT_CLIPS.has(asked)) asked = "idle";
+        triumphLeft = 0;
+      }
+      let want = pickHeroClip(asked, Object.assign(ctx, { mine }));
       // Force lookup once idleClear crosses the threshold
       if (want === "idle" && idleClear >= 4 && named("lookup") && mine) want = "lookup";
       clip = named(want) ? want : "idle";

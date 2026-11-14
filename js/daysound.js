@@ -220,10 +220,6 @@ export function startDaySound(dayApi) {
       })
       .then((ab) => b.ctx.decodeAudioData(ab.slice(0)))
       .then((buf) => {
-        // Equal-power loop seam when score exposes the fixer.
-        try {
-          if (day.score && typeof day.score.fixLoopSeam === "function") day.score.fixLoopSeam(buf, 0.6);
-        } catch (e) { /* */ }
         buffers[url] = buf;
         delete loading[url];
         if (live.loaded.indexOf(url) < 0) live.loaded.push(url);

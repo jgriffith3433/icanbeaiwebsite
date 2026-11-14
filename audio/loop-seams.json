@@ -1,0 +1,122 @@
+{
+  "audio/music/clear.mp3": {
+    "sha256": "58accb3d089225ae804315e74b58b3bfbca4692ad1b3b6cf8c7a1f1b8ad6fc42",
+    "seconds": 23.35,
+    "trimmedSamples": 278400,
+    "fadeSamples": 40800,
+    "jumpBefore": 0.001023,
+    "jumpAfter": 0.001763
+  },
+  "audio/music/clouds.mp3": {
+    "sha256": "570abb21ad0d20d8aa4cfe9b28387f75b3be737ad78002c635466c11f9260780",
+    "seconds": 23.3,
+    "trimmedSamples": 280800,
+    "fadeSamples": 40800,
+    "jumpBefore": 0.003637,
+    "jumpAfter": 0.006024
+  },
+  "audio/music/rain.mp3": {
+    "sha256": "d91865a97fc932d26c60bd2ce76a167fb914d7b53272b96ff16e38574f302425",
+    "seconds": 22.9,
+    "trimmedSamples": 300000,
+    "fadeSamples": 40800,
+    "jumpBefore": 0.001752,
+    "jumpAfter": 0.006967
+  },
+  "audio/music/storm.mp3": {
+    "sha256": "54430b5a4068bbcabe06203c5fe8dbc01a210977932c51bcc3f3e3fe193548e4",
+    "seconds": 25.8,
+    "trimmedSamples": 160800,
+    "fadeSamples": 40800,
+    "jumpBefore": 0.00034,
+    "jumpAfter": 0.007211
+  },
+  "audio/music/fog.mp3": {
+    "sha256": "d9c22dedb034b52263b708c4b0179162be6357411d113d961ca75bbbc2dde09d",
+    "seconds": 22.6,
+    "trimmedSamples": 314400,
+    "fadeSamples": 40800,
+    "jumpBefore": 0.01218,
+    "jumpAfter": 0.000405
+  },
+  "audio/music/snow.mp3": {
+    "sha256": "5131ab4954baf984b8ef770696dcb5a4b10984681165013c2d8aa279dc042bda",
+    "seconds": 22.95,
+    "trimmedSamples": 297600,
+    "fadeSamples": 40800,
+    "jumpBefore": 0.025371,
+    "jumpAfter": 0.000443
+  },
+  "audio/sfx/city-hum.mp3": {
+    "sha256": "d6ae800b0b9cbd7b15c50c2974570a48d87d5b56a44c1f34d95191220012c6f9",
+    "seconds": 11.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.010123,
+    "jumpAfter": 0.00168
+  },
+  "audio/sfx/rain-asphalt.mp3": {
+    "sha256": "dbfff7f4e0b3b017ca08b27f391a636f54a7477d93f57fde0c1c6d7c94220273",
+    "seconds": 11.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.18373,
+    "jumpAfter": 0.067746
+  },
+  "audio/sfx/rain-roof-light.mp3": {
+    "sha256": "7159776a3f1e6239f6dc22e69f4afecdbb3abb9f7d9d336d40508a282e7eb40d",
+    "seconds": 7.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.133868,
+    "jumpAfter": 0.001118
+  },
+  "audio/sfx/rain-downpour.mp3": {
+    "sha256": "f5b0f354d0a7ce8bfe4bddd9ae02842817abe631878f569f14c2274f277ab9e4",
+    "seconds": 7.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.079937,
+    "jumpAfter": 0.010407
+  },
+  "audio/sfx/rain-gutter.mp3": {
+    "sha256": "90108a41fa1e2899d7305d610ae056d5570495a1be647c0ea1e9c15d0ee75927",
+    "seconds": 7.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.021025,
+    "jumpAfter": 0.0009
+  },
+  "audio/sfx/rain-umbrella.mp3": {
+    "sha256": "6c71d0fd5145f95963b5a4e9a84b08f1fa2cb0b6b780f42d3ec0e11db436e487",
+    "seconds": 7.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.04968,
+    "jumpAfter": 0.033703
+  },
+  "audio/sfx/wind.mp3": {
+    "sha256": "84719cb3d6667ac577179886f369e0e5c173c5fd245f7e197c4c027df06e0c25",
+    "seconds": 11.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.018454,
+    "jumpAfter": 0.018393
+  },
+  "audio/sfx/wind-awning.mp3": {
+    "sha256": "3643455725bf8dfd950dc8ce19a32e379a5b8d95fa1771797f6baffc07d84e10",
+    "seconds": 7.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.063369,
+    "jumpAfter": 0.002634
+  },
+  "audio/sfx/sun-birds.mp3": {
+    "sha256": "cd9cd904766b393a065cce5627d7c6cd96187457eede6b289c07132d259b26b6",
+    "seconds": 7.15,
+    "trimmedSamples": 0,
+    "fadeSamples": 37485,
+    "jumpBefore": 0.110493,
+    "jumpAfter": 0.061051
+  }
+}
