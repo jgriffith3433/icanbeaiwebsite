@@ -754,10 +754,19 @@ function install() {
      target up on screen, smoothly, until his feet sit just above the top of that bottom stack. The reference is the
      damped target, not his feet, so a jump doesn't swing the shot. Phones keep the centre (their pads are at the sides). */
   function hudLiftGoal() {
-    if (touchMode() || (cs.cast && cs.cast.glance)) return 0;
+    if (cs.cast && cs.cast.glance) return 0;
     const cv = world.scene.getEngine().getRenderingCanvas();
     const ch = cv ? cv.clientHeight : 0;
     const cw = cv ? cv.clientWidth : 0;
+    if (touchMode()) {
+      // Phone portrait: the verb arc and stick fill the lower half, so he sits in the upper-middle (chest at ~36% of the
+      // screen height), clear of the arc. Landscape keeps the centre (the arc is at the right edge, he is left of it).
+      if (ch < 300 || ch <= cw) return 0;
+      const tt = camera.target;
+      const dd = Math.max(1, B.Vector3.Distance(camera.globalPosition, new B.Vector3(tt.x, tt.y, tt.z)));
+      const ppm = ch / 2 / (dd * Math.tan((camera.fov || 0.78) / 2));
+      return (0.14 * ch) / ppm;
+    }
     if (ch < 300) return 0;
     const now = performance.now();
     if (hudTop == null || now - hudAt > 250) {

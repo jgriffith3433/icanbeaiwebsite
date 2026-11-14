@@ -162,8 +162,10 @@ export function startAbilityBar(abilities, onPress, opt) {
 .abilitybar .charge.refused .refuse{display:block}
 .abilitybar .charge.refused .et{display:none}
 /* phone: five verbs in an arc on the right edge above the thumb; Charge is a ring around the arc */
-html.touch-ui .abilitybar{align-items:center;justify-content:center;gap:0;width:240px;height:240px;font-size:.8rem;pointer-events:none}
-html.touch-ui .abilitybar .row{position:relative;width:240px;height:240px;gap:0;pointer-events:none}
+/* the box is the arc's own bounds (ring x 62-178, verbs x 92-247, y -8..242 of the 240 px layout square) and only the buttons take touches:
+   a drag anywhere else in it reaches the game's look pad */
+html.touch-ui .abilitybar{display:block;position:fixed;width:186px;height:250px;font-size:.8rem;pointer-events:none}
+html.touch-ui .abilitybar .row{position:absolute;left:-62px;top:8px;width:240px;height:240px;gap:0;pointer-events:none}
 html.touch-ui .abilitybar .charge{position:absolute;inset:0;width:auto;min-width:0;pointer-events:none;z-index:0}
 html.touch-ui .abilitybar .charge .et{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.8rem;font-weight:700;white-space:nowrap}
 html.touch-ui .abilitybar .charge .bar{display:none}
@@ -187,8 +189,8 @@ html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-s
 html.touch-ui .abilitybar .ab .wipe{border-radius:50%}
 @media (orientation:landscape) and (max-height:520px){
   /* centre near the box's foot: the arc fans across the top */
-  html.touch-ui .abilitybar{width:260px;height:160px}
-  html.touch-ui .abilitybar .row{width:260px;height:160px}
+  html.touch-ui .abilitybar{width:254px;height:186px}
+  html.touch-ui .abilitybar .row{left:-3px;top:-2px;width:260px;height:160px}
   html.touch-ui .abilitybar .charge .ring{top:130px}
   html.touch-ui .abilitybar .charge .et{top:130px}
   html.touch-ui .abilitybar .ab{top:130px}
