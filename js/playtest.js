@@ -3688,6 +3688,12 @@ async function skyCast(options, t) {
     const top = Object.keys(i.weights).sort((a, b) => i.weights[b] - i.weights[a])[0];
     tops.push(top);
     t.event("sky-" + label.replace(":", ""), `${label}: ${top} (${i.weights[top].toFixed(2)}), painted ${i.painted}, loaded ${i.loaded.join("/")}`);
+    const bd = window.day && window.day.backdrop && window.day.backdrop.info();
+    if (bd) {
+      t.event("sky-backdrop-" + label.replace(":", ""), `${label}: far skyline ${bd.on ? "on" : "OFF"}, ${bd.towers} towers, silhouette ${bd.colour.join("/")} on horizon ${bd.horizon.join("/")}, contrast ${bd.contrast}`);
+      if (!bd.on) t.problem("bug", `${label}: the far-city skyline backdrop is off`);
+      else if (bd.contrast < 0.04) t.problem("bug", `${label}: the far skyline has no contrast against the horizon (${bd.contrast}): it would read as a flat band`);
+    }
     if (i.painted < 0.9) t.problem("bug", `${label}: the painted sky isn't showing (painted ${i.painted}, loaded ${i.loaded.join("/") || "none"})`);
     t.progress(0.1 + 0.1 * tops.length);
   }
