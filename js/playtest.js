@@ -12112,6 +12112,9 @@ async function phoneTouchRun(options, t) {
     if (sr) {
       const cx = sr.left + sr.width / 2, cy = sr.top + sr.height / 2;
       const reach = sr.width / 2;
+      // He is taken where the day has him (indoors at 19:00): the stick held forward for 6 s would press him into a wall and
+      // the feel sensor would rightly call it stuck. Setup shortcut: stand him on the open avenue, camera behind him, facing east.
+      if (C.place) { t.cut(); C.place(40, 12.6, 1.5708, { from: 14, alpha: 4.71, beta: 1.2, radius: 7 }); await sleep(700); }
       let peak = 0, fastest = 0;
       const sampler = setInterval(() => { const sp = C.state().speed || 0; peak = Math.max(peak, sp); }, 50);
       await footstepProbe(t, "phone touch walk/run", async () => {
