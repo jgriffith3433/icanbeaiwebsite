@@ -9,6 +9,8 @@
    the playtest calls day.title.quiet() for every other scenario.
    ========================================================================== */
 
+import { deedsFrom } from "./deeds.js";
+
 const DEFAULTS = {
   kicker: "I Can Be",
   name: "Small Weather",
@@ -59,7 +61,8 @@ export function startTitle() {
 @keyframes t-glint{0%,55%{background-position:140% 0}85%,100%{background-position:-40% 0}}
 .title-screen .daily{margin:14px 0 0;max-width:30em;color:#f0c27a;font:600 1rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen.fresh .clock{display:none}
-.title-screen .daily[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
+.title-screen .yday.left{color:#f0c27a}
+.title-screen .daily[hidden],.title-screen .left[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
 .title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:rgba(10,13,22,.62);color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
 .title-screen .prog b{color:#f0c27a;letter-spacing:.12em;font-weight:700}
 .title-screen .nextgoal{margin:0;max-width:min(86vw,340px);color:#f0c27a;font:600 .95rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.9);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
@@ -94,7 +97,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   el.hidden = true;
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", `${cfg.logoText.join(" ")}`);
-  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
+  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p><p class="yday left" id="title-left" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
   const logoEl = el.querySelector("#title-logo");
   logoEl.setAttribute("aria-label", cfg.logoText.join(" ")); // not a text node: a hidden-by-clip line still counts as words on screen
   if (cfg.logo) {
@@ -119,6 +122,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   }
   const dailyEl = el.querySelector("#title-daily");
   const ydayEl = el.querySelector("#title-yday");
+  const leftEl = el.querySelector("#title-left");
   const progEl = el.querySelector("#title-prog");
   const nextEl = el.querySelector("#title-next");
   const playBtn = el.querySelector("#title-play");
@@ -163,9 +167,18 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     const night = day.score && day.score.isNight ? day.score.isNight(m / 60) : h >= 20 || h < 6;
     clockEl.textContent = `Live · ${((h + 11) % 12) + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"} · ${night ? cfg.night : cfg.day}`;
   }
+  /* What he left behind: the city's memory (js/memory.js) of the last deeds, as one line on the title. */
+  function paintLeft() {
+    const m = day.memory;
+    const names = m && m.facts ? deedsFrom(m.facts()) : [];
+    const k = names.find((n) => cfg.left && cfg.left[n]);
+    leftEl.textContent = k ? cfg.left[k] : "";
+    leftEl.hidden = !k;
+  }
   /* Today's request (js/daily.js) in one line under the name, and yesterday's when it was answered. */
   function paintDaily() {
     const d = day.daily;
+    paintLeft();
     const t = d && d.line ? d.line() : "";
     const y = d && d.yesterdayLine ? d.yesterdayLine() : "";
     dailyEl.textContent = t;
@@ -291,7 +304,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     // A stranger's first title is the name and the buttons: the day's request, progress, the clock and the key hint wait for a returning player.
     const fresh = !!(day.coldopen && day.coldopen.pending && day.coldopen.pending());
     if (fresh) {
-      dailyEl.hidden = true; ydayEl.hidden = true; progEl.hidden = true; nextEl.hidden = true;
+      dailyEl.hidden = true; ydayEl.hidden = true; leftEl.hidden = true; progEl.hidden = true; nextEl.hidden = true;
       el.querySelector(".hint").textContent = "";
     }
     el.classList.toggle("fresh", fresh);
@@ -416,6 +429,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
       progress: progEl.hidden ? "" : progEl.textContent,
       next: nextEl.hidden ? "" : nextEl.textContent,
       yesterday: ydayEl.hidden ? "" : ydayEl.textContent,
+      left: leftEl.hidden ? "" : leftEl.textContent,
       sound: soundOn(),
       crane: day.world && day.world() && day.world().titleCrane ? day.world().titleCrane() : null,
       logo: cfg.logo ? "image" : "type",

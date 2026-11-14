@@ -208,6 +208,20 @@ window.DAY_CONFIG = {
     hint: "Enter to play",
     settings: "Settings",
     continue: "Continue", // Play's word when a save exists
+    // The title's "what you left behind" line for a returning player: the latest deed (js/deeds.js DEED_ORDER name) from the city's memory.
+    left: {
+      birdie: "Birdie's tomatoes are still thriving.",
+      flood: "The park is still green from your rain.",
+      rain: "The roads still shine from your rain.",
+      storm: "The scorch marks from your storm are still on the roofs.",
+      wind: "The bins are still where your gale left them.",
+      fog: "The fog you called left the street quiet.",
+      sun: "The sky you opened is still warm.",
+      roofs: "The roofs are waiting for you.",
+      rescue: "The people you got down said thanks.",
+      answered: "A neighbour is still thanking you.",
+      botched: "A neighbour is still waiting on you.",
+    },
     logoText: ["I Can Be", "AI"], // the lockup in type until the Gen-made logo (logo) is in the repo
     logo: "images/logo-icanbe-ai.webp", // Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
     // the key-art crane: ends on Small Weather on the apartment roof (the pose the cold open's camera starts from)
@@ -2515,6 +2529,7 @@ window.DAY_CONFIG = {
     },
     teach: {
       storageKey: "icanbe.street",
+      promise: "The street remembers this. Come back: more of the sky is waiting.", // one line after the first thanks (the teaser on the bar shows what is next)
       gap: 4.5, // s from a thanks to the next neighbor's call
       near: 14, // m: closer than this and they ask in person
       range: 18, // m: how close he must be to answer

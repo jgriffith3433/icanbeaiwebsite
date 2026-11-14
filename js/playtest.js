@@ -11438,6 +11438,11 @@ async function streetTeaches(options, t) {
     if (!shown) t.problem("bug", `${label}: the ${id} button didn't join the bar when it unlocked`);
     else if (r.width < 44 || r.height < 44) t.problem("bug", `${label}: the ${id} button is ${Math.round(r.width)}x${Math.round(r.height)} (44 px at least)`);
     if (!glow) t.problem("bug", `${label}: the ${id} button has no unlock glow`);
+    const tease = [...document.querySelectorAll(".abilitybar .ab.st-teaser")];
+    const tr = tease.map((el) => { const b = el.getBoundingClientRect(); return `${el.id} ${Math.round(b.width)}x${Math.round(b.height)}`; });
+    const pr = $("street-promise");
+    t.event("street-teaser", `${label}: teaser on the bar: ${tr.join(", ") || "none"}${pr && pr.classList.contains("on") ? "; promise: " + pr.textContent : ""}`);
+    if (tease.some((el) => !hudVisible(el) || el.getBoundingClientRect().width < 44)) t.problem("bug", `${label}: the next-verb teaser is hidden or under 44 px`);
     if (over.length) t.problem("bug", `${label}: the speaker caption overlaps the verb bar (${over.join(", ")})`);
   };
 
