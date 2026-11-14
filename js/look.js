@@ -119,14 +119,11 @@ function glass(u, v) {
   return { r: c.r, g: c.g, b: c.b, h: mullion ? 0.6 : 0.15 + n * 0.08 };
 }
 function roof(u, v) {
-  /* Flat tar membrane in broad strips: soft low-frequency mottling and a seam per strip. The old fine grain turned
-     into streaky "fur" on a roof seen at a grazing angle, so there is almost no height detail left. */
+  /* One clean matte slate: a flat colour with a barely-there tone drift. No seams, no grain: a textured roof seen at a
+     grazing angle smeared into streaks and read as a different art style from the title's diorama. */
   const n = fbm(u + 1, v + 3);
-  const strip = wrap01(u * 4);
-  const seam = strip < 0.025 || strip > 0.985;
-  const c = lerpRgb(rgb(30, 35, 44), rgb(40, 46, 57), n * 0.8);
-  const k = seam ? 0.72 : 1;
-  return { r: c.r * k, g: c.g * k, b: c.b * k, h: seam ? 0.3 : 0.5 + n * 0.04 };
+  const c = lerpRgb(rgb(34, 40, 50), rgb(37, 43, 54), n * 0.5);
+  return { r: c.r, g: c.g, b: c.b, h: 0.5 };
 }
 function park(u, v) {
   const n = fbm(u + 8, v);
@@ -275,7 +272,7 @@ export function installLook(world) {
     concrete: paint(scene, "concrete", TILE, concrete, 1.1),
     brick: paint(scene, "brick", TILE, brick, 1.8),
     glass: paint(scene, "glass", TILE, glass, 0.8),
-    roof: paint(scene, "roof", TILE, roof, 1.0),
+    roof: paint(scene, "roof", TILE, roof, 0),
     ground: paint(scene, "park", TILE, park, 1.1),
   };
 
@@ -322,7 +319,7 @@ export function installLook(world) {
     /* No clear coat (wet: false), like the ramp: a flat tar roof seen at a grazing angle in a storm turned the coat's
        reflection of the sky, curtains and probe into long wavy smears (the playtest's missing-texture in cold-start).
        It still darkens with the rain through the shared surface loop. The normal bump is nearly flat for the same reason. */
-    roof: pbr("roof", maps.roof, { roughness: 0.8, bump: 0.04 }),
+    roof: pbr("roof", maps.roof, { roughness: 0.85, bump: 0 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
   /* The lawn is the largest dark surface after dusk (albedo ~0.1 under a blue-grey light came out near black on a phone):
@@ -636,9 +633,9 @@ export function installLook(world) {
     if (!fps || document.hidden) return;
     let next = scaleLow;
     // measured frame time: under 30 fps steps up fast (0.5), a phone that cannot hold 24 goes to 3.5; eases back only when comfortable
-    if (fps < 24) next = Math.min(3.5, scaleLow + 0.5);
-    else if (fps < 30) next = Math.min(3.5, scaleLow + 0.25);
-    else if (fps > 48) next = Math.max(2, scaleLow - 0.25);
+    // one render resolution: the scale holds at 2 (the title's) and only drops, one step to 2.5, for a phone under 20 fps
+    if (fps < 20) next = 2.5;
+    else if (fps > 40) next = 2;
     if (next !== scaleLow) { scaleLow = next; engine.setHardwareScalingLevel(scaleLow); }
   });
 
