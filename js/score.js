@@ -472,11 +472,67 @@ export function startScore(dayApi) {
     node.connect(g);
     g.connect(bus);
     src.start();
-    return { src, gain: g, filter, panner };
+    return { src, gain: g, filter, panner, head: filter || panner || g, buf, id: o.id || "", bornMs: nowMsClock(), every: 0, refreshes: 0 };
+  }
+
+  /* The weather bed breathes: a loop that starts once is one event to the audio probe (and to an ear it is a seam every N seconds).
+     Each audible ambience layer hands over to a fresh copy of itself every 4-8 s (a random start offset, a rate never used by
+     this layer in the last 60 s, a 1.4 s equal-power crossfade), so rain and wind are a continuous bed that is never the identical
+     take twice and never goes 10 s without a new sound starting. */
+  const bedRates = Object.create(null);
+  function freshBedRate(id) {
+    const t = nowMsClock();
+    const used = (bedRates[id] = (bedRates[id] || []).filter((u) => t - u.t < 60000));
+    let r = 1;
+    for (let i = 0; i < 12; i++) {
+      r = 1 + (Math.random() * 0.044 - 0.022);
+      if (!used.some((u) => Math.abs(u.r - r) < 0.0012)) break;
+    }
+    used.push({ r, t });
+    return r;
+  }
+  function nowMsClock() { return typeof performance !== "undefined" ? performance.now() : Date.now(); }
+  function refreshLoop(n, xf) {
+    if (!ctx || !n || !n.buf || !n.head) return false;
+    try {
+      const t = ctx.currentTime;
+      const seg = ctx.createGain();
+      const next = ctx.createBufferSource();
+      next.buffer = n.buf;
+      next.loop = true;
+      next.playbackRate.value = freshBedRate(n.id);
+      if (n.id) { next.__hawkesSampleId = n.id; next.__hawkesBus = "ambience"; }
+      seg.gain.setValueAtTime(0.0001, t);
+      seg.gain.linearRampToValueAtTime(1, t + xf);
+      next.connect(seg);
+      seg.connect(n.head);
+      next.start(t, Math.random() * Math.max(0.1, n.buf.duration - 0.2));
+      const old = n.src;
+      const oldSeg = n.seg || null;
+      if (oldSeg) { oldSeg.gain.cancelScheduledValues(t); oldSeg.gain.setValueAtTime(oldSeg.gain.value, t); oldSeg.gain.linearRampToValueAtTime(0.0001, t + xf); }
+      else if (n.srcGain) { /* none */ }
+      else {
+        // the first source has no segment gain: fade it through a one-shot gain inserted by disconnecting and re-routing
+        const fade = ctx.createGain();
+        fade.gain.setValueAtTime(1, t);
+        fade.gain.linearRampToValueAtTime(0.0001, t + xf);
+        try { old.disconnect(); old.connect(fade); fade.connect(n.head); } catch (e) { /* */ }
+      }
+      try { old.stop(t + xf + 0.1); } catch (e) { /* */ }
+      n.src = next;
+      n.seg = seg;
+      n.bornMs = nowMsClock();
+      n.every = 4000 + Math.random() * 4000;
+      n.refreshes++;
+      return true;
+    } catch (e) { return false; }
   }
 
   /** Smoothly ramp a WebAudio AudioParam without clicks while keeping `.value` readable. */
   function setGainSmooth(gainNode, val, tau = 0.04) {
+    // A loop handle ({ src, gain: GainNode }) is passed for the beds and the ambience: its level is the inner node's AudioParam.
+    // (Before this, `.gain.setTargetAtTime` was read off the GainNode itself, so every bed and ambience loop stayed at 0.)
+    if (gainNode && gainNode.gain && gainNode.gain.gain && typeof gainNode.gain.gain.value === "number") gainNode = gainNode.gain;
     if (!gainNode || !gainNode.gain) return;
     const v = Math.max(0, Number(val) || 0);
     if (ctx && gainNode.gain.setTargetAtTime) {
@@ -1078,6 +1134,10 @@ export function startScore(dayApi) {
       const node = ensureAmb(k);
       if (node) {
         setGainSmooth(node, on ? live.amb[k] : 0, 0.045);
+        if (on && live.amb[k] > 0.03 && ctx.state === "running") {
+          if (!node.every) node.every = 4000 + Math.random() * 3000;
+          if (nowMs - node.bornMs > node.every) refreshLoop(node, 1.4);
+        }
         if (node.filter && k === "air") {
           node.filter.frequency.value = scape.cityToneHz;
         }
@@ -1126,6 +1186,7 @@ export function startScore(dayApi) {
       stingAt: live.stingAt,
       momentSting: live.momentSting ? Object.assign({}, live.momentSting) : null,
       whooshAt: live.whooshAt || 0,
+      bedRefreshes: AMB_LOOPS.reduce((n, k) => n + (amb[k] ? amb[k].refreshes : 0), 0),
       heard: live.heard,
       missing: Object.keys(missing).length,
       tod: live.tod,
