@@ -272,6 +272,24 @@ export function startDaySound(dayApi) {
     delete playing[id];
   }
 
+  /* Ducked under control: -6 dB (x0.5) on every loop, ramped over 0.4 s. */
+  const DUCK_DB = -6;
+  let duck = 1;
+  function setDuck(on) {
+    const want = on ? Math.pow(10, DUCK_DB / 20) : 1;
+    live.ducked = on;
+    live.duckDb = on ? DUCK_DB : 0;
+    if (want === duck) return;
+    duck = want;
+    try {
+      const b = bus();
+      Object.keys(playing).forEach((id) => {
+        const node = playing[id];
+        if (b && node && node.gain) node.gain.gain.setTargetAtTime(node.vol * duck, b.ctx.currentTime, 0.15);
+      });
+    } catch (e) { /* */ }
+  }
+
   function stopAll(fade) {
     Object.keys(playing).forEach((id) => stopLoop(id, fade));
   }
@@ -309,7 +327,7 @@ export function startDaySound(dayApi) {
     const vol = (layer && layer.vol != null ? layer.vol : 0.45) * cfg().mix;
     const t0 = b.ctx.currentTime;
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.linearRampToValueAtTime(vol, t0 + cfg().fade);
+    g.gain.linearRampToValueAtTime(vol * duck, t0 + cfg().fade);
     try { src.start(); } catch (e) { return null; }
     playing[id] = { src, gain: g, panner, file: source, vol, spot: layer && layer.at };
     live.sources[id] = source;
@@ -427,7 +445,7 @@ export function startDaySound(dayApi) {
           node.panner.pan.value = p.pan;
           try {
             const b = bus();
-            if (b) node.gain.gain.setTargetAtTime(node.vol * p.gain, b.ctx.currentTime, 0.15);
+            if (b) node.gain.gain.setTargetAtTime(node.vol * p.gain * duck, b.ctx.currentTime, 0.15);
           } catch (e) { /* */ }
         }
       });
@@ -470,16 +488,9 @@ export function startDaySound(dayApi) {
       live.playing = 0;
       return;
     }
-    // Autopilot room tone only: under control the stems / weather beds carry the mix.
+    // Under control the day's room tone stays, ducked about 6 dB (never muted) so the roof is not silent.
     const mode = day.control && typeof day.control.mode === "function" ? day.control.mode() : "schedule";
-    if (mode === "control" || mode === "returning") {
-      if (Object.keys(playing).length) stopAll(0.35);
-      live.on = true;
-      live.playing = 0;
-      live.loops = [];
-      live.keyboard = false;
-      return;
-    }
+    setDuck(mode === "control" || mode === "returning");
     resume();
     const fc = frameContext(info);
     const scape = scapeOf(fc);
@@ -572,6 +583,8 @@ export function startDaySound(dayApi) {
       block: live.block,
       loops: live.loops.slice(),
       playing: live.playing,
+      ducked: !!live.ducked,
+      duckDb: live.duckDb || 0,
       cap: live.cap,
       sources: Object.assign({}, live.sources),
       radio: live.radio ? Object.assign({}, live.radio) : null,

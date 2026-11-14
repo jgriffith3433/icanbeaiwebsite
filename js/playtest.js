@@ -7172,6 +7172,16 @@ async function daySoundScenario(options, t) {
     document.documentElement.classList.remove("touch-ui");
   }
   t.progress(0.95);
+  // Under control the day's room tone is ducked 6 dB, not muted.
+  if (window.day && window.day.control && window.day.control.mode() !== "control") {
+    pressKey("Enter");
+    await t.until(() => window.day.control.mode() === "control", 4000, "Take control (Enter)");
+    await sleep(900);
+    const U = DS.now();
+    t.event("day-sound-under-control", `ducked ${U.ducked} ${U.duckDb} dB, ${U.playing} loops playing`);
+    t.metric("dayControlLoops", U.playing);
+    if (U.playing < 1 || !U.ducked) t.problem("bug", "Under control the day soundscape is muted instead of ducked");
+  }
 
   window.removeEventListener("day:daysound", onDs);
   t.event("day-sound-done", `scapes ${scapesSeen.size} maxLoops ${maxLoops}`);

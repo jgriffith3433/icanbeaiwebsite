@@ -536,6 +536,10 @@ export function startScore(dayApi) {
     if (c.whoosh) urls.add(c.whoosh);
     Object.keys(c.ambience).forEach((k) => c.ambience[k] && urls.add(c.ambience[k]));
     urls.delete(c.ambience.air);
+    // Rain and wind beds load now (gameplay starts on this tap), so the roof is never silent before the first cast.
+    const early = [...urls].filter((u) => /rain|wind/.test(u));
+    early.forEach((u) => urls.delete(u));
+    await Promise.all(early.map((u) => loadUrl(u, true)));
     // Sting and secondary beds wait for idle after gameplay starts (and after the first cast in the cold open) so
     // neither take-control.mp3 nor the beds compete with the Play tap, roof arrival, or first cast.
     await waitGameplayIdle();
