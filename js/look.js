@@ -319,7 +319,10 @@ export function installLook(world) {
     concrete: pbr("concrete", maps.concrete, { roughness: 0.86, wet: true, coat: 0.38, bump: 0.32 }),
     brick: pbr("brick", maps.brick, { roughness: 0.88, bump: 0.65 }),
     glass: pbr("glass", maps.glass, { metallic: 0.35, roughness: 0.24, wet: true, coat: 0.45, bump: 0.2 }),
-    roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.12 }),
+    /* No clear coat (wet: false), like the ramp: a flat tar roof seen at a grazing angle in a storm turned the coat's
+       reflection of the sky, curtains and probe into long wavy smears (the playtest's missing-texture in cold-start).
+       It still darkens with the rain through the shared surface loop. The normal bump is nearly flat for the same reason. */
+    roof: pbr("roof", maps.roof, { roughness: 0.8, bump: 0.04 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
