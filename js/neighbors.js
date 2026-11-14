@@ -1,4 +1,5 @@
 import { buildFigure, detectAnimProblems, FOOT_SLIDE_LIMIT } from "./peoplekit.js";
+import { fixStops, segLength, along } from "./placement.js";
 import { buildArcProps, stepArcProps, nextBeat, powerMatches, clampBeat, emptyArcs } from "./neighbor-arcs.js";
 /* ==========================================================================
    Neighbors — three people on his avenue with their own look, home and day
@@ -33,7 +34,7 @@ export function placeAt(stops, h) {
   const a = stops[i];
   const b = stops[(i + 1) % stops.length];
   const bh = b[0] > a[0] ? b[0] : b[0] + 24;
-  const dist = Math.hypot(b[1] - a[1], b[2] - a[2]);
+  const dist = segLength(a, b); // through a.via: the corners round a building
   const dur = Math.min(Math.max(0.3, dist / WALK_M_PER_MIN) / 60, (bh - a[0]) * 0.8); // hours
   const leave = bh - dur;
   const hh = h < a[0] ? h + 24 : h;
@@ -48,14 +49,8 @@ export function placeAt(stops, h) {
     };
   }
   const f = Math.min(1, Math.max(0, (hh - leave) / dur));
-  return {
-    x: a[1] + (b[1] - a[1]) * f,
-    z: a[2] + (b[2] - a[2]) * f,
-    moving: f < 1,
-    inside: false,
-    sit: false,
-    yaw: Math.atan2(b[1] - a[1], b[2] - a[2]),
-  };
+  const pt = along(a, b, f);
+  return { x: pt.x, z: pt.z, moving: f < 1, inside: false, sit: false, yaw: pt.yaw };
 }
 
 function install() {
@@ -118,6 +113,14 @@ function install() {
 
   /* ---- figures + animation detectors ---- */
   const animStats = { footSlide: 0, mismatch: 0, samples: 0, dayKey: null };
+  /* placement: every stop on open ground (a stop in a building moves to the nearest door or pavement point) and each
+     walk routed round the footprints (js/placement.js) */
+  people.forEach((p) => {
+    if (p.__placed || !world.solids) return;
+    const fx = fixStops(p.stops, world.solids);
+    p.stops = fx.stops;
+    p.__placed = { moved: fx.moved, detours: fx.detours };
+  });
   people.forEach((p) => {
     const fig = buildFigure(B, scene, p.id, p.look, p.scale || 1);
     p.__fig = fig;
@@ -778,6 +781,14 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
         };
       }),
     }),
+    /** Placement audit (js/placement.js): where neighbour `id` stands at hour h, the height it is drawn at (`surfaceAt`), and the fix log. */
+    placementAt: (id, h) => {
+      const p = people.find((q) => q.id === id);
+      if (!p) return null;
+      const pl = placeAt(p.stops, h);
+      return { x: pl.x, z: pl.z, inside: pl.inside, y: world.surfaceAt ? world.surfaceAt(pl.x, pl.z) : 0 };
+    },
+    placement: () => people.map((p) => ({ id: p.id, moved: (p.__placed && p.__placed.moved) || [], detours: (p.__placed && p.__placed.detours) || [], drawnY: p.__root.position.y, shown: p.__root.isEnabled() })),
     /** Reset detector counters (a new day also clears them). */
     resetAnim: () => {
       animStats.footSlide = 0;

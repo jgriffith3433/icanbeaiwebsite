@@ -4338,6 +4338,59 @@ async function npcSpots(options, t) {
   pressKey("Escape");
 }
 
+/* ---------------- placement-audit: no neighbour inside a building or off the ground, 06:00 to 23:00 ---------------- */
+// Setup shortcut: the day bar is scrubbed (scrubTo) through every 15 sim minutes from 06:00 to 23:00; at each hour every
+// neighbour's standing point is read (day.neighbors.placementAt) and checked against world.solids (js/placement.js) and the
+// ground under it (the Havok ray where physics is on, else surfaceAt). Real input: Enter / a tap takes control, and the
+// drawn figures (root heights) are read live at each stop. Events: placement-audit, placement-fix; metrics
+// placementInside, placementOffGround, placementMovedStops.
+async function placementAudit(options, t) {
+  t.scene("Avenue");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const C = window.day.control;
+  const N = window.day.neighbors;
+  if (!N || !N.placementAt) { t.problem("bug", "There is no day.neighbors.placementAt"); return; }
+  const mod = await import("./placement.js");
+  const world = window.day.world();
+  if (options && options.touch && C) { try { C.touch(true); } catch (e) { /* desktop */ } }
+  if (C) {
+    if (options && options.touch) { const b = $("control"); if (b) b.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "touch" })); } else pressKey("Enter");
+    await t.until(() => C.mode() === "control", 3000, "Take control");
+  }
+  const ids = N.now().people.map((p) => p.id);
+  const ground = (x, z) => { const g = world.groundAt ? world.groundAt(x, z, 3) : null; return g && typeof g.y === "number" && g.y < 0.4 ? g.y : world.surfaceAt(x, z); };
+  const moved = N.placement().reduce((n, p) => n + p.moved.length, 0);
+  t.metric("placementMovedStops", moved);
+  N.placement().forEach((p) => p.moved.forEach((m) => t.event("placement-fix", `${p.id}: stop ${m.index} moved ${m.from.join(",")} -> ${m.to.map((v) => v.toFixed(1)).join(",")}`)));
+  const people = ids.map((id) => ({ id }));
+  const hours = [];
+  for (let m = 6 * 60; m <= 23 * 60; m += 15) hours.push(m / 60);
+  let at = 0;
+  let live = 0;
+  const cache = new Map();
+  const rep = mod.auditPlacement(people, (p, h) => { const r = N.placementAt(p.id, h); if (r) r.y = ground(r.x, r.z) + (r.y - world.surfaceAt(r.x, r.z)); return r; }, world.solids || [], ground, { from: 6, to: 23, stepMin: 5 });
+  for (const h of hours) {
+    t.progress(at++ / hours.length);
+    scrubTo(Math.round(h * 60));
+    await sleep(120);
+    for (const p of N.placement()) {
+      if (!p.shown) continue;
+      live++;
+      const pos = N.now().people.find((q) => q.id === p.id);
+      if (pos && Math.abs(p.drawnY - ground(pos.x, pos.z)) > 0.1) cache.set(p.id, `${p.id} is drawn ${p.drawnY.toFixed(2)} m high at ${pos.x.toFixed(1)},${pos.z.toFixed(1)} (ground ${ground(pos.x, pos.z).toFixed(2)})`);
+    }
+  }
+  const inside = rep.failures.filter((f) => /inside a footprint/.test(f)).length;
+  const off = rep.failures.length - inside + cache.size;
+  t.metric("placementInside", inside);
+  t.metric("placementOffGround", off);
+  t.event("placement-audit", `${rep.samples} samples and ${live} live reads from 06:00 to 23:00: ${inside} inside a footprint, ${off} off the ground`);
+  rep.failures.forEach((f) => t.problem("bug", "Placement: " + f));
+  cache.forEach((f) => t.problem("bug", "Placement: " + f));
+  if (C) pressKey("Escape");
+}
+
 /* ---------------- city-audit: props sit on their roofs and pavements; no flicker; he walks every roof ---------------- */
 // Setup shortcuts: the audit runs on the built scene, and six probe cameras (three rooftops, three street spots) are put
 // where a player's camera could be for two frames each, the second 2 cm to the side. Real input: Enter, then WASD with
@@ -13338,6 +13391,7 @@ installPlaytest({
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
     { id: "photos", title: "Photos of the dense city: noon at five spots along the avenue, dusk (windows and street lamps come on), night; frame rate at each", seconds: 120, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, then WASD with Shift east along the avenue. Events photo-noon / photo-dusk / photo-night / photo-fps; metrics photoFpsMin, photoFpsAvg, cityFillers, cityLamps." },
     { id: "crowd", title: "The street's people and cars follow the clock: quiet at 3 AM, busy at the 8:30 rush, full at lunch and dinner, thin again late; they walk, cross, go in and out of buildings; rain opens umbrellas; Quality: low thins them; frame rate at each", seconds: 90, tags: ["crowd", "photos"], description: "Day bar beside the car and to each hour (setup), then 1x. Enter, WASD with Shift to the shops, key 3, the quality button. Events crowd-night / crowd-rush / crowd-lunch / crowd-dinner / crowd-late / crowd-follows-clock / crowd-rain / crowd-quality-low / photo-fps; metrics crowd<Hour>People, crowd<Hour>Cars, photoFpsMin, photoFpsAvg." },
+    { id: "placement-audit", title: "Placement audit: scrub 06:00 to 23:00; no neighbour inside a building footprint or more than 0.1 m off the ground; the phone (390x844) the same", seconds: 90, tags: ["control", "quality", "phone"], description: "Load with ?playtest=placement-audit ({\"touch\":true} for 390x844). Scrubs the day every 15 sim minutes; each neighbour's standing point is checked against world.solids (js/placement.js) and the ground; live drawn heights are read at each stop. Events placement-audit / placement-fix; metrics placementInside, placementOffGround." },
     { id: "npc-spots", title: "NPC spots: every neighbor, daily citizen and rescue person stands in open ground (none inside a building collider, each with room to walk up); a screenshot of each spot; neighbors' name tags fully on screen; the phone (390x844) the same", seconds: 120, tags: ["control", "quality", "phone"], description: "Load with ?playtest=npc-spots ({\"touch\":true} for 390x844). Runs the js/npc-spots.js audit on world.solids, takes control, then stands 1.6 m from each NPC spot (neighbors at the hour they are there) with a screenshot per spot. Events npc-spots / npc-spot-<who>; metric npcSpotFailures." },
     { id: "city-audit", title: "City audit: every prop from props.js and cityscape.js sits on its roof or pavement (nothing floating, sunk, coplanar or inside out); six probe cameras (three rooftops, three streets) show no flicker between two frames; he walks each walkable roof along its AC units; shots at desktop and 844x390", seconds: 240, tags: ["look", "photos"], description: "Setup: scrubs to noon, runs day.cityscape.audit(), places six probe cameras for two frames each (the second moved 2 cm). Real input: Enter, WASD with Shift up each walkable roof's ramp and along its row of units, Esc. Events city-audit / city-shots-size / flicker-<spot> / roof-walk-<block>; metrics cityAuditFailures, flickerBlocks." },
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
@@ -13449,6 +13503,7 @@ installPlaytest({
       else if (id === "night-glow") await nightGlow(options, t);
       else if (id === "city-audit") await cityAudit(options, t);
       else if (id === "npc-spots") await npcSpots(options, t);
+      else if (id === "placement-audit") await placementAudit(options, t);
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "cast-feel") await castFeel(options, t);
