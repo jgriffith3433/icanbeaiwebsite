@@ -2558,6 +2558,16 @@ window.DAY_CONFIG = {
        on a stem and a ground ring that sit on the surface. `places` is [who][verb] -> where it is for. Tapping the marker
        takes control if he's on his day and swings the camera to the ask (`day.control.frame`). Answered or missed, they go. */
     askMarks: {
+      /* The hour's hint on take control (js/hourhint.js): the first entry whose [from, to) holds the hour; one per part of the day. */
+      hourRange: 30, // m: how close he must be to the place for the cast to count
+      hourSecs: 90, // s: the hint waits this long, then goes quietly
+      hours: [
+        { id: "morning", from: 5, to: 11, verb: "rain", place: { x: -6, z: 33, r: 7, name: "the gardens" }, line: "The gardens are dry. A little rain?", thanks: "The tomatoes are drinking it in." },
+        { id: "midday", from: 11, to: 14, verb: "wind", place: { x: 154, z: 9.8, r: 6, name: "the laundry on the annex" }, line: "Washing's out and nothing's moving. A gust?", thanks: "The sheets are flying." },
+        { id: "afternoon", from: 14, to: 17.5, verb: "fog", place: { x: 46, z: 9.8, r: 6, name: "the hot avenue" }, line: "The avenue is baking. Some low cloud would help.", thanks: "The street breathes out." },
+        { id: "evening", from: 17.5, to: 21, verb: "bolt", place: { x: 118, z: 26, r: 7, name: "the plaza" }, line: "Everyone's out in the plaza. Give them a show.", thanks: "The whole plaza looks up." },
+        { id: "night", from: 21, to: 5, verb: "fog", place: { x: 118, z: 26, r: 7, name: "the quiet plaza" }, line: "The city's asleep. Wrap it in fog.", thanks: "Quiet, and a little eerie." },
+      ],
       iconHeight: 6.5, // m over the ground
       markHeight: 0.85, // m over the asker's head
       places: {
