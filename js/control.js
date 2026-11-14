@@ -1744,6 +1744,17 @@ function install() {
       jumpId: s.jumpId, landId: s.landId, landDrop: s.landDrop, vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
     }),
     move: mover.move,
+    /** Movement input held right now, 1 or 0 (WASD / arrows, the touch stick, a gamepad's left stick): the feel sensor's `input`.
+     *  The sensor's own watcher only sees key and `touchstart` events, so a stick driven by pointer events (the phone playtest,
+     *  and real pointer-event touches) read as "no input" and a walk held with the stick was flagged stuck-state. */
+    moveInput: () => {
+      if (mode !== "control") return 0;
+      let m = Math.hypot((keys.has("f") ? 1 : 0) - (keys.has("b") ? 1 : 0), (keys.has("r") ? 1 : 0) - (keys.has("l") ? 1 : 0));
+      m = Math.max(m, Math.hypot(stick.x, stick.y));
+      const pads = (navigator.getGamepads && navigator.getGamepads()) || [];
+      for (const g of pads) if (g && g.connected) m = Math.max(m, Math.hypot(Math.abs(g.axes[0] || 0) < 0.15 ? 0 : g.axes[0] || 0, Math.abs(g.axes[1] || 0) < 0.15 ? 0 : g.axes[1] || 0));
+      return m > 0.1 ? 1 : 0; // held or not, like a key (a half-tilted stick is still a walk the player asked for)
+    },
     /** Swing the camera so the point (x, z) is ahead of him (a tap on a neighbor's ask marker, or a world reaction): eased ~1.5 s glance. */
     frame: (x, z, y, opts) => {
       if (mode !== "control" || cine()) return false;

@@ -14578,6 +14578,11 @@ installPlaytest({
       const C = feelControl();
       return C ? !!C.state().grounded : false;
     },
+    // Movement input as the game reads it (keys, the touch stick, a pad): the sensor's own watcher misses a stick driven by pointer events.
+    input: () => {
+      const C = window.day && window.day.control;
+      return C && C.moveInput ? C.moveInput() : 0;
+    },
     // The animation over time (hawkes-feel.js `trace`): his clip, the blend weights, the boots' own speed, a T-pose, and whether
     // the player is asking for the state (a cast in the last 2 s, a wind-up or hold, a landing, a one-shot still playing).
     trace: (dt) => {
