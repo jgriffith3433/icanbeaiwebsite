@@ -963,10 +963,13 @@
       box("fruit", 0.25, 0.12, 0.25, 0.4, 0.88, 0.15, mat("#c9a04f"), n);
       const opp = new B.TransformNode("oppchair", scene);
       opp.parent = n;
-      opp.position.set(0, 0, 0.72);
+      /* Pulled out from the table: the table spans z 0.295..1.145 from the seat, so the back
+         (local -0.3, 0.06 thick) and the seat's front edge both stay clear of it. */
+      opp.position.set(0, 0, 1.35);
       opp.rotation.y = PI;
       box("oseat", 0.48, 0.07, 0.46, 0, 0.5, -0.05, wood, opp);
       box("oback", 0.48, 0.55, 0.06, 0, 0.8, -0.3, wood, opp);
+      [[-0.2, 0.15], [0.2, 0.15], [-0.2, -0.25], [0.2, -0.25]].forEach((p, i) => box("oleg" + i, 0.05, 0.46, 0.05, p[0], 0.27, p[1], wood, opp));
     }
 
     /* Wall clock in the kitchen */
