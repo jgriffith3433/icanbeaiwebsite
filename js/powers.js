@@ -756,6 +756,7 @@ export function startPowers(world, dayApi) {
     const w = wx();
     if (id === "rain") {
       if (w && w.set) w.set("rain", 1, "power");
+      try { day.slice && day.slice.drench && day.slice.drench(true); } catch (e) { /* no slice */ }
       if (!(day && day.sfx && day.sfx.cast && day.sfx.cast("rain"))) {
         noiseWash(5200, 2.4, 0.2, "highpass");
         noiseWash(1700, 2.0, 0.1, "bandpass");

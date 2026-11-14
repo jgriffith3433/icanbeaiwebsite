@@ -89,6 +89,14 @@ export function installSlice(day, world) {
     if (!quiet) emit("lawn", { state: st.lawn });
   };
   let cur = 0;
+  /* The wet layer: a Rain cast darkens the lawn and spreads the pond within WET_SECS (1.6 s), wherever he stands, and it dries
+     off over WET_DRY s once the player's rain is gone. It sits on top of the slower lawn above (the shown value is the larger). */
+  const WET_SECS = 1.6;
+  const WET_DRY = 24;
+  const WET_LEVEL = 0.85;
+  let wet = 0;
+  let wetOn = false;
+  let wetAt = 0;
   const mudM = mat("slice-mud", "#5a4a30");
   mudM.alpha = 1;
   const pondMud = B.MeshBuilder.CreateCylinder("slice-pond-mud", { diameter: 10, height: 0.004, tessellation: 40 }, scene);
@@ -197,11 +205,19 @@ export function installSlice(day, world) {
       const d = st.goal - cur;
       const stp = dt / LAWN_SECS;
       cur = Math.abs(d) <= stp ? st.goal : cur + Math.sign(d) * stp;
-      paint(cur);
+      paint(Math.max(cur, drench));
       if (cur === st.goal) { st.easing = false; emit("lawn-done", { k: st.goal }); }
     }
     const w = (window.weather && window.weather.now && window.weather.now()) || { state: "clear" };
     const wet = w.state === "rain" || w.state === "storm";
+    if (drenchOn && !(w.manual && wet)) drenchOn = false;
+    const dGoal = drenchOn ? DRENCH_LEVEL : 0;
+    if (drench !== dGoal) {
+      const stp = (dt / (drenchOn ? DRENCH_SECS : DRENCH_DRY)) * DRENCH_LEVEL;
+      drench = Math.abs(dGoal - drench) <= stp ? dGoal : drench + Math.sign(dGoal - drench) * stp;
+      if (!st.easing) paint(Math.max(cur, drench));
+      st.drench = +drench.toFixed(3);
+    }
     // ripples
     rings.forEach((r) => {
       r.t += dt * (wet ? 1.6 : 0.7);
@@ -292,6 +308,8 @@ export function installSlice(day, world) {
     land,
     setLawn,
     setTomatoes,
+    /** A Rain cast: the lawn darkens and the pond spreads within 1.6 s (js/powers.js `weatherCall`). */
+    drench: (on) => { drenchOn = on !== false; if (drenchOn) emit("drench", {}); },
   };
   day.slice = api;
   return api;

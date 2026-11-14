@@ -11128,6 +11128,28 @@ async function coldStart(options, t) {
   const cast = await waitFor(() => T.bolt != null, 4000);
   if (!cast) { t.problem("blocker", `Pressing the prompted rain never cast it (${cueText})`); return; }
   t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
+  // the street answers within 2 s: the lawn darkens, the pond spreads, people run for cover
+  {
+    const t0 = performance.now();
+    const sl = () => (D.slice && D.slice.now ? D.slice.now() : {});
+    const base = { lawn: sl().lawnShown || 0, pond: sl().pond || 0.78 };
+    let run = 0;
+    await waitFor(() => {
+      const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
+      run = Math.max(run, c.running || 0, c.reacting || 0);
+      const s = sl();
+      return (s.lawnShown || 0) - base.lawn > 0.5 && (s.pond || 0) - base.pond > 0.1 && (run > 0 || !(c.people > 0));
+    }, 2000);
+    const el = (performance.now() - t0) / 1000;
+    const s = sl();
+    const lawnD = (s.lawnShown || 0) - base.lawn, pondD = (s.pond || 0) - base.pond;
+    t.event("cold-start-rain-reaction", `${el.toFixed(2)}s after the cast: lawn +${lawnD.toFixed(2)}, pond +${pondD.toFixed(2)}, ${run} people running for cover`);
+    t.metric("rainLawnDarkenS", +el.toFixed(2));
+    if (lawnD <= 0.5) t.problem("bug", `The lawn didn't darken within 2 s of Rain (+${lawnD.toFixed(2)})`);
+    if (pondD <= 0.1) t.problem("bug", `The pond didn't spread within 2 s of Rain (+${pondD.toFixed(2)})`);
+    const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
+    if (c.people > 0 && run === 0) t.problem("bug", "No pedestrian ran for cover within 2 s of Rain");
+  }
   t.metric("secondsToFirstInput", T.input);
   t.metric("secondsToFirstCast", T.bolt);
   if (T.input == null || T.input > 3) t.problem("bug", `The first input was accepted ${T.input}s after Play (the limit is 3 s)`);
