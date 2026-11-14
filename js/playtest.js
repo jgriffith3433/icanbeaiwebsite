@@ -11302,6 +11302,10 @@ async function audioCheck(options, t) {
   t.metric("sceneDrawCalls", draws);
   t.event("first-tap-hitch", `worst frame gap: first tap ${rnd(gaps.tap)} ms, Take control ${rnd(gaps.take)} ms, the five casts ${rnd(gaps.cast)} ms; ${draws} draw calls; warm-up idle ${!!window.__warmIdle}`);
   if (Math.max(gaps.tap, gaps.take, gaps.cast) > 250) t.problem("bug", `A frame took ${rnd(Math.max(gaps.tap, gaps.take, gaps.cast))} ms around the first tap, Take control or a cast (250 ms maximum): shaders or assets weren't warmed behind the loading bar`);
+  { const h = D.sfx.info().heard || {};
+    const miss = ["bolt", "rain", "gale", "fog", "sunbreak"].filter((k) => !h["press-" + k]);
+    t.event("audio-press-transients", miss.length ? `no press transient for ${miss.join(", ")}` : "each of the five casts played its own press transient (attack <= 5 ms)");
+    if (miss.length) t.problem("bug", `No instant press sound for: ${miss.join(", ")}`); }
   t.metric("audioCastsDistinct", sig.size);
   t.event("audio-casts", `${keys.length}/5 casts heard, ${sig.size} distinct sounds`);
   if (sig.size < 5) t.problem("bug", `The five casts must each play a distinct sound (${sig.size} distinct)`);

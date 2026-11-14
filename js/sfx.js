@@ -581,12 +581,75 @@
     return true;
   }
 
+  /* The press transient: each cast answers the press on the same frame with a short rendered buffer (attack 5 ms or less,
+     0.1-0.2 s), before its swell (Rain's clip ramps in over 0.5 s, Fog's over 0.9 s). One voicing per power so each sounds
+     different: Lightning a sharp snap, Rain a patter of ticks, Wind a breath, Fog a low hush, Sun a bright chime.
+     Rendered once per sample rate, played as a buffer source tagged "press-<id>" (the audio probe reads buffer sources). */
+  const pressBufs = {};
+  function pressBuffer(a, id) {
+    const sr = a.c.sampleRate;
+    const key = id + "@" + sr;
+    if (pressBufs[key]) return pressBufs[key];
+    const dur = { bolt: 0.14, rain: 0.2, gust: 0.18, gale: 0.18, fog: 0.2, sunbreak: 0.2 }[id] || 0.15;
+    const n = Math.floor(sr * dur);
+    const b = a.c.createBuffer(1, n, sr);
+    const d = b.getChannelData(0);
+    let lp = 0, ph = 0, ph2 = 0;
+    // a fixed pseudo-random stream (no Math.random in the render, so each voicing is repeatable)
+    let s = 12345 + id.length * 977;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
+    const ticks = id === "rain" ? [0, 0.022, 0.047, 0.071, 0.1, 0.13] : null;
+    for (let i = 0; i < n; i++) {
+      const x = i / sr;
+      const att = Math.min(1, x / 0.004);
+      let v = 0;
+      if (id === "bolt") {
+        v = (rnd() * Math.exp(-x * 70) * 0.9 + Math.sin(2 * Math.PI * 95 * x) * Math.exp(-x * 30) * 0.7);
+      } else if (id === "rain") {
+        for (const t0 of ticks) if (x >= t0) v += rnd() * Math.exp(-(x - t0) * 220) * 0.55;
+        lp += (v - lp) * 0.55; v = lp * 1.6;
+      } else if (id === "gust" || id === "gale") {
+        const f = id === "gale" ? 0.18 : 0.28;
+        lp += (rnd() - lp) * (0.08 + 0.5 * Math.min(1, x / dur)); // the breath opens as it goes
+        v = lp * 2.2 * Math.sin(Math.PI * Math.min(1, x / dur)) ** f;
+      } else if (id === "fog") {
+        ph += 2 * Math.PI * (110 - 30 * (x / dur)) / sr; ph2 += 2 * Math.PI * 165 / sr;
+        v = (Math.sin(ph) * 0.7 + Math.sin(ph2) * 0.3) * Math.exp(-x * 9);
+      } else {
+        ph += 2 * Math.PI * 1568 / sr; ph2 += 2 * Math.PI * 2093 / sr;
+        v = (Math.sin(ph) * 0.6 + Math.sin(ph2) * 0.4) * Math.exp(-x * 14);
+      }
+      d[i] = v * att * Math.min(1, (dur - x) / 0.02) * 0.8; // 20 ms tail: ends on zero
+    }
+    pressBufs[key] = b;
+    return b;
+  }
+  function pressCast(id) {
+    const a = ctx();
+    if (!a) return false;
+    try {
+      const src = a.c.createBufferSource();
+      src.buffer = pressBuffer(a, id);
+      src.playbackRate.value = 1 + (Math.random() * 0.06 - 0.03);
+      const vol = { bolt: 0.55, rain: 0.5, gust: 0.4, gale: 0.45, fog: 0.5, sunbreak: 0.3 }[id] || 0.4;
+      try { src.__hawkesSampleId = "press-" + id; src.__hawkesBus = "sfx"; src.__hawkesGain = vol; } catch (e) { /* */ }
+      const g = a.c.createGain();
+      g.gain.value = vol;
+      src.connect(g);
+      g.connect(out(a, 0, "sfx"));
+      src.start(a.c.currentTime);
+      note("press-" + id);
+      return true;
+    } catch (e) { return false; }
+  }
+
   let liveThunder = null;
   let galeLoop = null;
 
   function castPower(id) {
     const a = ctx();
     if (!a) return false;
+    pressCast(id);
     if (id === "gust") {
       if (powerSample("whoosh", { gain: 0.85 })) { note("gust-whoosh"); return true; }
       note("gust-whoosh");
@@ -1292,7 +1355,7 @@
   /* Everything the UI probe counts as a control (hawkes-ui.js CONTROL) plus the game's own: the ability slots and the cold open's
      big Rain/Bolt button are divs/buttons the old list could miss. One handler call per event (capture on document), so there is
      no time debounce: a second press 40 ms after the first (two fingers, a tap during a hold) must answer too. */
-  const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, #sound, #time-btn";
+  const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, #charge, .charge, #sound, #time-btn";
   const pressable = (el) => el && el.closest && el.closest(PRESSABLE);
   let lastPressEv = null;
   if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
@@ -1328,6 +1391,7 @@
     const d = e.detail || {};
     if (d.action === "denied") S.denied();
     else if (d.action === "bolt") {
+      pressCast("bolt"); // the snap on the press; the crack follows when it lands
       let s = null;
       try { s = day.powers.now().strike; } catch (err) { s = null; }
       const at = s ? place(s.x, s.z) : { pan: 0, gain: 1 };
