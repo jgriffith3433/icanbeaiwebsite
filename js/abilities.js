@@ -139,7 +139,7 @@ export function startAbilityBar(abilities, onPress, opt) {
 .abilitybar .ab.cooling .wipe{opacity:1}
 .abilitybar .ab .cd{position:absolute;left:0;right:0;bottom:0;z-index:2;display:none;align-items:center;justify-content:center;padding:1px 0;font-size:.7rem;line-height:1;color:#fff;background:transparent;text-shadow:0 1px 4px rgba(0,0,0,.9)}
 .abilitybar .ab.cooling .cd{display:flex}
-.abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor){border-color:#9fd4ff;box-shadow:0 0 0 1px rgba(159,212,255,.35),0 0 18px rgba(126,200,255,.75)}
+.abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor){border-color:#9fd4ff;box-shadow:0 0 0 1px rgba(159,212,255,.35),0 0 8px rgba(126,200,255,.75)}
 .abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor) .ico{filter:drop-shadow(0 0 10px rgba(126,200,255,.85)) brightness(1.12)}
 .abilitybar .ab.locked .ico{filter:grayscale(1) brightness(.7);opacity:.55}
 .abilitybar .ab.cooling .ico{opacity:.55;filter:grayscale(.35) brightness(.85)}
@@ -169,16 +169,20 @@ html.touch-ui .abilitybar .row{position:absolute;left:-62px;top:8px;width:240px;
 html.touch-ui .abilitybar .charge{position:absolute;inset:0;width:auto;min-width:0;pointer-events:none;z-index:0}
 html.touch-ui .abilitybar .charge .et{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.8rem;font-weight:700;white-space:nowrap}
 html.touch-ui .abilitybar .charge .bar{display:none}
-html.touch-ui .abilitybar .charge .ring{position:absolute;left:50%;top:50%;width:116px;height:116px;margin:-58px 0 0 -58px;border-radius:50%;border:3px solid rgba(240,168,74,.28);box-sizing:border-box;background:conic-gradient(#f0a84a var(--charge-deg,0deg),rgba(20,12,4,.45) 0)}
+html.touch-ui .abilitybar .charge .ring{position:absolute;left:50%;top:50%;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;border:3px solid rgba(240,168,74,.28);box-sizing:border-box;background:conic-gradient(#f0a84a var(--charge-deg,0deg),rgba(20,12,4,.45) 0)}
 html.touch-ui .abilitybar .charge .ring::after{content:"";position:absolute;inset:5px;border-radius:50%;background:rgba(8,12,20,.55)}
-html.touch-ui .abilitybar .ab{position:absolute;width:56px;height:56px;min-width:44px;min-height:44px;border-radius:50%;gap:0;justify-content:center;padding:0;z-index:1;left:50%;top:50%;margin:-28px 0 0 -28px;pointer-events:auto}
-/* the verbs sit on an 86 px radius round the Charge ring (54 px): 8 px clear of the ring, 10 px between icons, and the
-   whole arc inside the 220 px box, so the right-most icon is 9 px from the screen edge, never cut off */
-html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(0,-100px)}
-html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(64px,-77px)}
-html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(99px,-17px)}
-html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(86px,50px)}
-html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(34px,94px)}
+html.touch-ui .abilitybar .ab{position:absolute;width:50px;height:50px;min-width:44px;min-height:44px;border-radius:50%;gap:0;justify-content:center;padding:0;z-index:1;left:50%;top:50%;margin:-25px 0 0 -25px;pointer-events:auto}
+/* the verbs sit on a 94 px radius round the 96 px Charge ring: 21 px clear of the ring, 14 px between 50 px icons (40 deg apart),
+   the whole arc inside the 240 px box. The arc just fades in: no transform transition, so nothing slides over the ring */
+html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(0,-94px)}
+html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(60px,-72px)}
+html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(93px,-16px)}
+html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(81px,47px)}
+html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(32px,88px)}
+html.touch-ui .abilitybar{animation:abfade .25s ease-out}
+html.touch-ui .abilitybar .ab.pulse{animation:abpulse-t .32s ease-out}
+@keyframes abpulse-t{0%{box-shadow:0 0 0 0 rgba(255,255,255,.95)}35%{box-shadow:0 0 8px 3px rgba(126,200,255,.95)}100%{box-shadow:0 0 0 0 rgba(126,200,255,0)}}
+@keyframes abfade{from{opacity:0}to{opacity:1}}
 html.touch-ui .abilitybar .ab .ico{width:78%;height:78%}
 html.touch-ui .abilitybar .ab .c{top:0;right:0;min-width:20px;height:20px;line-height:20px;text-align:center;border-radius:10px;background:rgba(8,12,20,.9);border:1px solid rgba(240,168,74,.8);color:#ffe2b0;font-size:.8rem;font-weight:700;padding:0 3px;box-sizing:border-box;z-index:3}
 html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:1.1rem;background:transparent;border-radius:50%}
@@ -190,11 +194,11 @@ html.touch-ui .abilitybar .ab .wipe{border-radius:50%}
   html.touch-ui .abilitybar .charge .ring{top:130px}
   html.touch-ui .abilitybar .charge .et{top:130px}
   html.touch-ui .abilitybar .ab{top:130px}
-  html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(-99px,-17px)}
-  html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(-64px,-77px)}
-  html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(0,-100px)}
-  html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(64px,-77px)}
-  html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(99px,-17px)}
+  html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(-93px,-16px)}
+  html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(-60px,-72px)}
+  html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(0,-94px)}
+  html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(60px,-72px)}
+  html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(93px,-16px)}
 }
 html.in-control:not(.preview-public):not(.touch-ui) .side .log{max-height:22vh}
 html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.touch-ui):not(.in-control) body:has(.tutorial:not([hidden])) .control-hint{visibility:hidden}
