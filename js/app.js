@@ -23,6 +23,7 @@ import "./stems.js"; // the stem score under control: one 4-note motif, three sy
 import "./daysound.js"; // autopilot diegetic soundscapes by schedule block (after score: uses ambience bus)
 import "./render-pipeline.js"; // the picture: ACES, a grade LUT per hour and weather, emissive bloom, SSAO2, cascaded shadows (after weather: it follows weather.now())
 import "./sky.js"; // the sky: painted panoramas by the clock, a cloud deck, Sun break god rays, sky reflections (after look, weather and the pipeline)
+import "./backdrop.js"; // the far city: a baked skyline silhouette ring tinted by the hour, never fogged, every quality (after sky)
 import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyline curtains, window runnels, drips, lens drops, height fog (after weather)
 import "./aftermath.js"; // Sun break after rain: steam, rainbow at 42°, dripping gutters, pigeons home, umbrellas fold (after rain + sky)
 import "./ui-art.js"; // UI art kit: verb icons, frames, ranks, busts, fonts (before powers paints the bar)
