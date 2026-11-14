@@ -904,6 +904,9 @@
       const t = a.c.currentTime;
       const src = a.c.createBufferSource();
       src.buffer = a.white;
+      // Tagged for the audio probe: the shared white buffer isn't "buf:2x88200" repeating; the rate varies per pass.
+      src.playbackRate.value = 0.94 + Math.random() * 0.12;
+      try { src.__hawkesSampleId = "syn-car-pass"; src.__hawkesBus = "sfx"; src.__hawkesGain = 0.07 * gain; } catch (e) { /* */ }
       const f = a.c.createBiquadFilter();
       f.type = "lowpass";
       f.frequency.setValueAtTime(300, t);
@@ -1085,6 +1088,7 @@
           power.sources[kind] = "file";
         } else {
           src.buffer = a.white;
+          try { src.__hawkesSampleId = "syn-tornado-" + kind; src.__hawkesBus = "sfx"; } catch (e) { /* */ }
         }
         src.loop = true;
         const f = a.c.createBiquadFilter();
