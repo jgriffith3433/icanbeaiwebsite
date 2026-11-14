@@ -29,7 +29,7 @@ const root = new URL('../', import.meta.url);
 for (const f of ['day.config.js', 'js/schedule.js', 'js/world.js']) await import(new URL(f, root).href);
 const cfg = globalThis.DAY_CONFIG;
 const day = globalThis.DayEngine.build(cfg, '2026-10-19');
-const world = globalThis.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
+const world = globalThis.DayWorld.create({ ...events, removeAttribute() {}, setAttribute() {}, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 console.warn = origWarn;
 
 const F = (m) => globalThis.DayEngine.frame(day, m);

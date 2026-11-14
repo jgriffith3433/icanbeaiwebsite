@@ -54,7 +54,7 @@ const theyLines = [...texts].filter((t) => /\b(they|their|theirs|themselves)\b/i
 ok([...texts].some((t) => t.includes('Small Weather')), 'no line in the day names Small Weather');
 ok(!theyLines.length, `lines that still say "they": ${theyLines.slice(0, 5).join(' | ')}`);
 
-const world = sandbox.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
+const world = sandbox.DayWorld.create({ ...events, removeAttribute() {}, setAttribute() {}, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 ok(world && world.person, 'the world has no person');
 // The stand-in figure is drawn until his model is on him and again after a failed load (setSkin(null)): never hidden.
 const figureShowing = () => world.person.getChildMeshes(false).filter((m) => m.isEnabled() && !/phone|cup|bag|shadowproxy/i.test(m.name));
