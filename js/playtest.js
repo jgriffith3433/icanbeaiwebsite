@@ -1783,7 +1783,8 @@ async function warmStart(options, t) {
     if (lc.worst > lc.max) t.problem("bug", `A material asks for ${lc.worst} lights, over the cap of ${lc.max}`);
   }
   // take control through the real control, then let the first 30 s run
-  if (touch) await tapEl($("control")); else pressKey("Enter");
+  // a phone's cold session auto-plays into control: tapping the button then would let go
+  if (C.mode() !== "control") { if (touch) await tapEl($("control")); else pressKey("Enter"); }
   await t.until(() => C.mode() === "control", 4000, "Take control");
   { const o = $("episode-offer"); if (o && !o.hidden) { const d = o.querySelector(".decline"); if (d) d.click(); } }
   C.place(-21, 0.5, 1.5708, { from: 14, alpha: 4.1, beta: 1.15, radius: 11 });
@@ -1832,7 +1833,14 @@ async function warmStart(options, t) {
   t.metric("shaderErrors", bad.length);
   if (bad.length) t.problem("bug", `Shader compile errors in the console: ${bad[0]}`);
   else t.event("shaders-clean", "no shader compile errors");
-  pressKey("Escape");
+  // let go inside the first minute: the way back into control must be on screen (a phone has no stick then)
+  if (touch) await tapEl($("control")); else pressKey("Escape");
+  await t.until(() => C.mode() === "schedule", 8000, "back on the day").catch(() => {});
+  const cb = document.querySelector(".control-btn");
+  const cr = cb ? cb.getBoundingClientRect() : null;
+  const shown = !!cb && getComputedStyle(cb).visibility !== "hidden" && cr.width >= 44 && cr.height >= 44;
+  if (C.mode() === "schedule" && !shown) t.problem("bug", "After letting go there is no visible Take control button (44 px)");
+  else t.event("take-control-back", "Take control is on screen after letting go");
 }
 
 /* ---------------- day: the whole day at high speed; every block must happen ---------------- */
