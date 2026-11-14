@@ -11575,6 +11575,12 @@ async function wakeHimRun(options, t) {
   const tTap = performance.now();
   if (phone) await tapEl(btn); else btn.click();
   t.milestone && t.milestone("first-input-accepted", "Take control tapped");
+  // the stretch is its own beat: while it plays the verb bar stays down
+  await t.until(() => D.wake.now().phase !== "idle", 3000, "the stretch to start").catch(() => {});
+  const barEl = document.querySelector(".abilitybar");
+  const barDuring = D.wake.now().phase === "stretch" && barEl ? getComputedStyle(barEl).visibility : "n/a";
+  t.event("wake-stretch-hud", `verb bar during the stretch: ${barDuring}`);
+  if (barDuring === "visible") t.problem("bug", "The verb bar is up while the wake stretch plays");
   await t.until(() => D.wake.now().phase === "ready", 8000, "the wake moment to finish").catch(() => {});
   const wk = D.wake.now();
   const toReady = (wk.readyAt ? wk.readyAt - tTap : 99999) / 1000;

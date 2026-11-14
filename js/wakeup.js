@@ -34,6 +34,24 @@ export function startWake() {
   }
   const asleep = (fr) => !!(fr && fr.person && ["lie", "side", "recline"].includes(fr.person.pose) && !fr.person.inCar);
 
+  /* The cut to the roof is the heavy frame (the roof, fog and night-sky shaders compile on the first frame that draws them, and a
+     software renderer stalls the page for seconds). Pay for it while he is still asleep and nobody has tapped: once at load and
+     after each scene change (a clock jump to the night), compile the materials around the roof spot. A stall that lands between the
+     tap and the 1.3 s stretch timer used to put "ready" seconds late. */
+  let warmedFor = "";
+  function prewarm() {
+    try {
+      if (quiet || phase !== "idle" || !day.transition || !day.transition.warm || !day.control || day.control.mode() !== "schedule") return;
+      if (!asleep(day.now && day.now().frame)) return;
+      const key = String(Math.round(day.now().minutes / 60));
+      if (warmedFor === key) return;
+      warmedFor = key;
+      Promise.resolve(day.transition.warm(1200, { x: cfg.spot.x, z: cfg.spot.z, r: 45 })).catch(() => {});
+    } catch (e) { /* a head start only */ }
+  }
+  window.addEventListener("day:transition", (e) => { if (e && e.detail && e.detail.action === "end") setTimeout(prewarm, 50); });
+  setTimeout(prewarm, 3000);
+
   function release() {
     const C = day.control;
     if (C.hold) C.hold(false);
@@ -87,7 +105,7 @@ export function startWake() {
     emit("start", { via, pose: bedPose });
     emit("stretch", { clip: st.clip });
     // Compile the roof's and the night sky's shaders now, async, behind the stretch, so the cut isn't the frame that pays for them.
-    try { if (day.transition && day.transition.warm) Promise.resolve(day.transition.warm(900)).catch(() => {}); } catch (e) { /* warm is a head start */ }
+    try { if (day.transition && day.transition.warm) Promise.resolve(day.transition.warm(900, { x: cfg.spot.x, z: cfg.spot.z, r: 45 })).catch(() => {}); } catch (e) { /* warm is a head start */ }
     later(toRoof, (st.secs || 1.3) * 1000);
   }
 
