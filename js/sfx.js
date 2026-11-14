@@ -151,6 +151,37 @@ import { pickRate } from "./variety.js";
     return out(a, 0, busName);
   }
 
+  /* Footstep / landing voicing context: while a step or landing is synthesized every layer is tagged for the audio probe
+     with the surface and a round-robin take ("step-gravel-2:syn-noise-..."), takes differ in pitch, and the level follows
+     the phone / voice mix (stepGain). */
+  let curTag = "";
+  let curVar = 1;
+  let curGain = 1;
+  const RR_PITCH = [1, 0.93, 1.08, 0.97];
+  const rr = {};
+  let voiceOn = 0;
+  function stepGain() {
+    let g = 1;
+    try { if (document.documentElement.classList.contains("touch-ui")) g *= 0.7; } catch (e) { /* */ }
+    if (voiceOn > 0) g *= 0.5;
+    return g;
+  }
+  let voiceTimer = 0;
+  ["day:voice", "day:dialogue"].forEach((n) => window.addEventListener(n, (ev) => {
+    const act = (ev && ev.detail && ev.detail.action) || "play";
+    clearTimeout(voiceTimer);
+    if (act === "end" || act === "stop") { voiceOn = 0; return; }
+    voiceOn = 1;
+    voiceTimer = setTimeout(() => { voiceOn = 0; }, 7000); // failsafe if an end never comes
+  }));
+  function voicing(tag, fn, pitched) {
+    const n = (rr[tag] = ((rr[tag] || 0) + 1) % RR_PITCH.length);
+    curTag = tag + "-" + n;
+    curVar = pitched === false ? 1 : RR_PITCH[n];
+    curGain = stepGain();
+    try { fn(); } finally { curTag = ""; curVar = 1; curGain = 1; }
+    return curTag || tag;
+  }
   /** Filtered noise: a hit, a thump, a whoosh (sweep with `to`). Pass x/z for HRTF+occlusion via mix. */
   function noise(o) {
     const a = ctx();
@@ -161,7 +192,7 @@ import { pickRate } from "./variety.js";
     // Tagged for the audio probe (hawkes-audio.js): the id names the voicing, the rate carries the pitch jitter, so
     // the shared white-noise buffer isn't read as one sample repeating.
     const pj = 0.94 + Math.random() * 0.12;
-    const nid = "syn-noise-" + (o.type || "lowpass") + "-" + Math.round(o.freq || 0) + (o.to ? ">" + Math.round(o.to) : "");
+    const nid = (curTag ? curTag + ":" : "") + "syn-noise-" + (o.type || "lowpass") + "-" + Math.round(o.freq || 0) + (o.to ? ">" + Math.round(o.to) : "");
     src.playbackRate.value = pickRate(nid, o.rate || 1);
     try {
       src.__hawkesSampleId = nid;
@@ -173,10 +204,10 @@ import { pickRate } from "./variety.js";
     f.type = o.type || "lowpass";
     f.Q.value = o.q || 0.8;
     // Every synthesized hit varies a little (pitch ~+-6%, level ~+-8%) so repeats never sound identical.
-    f.frequency.setValueAtTime(o.freq * pj, t);
-    if (o.to) f.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
+    f.frequency.setValueAtTime(o.freq * pj * curVar, t);
+    if (o.to) f.frequency.exponentialRampToValueAtTime(o.to * pj * curVar, t + o.dur);
     const g = a.c.createGain();
-    const vol = Math.max(0.0002, o.vol) * (0.92 + Math.random() * 0.16);
+    const vol = Math.max(0.0002, o.vol) * curGain * (0.92 + Math.random() * 0.16);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + Math.max(0.006, o.attack || 0.008));
     g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
@@ -195,12 +226,12 @@ import { pickRate } from "./variety.js";
     const t = a.c.currentTime + (o.delay || 0);
     const osc = a.c.createOscillator();
     osc.type = o.wave || "sine";
-    const pj = 0.97 + Math.random() * 0.06; // +-3% pitch: musical notes stay in tune, repeats still differ
+    const pj = (0.97 + Math.random() * 0.06) * curVar; // +-3% pitch: musical notes stay in tune, repeats still differ
     osc.frequency.setValueAtTime(o.freq * pj, t);
     if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
     const g = a.c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol) * (0.94 + Math.random() * 0.12), t + Math.max(0.008, o.attack || 0.01));
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol) * curGain * (0.94 + Math.random() * 0.12), t + Math.max(0.008, o.attack || 0.01));
     g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
     g.gain.setValueAtTime(0, t + o.dur + 0.002);
     let node = osc;
@@ -219,7 +250,7 @@ import { pickRate } from "./variety.js";
     osc.stop(t + o.dur + 0.05);
     // An oscillator isn't a buffer source, so the audio probe can't see it: say so through the sound kit's event.
     try {
-      window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { type: "sound-start", sample: "syn-tone-" + o.freq + (o.to ? ">" + o.to : "") + "-" + (o.wave || "sine"), bus: o.bus || "sfx", rate: Math.round(pj * 1000) / 1000, gain: o.vol, dur: o.dur } }));
+      window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { type: "sound-start", sample: (curTag ? curTag + ":" : "") + "syn-tone-" + o.freq + (o.to ? ">" + o.to : "") + "-" + (o.wave || "sine"), bus: o.bus || "sfx", rate: Math.round(pj * 1000) / 1000, gain: o.vol, dur: o.dur } }));
     } catch (e) { /* */ }
   }
   const notes = (freqs, gap, vol, wave, dur) => freqs.forEach((f, i) => tone({ freq: f, dur: dur || 0.5, vol, wave: wave || "triangle", delay: i * gap }));
@@ -755,6 +786,8 @@ import { pickRate } from "./variety.js";
   const surfaces = { gravel: 0, metal: 0, tar: 0, puddle: 0, pavement: 0, grass: 0, wood: 0 };
   let lastSurface = "pavement";
   const recentSteps = [];
+  let lastStepId = "";
+  let lastLandId = "";
 
   function surfaceAt(x, y, z, isWet) {
     const cfg = window.DAY_CONFIG || {};
@@ -837,12 +870,13 @@ import { pickRate } from "./variety.js";
       note("step-" + surf);
       surfaces[surf] = (surfaces[surf] || 0) + 1;
       lastSurface = surf;
-      recentSteps.push({ surface: surf, wet: isWet || surf === "puddle", t: typeof performance !== "undefined" ? Math.round(performance.now()) : Date.now() });
+      recentSteps.push({ surface: surf, id: lastStepId, wet: isWet || surf === "puddle", t: typeof performance !== "undefined" ? Math.round(performance.now()) : Date.now() });
       if (recentSteps.length > 20) recentSteps.shift();
       try {
         window.dispatchEvent(new CustomEvent("day:footstep", { detail: { surface: surf, wet: isWet || surf === "puddle", pan: pan || 0 } }));
       } catch (e) { /* ignore */ }
 
+      const sid = voicing("step-" + surf, () => {
       if (surf === "gravel") {
         // Crunchy multi-grain gravel roof step: three staggered high-mid pebble crunches + dry sole thud
         noise({ type: "bandpass", freq: 2350 + Math.random() * 350, q: 2.4, dur: 0.055, vol: 0.068, attack: 0.003, pan });
@@ -878,6 +912,8 @@ import { pickRate } from "./variety.js";
       if (isWet && surf !== "puddle") {
         noise({ type: "highpass", freq: 3600, dur: 0.085, vol: 0.028, pan, delay: 0.014 });
       }
+      });
+      lastStepId = sid;
       return surf;
     },
     jump(air) {
@@ -890,10 +926,14 @@ import { pickRate } from "./variety.js";
       note("land");
       const k = Math.max(0.2, Math.min(1, h / 6));
       const sk = surf === "metal" ? "grating" : surf === "gravel" || surf === "tar" ? surf : "pavement";
-      if (sample(`land-${sk}-${h > 2.2 ? "hard" : "soft"}`, { gain: 0.6 + 0.4 * k })) return;
+      const emit = (id) => { lastLandId = id; try { window.dispatchEvent(new CustomEvent("day:land-sound", { detail: { id, h: Math.round(h * 100) / 100, surface: surf } })); } catch (e) { /* no window events */ } };
+      if (sample(`land-${sk}-${h > 2.2 ? "hard" : "soft"}`, { gain: (0.6 + 0.4 * k) * stepGain() })) { emit(`land-${sk}-${h > 2.2 ? "hard" : "soft"}-file`); return; }
       synthTag("landing");
-      noise({ type: "lowpass", freq: 260 + 300 * k, dur: 0.18 + 0.3 * k, vol: 0.1 + 0.25 * k });
-      tone({ freq: 90, to: 45, dur: 0.15 + 0.25 * k, vol: 0.08 + 0.22 * k });
+      emit(voicing(`land-${sk}-${h > 2.2 ? "hard" : "soft"}`, () => {
+        noise({ type: "lowpass", freq: (surf === "gravel" ? 420 : surf === "metal" ? 520 : 260) + 300 * k, dur: 0.18 + 0.3 * k, vol: 0.1 + 0.25 * k });
+        tone({ freq: surf === "metal" ? 150 : 90, to: 45, dur: 0.15 + 0.25 * k, vol: 0.08 + 0.22 * k });
+        if (surf === "metal") tone({ freq: 880, to: 760, dur: 0.18 + 0.2 * k, vol: 0.03 + 0.05 * k, wave: "sine" });
+      }));
     },
     letGo() {
       note("let-go");
@@ -1747,6 +1787,9 @@ import { pickRate } from "./variety.js";
       heard: { ...heard },
       surfaces: { ...surfaces },
       lastSurface,
+      lastStepId,
+      lastLandId,
+      stepGain: stepGain(),
       recentSteps: recentSteps.slice(),
       tornado: !!roar,
       tornadoDb: roarLastDb,
