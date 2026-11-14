@@ -325,6 +325,7 @@ export function startDaySound(dayApi) {
       if (!buf) return false;
       const src = b.ctx.createBufferSource();
       src.buffer = buf;
+      try { src.__hawkesSampleId = "daysound-" + String(url || synthId || "oneshot").split("/").pop(); } catch (e) { /* */ }
       const g = b.ctx.createGain();
       g.gain.value = (vol != null ? vol : 0.5) * cfg().mix;
       let node = g;

@@ -283,6 +283,8 @@
     const vol = (o.gain == null ? 1 : o.gain) * (1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1));
     const src = a.c.createBufferSource();
     src.buffer = pick.b;
+    // Name it by its file: same-length foley clips would otherwise share the probe's "buf:<secs>x<len>" id.
+    try { src.__hawkesSampleId = "foley-" + String(pick.url).split("/").pop(); } catch (e) { /* */ }
     src.playbackRate.value = rate;
     const g = a.c.createGain();
     g.gain.value = Math.max(0.0002, vol);
@@ -374,6 +376,7 @@
     const t = a.c.currentTime + (o.delay || 0);
     const src = a.c.createBufferSource();
     src.buffer = pick.b;
+    try { src.__hawkesSampleId = "power-" + String(pick.url).split("/").pop(); } catch (e) { /* */ }
     src.playbackRate.value = o.rate || 1 + (Math.random() * 0.06 - 0.03);
     let node = src;
     if (o.lp != null && a.c.createBiquadFilter) {
@@ -514,6 +517,7 @@
     const t = a.c.currentTime;
     const src = a.c.createBufferSource();
     src.buffer = b;
+    try { src.__hawkesSampleId = "castclip-" + k; } catch (e) { /* */ }
     src.playbackRate.value = (o.rate || 1) * (1 + (Math.random() * 0.06 - 0.03));
     let node = src;
     if (o.lp) {
