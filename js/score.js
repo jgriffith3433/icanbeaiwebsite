@@ -450,7 +450,7 @@ export function startScore(dayApi) {
     src.loop = true;
     // Several clips share one length after the seam fix (the 8 s beds all bake to 7.15 s), so the probe's automatic
     // "buf:<secs>x<len>" id would read different files as one sample: name each loop by its own file.
-    if (o.id) { try { src.__hawkesSampleId = o.id; src.__hawkesBus = o.bus || "ambience"; src.playbackRate.value = jitterRate(o.id); } catch (e) { /* */ } }
+    if (o.id) { try { src.__hawkesSampleId = o.id; src.__hawkesBus = o.bus || "ambience"; src.playbackRate.value = freshBedRate(o.id); } catch (e) { /* */ } }
     const filter = o.filter && ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
     if (filter) {
       filter.type = o.filterType || "lowpass";
@@ -484,9 +484,9 @@ export function startScore(dayApi) {
     const t = nowMsClock();
     const used = (bedRates[id] = (bedRates[id] || []).filter((u) => t - u.t < 60000));
     let r = 1;
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 40; i++) {
       r = 1 + (Math.random() * 0.044 - 0.022);
-      if (!used.some((u) => Math.abs(u.r - r) < 0.0012)) break;
+      if (!used.some((u) => Math.abs(u.r - r) < 0.002)) break;
     }
     used.push({ r, t });
     return r;
