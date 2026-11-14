@@ -121,8 +121,16 @@ function glass(u, v) {
 function roof(u, v) {
   /* One clean matte slate: a flat colour with a barely-there tone drift. No seams, no grain: a textured roof seen at a
      grazing angle smeared into streaks and read as a different art style from the title's diorama. */
+  /* Not a single flat colour: that filled the phone's view as a bare grey field (the playtest's missing-texture in wake-him).
+     Soft tar patches, a fine gravel speckle (small cells: it averages out in the mips at a grazing angle instead of streaking)
+     and faint membrane seams every half tile (one thin line, no crossing grid). */
   const n = fbm(u + 1, v + 3);
-  const c = lerpRgb(rgb(34, 40, 50), rgb(37, 43, 54), n * 0.5);
+  const patch = fbm(u * 2 + 5, v * 2 + 9);
+  const gravel = noise(u, v, 64);
+  let t = n * 0.35 + patch * 0.5 + gravel * 0.45;
+  const seam = wrap01(u * 2) < 0.015 || wrap01(v * 2) < 0.015;
+  let c = lerpRgb(rgb(30, 35, 44), rgb(50, 57, 68), Math.max(0, Math.min(1, t)));
+  if (seam) c = lerpRgb(c, rgb(18, 21, 28), 0.55);
   return { r: c.r, g: c.g, b: c.b, h: 0.5 };
 }
 function park(u, v) {
