@@ -688,10 +688,10 @@
       box("legL", 0.06, 0.74, 0.6, -(opts.w || 1.4) / 2 + 0.06, 0.45, 0, opts.m || wood, n);
       box("legR", 0.06, 0.74, 0.6, (opts.w || 1.4) / 2 - 0.06, 0.45, 0, opts.m || wood, n);
       if (opts.screen) {
-        box("stand", 0.08, 0.25, 0.08, 0, 0.98, 0.18, dark, n);
+        box("stand", 0.08, 0.25, 0.08, 0, 0.98, 0.28, dark, n);
         const sm = glowMat("#14181f");
-        const scr = box("screen", 0.72, 0.42, 0.04, 0, 1.25, 0.2, dark, n);
-        const face = box("screenface", 0.66, 0.37, 0.01, 0, 1.25, 0.177, sm, n, false);
+        const scr = box("screen", 0.72, 0.42, 0.04, 0, 1.25, 0.3, dark, n);
+        const face = box("screenface", 0.66, 0.37, 0.01, 0, 1.25, 0.277, sm, n, false);
         glowing(face);
         box("kbd", 0.45, 0.02, 0.15, 0, 0.86, -0.12, mat("#3a3e46"), n);
         scr.receiveShadows = true;
