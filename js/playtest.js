@@ -11068,6 +11068,30 @@ async function phoneTouch(options, t) {
   if (ms > 1000) t.problem("bug", `Take control by tap took ${ms} ms (the limit is 1000)`);
   await sleep(1200);
 
+  // 2b. Feet on the ground: the touch stick at half tilt (walk) then full tilt (run), then back to half and a stop.
+  // The animation trace (anim.footSlideSeconds, anim.blendPops) reads the whole stretch.
+  {
+    const stickEl = $("stick");
+    const sr = stickEl && hudVisible(stickEl);
+    if (sr) {
+      const cx = sr.left + sr.width / 2, cy = sr.top + sr.height / 2;
+      const reach = sr.width / 2;
+      let peak = 0, fastest = 0;
+      const sampler = setInterval(() => { const sp = C.state().speed || 0; peak = Math.max(peak, sp); }, 50);
+      touchOn(stickEl, "pointerdown", cx, cy);
+      for (const [k, ms] of [[0.5, 2200], [1, 2200], [0.5, 1800]]) {
+        for (let i = 1; i <= 4; i++) { touchOn(stickEl, "pointermove", cx, cy - (reach * k * i) / 4); await sleep(40); }
+        await sleep(ms);
+        fastest = Math.max(fastest, C.state().speed || 0);
+      }
+      touchOn(stickEl, "pointerup", cx, cy - reach * 0.5);
+      clearInterval(sampler);
+      await sleep(600);
+      t.metric("phone.stickPeakSpeed", Math.round(peak * 100) / 100);
+      t.event("phone-stick-walk", `stick half then full tilt then half: peak ${Math.round(peak * 10) / 10} m/s`);
+    }
+  }
+
   // 3. Every control: 44 px, on screen, no overlap.
   const sels = ["#control", ".abilitybar .ab", ".touchpad .jump", ".touchpad .stick", "#sound", "#settings", "#episodes", "#time-btn", "#weather-btn"];
   let minPx = 9999;
