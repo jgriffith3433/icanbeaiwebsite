@@ -72,9 +72,9 @@ export function installSlice(day, world) {
      top that grows from 78% to the full 5 m and rises 4 mm (planes 5 and 10 mm clear of each other: no z-fighting). */
   const LAWN_SECS = 5;
   let cur = 0;
-  /* The wet layer: a Rain cast darkens the lawn and spreads the pond within DRENCH_SECS (1.6 s), wherever he stands, and it dries
+  /* The wet layer: a Rain cast darkens the lawn and spreads the pond within DRENCH_SECS (0.8 s), wherever he stands, and it dries
      off over DRENCH_DRY s once the player's rain is gone. It sits on top of the slower lawn above (the shown value is the larger). */
-  const DRENCH_SECS = 1.6;
+  const DRENCH_SECS = 0.8;
   const DRENCH_DRY = 24;
   const DRENCH_LEVEL = 0.85;
   let drench = 0;
@@ -261,23 +261,25 @@ export function installSlice(day, world) {
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
     t += dt;
-    if (st.easing) {
-      const d = st.goal - cur;
-      const stp = dt / LAWN_SECS;
-      cur = Math.abs(d) <= stp ? st.goal : cur + Math.sign(d) * stp;
-      paint(Math.max(cur, drench));
-      if (cur === st.goal) { st.easing = false; emit("lawn-done", { k: st.goal }); }
-    }
     const w = (window.weather && window.weather.now && window.weather.now()) || { state: "clear" };
     const wet = w.state === "rain" || w.state === "storm";
     if (drenchOn && !(w.manual && wet)) drenchOn = false;
     const dGoal = drenchOn ? DRENCH_LEVEL : 0;
+    let dirty = false;
     if (drench !== dGoal) {
       const stp = (dt / (drenchOn ? DRENCH_SECS : DRENCH_DRY)) * DRENCH_LEVEL;
       drench = Math.abs(dGoal - drench) <= stp ? dGoal : drench + Math.sign(dGoal - drench) * stp;
-      if (!st.easing) paint(Math.max(cur, drench));
       st.drench = +drench.toFixed(3);
+      dirty = true;
     }
+    if (st.easing) {
+      const d = st.goal - cur;
+      const stp = dt / LAWN_SECS;
+      cur = Math.abs(d) <= stp ? st.goal : cur + Math.sign(d) * stp;
+      dirty = true;
+      if (cur === st.goal) { st.easing = false; emit("lawn-done", { k: st.goal }); }
+    }
+    if (dirty) paint(Math.max(cur, drench));
     // ripples
     rings.forEach((r) => {
       r.t += dt * (wet ? 1.8 : 0.85);
@@ -346,12 +348,17 @@ export function installSlice(day, world) {
   window.addEventListener("day:power", (e) => {
     const d = e.detail || {};
     if (d.action === "denied") return;
-    const p = d.power || d.id || d.name || d.action;
+    const p = d.power || d.action || d.id || d.name;
+    if (p === "rain" || p === "storm") { drenchOn = true; emit("drench", { on: true }); }
     if (p === "gust" || p === "bolt" || p === "lightning" || p === "storm") {
       const c = me();
       if (c && Math.hypot(c.x - BAND.x, c.z - BAND.z) < 40) scatter(p);
     }
     if (p === "rain" && me() && st.goal < 1) setLawn("damp", 1);
+  });
+  window.addEventListener("day:coldopen", (e) => {
+    const d = e.detail || {};
+    if (d.action === "start") { drenchOn = false; drench = 0; st.drench = 0; setLawn("straw", 0, true, true); }
   });
   window.addEventListener("day:neighbor", (e) => {
     const d = e.detail || {};

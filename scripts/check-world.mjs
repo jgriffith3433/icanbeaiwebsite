@@ -99,7 +99,7 @@ ok(world.stage.bedroomLight && world.stage.bedroomLight.intensity > 0.35, `bedro
 world.update(sandbox.DayEngine.frame(day, 12 * 60), 0.016, { snap: true });
 world.look.quality('low');
 const low = world.look.info();
-ok(low.quality === 'low' && low.bloom === true && low.shadows === true && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
+ok(low.quality === 'low' && low.bloom === false && low.shadows === true && low.samples === 1, `low quality didn't take (bloom ${low.bloom}, shadows ${low.shadows}, samples ${low.samples})`);
 world.look.quality('high');
 ok(world.look.info().bloom === true, 'high quality left bloom off');
 
@@ -481,9 +481,11 @@ ok(!power.now().manual && power.now().state === 'clear' && power.now().wet < 0.1
   ok(!w.warming() && !w.now().manual && w.now().state === 'clear' && w.now().rain < 0.01 && w.now().sun < 0.01, 'warm-up did not snap back to the forecast');
   w.warm({ state: 'fog', intensity: 0.8 });
   w.set('rain', 0.75, 'cell');
-  ok(!w.warming() && w.now().manual && w.now().state === 'rain', 'a real set did not take over from the warm-up');
+  ok(!w.warming() && !w.now().manual && w.now().state === 'rain', 'a cell set did not take over from the warm-up without setting manual');
   ok(!w.warm(null) && w.now().state === 'rain', 'the warm-up ended a real call');
   ok(!w.warm({ state: 'fog', intensity: 1 }), 'the warm-up took over a real call');
+  w.set('rain', 1, 'power');
+  ok(w.now().manual && w.now().state === 'rain', 'a power set did not mark weather manual');
 }
 const sim = createWeather({ blend: wx.blend || 3.4, forecast: wx.forecast });
 sim.set('clear', 1, 'key');

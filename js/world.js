@@ -157,7 +157,19 @@
        with zero extra scene render passes. */
     const glowing = (mesh) => mesh;
 
-    const pipeline = new B.DefaultRenderingPipeline("look", true, scene, [camera]);
+    /* Phone / low quality (same pick as js/look.js: url, saved, else narrow / coarse / <= 4 GB): an 8-bit pipeline, no HDR targets.
+       Tone mapping is still the image-processing pass; the bloom pass is off on low (js/look.js applyQuality). */
+    const lowAtBoot = (() => {
+      try {
+        const q = new URLSearchParams(location.search).get("quality") || localStorage.getItem("icanbe.quality");
+        if (q === "low" || q === "high") return q === "low";
+      } catch (e) { /* node, or no storage */ }
+      let narrow = false, coarse = false;
+      try { narrow = window.innerWidth <= 700; coarse = window.matchMedia("(pointer: coarse)").matches; } catch (e) { /* node */ }
+      const mem = typeof navigator !== "undefined" && navigator.deviceMemory;
+      return !!((mem && mem <= 4) || narrow || coarse);
+    })();
+    const pipeline = new B.DefaultRenderingPipeline("look", !lowAtBoot, scene, [camera]);
     pipeline.fxaaEnabled = true;
     pipeline.samples = 1;
     pipeline.imageProcessing.toneMappingEnabled = true;

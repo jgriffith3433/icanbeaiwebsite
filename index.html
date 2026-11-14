@@ -264,8 +264,9 @@
 
     <!-- Babylon.js 9 and Havok physics from npm, the day, the world, the page and analytics: bundled by Vite (js/app.js). -->
     <script type="module" src="js/app.js?v=b2c4a141f5"></script>
-    <!-- Hawkes playtest hooks. Idle unless the runner calls them or the URL has ?playtest=<id>. -->
-    <script type="module" src="js/playtest.js?v=b2c4a141f5"></script>
+    <!-- Hawkes playtest hooks: js/playtest.js is fetched by dynamic import only for ?playtest=<id> or when the runner
+         touches window.hawkesPlaytest (js/playtest-loader.js). A player's page never downloads it. -->
+    <script type="module" src="js/playtest-loader.js?v=b2c4a141f5"></script>
     <script src="js/hawkes-release.js?v=b2c4a141f5" data-releases="releases.json" defer></script>
   </body>
 </html>

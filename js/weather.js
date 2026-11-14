@@ -152,6 +152,7 @@ export function createWeather(opt) {
   let targetIntensity = 1;
   let level = 1;
   let manual = false;
+  let cell = false; // the title/cold-open storm cell: holds the sky without setting `manual`, so ability reactions wait for the player's cast
   let wasHeld = false;
   let holdLeft = 0;
   let powerLeft = 0; // an ability's own weather: lasts ABILITY_HOLD_SEC from its last call, in control or not
@@ -187,7 +188,7 @@ export function createWeather(opt) {
       steamHold = 0;
       steam = 0;
       roofWet = L.wet;
-      puddleLevel = L.rain > 0.15 ? L.wet : 0;
+      puddleLevel = manual && L.rain > 0.15 ? L.wet : 0;
       wasRainWet = L.rain > 0.25 || L.wet > 0.5;
       snowCover = L.snow > 0.5 ? 1 : 0;
     } else {
@@ -198,8 +199,8 @@ export function createWeather(opt) {
       if (roofWet < 0.01) roofWet = 0;
       if (roofWet > 0.25 && (L.rain > 0.2 || L.wet > 0.45)) wasRainWet = true;
 
-      const pGoal = raining ? Math.min(1, Math.max(L.wet, L.rain)) : 0;
-      const pTau = pGoal > puddleLevel ? 1.15 : sunny ? 1.05 : 1.8;
+      const pGoal = manual && raining ? Math.min(1, Math.max(L.wet, L.rain)) : 0;
+      const pTau = pGoal > puddleLevel ? 0.45 : sunny ? 1.05 : 1.8;
       puddleLevel += (pGoal - puddleLevel) * (1 - Math.exp(-dtPos / pTau));
       if (puddleLevel < 0.01) puddleLevel = 0;
 
@@ -283,10 +284,18 @@ export function createWeather(opt) {
     target = state;
     targetIntensity = intensity == null || !Number.isFinite(intensity) ? 1 : Math.max(0, Math.min(1, intensity));
     sunFlag = false;
-    if (via !== "forecast") {
+    if (via === "cell") {
+      manual = false;
+      cell = state !== lastForecast.state;
+      holdLeft = 0;
+      powerLeft = 0;
+      if (opt.onSet) opt.onSet({ state, intensity: targetIntensity, via });
+    } else if (via !== "forecast") {
       manual = true;
+      cell = false;
       holdLeft = 0;
       powerLeft = via === "power" ? holdSec * (state === "rain" ? 2.4 : 1) : 0; // a Rain cast stays long enough to soak the street
+      if (via === "power" && (state === "rain" || state === "storm")) puddleLevel = Math.min(puddleLevel, 0.05);
       if (opt.onSet) opt.onSet({ state, intensity: targetIntensity, via: via || "set" });
     }
     return true;
@@ -298,6 +307,7 @@ export function createWeather(opt) {
       // Keep what he left behind for a while, then hand it back to the forecast.
       if (manual) holdLeft = holdSec;
       else holdLeft = 0;
+      cell = false;
     }
     wasHeld = held;
     lastForecast = forecastAt(dateKey, minutes, opt.forecast);
@@ -316,7 +326,7 @@ export function createWeather(opt) {
         if (opt.onDrift) opt.onDrift({ from: target, to: lastForecast.state });
       }
     }
-    if (!manual) {
+    if (!manual && !cell) {
       target = lastForecast.state;
       targetIntensity = lastForecast.intensity;
       holdLeft = 0;
@@ -332,6 +342,7 @@ export function createWeather(opt) {
       if (!warming) return false;
       warming = null;
       manual = false;
+      cell = false;
       powerLeft = 0;
       holdLeft = 0;
       sunFlag = false;
@@ -340,7 +351,7 @@ export function createWeather(opt) {
       step(0, true);
       return true;
     }
-    if (manual && !warming) return false;
+    if ((manual || cell) && !warming) return false;
     if (!STATES.includes(spec.state)) return false;
     warming = spec;
     manual = true;
@@ -504,6 +515,7 @@ export function startWeather(world, dayApi) {
   let streetProbeOn = false;
   let streetProbeAcc = 1;
   let streetProbeReady = false;
+  const streetProbePos = new B.Vector3(Number.NaN, 0.4, 0);
   function fillStreetProbeList() {
     if (!streetProbe) return;
     streetProbe.renderList.length = 0;
@@ -1305,7 +1317,8 @@ export function startWeather(world, dayApi) {
     windT += dt;
     const wNow = weather.now();
     const isAbility = !!wNow.manual;
-    abilityK = snap ? (isAbility ? 1 : 0) : abilityK + ((isAbility ? 1 : 0) - abilityK) * (1 - Math.exp(-Math.max(0, dt) / 1.2));
+    const abTau = isAbility ? 0.45 : 1.2;
+    abilityK = snap ? (isAbility ? 1 : 0) : abilityK + ((isAbility ? 1 : 0) - abilityK) * (1 - Math.exp(-Math.max(0, dt) / abTau));
     if (Math.abs(abilityK - (isAbility ? 1 : 0)) < 0.004) abilityK = isAbility ? 1 : 0;
     const wetR = L.wet * abilityK;
     const surfaceWet = Math.max(L.wet, wNow.roofWet || 0);
@@ -1423,17 +1436,23 @@ export function startWeather(world, dayApi) {
           if (low && streetProbe && streetProbe.cubeTexture) {
             if (!streetProbeReady) fillStreetProbeList();
             const wantProbe = wetR > 0.15;
+            // bound once and left bound: assigning reflectionTexture on and off recompiled the road's PBR shader at the first rain
+            // (and every dry-wet change). Dry = environmentIntensity 0; wet = intensity up, the probe's refresh rate follows.
+            if (roadMat.reflectionTexture !== streetProbe.cubeTexture) {
+              if (roadMat.__dryEnv == null && roadMat.environmentIntensity != null) roadMat.__dryEnv = roadMat.environmentIntensity;
+              roadMat.reflectionTexture = streetProbe.cubeTexture;
+              if (roadMat.environmentIntensity != null) roadMat.environmentIntensity = 0;
+            }
             if (wantProbe !== streetProbeOn) {
               streetProbeOn = wantProbe;
-              roadMat.reflectionTexture = wantProbe ? streetProbe.cubeTexture : null;
               // metallic workflow: environmentIntensity lifts the probe; reflectivityColor alone is ignored
               if (roadMat.__dryMetallic == null && roadMat.metallic != null) roadMat.__dryMetallic = roadMat.metallic;
               if (roadMat.metallic != null) roadMat.metallic = wantProbe ? Math.max(roadMat.__dryMetallic || 0, 0.35) : (roadMat.__dryMetallic != null ? roadMat.__dryMetallic : 0.08);
               if (roadMat.environmentIntensity != null) {
-                if (roadMat.__dryEnv == null) roadMat.__dryEnv = roadMat.environmentIntensity;
-                roadMat.environmentIntensity = wantProbe ? Math.max(0.85, roadMat.__dryEnv) : roadMat.__dryEnv;
+                roadMat.environmentIntensity = wantProbe ? Math.max(0.85, roadMat.__dryEnv == null ? 0.85 : roadMat.__dryEnv) : 0;
               }
-              streetProbe.refreshRate = wantProbe ? 12 : -1;
+              streetProbe.refreshRate = wantProbe ? 0 : -1; // 0 = render once: a static cube, not six faces of the city every 12 frames
+              if (wantProbe) streetProbePos.copyFromFloats(Number.NaN, 0, 0);
             }
             if (wantProbe) {
               streetProbeAcc += 0.3;
@@ -1442,13 +1461,21 @@ export function startWeather(world, dayApi) {
                 const cam = scene.activeCamera;
                 if (cam) {
                   const p = cam.globalPosition || cam.position;
-                  streetProbe.position.set(p.x, 0.4, p.z);
+                  // re-render the cube only after he has walked 40 m from where it was taken
+                  const dx = p.x - streetProbePos.x, dz = p.z - streetProbePos.z;
+                  if (!(dx * dx + dz * dz < 1600)) {
+                    streetProbePos.copyFromFloats(p.x, 0.4, p.z);
+                    streetProbe.position.copyFrom(streetProbePos);
+                    streetProbe.refreshRate = 0;
+                  }
                 }
               }
             }
-          } else if (streetProbeOn) {
+          } else if (streetProbeOn || (roadMat.reflectionTexture && roadMat.reflectionTexture === (streetProbe && streetProbe.cubeTexture))) {
+            // leaving low quality (high has SSR and its own IBL): restore the dry look, one recompile on a deliberate switch
             streetProbeOn = false;
             roadMat.reflectionTexture = null;
+            if (roadMat.__dryEnv != null && roadMat.environmentIntensity != null) roadMat.environmentIntensity = roadMat.__dryEnv;
             if (streetProbe) streetProbe.refreshRate = -1;
           }
         } else {
@@ -1686,8 +1713,12 @@ export function startWeather(world, dayApi) {
         const obs = scene.onAfterRenderObservable.add(() => { if (++i >= k) done(); });
         setTimeout(done, 1500); // a hidden tab or a lost context draws nothing: don't hang
       });
-      const steps = [["rain", 0.7, false], ["fog", 0.8, false], ["clear", 1, true], ["wind", 0.8, false]];
+      // snow too: the first snow (the switch the forecast makes ~24 s in on a snowy day) built its 5000 flakes, roof caps and road tint mid-play
+      const steps = [["rain", 0.7, false], ["fog", 0.8, false], ["clear", 1, true], ["wind", 0.8, false], ["snow", 0.8, false]];
       let ran = 0;
+      // the god-ray pass and the bolt's ribbons and scorch decal compile here too (no weather change, nothing shows)
+      try { if (window.day && window.day.sky && window.day.sky.warmGodRays) await window.day.sky.warmGodRays(); } catch (e) { /* */ }
+      try { const bf = window.powers && window.powers.boltFx; if (bf && bf.warm) await bf.warm(); } catch (e) { /* */ }
       for (const [state, intensity, sun] of steps) {
         if (!weather.warm({ state, intensity, sun })) break; // someone else already holds the sky
         await eachFrames(n);

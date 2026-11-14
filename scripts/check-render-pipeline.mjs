@@ -100,7 +100,7 @@ ok(info.luts.includes('storm') && info.luts.includes('fog') && info.luts.include
 world.look.quality('low');
 world.scene.render();
 const low = api.info();
-ok(low.quality === 'low' && low.bloom.enabled && !low.ssao && !low.fxaa, `low quality: bloom ${low.bloom.enabled}, ssao ${low.ssao}, fxaa ${low.fxaa}`);
+ok(low.quality === 'low' && !low.bloom.enabled && !low.ssao && !low.fxaa, `low quality: bloom ${low.bloom.enabled}, ssao ${low.ssao}, fxaa ${low.fxaa}`);
 world.look.quality('high');
 world.scene.render();
 ok(api.info().quality === 'high', 'high quality did not come back');

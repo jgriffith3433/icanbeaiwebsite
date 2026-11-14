@@ -779,10 +779,20 @@ export function installCrowd(world) {
     try { window.dispatchEvent(new CustomEvent("day:crowd", { detail: { action: "reaction", kind } })); } catch (e) { /* node */ }
     for (let i = 0; i < MAXP; i++) {
       const p = people[i];
-      p.rdelay = rng() * 0.6;
+      p.rdelay = rng() * (kind === "rain" ? 0.25 : 0.6);
       p.look = kind === "lookup" ? 1.6 + rng() * 1.4 : 0;
       // under rain, the ones with no umbrella run for the nearest door
-      if (kind === "rain" && p.active && !p.hasUmb && !p.leaving && p.state === "walk" && rng() < 0.7) p.leaving = true;
+      if (kind === "rain" && p.active && !p.hasUmb && !p.leaving && p.state === "walk" && rng() < 0.7) {
+        p.leaving = true;
+        if (!p.door && p.edge && p.edge.kind === "walk" && p.edge.doors && p.edge.doors.length) {
+          let best = null, bestD = 1e9;
+          for (const d of p.edge.doors) {
+            const ahead = p.dir > 0 ? d.s - p.s : p.s - d.s;
+            if (ahead > 0.6 && ahead < bestD) { best = d; bestD = ahead; }
+          }
+          if (best) p.door = best;
+        }
+      }
     }
   }
 
@@ -909,7 +919,7 @@ export function installCrowd(world) {
 
     // frame-time guard: thin the crowd when frames run long, bring it back slowly
     ema = lerp(ema, dtReal * 1000, 0.05);
-    const floor = quality === "low" ? 0.6 : 0.5;
+    const floor = quality === "low" ? 0.3 : 0.5; // a phone may thin the crowd to 30% of its (already 0.4x) budget before it drops frames
     if (ema > 40) { slow += dtReal; fast = 0; } else if (ema < 22) { fast += dtReal; slow = 0; } else { slow = 0; fast = 0; }
     if (slow > 3) { guard = Math.max(floor, guard * 0.85); slow = 0; }
     if (fast > 10) { guard = Math.min(1, guard * 1.1); fast = 0; }
@@ -1221,6 +1231,10 @@ export function installCrowd(world) {
   if (typeof window.addEventListener === "function") {
     window.addEventListener("day:power", (e) => {
       const d = (e && e.detail) || {};
+      if (d.action === "denied") return;
+      const act = d.power || d.action || "";
+      if (act === "rain") startReaction("rain");
+      else if (act === "storm") startReaction("lookup");
       const P = window.day && window.day.powers;
       if (!P || !P.now || !/^(bolt|tornado|gust)$/.test(d.action || "")) return;
       let n = null;

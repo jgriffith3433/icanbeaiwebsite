@@ -31,7 +31,7 @@ const HUD_PARTS = [
   ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .charge", "Charge"],
   [".powerpad button", "power pad"], [".touchpad .stick", "stick"], [".touchpad .jump", "jump"],
   [".tutorial", "tutorial card"], [".ep-hud", "episode HUD"], [".control-hint", "controls hint"],
-  ["#voice-caption", "voice caption"], ["#voices", "Voices"], ["#time-btn", "Time control"], ["#time-drawer", "Time drawer"], ["#update-pill", "New version"],
+  ["#storm-toast", "storm tally card"], ["#voice-caption", "voice caption"], ["#voices", "Voices"], ["#time-btn", "Time control"], ["#time-drawer", "Time drawer"], ["#update-pill", "New version"],
 ];
 /* HUD regions: the parts above grouped as a player sees them (the status card and the tools are the top bar, an ability
    bar of six buttons is one region). The public view holds these to six at any time. */
@@ -1809,6 +1809,17 @@ async function warmStart(options, t) {
   t.metric("firstCastWorstMs", Math.round(worstCast));
   // the first 30 s as a whole, then (phone) 60 s
   const total = touch ? 60000 : 30000;
+  // the switch to snow near 24 s (a named setup shortcut: the forecast does it on snowy days): its flakes and roof caps must already be warm
+  const toSnow = 24000 - (performance.now() - t0);
+  if (toSnow > 0) await sleep(toSnow);
+  const snowAt = performance.now();
+  try { if (window.weather && window.weather.set) window.weather.set("snow", 0.8, "power"); } catch (e) { /* */ }
+  await sleep(2500);
+  const snowWorst = worstIn(snowAt, performance.now());
+  t.metric("snowSwitchWorstMs", Math.round(snowWorst));
+  if (snowWorst > (touch ? 150 : 100)) t.problem("bug", `The switch to snow cost a ${Math.round(snowWorst)} ms frame (limit ${touch ? 150 : 100})`);
+  else t.event("snow-switch", `worst frame ${Math.round(snowWorst)} ms`);
+  try { if (window.weather && window.weather.set) window.weather.set("clear", 0.5, "power"); } catch (e) { /* */ }
   const rest = total - (performance.now() - t0);
   if (rest > 0) await sleep(rest);
   const end = performance.now();
@@ -1833,6 +1844,12 @@ async function warmStart(options, t) {
   t.metric("shaderErrors", bad.length);
   if (bad.length) t.problem("bug", `Shader compile errors in the console: ${bad[0]}`);
   else t.event("shaders-clean", "no shader compile errors");
+  if (window.__compilesAfterLoad) {
+    const n = window.__compilesAfterLoad();
+    t.metric("perf.compilesAfterLoad", n);
+    if (n > 0) t.problem("bug", `${n} shader effects compiled after the loading card (the casts, snow and god rays must be warm)`);
+    else t.event("compiles-after-load", "0 shader effects compiled after the loading card");
+  }
   // let go inside the first minute: the way back into control must be on screen (a phone has no stick then)
   if (touch) await tapEl($("control")); else pressKey("Escape");
   await t.until(() => C.mode() === "schedule", 8000, "back on the day").catch(() => {});
@@ -10863,12 +10880,16 @@ function audioReport() {
   const D = window.day;
   const A = D.audio && D.audio.info ? D.audio.info() : null;
   const S = D.score && D.score.now ? D.score.now() : null;
+  const ST = D.stems && D.stems.now ? D.stems.now() : null;
   const X = D.sfx && D.sfx.info ? D.sfx.info() : null;
   const btn = $("sound");
   const amb = {};
   if (S) Object.keys(S.amb || {}).forEach((k) => { if ((S.amb[k] || 0) > 0.01) amb[k] = S.amb[k]; });
   const music = {};
   if (S) Object.keys(S.music || {}).forEach((k) => { if ((S.music[k] || 0) > 0.01) music[k] = S.music[k]; });
+  if (ST && ST.stems && ST.layers) {
+    Object.keys(ST.layers).forEach((k) => { if ((ST.layers[k].gain || 0) > 0.01) music["stem-" + k] = ST.layers[k].gain; });
+  }
   return {
     on: !!btn && btn.getAttribute("aria-pressed") === "true",
     unlocked: !!(A && A.unlocked) || !!(S && S.unlocked),
@@ -10986,6 +11007,69 @@ async function firstRain(options, t) {
   if (after.length < 5) t.problem("bug", `After the first Rain the bar shows ${after.length} verbs (5 expected)`);
   t.progress(1);
 }
+/* The first Rain changes the world and the page says so: the lawn greens and the pond fills (even far from the park), a card
+   names what changed, and the title shows the same tally. Touch: the tap on the street, then the title's line at 390x844. */
+async function stormTally(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Phone: what the storm changed" : "What the storm changed");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day;
+  const P = window.powers || D.powers;
+  const C = D.control;
+  if (!D.memory || !D.slice || !D.tally || !P) { t.problem("bug", "day.memory, day.slice, day.tally or powers is missing"); return; }
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  try { D.memory.reset(); D.firstrain.reset(); if (D.street && D.street.stop) D.street.stop("check"); if (D.title && D.title.quiet) D.title.quiet(); } catch (e) { /* ok */ }
+  if (touch) { document.documentElement.classList.add("touch-ui"); if (C.touch) C.touch(true); }
+  for (let k = 0; k < 4 && C.mode() !== "control"; k++) {
+    if (k > 0 && D.jump) D.jump("19:00");
+    await sleep(400);
+    if (touch) { const tk = $("control"); if (tk && !tk.disabled) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+    await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  }
+  if (C.mode() !== "control") { t.problem("bug", "Take control never handed him over"); return; }
+  if (C.place) C.place(-21, 0.5, 1.5708, {}); // the apt roof side of the avenue: far from the park
+  await t.until(() => document.documentElement.classList.contains("first-rain"), 3000, "the first-Rain bar").catch(() => {});
+  await sleep(500);
+  const before = D.slice.now();
+  t.event("storm-before", `lawn ${before.lawn} shown ${before.lawnShown}, pond ${before.pond}, tally ${D.memory.tally().total}`);
+  const cv = document.querySelector("canvas");
+  const rc = cv.getBoundingClientRect();
+  const x = rc.left + rc.width / 2, y = rc.top + rc.height * 0.62;
+  const sendPtr = (type) => cv.dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: touch ? "touch" : "mouse", isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true }));
+  sendPtr("pointerdown"); await sleep(90); sendPtr("pointerup");
+  const toast = await t.until(() => D.tally.now().on, 6000, "the tally card").then(() => true).catch(() => false);
+  const tn = D.tally.now();
+  const el = $("storm-toast");
+  const r = el ? el.getBoundingClientRect() : null;
+  const inside = !!r && r.left >= 0 && r.right <= window.innerWidth && r.top >= 0 && r.bottom <= window.innerHeight;
+  t.event("storm-card", toast ? `card: ${tn.text}` : "the tally card never showed");
+  if (!toast) t.problem("bug", "After the first Rain no card said what the storm changed");
+  else if (!inside) t.problem("bug", "The tally card runs off the screen");
+  await t.until(() => D.slice.now().lawnShown >= 0.99, 9000, "the lawn to green").catch(() => {});
+  const after = D.slice.now();
+  t.metric("stormLawnShown", after.lawnShown);
+  t.metric("stormPond", after.pond);
+  t.metric("stormTallyRows", D.memory.tally().total);
+  t.metric("stormScrollX", Math.max(0, document.documentElement.scrollWidth - window.innerWidth));
+  t.event("storm-after", `lawn ${after.lawn} shown ${after.lawnShown}, pond ${after.pond}`);
+  if (!(after.lawnShown > before.lawnShown + 0.5)) t.problem("bug", "The park lawn did not green after the first Rain");
+  if (!(after.pond > before.pond + 0.1)) t.problem("bug", "The pond did not fill after the first Rain");
+  await sleep(400);
+  // the title shows it too
+  pressKey("Escape");
+  await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {});
+  if (D.title && D.title.show) D.title.show("check");
+  await sleep(900);
+  const te = $("title-tally");
+  const tr = te && !te.hidden ? te.getBoundingClientRect() : null;
+  const tIn = !!tr && tr.width > 0 && tr.left >= 0 && tr.right <= window.innerWidth && tr.bottom <= window.innerHeight;
+  t.event("storm-title", tr ? `title tally: ${te.textContent}` : "no tally on the title");
+  t.metric("stormTitleTally", tr ? 1 : 0);
+  if (!tIn) t.problem("bug", "The title does not show the tally of what the storm changed");
+  const lw = D.slice.now();
+  if (!(lw.lawnShown >= 0.99)) t.problem("bug", "The lawn is not green on the title screen");
+  t.progress(1);
+}
 async function audioCheck(options, t) {
   const touch = !!(options && options.touch);
   t.scene(touch ? "Phone: first tap" : "First tap");
@@ -11032,6 +11116,21 @@ async function audioCheck(options, t) {
   t.progress(0.25);
 
   // The cold open (if it ran): he is on the roof with Rain armed; one real tap (the Rain button by touch, R on a keyboard) is the first cast
+  let musicMeasured = false;
+  async function checkMusicAfterCast() {
+    if (musicMeasured) return;
+    musicMeasured = true;
+    const tCast = performance.now();
+    const okMusic = await t.until(() => {
+      const r = audioReport();
+      return Object.keys(r.music).length > 0 && (r.buses.music || 0) > 0;
+    }, 5000, "music after the first cast").then(() => true).catch(() => false);
+    const secs = Math.round(((performance.now() - tCast) / 1000) * 100) / 100;
+    const r = audioReport();
+    t.metric("audioMusicAfterCastS", okMusic ? secs : -1);
+    t.event("audio-music-after-cast", okMusic ? `music audible ${secs}s after the first cast: ${JSON.stringify(r.music)} (bus ${(r.buses.music || 0).toFixed(2)})` : `NO music within 5 s of the first cast (${JSON.stringify(r.music)})`);
+    if (!okMusic) t.problem("bug", "Music wasn't audible within 5 s of the first cast");
+  }
   if (cold) {
     if (D.title && D.title.showing() && D.title.play) D.title.play("tap");
     await t.until(() => D.coldopen.now().phase === "waiting" || D.coldopen.now().cast != null, 20000, "the cold open's prompt").catch(() => {});
@@ -11042,6 +11141,7 @@ async function audioCheck(options, t) {
       await t.until(() => D.coldopen.now().cast != null, 3000, "the first Rain").catch(() => {});
       if (D.coldopen.now().cast != null) t.milestone && t.milestone("first-success", "first Rain");
     }
+    await checkMusicAfterCast();
     t.event("audio-cold-open", `cold open ${D.coldopen.now().phase}, first input ${D.coldopen.now().firstInput}s, cast ${D.coldopen.now().cast}s`);
     if (D.coldopen.now().cast == null) t.problem("bug", "The first tap on the roof didn't cast Rain");
     await t.until(() => !D.coldopen.now().on, 25000, "the story line and the cold open's end").catch(() => {});
@@ -11083,6 +11183,7 @@ async function audioCheck(options, t) {
   const onStrike = (e) => strikes.push((e && e.detail) || {});
   window.addEventListener("day:strike", onStrike);
   const okBolt = P.command("bolt", touch ? "touch" : "key");
+  await checkMusicAfterCast();
   const reacted = await t.until(() => { const c = crowdNow(); return (c.flinching || 0) > 0 || (c.lookingUp || 0) > 0 || (c.reacting || 0) > 0; }, 3000, "a pedestrian's reaction").then(() => true).catch(() => false);
   window.removeEventListener("day:strike", onStrike);
   if (P.aimAt) P.aimAt(null);
@@ -11177,9 +11278,32 @@ async function audioCheck(options, t) {
   // menus-ui: while he is the player's, Let go, Rain (weather), Neighbors (a phone shows it as a pip) and Episodes are in the thumb's reach
   // (the lower 55% of a portrait phone), each at least 44 px, and nothing scrolls sideways
   if (touch && innerHeight > innerWidth) {
-    const reach = [["#control", "Let go"], ["#weather-btn", "Rain"], ["#neighbors-btn", "Neighbors"], ["#episodes", "Episodes"]];
+    // Neighbors and Episodes sit behind one Menu button (js/phonemenu.js): tap it, they must show, in reach, 44 px
+    const reach = [["#control", "Let go"], ["#weather-btn", "Rain"], ["#phone-menu-btn", "Menu"]];
     const out = [];
     let seen = 0;
+    const pm = document.getElementById("phone-menu-btn");
+    if (!pm || !hudVisible(pm)) out.push("the Menu button isn't on screen");
+    else {
+      if (hudVisible(document.getElementById("episodes"))) out.push("Episodes is still on screen outside the menu");
+      await tapEl(pm);
+      await sleep(250);
+      if (!hudVisible(document.getElementById("episodes"))) out.push("tapping Menu didn't show Episodes");
+      reach.push(["#episodes", "Episodes in the menu"]);
+      if (!isPublicView()) reach.push(["#neighbors-btn", "Neighbors in the menu"]);
+      t.event("phone-menu-open", "Menu tapped: Episodes" + (isPublicView() ? "" : " and Neighbors") + " shown");
+    }
+    // the five verbs: one arc at the bottom right, each 44 px or more with its cost label at least 12 px
+    const verbs = [...document.querySelectorAll(".abilitybar .ab[data-verb]")].filter((b) => hudVisible(b));
+    verbs.forEach((b) => {
+      const r = b.getBoundingClientRect();
+      if (r.left < innerWidth * 0.45 || r.top < innerHeight * 0.4) out.push(`verb ${b.dataset.ability} is outside the bottom-right thumb arc`);
+      if (r.width < 43.5 || r.height < 43.5) out.push(`verb ${b.dataset.ability} is ${Math.round(r.width)}x${Math.round(r.height)}px`);
+      const c = b.querySelector(".c");
+      if (c && hudVisible(c) && parseFloat(getComputedStyle(c).fontSize) < 12) out.push(`verb ${b.dataset.ability}'s cost label is under 12 px`);
+    });
+    if (verbs.length) t.event("verb-arc", `${verbs.length} verbs in the bottom-right arc, 44 px or more, labels 12 px or more`);
+    t.metric && t.metric("phoneRenderScale", window.day.look && window.day.look.info ? (window.day.look.info().scaling || 0) : 0);
     reach.forEach(([sel, name]) => {
       const el = document.querySelector(sel);
       if (!el || !hudVisible(el)) return;
@@ -11191,6 +11315,7 @@ async function audioCheck(options, t) {
     if (document.documentElement.scrollWidth > innerWidth + 1) out.push("the page scrolls sideways");
     out.forEach((m) => t.problem("bug", "Menus (phone): " + m));
     if (!out.length) t.event("menus-thumb-reach", `${seen} controls in the lower 55%, all 44 px or more, no sideways scroll`);
+    if (window.day.phoneMenu) window.day.phoneMenu.close();
     checkHud(t, "audio-check: phone controls");
   }
   // the morning's own sounds: alarm, stretch, coffee, the stair and the roof, each a beat of its own (no speech pill)
@@ -11242,7 +11367,15 @@ async function stemScore(options, t) {
   else if (mt.notes !== mc.notes || mt.notes.split(" ").length !== 4) t.problem("bug", "The title's and the cold open's motifs aren't the same four notes");
   t.progress(0.25);
 
-  // the first input has happened (the Play click): the stems stream and start together
+  // the Play click goes straight to the roof; stems start on the first day:power cast
+  await t.until(() => D.coldopen.now().phase === "waiting" || D.coldopen.now().cast != null, 15000, "the cold open's prompt").catch(() => {});
+  const preCast = D.stems.now();
+  t.event("stem-before-cast", `stems before first cast: ${preCast.stems}, streaming ${preCast.streaming}, bytes ${preCast.bytes}`);
+  if (preCast.stems !== 0 || preCast.bytes !== 0) t.problem("bug", `Stems started before the first cast (${preCast.stems} stems, ${preCast.bytes} bytes)`);
+  if (D.coldopen.now().phase === "waiting") {
+    const rb = $("coldopen-bolt");
+    if (phone && rb && !rb.hidden) await tapEl(rb); else pressKey("r");
+  }
   const ready = await t.until(() => D.stems.now().stems === 3, 20000, "three stems").then(() => true).catch(() => false);
   const S = D.stems.now();
   const spent = mb() - mbBefore;
@@ -11428,7 +11561,7 @@ async function titleKeyArt(options, t) {
 // Reports seconds to first input / first cast / first city reaction / Birdie's voice, words on screen before the first cast,
 // what else is visible before it (a phone: only the stick, Jump and Bolt), and the other criteria as problems.
 async function coldStart(options, t) {
-  t.scene("Cold start");
+  t.scene("Loading");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
   // the title holds the auto-started cold open until the shader warm-up (js/app.js, once his model is on) is over, so this setup
@@ -11448,6 +11581,7 @@ async function coldStart(options, t) {
   // measure it from that moment (letting go of it and walking back to re-run it by Play is what stalled in "returning").
   const auto = !!(D.coldopen && D.coldopen.now().on && D.control.mode() === "control");
   if (!auto) {
+    t.scene("Title");
     if (D.control.mode() === "control") { pressKey("Escape"); await t.until(() => D.control.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
     // setup: a new player (no icanbe.* keys), the title up, the cold open armed
     Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
@@ -11528,6 +11662,8 @@ async function coldStart(options, t) {
   t.event("cold-start-play", auto ? "auto-started (no click)" : phone ? "tapped Play" : "clicked Play");
   const gotControl = await waitFor(() => T.control != null, 4000);
   if (!gotControl) { t.problem("blocker", `Play didn't hand him over (control mode ${D.control.mode()})`); return; }
+  t.scene("Cold start");
+  if (t.milestone) t.milestone("gameplay", "on the roof");
   t.event("cold-start-control", `he is the player's ${T.control}s after Play; title ${D.title.showing() ? "STILL UP" : "closed"}`);
   if (D.title.showing()) t.problem("bug", "The title is still up after Play");
   if (D.tutorial && D.tutorial.blocking && D.tutorial.blocking()) t.problem("bug", "The first-visit card shows during the cold open");
@@ -11570,12 +11706,43 @@ async function coldStart(options, t) {
       if (jr && !(r.bottom <= jr.top + 2 || r.top >= jr.bottom - 2 || r.right <= jr.left || r.left >= jr.right)) t.problem("bug", "The Bolt button overlaps Jump");
     }
   }
+  {
+    // the late chunk (js/late.js): nothing of episodes, the tornado, wind and fog or moments may be in before the first cast
+    const L0 = D.late && D.late.now ? D.late.now() : null;
+    const early = L0 ? Object.keys(L0.modules).filter((k) => L0.modules[k]) : ["no day.late"];
+    t.event("cold-start-late-before", `modules loaded before gameplay: ${early.join(", ") || "none"} (started ${L0 ? L0.started : "?"})`);
+    t.metric("lateModulesBeforeGameplay", early.length);
+    if (!L0 || early.length) t.problem("bug", `Late modules were loaded before gameplay: ${early.join(", ") || "day.late is missing"}`);
+    if (D.episodes) t.problem("bug", "day.episodes exists before the first cast (episodes.js is in the first chunk)");
+    if (D.powers && D.powers.tornadoLoaded && D.powers.tornadoLoaded()) t.problem("bug", "The tornado module is loaded before the first cast");
+  }
   t.progress(0.4);
 
   // follow the cue (Rain: "Press R for rain" / the Rain button tap): no card is clicked anywhere before it
   const dim = Array.from(document.querySelectorAll(".ep-offer:not([hidden]),.tutorial:not([hidden]),#day-end:not([hidden])")).filter((e) => e.offsetParent !== null);
   if (dim.length) t.problem("bug", "A card is up before the first cast: " + dim.map((e) => e.id || e.className).join(", "));
+  {
+    const preAudio = performance.getEntriesByType("resource")
+      .map((r) => (r.name || "").split("/").pop().split("?")[0])
+      .filter((n) => /^(stem-|take-control\.mp3)/i.test(n));
+    const stNow = D.stems && D.stems.now ? D.stems.now() : { stems: 0, bytes: 0 };
+    t.metric("preGameplayStemOrStingAssets", preAudio.length);
+    t.event("cold-start-pre-cast-audio", `before first cast: stems ${stNow.stems} (${stNow.bytes} B), stem/sting assets fetched: ${preAudio.join(", ") || "none"}`);
+    if (preAudio.length > 0 || stNow.stems > 0) {
+      t.problem("bug", `Stems or take-control.mp3 fetched before the first cast: ${preAudio.join(", ") || stNow.stems + " stems"}`);
+    }
+  }
   t.event("cold-start-no-card", "no card to click: the first cast follows the prompt on the roof");
+  const sl = () => (D.slice && D.slice.now ? D.slice.now() : {});
+  const base = { lawn: sl().lawnShown || 0, pond: sl().pond || 0.78 };
+  const g0 = D.garden && D.garden.now ? D.garden.now() : null;
+  const wPre = W && W.now ? W.now() : {};
+  const cPre = D.crowd && D.crowd.info ? D.crowd.info() : {};
+  t.event("cold-start-pre-cast", `before cast: manual ${!!wPre.manual}, lawn ${base.lawn}, pond ${base.pond}, garden k ${g0 ? g0.k : "?"}, crowd reaction ${cPre.reaction || "none"}`);
+  if (wPre.manual) t.problem("bug", "The cold-open storm cell marked weather manual before the player cast");
+  if (base.lawn > 0.05) t.problem("bug", `The lawn darkened before the first Rain cast (${base.lawn})`);
+  if (g0 && (g0.k > 0.05 || g0.goal > 0)) t.problem("bug", `Birdie's garden started reviving before the first Rain cast (k ${g0.k}, goal ${g0.goal})`);
+  if (cPre.reaction === "rain") t.problem("bug", "The crowd reacted to rain before the player cast");
   if (phone) {
     const b = $("coldopen-bolt");
     const r = b.getBoundingClientRect();
@@ -11590,6 +11757,56 @@ async function coldStart(options, t) {
   const cast = await waitFor(() => T.bolt != null, 4000);
   if (!cast) { t.problem("blocker", `Pressing the prompted rain never cast it (${cueText})`); return; }
   t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
+  // the street answers within 2 s: the lawn darkens, the pond spreads, Birdie's pots lift and go green, people run for cover
+  {
+    const t0 = performance.now();
+    let lawnAt = null, gardenAt = null, run = 0;
+    await waitFor(() => {
+      const elS = (performance.now() - t0) / 1000;
+      const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
+      run = Math.max(run, c.running || 0, c.reacting || 0);
+      const s = sl();
+      if (lawnAt == null && (s.lawnShown || 0) - base.lawn > 0.5 && (s.pond || 0) - base.pond > 0.1) lawnAt = elS;
+      if (gardenAt == null && D.garden && D.garden.now().k > 0.9) gardenAt = elS;
+      return lawnAt != null && (gardenAt != null || !D.garden) && (run > 0 || !(c.people > 0));
+    }, 2000);
+    const el = (performance.now() - t0) / 1000;
+    const s = sl();
+    const lawnD = (s.lawnShown || 0) - base.lawn, pondD = (s.pond || 0) - base.pond;
+    const lawnS = lawnAt != null ? lawnAt : el;
+    t.event("cold-start-rain-reaction", `${lawnS.toFixed(2)}s after the cast: lawn +${lawnD.toFixed(2)} (${base.lawn} -> ${s.lawnShown}), pond +${pondD.toFixed(2)}, ${run} people running for cover`);
+    t.metric("rainLawnDarkenS", +lawnS.toFixed(2));
+    if (lawnD <= 0.5) t.problem("bug", `The lawn didn't darken within 2 s of Rain (+${lawnD.toFixed(2)})`);
+    if (pondD <= 0.1) t.problem("bug", `The pond didn't spread within 2 s of Rain (+${pondD.toFixed(2)})`);
+    const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
+    if (c.people > 0 && run === 0) t.problem("bug", "No pedestrian ran for cover within 2 s of Rain");
+    if (D.garden) {
+      const g1 = D.garden.now();
+      const gS = gardenAt != null ? gardenAt : el;
+      t.event("cold-start-garden", `${gS.toFixed(2)}s after the cast: her ${g1.plants} pots and ${g1.tufts} lawn tufts: freshness ${g0.k} -> ${g1.k}, leaf droop ${g0.droop} -> ${g1.droop} rad, revived ${g1.revived}`);
+      t.metric("gardenRevived", g1.k);
+      t.metric("gardenReviveS", +gS.toFixed(2));
+      if (g1.k < 0.9 || gS > 2) t.problem("bug", `Birdie's wilting pots didn't revive within 2 s of the rain (freshness ${g1.k} at ${gS.toFixed(2)}s)`);
+    } else t.problem("bug", "No garden: Birdie's wilting pots are missing (js/garden.js)");
+  }
+  {
+    // after the first cast the late chunk arrives; a tap on Episodes then (loaded or still loading) opens the menu, never nothing
+    const tl = performance.now();
+    const loaded = await waitFor(() => D.late && D.late.now().loaded, 8000);
+    t.event("cold-start-late-after", `late chunk ${loaded ? "loaded" : "NOT loaded"} ${((performance.now() - tl) / 1000).toFixed(1)}s after the cast: ${JSON.stringify(D.late ? D.late.now().modules : {})}`);
+    if (!loaded) t.problem("bug", "The late chunk (episodes, tornado, wind and fog, moments) never loaded after the first cast");
+    const epb = $("episodes");
+    if (!epb) t.problem("bug", "No Episodes button after the first cast");
+    else {
+      if (phone) { const pm = $("phone-menu-btn"); if (pm && !D.phoneMenu.isOpen()) await tapEl(pm); await sleep(200); }
+      if (phone) await tapEl(epb); else await clickEl(epb);
+      const opened = await waitFor(() => { const m = $("episode-menu"); return m && !m.hidden; }, 4000);
+      t.event("cold-start-episodes-tap", `Episodes ${opened ? "opened" : "did NOT open"} after the first cast (button "${epb.textContent}")`);
+      if (!opened) t.problem("bug", "Tapping Episodes after the first cast did nothing");
+      else { epb.click(); await sleep(150); }
+    }
+    if (D.powers && D.powers.tornadoLoaded) t.metric("tornadoLoadedAfterCast", D.powers.tornadoLoaded() ? 1 : 0);
+  }
   // sound: the context woke on that first click/tap/key, the cast made a sound (rain bed up, a cast clip), a step and a UI tick follow
   {
     const ar = audioReport();
@@ -11607,37 +11824,6 @@ async function coldStart(options, t) {
     const x1 = window.day.sfx && window.day.sfx.info ? window.day.sfx.info() : null;
     if (x0 && x1) t.event("cold-start-sound-step", `plays ${JSON.stringify(x0.plays != null ? x0.plays : "?")} -> ${JSON.stringify(x1.plays != null ? x1.plays : "?")}`);
   }
-  // the street answers within 2 s: the lawn darkens, the pond spreads, people run for cover
-  {
-    const t0 = performance.now();
-    const sl = () => (D.slice && D.slice.now ? D.slice.now() : {});
-    const base = { lawn: sl().lawnShown || 0, pond: sl().pond || 0.78 };
-    let run = 0;
-    await waitFor(() => {
-      const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
-      run = Math.max(run, c.running || 0, c.reacting || 0);
-      const s = sl();
-      return (s.lawnShown || 0) - base.lawn > 0.5 && (s.pond || 0) - base.pond > 0.1 && (run > 0 || !(c.people > 0));
-    }, 2000);
-    const el = (performance.now() - t0) / 1000;
-    const s = sl();
-    const lawnD = (s.lawnShown || 0) - base.lawn, pondD = (s.pond || 0) - base.pond;
-    t.event("cold-start-rain-reaction", `${el.toFixed(2)}s after the cast: lawn +${lawnD.toFixed(2)}, pond +${pondD.toFixed(2)}, ${run} people running for cover`);
-    t.metric("rainLawnDarkenS", +el.toFixed(2));
-    if (lawnD <= 0.5) t.problem("bug", `The lawn didn't darken within 2 s of Rain (+${lawnD.toFixed(2)})`);
-    if (pondD <= 0.1) t.problem("bug", `The pond didn't spread within 2 s of Rain (+${pondD.toFixed(2)})`);
-    const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
-    if (c.people > 0 && run === 0) t.problem("bug", "No pedestrian ran for cover within 2 s of Rain");
-  }
-  // Birdie's ask as action: the pots she is worried about lift and go green in front of him, before any thanks is spoken
-  if (D.garden) {
-    const g0 = D.garden.now();
-    await waitFor(() => D.garden.now().k > 0.9, 4000);
-    const g1 = D.garden.now();
-    t.event("cold-start-garden", `her ${g1.plants} pots and ${g1.tufts} lawn tufts: freshness ${g0.k} -> ${g1.k}, leaf droop ${g0.droop} -> ${g1.droop} rad, revived ${g1.revived}`);
-    t.metric("gardenRevived", g1.k);
-    if (g1.k < 0.9) t.problem("bug", `Birdie's wilting pots didn't revive after the rain (freshness ${g1.k})`);
-  } else t.problem("bug", "No garden: Birdie's wilting pots are missing (js/garden.js)");
   t.metric("secondsToFirstInput", T.input);
   t.metric("secondsToFirstCast", T.bolt);
   if (T.input == null || T.input > 3) t.problem("bug", `The first input was accepted ${T.input}s after Play (the limit is 3 s)`);
@@ -11660,6 +11846,12 @@ async function coldStart(options, t) {
   const free = !document.documentElement.classList.contains("cold-open");
   t.event("cold-start-free", `${since().toFixed(1)}s after Play: HUD ${free ? "back" : "STILL HIDDEN"}, cold open ${D.coldopen.now().phase}`);
   if (!free) t.problem("bug", "The HUD never came back after the first bolt");
+  if (window.__compilesAfterLoad) {
+    // the dusk switch (the cold open's jump to 19:00) must not compile anything: the lamp lights stay enabled and only fade
+    const n = window.__compilesAfterLoad();
+    t.metric("perf.compilesAfterLoad", n);
+    t.event("cold-start-compiles", `${n} shader effects compiled after the loading card; lamp lights ${JSON.stringify(D.cityscape && D.cityscape.info ? D.cityscape.info().dynamicLights : null)}`);
+  }
   checkHud(t, "cold-start");
   // the episode offer is a corner toast that comes after the first cast: under 40 words that waits until the first minute is over (the 40-word limit), the day clock keeps running, clear of the ability bar
   const m0 = D.now().minutes;
@@ -12838,6 +13030,7 @@ installPlaytest({
     { id: "night-glow", title: "District glow after dusk: windows light on schedules with interior-mapped rooms, neon flickers, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares; wet street uses SSR on high and a reflection probe on low; a bolt flickers windows", seconds: 160, tags: ["look", "photos", "phone", "feel"], description: "Day bar beside the car (setup), Enter / Take control tap, scrub 17→01 for window counts, walk the avenue at 22:00, key 3 for rain reflections. Events night-glow-schedule / -street / -reflect / -fps / -flicker; metrics windowOnDusk, windowOnNight, windowOnLate, dynamicLights, nightNeonSigns, nightReflect, nightFps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
+    { id: "storm-tally", title: "What the storm changed: the first Rain (anywhere) greens the park lawn and fills the pond, a card names what changed, and the title shows the same tally", seconds: 45, tags: ["retention", "phone", "first-minute"], description: "Load with ?playtest=storm-tally ({\"touch\":true} for 390x844). Setup: memory reset, first-rain flag, title quiet. Real input: Take control, a tap on the street (far from the park), then Let go and the title. Events storm-before / storm-card / storm-after / storm-title; metrics stormLawnShown, stormPond, stormTallyRows, stormTitleTally, stormScrollX." },
     { id: "first-rain", title: "First Rain: after Take control the ability bar is one glowing Rain icon with a pulsing Tap the street arrow (the other four verbs hidden and refused); a tap on the street calls Rain and the bar opens to five", seconds: 40, tags: ["clarity", "phone", "first-minute"], description: "Load with ?playtest=first-rain ({\"touch\":true} for 390x844). Setup: first-rain flag, street lesson cleared, title quiet. Real input: Take control, a tap on the street. Events first-rain-state / first-rain-refused / first-rain-cast / first-rain-open; metrics firstRainVisibleVerbs, firstRainMinPx, firstRainScrollX." },
     { id: "morning-beats", title: "The morning in animation and sound: the alarm rings and is switched off, he stretches, makes coffee, climbs to the roof; each step has its own sound and no speech pill", seconds: 40, tags: ["story", "audio"], description: "Load with ?playtest=morning-beats. Setup: the clock stepped 7:30-8:15 in 30 s jumps. Events morning-beat-<kind>, morning-beats; metric morningBeats." },
     { id: "audio-check", title: "Audio from the first tap: sound is on by default, the city ambience plays within 2 s of the first tap with no settings change, Rain, Gale, Fog, Sun break and Lightning each play a distinct cast sound, music and ambience duck at least 6 dB under a voice line so the line is the loudest bus, and the 44 px sound toggle keeps the player's mute", seconds: 60, tags: ["audio", "phone", "first-minute"], description: "Load with ?playtest=audio-check ({\"touch\":true} for 390x844). Setup: saved mute cleared, title quiet. Real input: one tap or click on the canvas, Enter or the Take control button, taps on the sound toggle; casts by the named shortcut powers.command; a voiced line by voice.say. Events audio-before-tap / audio-ambience / audio-cast-<power> / audio-casts / audio-duck / audio-report; metrics audioAmbienceMs, audioCastsDistinct, audioDuckMusicDb, audioDuckAmbienceDb, audioToggleMinPx. Run at 1280x720 and 390x844 touch." },
@@ -12961,6 +13154,7 @@ installPlaytest({
       else if (id === "audio-check") await audioCheck(options, t);
       else if (id === "morning-beats") await morningBeats(options, t);
       else if (id === "first-rain") await firstRain(options, t);
+      else if (id === "storm-tally") await stormTally(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "ui-art-kit") await uiArtKit(options, t);

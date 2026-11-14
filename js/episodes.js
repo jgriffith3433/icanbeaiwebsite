@@ -522,10 +522,13 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
 `;
   document.head.appendChild(style);
 
-  const menuBtn = document.createElement("button");
+  /* js/late.js stands a placeholder #episodes button in the HUD until this module is in; take it over rather than add a second. */
+  const menuBtn = document.getElementById("episodes") || document.createElement("button");
   menuBtn.type = "button";
   menuBtn.id = "episodes";
   menuBtn.className = "ep-btn";
+  menuBtn.removeAttribute("aria-busy");
+  menuBtn.disabled = false;
   menuBtn.textContent = L.menu;
 
   const hud = document.createElement("div");
@@ -590,7 +593,7 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
   say.setAttribute("role", "status");
   say.setAttribute("aria-live", "polite");
 
-  (document.getElementById("hud-left") || document.body).append(menuBtn);
+  if (!menuBtn.parentNode) (document.getElementById("hud-left") || document.body).append(menuBtn);
   document.body.append(hud, offer, scoreEl, endEl, closeEl, creditsEl, postEl, menu, toast, say);
 
   const hudTitle = hud.querySelector("h3");
