@@ -324,7 +324,7 @@ export function startColdOpen() {
       if (P.abilities.unlock) P.abilities.unlock("rain"); // the street's lessons lock the verbs from the start: the first cast is Rain
       P.aimAt({ x: cfg.rod.x, y: cfg.rod.roofY + cfg.rod.height, z: cfg.rod.z });
       P.gate((name, via) => {
-        if (passing) return true;
+        if (passing || !on || phase === "done") return true; // never refuse a cast once the opening is over
         if (name === "rain" || name === "bolt") press(via, name);
         return false; // nothing but Rain (the prompted gesture) and the rod's bolt
       });

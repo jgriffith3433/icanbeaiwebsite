@@ -11072,6 +11072,10 @@ async function audioCheck(options, t) {
   if (!okRain) t.problem("bug", "The first Rain cast on the roof was refused");
   t.metric("firstCastAccepted", okBolt && okRain ? 1 : 0);
   await sleep(700);
+  { const inf = D.sfx.info(); const dec = inf.decoded || { power: [], cast: [] };
+    t.event("audio-predecode", `decoded before the first verb cast: power ${dec.power.join(",") || "none"}; cast clips ${dec.cast.join(",") || "none"}; quiet room loop ${inf.roomTone ? "running" : "MISSING"}`);
+    if (!inf.roomTone) t.problem("bug", "The quiet loop under idle moments isn't running");
+    if (!(dec.power.includes("gale-loop") && dec.power.includes("sun-shimmer") && dec.cast.includes("rain") && dec.cast.includes("fog"))) t.problem("warning", "Not every verb's clip was decoded before the first cast"); }
   const seen = {};
   for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"], ["gale", "gale"], ["fog", "fog"], ["sunbreak", "sunbreak"]]) {
     refill();
@@ -11080,6 +11084,7 @@ async function audioCheck(options, t) {
     await t.until(() => D.sfx.info().casts.some((c, i) => i >= n0 - 0 && c.power === name), 2500, `the ${name} cast sound`).catch(() => {});
     const c = D.sfx.info().casts.filter((x) => x.power === name).pop();
     seen[name] = c || null;
+    if (!ok) t.problem("bug", `${name}: the cast command was refused`);
     t.event("audio-cast-" + name, c ? `${name}: ${c.source}${c.file ? " " + c.file : ""}` : `${name}: no cast sound (command ${ok ? "accepted" : "refused"})`);
     if (!c) t.problem("bug", `${name} played no cast sound`);
     else if (c.source !== "file") t.problem("warning", `${name}'s cast sound was the synth stand-in, not a clip (the clip hadn't decoded yet)`);
