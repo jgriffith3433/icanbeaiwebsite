@@ -337,6 +337,13 @@ export function installLook(world) {
      (lit only by the weak night hemisphere) filled the lower half of the phone view with a flat near-black navy void
      (phone-touch, bad lighting). A faint cool self-light keeps the gravel and the parapet faces readable. */
   mats.roof.emissiveColor = new B.Color3(0.05, 0.058, 0.075);
+  /* And the streets and pavements below it: seen from the roof at dusk the asphalt, kerbs and sidewalks (albedo ~0.1 under the
+     weak night hemisphere, fogged navy) were one flat near-black band between the park and the roof edge (phone-touch, bad
+     lighting at 39.5 s). The same faint cool self-light keeps the road and paving readable; lamp pools and headlights still
+     read on top, and in daylight it is lost in the sun. */
+  mats.asphalt.emissiveColor = new B.Color3(0.034, 0.04, 0.056);
+  mats.concrete.emissiveColor = new B.Color3(0.05, 0.058, 0.075);
+  mats.brick.emissiveColor = new B.Color3(0.045, 0.04, 0.05);
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
      overwrite world.js's StandardMaterial (which already had an emissive) with the shared sidewalk concrete
      (emissive 0), so after dusk the vertical rampend/rampside read as a black slab in smoke. */
