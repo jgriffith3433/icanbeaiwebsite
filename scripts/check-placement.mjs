@@ -4,6 +4,8 @@
 // more than 0.1 m off the ground. Also proves the fixer: a stop planted in a building moves to open ground.
 import * as core from '@babylonjs/core';
 import { fixStops, nearestFree, auditPlacement } from '../js/placement.js';
+import { makeRouter, buildPavement, offPavement } from '../js/pavement.js';
+import { lawnSolids } from '../js/neighbors.js';
 import { placeAt } from '../js/neighbors.js';
 import { inSolid } from '../js/npc-spots.js';
 
@@ -35,9 +37,35 @@ console.warn = origWarn;
 console.log = origLog;
 
 const fails = [];
-const people = (cfg.neighbors.list || []).map((p) => ({ id: p.id, stops: fixStops(p.stops, world.solids).stops }));
-const rep = auditPlacement(people, (p, h) => { const pl = placeAt(p.stops, h); return { x: pl.x, z: pl.z, inside: pl.inside, y: world.surfaceAt(pl.x, pl.z) }; }, world.solids, (x, z) => world.surfaceAt(x, z));
+// the routes are the pavement graph's (js/pavement.js); the lawn counts as a footprint, so no walk crosses its edge
+const lawn = lawnSolids(cfg.city);
+const solids = world.solids.concat(lawn);
+const router = makeRouter(cfg.city, cfg.street, solids);
+const people = (cfg.neighbors.list || []).map((p) => ({ id: p.id, stops: fixStops(p.stops, solids, router).stops }));
+const rep = auditPlacement(people, (p, h) => { const pl = placeAt(p.stops, h); return { x: pl.x, z: pl.z, inside: pl.inside, y: world.surfaceAt(pl.x, pl.z) }; }, solids, (x, z) => world.surfaceAt(x, z));
 fails.push(...rep.failures);
+// walks stay on the pavement: while moving, a walker is within 1.5 m of a sidewalk line (kerb props and trees swing a walk a metre) or crosswalk, except on the short
+// legs that leave a stop and join the pavement (the first and last 12 m of a walk)
+const g = router.graph;
+let walked = 0;
+let worstOff = 0;
+for (const p of people) {
+  for (let m = 0; m < 1440; m += 0.25) {
+    const h = m / 60;
+    const pl = placeAt(p.stops, h);
+    if (!pl.moving) continue;
+    walked++;
+    const off = offPavement(g, pl.x, pl.z);
+    // distance to either end of this walk
+    const ends = p.stops.map((s) => Math.hypot(s[1] - pl.x, s[2] - pl.z));
+    if (off > 1.5 && Math.min(...ends) > 12) { worstOff = Math.max(worstOff, off); fails.push(`${p.id} walks ${off.toFixed(1)} m off the pavement at ${pl.x.toFixed(1)},${pl.z.toFixed(1)} (${h.toFixed(2)} h)`); break; }
+  }
+}
+for (const p of people) {
+  const at = [8, 12, 18].map((h) => placeAt(p.stops, h).stop);
+  if (new Set(at).size !== 3) fails.push(`${p.id} is at stops ${at.join(', ')} at 08:00, 12:00, 18:00 (wanted three different)`);
+}
+if (!buildPavement(cfg.city, cfg.street).nodes.length) fails.push('the pavement graph is empty');
 
 // the fixer: a stop planted inside a building comes out on open ground, and its walk goes round
 const block = world.solids.filter((s) => s.w > 8 && s.d > 8 && !s.roll)[0];
@@ -51,4 +79,4 @@ if (fails.length) {
   console.error(`check-placement: ${fails.length} failure(s)\n - ` + fails.join('\n - '));
   process.exit(1);
 }
-console.log(`check-placement: ok (${people.length} neighbours, ${rep.samples} samples 06:00-23:00, none in a footprint, worst ground offset ${rep.worstOff.toFixed(3)} m)`);
+console.log(`check-placement: ok (${people.length} neighbours, ${rep.samples} samples 06:00-23:00, none in a footprint or on the lawn, ${walked} walking samples on the pavement, three different stops at 08/12/18, worst ground offset ${rep.worstOff.toFixed(3)} m)`);

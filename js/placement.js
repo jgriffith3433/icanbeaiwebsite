@@ -96,8 +96,9 @@ export function routeAround(solids, a, b) {
 }
 
 /** Stops with every standing point moved to open ground, and a `via` list on each segment that would cross a building.
+    `router(a, b)` (js/pavement.js) gives the corners along the pavement instead of the shortest way round.
     Returns { stops, moved: [{ index, from, to }], detours: [{ index, via }] }; the stops array is a copy. */
-export function fixStops(stops, solids) {
+export function fixStops(stops, solids, router) {
   const moved = [];
   const detours = [];
   const out = stops.map((s, index) => {
@@ -110,7 +111,7 @@ export function fixStops(stops, solids) {
   });
   out.forEach((s, index) => {
     const n = out[(index + 1) % out.length];
-    const via = routeAround(solids, [s[1], s[2]], [n[1], n[2]]);
+    const via = router ? router([s[1], s[2]], [n[1], n[2]]) : routeAround(solids, [s[1], s[2]], [n[1], n[2]]);
     s.via = via;
     if (via.length) detours.push({ index, via });
   });

@@ -1,5 +1,6 @@
 import { buildFigure, detectAnimProblems, FOOT_SLIDE_LIMIT } from "./peoplekit.js";
 import { fixStops, segLength, along } from "./placement.js";
+import { makeRouter } from "./pavement.js";
 import { buildArcProps, stepArcProps, nextBeat, powerMatches, clampBeat, emptyArcs } from "./neighbor-arcs.js";
 /* ==========================================================================
    Neighbors — three people on his avenue with their own look, home and day
@@ -26,6 +27,8 @@ export function hourOf(minutes) {
 
 const WALK_M_PER_MIN = 80; // sim metres per sim minute for the walks between stops
 const PERSONALITY = { birdie: "plants", dex: "phone", quill: "scope" };
+/* idle actions at a stop (stops' 5th item) -> the figure's own idle pose (js/peoplekit.js): the existing clips, no new ones */
+const ACTION_POSE = { water: "plants", phone: "phone", scope: "scope" };
 
 /** Where a neighbor is at hour h: { x, z, moving, inside, sit, yaw }. `stops` are [hour, x, z, "inside"|"sit"?]. */
 export function placeAt(stops, h) {
@@ -44,13 +47,22 @@ export function placeAt(stops, h) {
       z: a[2],
       moving: false,
       inside: a[3] === "inside",
-      sit: a[3] === "sit",
+      sit: a[3] === "sit" || a[4] === "sit",
       yaw: null,
+      stop: i,
+      action: a[4] || null,
     };
   }
   const f = Math.min(1, Math.max(0, (hh - leave) / dur));
   const pt = along(a, b, f);
-  return { x: pt.x, z: pt.z, moving: f < 1, inside: false, sit: false, yaw: pt.yaw };
+  return { x: pt.x, z: pt.z, moving: f < 1, inside: false, sit: false, yaw: pt.yaw, stop: f < 1 ? -1 : (i + 1) % stops.length, action: null };
+}
+
+/** The park's lawn as a footprint, so a walk never crosses its edge: [{ x, z, w, d }] ([] without a park). */
+export function lawnSolids(city) {
+  const p = city && city.park;
+  if (!p) return [];
+  return [{ x: (p.x0 + p.x1) / 2, z: (p.z0 + p.z1) / 2, w: p.x1 - p.x0, d: p.z1 - p.z0, lawn: true }];
 }
 
 function install() {
@@ -115,9 +127,15 @@ function install() {
   const animStats = { footSlide: 0, mismatch: 0, samples: 0, dayKey: null };
   /* placement: every stop on open ground (a stop in a building moves to the nearest door or pavement point) and each
      walk routed round the footprints (js/placement.js) */
+  /* the pavement graph (js/pavement.js): walks go along the sidewalks and crosswalks; the park's lawn counts as a solid so
+     no leg crosses its edge */
+  const cityCfg = (window.DAY_CONFIG && window.DAY_CONFIG.city) || {};
+  const lawn = lawnSolids(cityCfg);
+  const routeSolids = (world.solids || []).concat(lawn);
+  const router = world.solids ? makeRouter(cityCfg, (window.DAY_CONFIG && window.DAY_CONFIG.street) || null, routeSolids) : null;
   people.forEach((p) => {
     if (p.__placed || !world.solids) return;
-    const fx = fixStops(p.stops, world.solids);
+    const fx = fixStops(p.stops, routeSolids, router || undefined);
     p.stops = fx.stops;
     p.__placed = { moved: fx.moved, detours: fx.detours };
   });
@@ -537,7 +555,7 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
         ? `<img class="bust" alt="" src="${art.bust(p.id || p.name)}"/>`
         : `<span class="dot" style="background:${p.color}"></span>`;
       const arcTitle = (arcsList[p.id] && arcsList[p.id].title) || "";
-      return `<div class="row" data-neighbor="${p.id}">${face}<div>${p.name}<small>${p.role}${arcTitle ? " · " + arcTitle : ""} · ${where}</small></div>${pipsHtml(p.id)}</div>`;
+      return `<div class="row" data-neighbor="${p.id}">${face}<div>${p.name}<small>${p.role}${arcTitle ? " · " + arcTitle : ""} · ${where}</small></div>${arcsList[p.id] ? pipsHtml(p.id) : ""}</div>`;
     }).join("") + `<div class="tally">${L.score || "Good neighbor"}: ${total}</div>`;
     if (art && art.applyFrame) art.applyFrame(panel);
   }
@@ -624,6 +642,11 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       root.position.set(dx, p.__gy, dz);
       root.rotation.y = p.__yaw;
 
+      // a chat stop: a short wave to whoever passes, every 9-15 s of standing there (the figure's own `ask` gesture)
+      if (pl.action === "chat" && !pl.moving && !pl.inside && !p.__gestureWant && !(p.__fig.anim && p.__fig.anim.gesture)) {
+        if (p.__chatAt == null) p.__chatAt = nowMs + 2500 + ((p.id.charCodeAt(0) * 37) % 6000);
+        if (nowMs >= p.__chatAt) { p.__gestureWant = "ask"; p.__chatAt = nowMs + 9000 + ((nowMs | 0) % 6000); }
+      } else if (pl.moving) p.__chatAt = null;
       const gest = p.__gestureWant;
       // work (Dex patching a turbine) stays held for the ending scene; other beats clear once played
       if (gest && gest !== "work" && p.__fig.anim.gesture === gest) p.__gestureWant = null;
@@ -639,7 +662,7 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
         sunShield: sunK,
         gesture: gest || (p.__fig.anim.gesture && p.__fig.anim.gesture !== "react" ? p.__fig.anim.gesture : null),
         react,
-        personality: PERSONALITY[p.id] || null,
+        personality: (!pl.moving && pl.action && ACTION_POSE[pl.action]) || PERSONALITY[p.id] || null,
         jump,
       });
       // hip drop already applied inside step; keep feet on the surface
@@ -737,6 +760,9 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
           inside: p.__pos.inside,
           moving: p.__pos.moving,
           sit: !!p.__pos.sit,
+          stop: p.__pos.stop == null ? -1 : p.__pos.stop,
+          action: p.__pos.action || null,
+          routine: (p.stops || []).length,
           stage: st[p.id].stage,
           done: st[p.id].doneBeats.slice(),
           asking: st[p.id].askOpen,
@@ -786,8 +812,10 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       const p = people.find((q) => q.id === id);
       if (!p) return null;
       const pl = placeAt(p.stops, h);
-      return { x: pl.x, z: pl.z, inside: pl.inside, y: world.surfaceAt ? world.surfaceAt(pl.x, pl.z) : 0 };
+      return { x: pl.x, z: pl.z, inside: pl.inside, moving: pl.moving, stop: pl.stop, action: pl.action, y: world.surfaceAt ? world.surfaceAt(pl.x, pl.z) : 0 };
     },
+    /** The solids a walk must keep out of (buildings and the lawn) and the pavement graph the routes follow. */
+    pavement: () => ({ graph: router ? router.graph : null, solids: routeSolids }),
     placement: () => people.map((p) => ({ id: p.id, moved: (p.__placed && p.__placed.moved) || [], detours: (p.__placed && p.__placed.detours) || [], drawnY: p.__root.position.y, shown: p.__root.isEnabled() })),
     /** Reset detector counters (a new day also clears them). */
     resetAnim: () => {
