@@ -377,7 +377,7 @@
     }
     el.scrub.min = String(day.dayStart);
     el.scrub.max = String(day.dayEnd - 0.01);
-    el.count.textContent = `${day.actions.length} actions · ${day.rows.filter((r) => r.kind === "micro").length} small ones`;
+    el.count.textContent = `${day.actions.length} actions · ${(day.rows || []).filter((r) => r.kind === "micro").length} small ones`;
     const base = new Date(day.dateKey + "T12:00:00");
     el.date.textContent = base.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
     showErrors(day);

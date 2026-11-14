@@ -54,6 +54,18 @@
       })();
     </script>
     <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
+    <script>
+      /* Preload: on a phone the 0.8 MB model copy starts downloading now, in parallel with the bundle, so the model is on him when
+         the page is up (js/app.js takes this Response for its first fetch; same URL as day.config.js control.modelPhone). */
+      (function () {
+        try {
+          var q = location.search;
+          if (/[?&]blockmodel=1/.test(q) || /[?&]block=model/.test(q) || window.__blockModel) return;
+          var phone = /[?&]quality=low/.test(q) || (window.matchMedia && (matchMedia("(pointer:coarse)").matches || window.innerWidth <= 700));
+          if (phone && window.fetch) { window.__earlyModel = { url: "models/small-weather.phone.glb", p: fetch("models/small-weather.phone.glb", { cache: "no-cache" }).catch(function () { return null; }) }; }
+        } catch (e) { /* no preload */ }
+      })();
+    </script>
     <script>window.HAWKES_BUILD = {"version":"1.5.0+b2c4a141f5","commit":"5a66b3f970","date":"2026-10-28T12:00:58Z"};</script>
     <script>
       /* A playtest bot's tab logs what it sends (the SDK's debug mode), so the playtest can show the events going out. */
