@@ -1450,7 +1450,22 @@ import { pickRate } from "./variety.js";
     if (d.action === "reaction") {
       if (d.kind === "storm") S.whoa(0, 0.9);
       else if (d.kind === "sun") S.cheer(0, 0.8);
-      else if (d.kind === "wind") S.clap(0, 0.8);
+      else if (d.kind === "gale") {
+        // the street answers a Gale: awnings and laundry flap in bursts, a hat is clutched, and the push of air dies over ~10 s
+        S.clap(0, 0.5);
+        [0.15, 0.9, 1.8, 3.1, 4.8, 7].forEach((t, k) => setTimeout(() => {
+          noise({ type: "bandpass", freq: 1300 + k * 90, to: 520, q: 2.2, dur: 0.38, vol: 0.1 * (1 - k * 0.12), attack: 0.02 });
+          if (k % 2 === 0) noise({ type: "highpass", freq: 3000, dur: 0.22, vol: 0.05, attack: 0.01, delay: 0.12 });
+        }, t * 1000));
+        note("gale-street");
+      } else if (d.kind === "fog") {
+        // fog on the river: a far low horn, twice, and the muffled shuffle of people pulling their coats tight
+        tone({ freq: 118, to: 108, dur: 2.1, vol: 0.07, wave: "sawtooth", attack: 0.5, delay: 0.5 });
+        tone({ freq: 118, to: 106, dur: 2.4, vol: 0.06, wave: "sawtooth", attack: 0.5, delay: 6.5 });
+        noise({ type: "lowpass", freq: 520, dur: 1.4, vol: 0.09, attack: 0.3, delay: 0.2 });
+        noise({ type: "bandpass", freq: 900, to: 700, q: 1.4, dur: 0.6, vol: 0.05, attack: 0.1, delay: 1.3 });
+        note("fog-street");
+      }
       return;
     }
     if (d.action === "aftermath") {
