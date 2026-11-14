@@ -11162,6 +11162,127 @@ async function coldStart(options, t) {
   t.progress(1);
 }
 
+/* ---------------- ask-markers: what a neighbor wants is seen in the world, and the park answers ---------------- */
+// Needs ?playtest=ask-markers ({"touch":true} for 390x844). Setup (named): every icanbe.* key cleared, the cold open armed, the
+// title up. Real input: Play, the prompt's hold for the first bolt, a tap on Birdie's marker (phone: pointer events; desktop: a click),
+// then Rain (R, or the arc button). Checks: a marker over Birdie (at least 44 px, on screen) and a rain icon over the dry lawn standing
+// on the ground; the camera swings to the ask on a tap; the lawn eases green and the pond rises over seconds (screenshots before and
+// after), Birdie's existing thanks is voiced, it all holds through a same-day reload, and Dex's ask then gets the same marker.
+async function askMarkers(options, t) {
+  t.scene("Ask markers");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const C = D.control;
+  const phone = C && C.state ? !!C.state().touch : innerWidth <= 700;
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  Object.keys(window.localStorage).filter((k) => k.startsWith("icanbe.")).forEach((k) => window.localStorage.removeItem(k));
+  if (!D.coldopen || !D.street || !D.asks || !D.slice) { t.problem("blocker", "The cold open, street, asks or slice module isn't installed"); return; }
+  D.street.reset();
+  D.memory.reset();
+  D.coldopen.arm();
+  D.title.show("playtest");
+  await sleep(700);
+  const voices = [];
+  window.addEventListener("day:voice", (e) => { const d = e.detail || {}; if (d.action === "play") voices.push(Object.assign({ at: performance.now() }, d)); });
+  const asksEv = [];
+  window.addEventListener("day:ask", (e) => asksEv.push(Object.assign({ at: performance.now() }, e.detail)));
+  t.event("ask-setup", `${innerWidth}x${innerHeight}, ${phone ? "touch" : "keyboard and mouse"}`);
+
+  const playBtn = $("title-play");
+  if (phone) await tapEl(playBtn); else await clickEl(playBtn);
+  await t.until(() => C.mode() === "control", 4000, "Play to hand him over").catch(() => {});
+  await t.until(() => D.coldopen.now().phase === "waiting", 12000, "the cold open's prompt").catch(() => {});
+  await sleep(600);
+  if (phone) {
+    const b = $("coldopen-bolt");
+    const r = b.getBoundingClientRect();
+    touchOn(b, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
+    await sleep(900);
+    touchOn(b, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
+  } else { keyDown("e"); await sleep(900); keyUp("e"); }
+
+  // 1. the marker over Birdie and the icon over the dry lawn, from the roof camera
+  await t.until(() => D.asks.now().asks.some((a) => a.who === "birdie" && a.visible), 20000, "Birdie's marker").catch(() => {});
+  await sleep(900);
+  const before = D.asks.now().asks.find((a) => a.who === "birdie");
+  const slice0 = D.slice.now();
+  t.scene("Roof: Birdie's marker and the rain icon over the dry lawn");
+  if (!before) { t.problem("blocker", "No ask marker for Birdie after the first bolt"); return; }
+  t.event("ask-marker", `Birdie's marker ${before.visible ? "visible" : "NOT visible"} at ${before.screen ? before.screen.x + "," + before.screen.y : "off screen"}, ${before.w}x${before.h}; icon over ${before.place.name} at ${before.place.x},${before.place.z} (${before.verb}); lawn ${slice0.lawn} ${slice0.lawnShown}, pond ${slice0.pond}`);
+  if (!before.visible) t.problem("bug", "Birdie's marker isn't on screen from the roof camera");
+  if (before.w < 44 || before.h < 44) t.problem("bug", `Birdie's marker is ${before.w}x${before.h} (44 px at least)`);
+  if (before.verb !== "rain") t.problem("bug", `Birdie's marker is for ${before.verb}, not rain`);
+  if (slice0.lawnShown > 0.01) t.problem("bug", "The lawn is already green before the rain");
+  if (!before.icon || before.icon.y - before.gy < 3) t.problem("bug", "The rain icon isn't hung up over the lawn");
+  // the icon is in the frame too: project it
+  const cam = world().camera;
+  const B = window.BABYLON;
+  const eng = world().scene.getEngine();
+  const pr = B.Vector3.Project(new B.Vector3(before.icon.x, before.icon.y, before.icon.z), B.Matrix.IdentityReadOnly, world().scene.getTransformMatrix(), cam.viewport.toGlobal(eng.getRenderWidth(), eng.getRenderHeight()));
+  const iconOn = pr.z > 0 && pr.z < 1 && pr.x > 0 && pr.x < eng.getRenderWidth() && pr.y > 0 && pr.y < eng.getRenderHeight();
+  t.event("ask-icon", `the rain icon ${iconOn ? "is" : "is NOT"} in the frame`);
+  if (!iconOn) t.problem("bug", "The rain icon over the lawn is off screen from the roof camera");
+
+  // 2. a tap on the marker frames the camera on the ask
+  const mk = $("ask-" + before.key);
+  const fwd = () => { const a = cam.alpha; return { x: -Math.cos(a), z: -Math.sin(a) }; };
+  const align = () => { const s = C.state(); const f = fwd(); const dx = before.place.x - s.x, dz = before.place.z - s.z; const d = Math.hypot(dx, dz) || 1; return (f.x * dx + f.z * dz) / d; };
+  const a0 = align();
+  if (phone) await tapEl(mk); else await clickEl(mk);
+  let best = a0;
+  for (let i = 0; i < 18; i++) { await sleep(100); best = Math.max(best, align()); }
+  const fr = asksEv.find((e) => e.action === "frame");
+  t.event("ask-tap", `tap on the marker: ${fr ? "frame call " + (fr.ok ? "ok" : "refused") : "NO frame call"}; camera alignment with the ask ${a0.toFixed(2)} -> ${best.toFixed(2)}`);
+  if (!fr || !fr.ok) t.problem("bug", "Tapping the marker didn't frame the camera on the ask");
+  else if (best < 0.8 && best - a0 < 0.15) t.problem("bug", `Tapping the marker didn't swing the camera to the ask (alignment ${a0.toFixed(2)} -> ${best.toFixed(2)})`);
+  await t.until(() => D.coldopen.now().phase === "done", 12000, "the cold open to hand him the sky").catch(() => {});
+
+  // 3. the park before the rain: look at it
+  D.control.frame(before.place.x, before.place.z, 1);
+  await sleep(1100);
+  t.scene("The park before the rain: dry lawn, low pond");
+  const dry = D.slice.now();
+
+  // 4. Rain, from where he stands (within range of Birdie)
+  const rainKey = String((window.powers.abilities.get("rain") || {}).key || "r").toLowerCase();
+  const tRain = performance.now();
+  if (phone) await tapEl($("ability-rain")); else pressKey(rainKey);
+  const samples = [];
+  for (let i = 0; i < 9; i++) { await sleep(900); const s = D.slice.now(); samples.push([+((performance.now() - tRain) / 1000).toFixed(1), s.lawnShown, s.pond]); }
+  t.event("ask-lawn", "lawn/pond over time: " + samples.map((x) => `${x[0]}s ${x[1]}/${x[2]}`).join(", "));
+  const after = D.slice.now();
+  const mid = samples.find((x) => x[1] > 0.05 && x[1] < 0.95);
+  if (after.lawnShown < 0.99) t.problem("bug", `The lawn only reached ${after.lawnShown} after the rain`);
+  if (!mid) t.problem("bug", "The lawn jumped to green instead of blending over a few seconds");
+  if (after.pond < dry.pond + 0.15) t.problem("bug", `The pond didn't rise (${dry.pond} -> ${after.pond})`);
+  D.control.frame(before.place.x, before.place.z, 1);
+  await sleep(1100);
+  t.scene("The park after the rain: green lawn, fuller pond");
+  const thanks = voices.filter((v) => v.positional && v.who === "Birdie" && v.at >= tRain);
+  t.event("ask-thanks", `Birdie's thanks ${thanks.length ? "was voiced (" + (thanks[0].file ? "clip" : "caption only") + ")" : "MISSING"}`);
+  if (!thanks.length) t.problem("bug", "Birdie's thanks wasn't voiced when the lawn recovered");
+  const gone = !D.asks.now().asks.some((a) => a.who === "birdie");
+  if (!gone) t.problem("bug", "Birdie's marker is still up after the rain");
+
+  // 5. it stays: same-day reload
+  const m = D.memory.reload();
+  await sleep(300);
+  const re = D.slice.now();
+  t.event("ask-reload", `after a same-day reload: lawn ${re.lawn} ${re.lawnShown}, pond ${re.pond}, memory lawn ${m.lawn}`);
+  if (re.lawnShown < 0.99 || re.pond < 0.99) t.problem("bug", "The green lawn and the fuller pond didn't survive a same-day reload");
+  t.scene("After a same-day reload the park is still green");
+
+  // 6. the same system for the next neighbor
+  const nextOk = await t.until(() => D.asks.now().asks.some((a) => a.who === "dex"), 20000, "Dex's marker").then(() => true).catch(() => false);
+  const dex = D.asks.now().asks.find((a) => a.who === "dex");
+  t.event("ask-dex", nextOk && dex ? `Dex's marker: ${dex.verb} over ${dex.place.name}, ${dex.w}x${dex.h}` : "Dex's marker never came");
+  if (!nextOk) t.problem("bug", "Dex's ask didn't get a marker");
+  else if (dex.w < 44) t.problem("bug", "Dex's marker is under 44 px");
+  checkHud(t, "ask-markers");
+}
+
 /* ---------------- street-teaches: after the cold open, Rain, Sun, Fog and Wind each unlock on a neighbor's voiced ask ---------------- */
 // Needs ?playtest=street-teaches. Setup (named): every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate
 // recorded. Real input: a click (a tap on a phone) on Play, the prompt's own hold for the first bolt, then the keys (the
@@ -12153,6 +12274,7 @@ installPlaytest({
     { id: "chapter-openers", title: "Chapter openers: each of the five chapters (The Sky, The Neighbours, The Long Drought, Storm Chasers, The Night Show) opens on a voiced in-engine scene of 20 s or less: the title in the sky (clouds or a billboard), a camera move clear of geometry, the motif, a He and Pilot exchange, one caption line, Skip in thumb reach, no text card", seconds: 300, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=chapter-openers ({\"touch\":true} for the phone run). Setup: earlier episodes marked finished, chapter-seen flags cleared. Real input: the Episodes button and each chapter's first row, Esc, a tap on Skip. Events chapter-<n>-start / -layout / -end, chapter-summary; metrics chapterMaxSeconds, chapterCameraInsideFrames, chapterLines, chapterSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "turning-moments", title: "Turning moments: each episode's turning point (Part 1 drought, Part 2 turbines and office lights, Part 3 Tank gauge and the Board, the lunch storm's twist, the bridge closing) plays a skippable moment of 8 s or less with a camera move, a music sting and the episode's voiced line, in place of the toast; one caption line, Skip in thumb reach", seconds: 240, tags: ["story", "moments", "phone", "audio"], description: "Load with ?playtest=turning-moments ({\"touch\":true} for the phone run). Setup: each episode started by its API, control.place at the beat. Real input: the weather calls (keys, or taps and a held tap on the ability buttons), Esc, a tap on Skip. Events moment-<id>-start / -layout / -toast / -end, moment-summary; metrics momentsCameraInsideFrames, momentsMaxSeconds, momentsSkipMinY. Run at 1280x720 and 390x844 touch." },
     { id: "moments", title: "Moments: taking over plays a camera push and one line (Skip or moving ends it); the day's end shows a recap of three events from the log (Skip or Esc closes it)", seconds: 70, tags: ["story", "moments"], description: "Load with ?playtest=moments. Real input: the Take control button, Skip, W, Esc; the day bar to 3 minutes before the day ends (setup) and the 1200x button. Events takeover-line / takeover-push / takeover-skipped / takeover-move / dayend-recap / dayend-skipped / dayend-esc / moments-log." },
+    { id: "ask-markers", title: "Ask markers: a plumbob over Birdie and a rain icon over the dry park lawn from the roof camera; a tap frames the camera on the ask; rain blends the lawn green and fills the pond over seconds, Birdie's thanks is voiced, and it stays through a same-day reload", seconds: 150, tags: ["neighbors", "story", "phone", "voice", "memory"], description: "Load with ?playtest=ask-markers ({\"touch\":true} for 390x844). Setup: every icanbe.* key cleared, the cold open armed. Real input: Play, the first bolt, a tap or click on Birdie's marker (44 px at least, the camera swings to the ask), Rain (R or the arc button). Scenes: roof with marker and icon, the park before, the park after, after a reload. Events ask-marker / -icon / -tap / -lawn / -thanks / -reload / -dex." },
     { id: "street-teaches", title: "The street teaches: after the cold open's bolt, Rain, Sun break, Fog and Wind each unlock on a neighbor's voiced ask (Birdie, Dex, Ines) with a cue on the target, a glow, a vibrate and a voiced thanks, and no text card", seconds: 330, tags: ["first-minute", "phone", "voice", "neighbors", "abilities"], description: "Load with ?playtest=street-teaches. Setup: every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate recorded. Real input: Play, the bolt's hold, then keys (taps on the thumb arc and the stick on a phone) to answer each neighbor in turn. Events street-ask / -unlock / -arc / -cast / -thanks / -done / -practice; metrics secondsToRain, secondsToSun, secondsToFog, secondsToWind, secondsToAllFive. Run at 1280x720 and 390x844 touch." },
     { id: "title-progress", title: "Title progress: the title shows stars and episodes finished, and Continue names the next goal (Next: Part 1: Dry); fits 390x844 with 44 px targets and no sideways scroll", seconds: 25, tags: ["title", "retention", "phone"], description: "Load with ?playtest=title-progress. Setup: icanbe.* cleared, a returning save (opening seen, Clear the sky finished at rank A). Real input: a click (a tap on a phone) on Continue. Events title-progress / title-next / title-progress-phone / title-progress-play; metrics titleProgressStars, titleProgressSmallTargets. Run at 1280x720 and 390x844 touch." },
     { id: "title-key-art", title: "Title key art: a slow crane over the district at the real time of day lands on Small Weather on the apartment roof under a forming storm with glints every few seconds, the logo lockup on top (Play 56 px+, logo and him above the fold at 390x844), at most 4 buttons; Play dives into the cold open with no cut, no black frame and control within 1 s", seconds: 45, tags: ["title", "first-minute", "phone", "audio"], description: "Load with ?playtest=title-key-art. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleButtons, titleSecondsToControl, titleBlackFrames. Run at 1280x720 and 390x844 touch." },
@@ -12248,8 +12370,8 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "quiet-ui", "phone-touch"].includes(id)) forcePublicView();
-      if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "title-progress" && id !== "street-teaches" && id !== "phone-touch" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
+      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "ask-markers", "quiet-ui", "phone-touch"].includes(id)) forcePublicView();
+      if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
       }
@@ -12263,6 +12385,7 @@ installPlaytest({
       else if (id === "title-key-art") await titleKeyArt(options, t);
       else if (id === "title-progress") await titleProgress(options, t);
       else if (id === "street-teaches") await streetTeaches(options, t);
+      else if (id === "ask-markers") await askMarkers(options, t);
       else if (id === "opening") await openingScenario(options, t);
       else if (id === "title") await titleScenario(options, t);
       else if (id === "hud-layout") await hudLayoutScenario(options, t);

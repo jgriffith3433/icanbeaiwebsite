@@ -245,8 +245,10 @@ export function installMemory(day, world) {
     const half = liveFlag(store, t, endingHalfLawn);
     const tom = liveFlag(store, t, birdieRain);
     try {
-      if (half > 0 && lawn > 0) day.slice && day.slice.setLawn && day.slice.setLawn("damp", 0.45 * half, true);
-      else day.slice && day.slice.setLawn && day.slice.setLawn(lawn > 0 ? "damp" : "straw", lawn || 1, true);
+      // a fresh deed eases the lawn green and the pond up over a few seconds; a load, reload, shift or reset jumps to it
+      const jump = ["load", "reload", "shift", "reset", "quality", "api"].includes(why);
+      if (half > 0 && lawn > 0) day.slice && day.slice.setLawn && day.slice.setLawn("damp", 0.45 * half, true, jump);
+      else day.slice && day.slice.setLawn && day.slice.setLawn(lawn > 0 ? "damp" : "straw", lawn || 1, true, jump);
     } catch (e) { /* slice not up */ }
     try { day.slice && day.slice.setTomatoes && day.slice.setTomatoes(tom); } catch (e) { /* slice not up */ }
     nowInfo = { lawn: +lawn.toFixed(2), tomatoes: +tom.toFixed(2), decals: list.length, quality: low ? "low" : "high", date: t, ...counts };
@@ -316,6 +318,11 @@ export function installMemory(day, world) {
       record("arc-" + d.id, d.id, "beat" + d.beat);
       if (d.id === "birdie" && d.beat >= 2) record("birdieRain", "park", "rain");
     }
+  });
+  // the street's lesson: Birdie asked for rain, he gave it near her: the park drinks (same deed as her morning ask)
+  window.addEventListener("day:street", (e) => {
+    const d = e.detail || {};
+    if (d.action === "thanks" && d.who === "birdie" && d.id === "rain") record("birdieRain", "park", "rain");
   });
   window.addEventListener("day:episode", (e) => {
     const d = e.detail || {};
