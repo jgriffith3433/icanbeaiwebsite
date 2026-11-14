@@ -149,6 +149,9 @@ export function startColdOpen() {
     meshes.ring.rotation.y += dt * (1 + prog * 6);
     meshes.glow.emissiveColor.set(0.45 + 0.55 * prog, 0.78 + 0.22 * prog, 1);
     meshes.beamM.alpha = 0.13 + 0.06 * Math.sin(nowS * 5) + 0.3 * prog;
+    // up close the 1.5 m shaft reads as a solid blue pillar: fade it out within 22 m, gone by 9 m
+    const cam = meshes.scene.activeCamera;
+    if (cam) meshes.beam.visibility = Math.max(0, Math.min(1, (Math.hypot(cam.position.x - meshes.beam.position.x, cam.position.z - meshes.beam.position.z) - 9) / 13));
     promptBar.style.width = Math.round(prog * 100) + "%";
   }
 
