@@ -11720,6 +11720,9 @@ async function coldStart(options, t) {
     }
   }
   t.event("cold-start-no-card", "no card to click: the first cast follows the prompt on the roof");
+  const sl = () => (D.slice && D.slice.now ? D.slice.now() : {});
+  const baseSlice = { lawn: sl().lawnShown || 0, pond: sl().pond || 0.78 };
+  const g0 = D.garden ? D.garden.now() : null;
   if (phone) {
     const b = $("coldopen-bolt");
     const r = b.getBoundingClientRect();
@@ -11733,7 +11736,122 @@ async function coldStart(options, t) {
   }
   const cast = await waitFor(() => T.bolt != null, 4000);
   if (!cast) { t.problem("blocker", `Pressing the prompted rain never cast it (${cueText})`); return; }
+  const tCast0 = performance.now();
   t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
+  // 1. Reaction glance & street reaction within 2 s of the first Rain cast: the camera eases to frame Birdie's lawn, pots and the pond above the controls
+  {
+    const B = window.BABYLON;
+    const cam = world().camera;
+    const eng = world().scene.getEngine();
+    const projectSpot = (wx, wy, wz) => {
+      const rw = eng.getRenderWidth(), rh = eng.getRenderHeight();
+      const p = B.Vector3.Project(new B.Vector3(wx, wy, wz), B.Matrix.IdentityReadOnly, world().scene.getTransformMatrix(), cam.viewport.toGlobal(rw, rh));
+      return {
+        inFront: p.z > 0 && p.z < 1,
+        x: (p.x / Math.max(1, rw)) * innerWidth,
+        y: (p.y / Math.max(1, rh)) * innerHeight,
+        u: p.x / Math.max(1, rw),
+        v: p.y / Math.max(1, rh),
+      };
+    };
+    const spotFramed = () => {
+      const lw = projectSpot(-6, 0.2, 33);
+      const pd = projectSpot(15, 0.2, 60);
+      const okL = lw.inFront && lw.u > 0.08 && lw.u < 0.92 && lw.v >= 0.24 && lw.v <= 0.68;
+      const okP = pd.inFront && pd.u > 0.08 && pd.u < 0.92 && pd.v >= 0.24 && pd.v <= 0.68;
+      return (okL || okP) ? { lw, pd, okL, okP } : null;
+    };
+    let framedAtS = null;
+    let run = 0;
+    await waitFor(() => {
+      const f = spotFramed();
+      if (f && framedAtS == null) framedAtS = (performance.now() - tCast0) / 1000;
+      const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
+      run = Math.max(run, c.running || 0, c.reacting || 0);
+      const s = sl();
+      const reacted = (s.lawnShown || 0) - baseSlice.lawn > 0.5 && (s.pond || 0) - baseSlice.pond > 0.1 && (run > 0 || !(c.people > 0));
+      return f && reacted;
+    }, 2000);
+    const el = (performance.now() - tCast0) / 1000;
+    if (framedAtS == null && spotFramed()) framedAtS = el;
+    const s = sl();
+    const lawnD = (s.lawnShown || 0) - baseSlice.lawn, pondD = (s.pond || 0) - baseSlice.pond;
+    t.event("cold-start-rain-reaction", `${el.toFixed(2)}s after the cast: lawn +${lawnD.toFixed(2)}, pond +${pondD.toFixed(2)}, ${run} people running for cover`);
+    t.metric("rainLawnDarkenS", +el.toFixed(2));
+    if (lawnD <= 0.5) t.problem("bug", `The lawn didn't darken within 2 s of Rain (+${lawnD.toFixed(2)})`);
+    if (pondD <= 0.1) t.problem("bug", `The pond didn't spread within 2 s of Rain (+${pondD.toFixed(2)})`);
+    const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
+    if (c.people > 0 && run === 0) t.problem("bug", "No pedestrian ran for cover within 2 s of Rain");
+    // Wait until the HUD / ability arc comes in (~1.6 s after cast, still < 2 s) so the phone screenshot shows the reacting spot above the ability arc
+    const waitArcMs = Math.max(0, 1650 - (performance.now() - tCast0));
+    if (waitArcMs > 0) await sleep(waitArcMs);
+    const fNow = spotFramed() || { lw: projectSpot(-6, 0.2, 33), pd: projectSpot(15, 0.2, 60), okL: false, okP: false };
+    const arcEl = document.querySelector(".abilitybar") || $("ability-rain") || $("ability-bolt") || $("coldopen-bolt");
+    const arcR = arcEl && arcEl.offsetParent !== null ? arcEl.getBoundingClientRect() : null;
+    const arcTop = arcR && arcR.top > innerHeight * 0.4 ? arcR.top : innerHeight - 210;
+    const bestY = fNow.okL ? fNow.lw.y : fNow.pd.y;
+    const aboveArc = (fNow.okL && fNow.lw.y < arcTop) || (fNow.okP && fNow.pd.y < arcTop);
+    const clipSec = window.hawkesFeel && window.hawkesFeel.report ? (window.hawkesFeel.report().summary.cameraClipSeconds || 0) : 0;
+    const camRep = D.control.camera();
+    t.metric("glanceInFrameS", framedAtS != null ? +framedAtS.toFixed(2) : -1);
+    t.metric("glanceClipSeconds", clipSec);
+    t.event(
+      "cold-start-glance",
+      `in frame ${framedAtS != null ? framedAtS.toFixed(2) + "s" : "NEVER"} after cast: lawn (${Math.round(fNow.lw.x)},${Math.round(fNow.lw.y)} px, ${(fNow.lw.v * 100).toFixed(0)}% H), pond (${Math.round(fNow.pd.x)},${Math.round(fNow.pd.y)} px, ${(fNow.pd.v * 100).toFixed(0)}% H), ability arc top ${Math.round(arcTop)} px, above arc ${aboveArc}, clip ${clipSec}s, inside ${camRep.inside}`
+    );
+    t.scene("First Rain reaction: Birdie's park lawn and the pond in frame above the ability arc");
+    if (framedAtS == null || framedAtS > 2) t.problem("bug", `The park lawn or pond wasn't in frame within 2 s of the first Rain cast (${framedAtS})`);
+    if (!aboveArc) t.problem("bug", `The reacting spot (y ${Math.round(bestY)} px) isn't visible above the ability arc (top ${Math.round(arcTop)} px)`);
+    if (clipSec > 0 || camRep.inside > 0) t.problem("bug", `Camera clipped geometry during the glance (feel.cameraClipSeconds ${clipSec}, inside ${camRep.inside})`);
+  }
+  // 2. Any input during the glance cancels it at once and returns control within 100 ms
+  {
+    if (!D.control.camera().glancing) {
+      D.control.frame(-1, 39, 0.06, { force: true });
+      await sleep(60);
+    }
+    const tIn = performance.now();
+    const x0 = window.day.sfx && window.day.sfx.info ? window.day.sfx.info() : null;
+    if (phone) {
+      const stickEl = $("stick") || document.querySelector(".touchpad .stick");
+      const sr = stickEl ? stickEl.getBoundingClientRect() : { left: 60, top: innerHeight - 120, width: 100, height: 100 };
+      const cx = sr.left + sr.width / 2, cy = sr.top + sr.height / 2;
+      if (stickEl) {
+        touchOn(stickEl, "pointerdown", cx, cy - 28, 17);
+        await waitFor(() => !D.control.camera().glancing, 200);
+        const cancelMs = Math.round(performance.now() - tIn);
+        touchOn(window, "pointerup", cx, cy - 28, 17);
+        t.metric("glanceCancelMs", cancelMs);
+        t.event("cold-start-glance-cancel", `touch stick cancelled the glance in ${cancelMs} ms (reported ${D.control.camera().lastGlanceCancelMs} ms)`);
+        if (cancelMs > 100) t.problem("bug", `Input during the glance took ${cancelMs} ms to return control (limit 100 ms)`);
+      }
+    } else {
+      keyDown("w");
+      await waitFor(() => !D.control.camera().glancing, 200);
+      const cancelMs = Math.round(performance.now() - tIn);
+      t.metric("glanceCancelMs", cancelMs);
+      t.event("cold-start-glance-cancel", `pressing W cancelled the glance in ${cancelMs} ms (reported ${D.control.camera().lastGlanceCancelMs} ms)`);
+      if (cancelMs > 100) t.problem("bug", `Input during the glance took ${cancelMs} ms to return control (limit 100 ms)`);
+      await sleep(750);
+      keyUp("w");
+    }
+    const ar2 = audioReport();
+    const rainBed = (ar2.ambience.rain || 0) > 0.01 || (ar2.music.rain || 0) > 0.01 || ar2.casts.length > 0;
+    t.event("cold-start-sound", `context ${ar2.unlocked ? "running" : "SUSPENDED"}, Sound ${ar2.on ? "on" : "off"}, casts heard: ${ar2.casts.join(",") || "none"}, rain bed ${JSON.stringify(ar2.ambience)}`);
+    t.metric("coldStartSoundUnlocked", ar2.unlocked ? 1 : 0);
+    if (!ar2.unlocked && ar2.on) t.problem("bug", "The audio context was still suspended after the first click or tap");
+    if (!rainBed) t.problem("bug", "Casting Rain on the roof made no cast sound or rain bed");
+    const x1 = window.day.sfx && window.day.sfx.info ? window.day.sfx.info() : null;
+    if (x0 && x1) t.event("cold-start-sound-step", `plays ${JSON.stringify(x0.plays != null ? x0.plays : "?")} -> ${JSON.stringify(x1.plays != null ? x1.plays : "?")}`);
+  }
+  // 3. Birdie's ask as action: the pots she is worried about lift and go green in front of him, before any thanks is spoken
+  if (D.garden && g0) {
+    await waitFor(() => D.garden.now().k > 0.9, 4000);
+    const g1 = D.garden.now();
+    t.event("cold-start-garden", `her ${g1.plants} pots and ${g1.tufts} lawn tufts: freshness ${g0.k} -> ${g1.k}, leaf droop ${g0.droop} -> ${g1.droop} rad, revived ${g1.revived}`);
+    t.metric("gardenRevived", g1.k);
+    if (g1.k < 0.9) t.problem("bug", `Birdie's wilting pots didn't revive after the rain (freshness ${g1.k})`);
+  } else t.problem("bug", "No garden: Birdie's wilting pots are missing (js/garden.js)");
   {
     // after the first cast the late chunk arrives; a tap on Episodes then (loaded or still loading) opens the menu, never nothing
     const tl = performance.now();
@@ -11752,54 +11870,6 @@ async function coldStart(options, t) {
     }
     if (D.powers && D.powers.tornadoLoaded) t.metric("tornadoLoadedAfterCast", D.powers.tornadoLoaded() ? 1 : 0);
   }
-  // sound: the context woke on that first click/tap/key, the cast made a sound (rain bed up, a cast clip), a step and a UI tick follow
-  {
-    const ar = audioReport();
-    await sleep(600);
-    const ar2 = audioReport();
-    const rainBed = (ar2.ambience.rain || 0) > 0.01 || (ar2.music.rain || 0) > 0.01 || ar2.casts.length > 0;
-    t.event("cold-start-sound", `context ${ar2.unlocked ? "running" : "SUSPENDED"}, Sound ${ar2.on ? "on" : "off"}, casts heard: ${ar2.casts.join(",") || "none"}, rain bed ${JSON.stringify(ar2.ambience)}`);
-    t.metric("coldStartSoundUnlocked", ar2.unlocked ? 1 : 0);
-    if (!ar2.unlocked && ar2.on) t.problem("bug", "The audio context was still suspended after the first click or tap");
-    if (!rainBed) t.problem("bug", "Casting Rain on the roof made no cast sound or rain bed");
-    // a step: walk a moment with real input, the foley bank or the synthesis answers
-    const x0 = window.day.sfx && window.day.sfx.info ? window.day.sfx.info() : null;
-    if (phone) { /* the stick is exercised by phone-touch; the cast and the tap above are the inputs here */ }
-    else { keyDown("w"); await sleep(900); keyUp("w"); }
-    const x1 = window.day.sfx && window.day.sfx.info ? window.day.sfx.info() : null;
-    if (x0 && x1) t.event("cold-start-sound-step", `plays ${JSON.stringify(x0.plays != null ? x0.plays : "?")} -> ${JSON.stringify(x1.plays != null ? x1.plays : "?")}`);
-  }
-  // the street answers within 2 s: the lawn darkens, the pond spreads, people run for cover
-  {
-    const t0 = performance.now();
-    const sl = () => (D.slice && D.slice.now ? D.slice.now() : {});
-    const base = { lawn: sl().lawnShown || 0, pond: sl().pond || 0.78 };
-    let run = 0;
-    await waitFor(() => {
-      const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
-      run = Math.max(run, c.running || 0, c.reacting || 0);
-      const s = sl();
-      return (s.lawnShown || 0) - base.lawn > 0.5 && (s.pond || 0) - base.pond > 0.1 && (run > 0 || !(c.people > 0));
-    }, 2000);
-    const el = (performance.now() - t0) / 1000;
-    const s = sl();
-    const lawnD = (s.lawnShown || 0) - base.lawn, pondD = (s.pond || 0) - base.pond;
-    t.event("cold-start-rain-reaction", `${el.toFixed(2)}s after the cast: lawn +${lawnD.toFixed(2)}, pond +${pondD.toFixed(2)}, ${run} people running for cover`);
-    t.metric("rainLawnDarkenS", +el.toFixed(2));
-    if (lawnD <= 0.5) t.problem("bug", `The lawn didn't darken within 2 s of Rain (+${lawnD.toFixed(2)})`);
-    if (pondD <= 0.1) t.problem("bug", `The pond didn't spread within 2 s of Rain (+${pondD.toFixed(2)})`);
-    const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
-    if (c.people > 0 && run === 0) t.problem("bug", "No pedestrian ran for cover within 2 s of Rain");
-  }
-  // Birdie's ask as action: the pots she is worried about lift and go green in front of him, before any thanks is spoken
-  if (D.garden) {
-    const g0 = D.garden.now();
-    await waitFor(() => D.garden.now().k > 0.9, 4000);
-    const g1 = D.garden.now();
-    t.event("cold-start-garden", `her ${g1.plants} pots and ${g1.tufts} lawn tufts: freshness ${g0.k} -> ${g1.k}, leaf droop ${g0.droop} -> ${g1.droop} rad, revived ${g1.revived}`);
-    t.metric("gardenRevived", g1.k);
-    if (g1.k < 0.9) t.problem("bug", `Birdie's wilting pots didn't revive after the rain (freshness ${g1.k})`);
-  } else t.problem("bug", "No garden: Birdie's wilting pots are missing (js/garden.js)");
   t.metric("secondsToFirstInput", T.input);
   t.metric("secondsToFirstCast", T.bolt);
   if (T.input == null || T.input > 3) t.problem("bug", `The first input was accepted ${T.input}s after Play (the limit is 3 s)`);

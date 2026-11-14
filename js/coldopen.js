@@ -189,6 +189,7 @@ export function startColdOpen() {
     bolt.classList.remove("held");
     const P = window.powers || day.powers;
     if (!P) return;
+    if (verb === "rain" && P.aimAt) P.aimAt({ x: -1, y: 0.06, z: 39 });
     passing = true;
     let ok = false;
     try { ok = P.command(verb, via === "touch" ? "touch" : via); } finally { passing = false; }
