@@ -1575,6 +1575,20 @@ import { pickRate } from "./variety.js";
     lastPressAt = -1e9; // one echo per press
     try { uiClick(0.03); } catch (err) { /* the press tick already played */ }
   }, { capture: true, passive: true });
+  /* Esc is a press too (the audio probe counts every keydown as an input). Letting go answers it with its own sound, but Esc while
+     he walks back, while a turning-point moment is skipped, or in any other state that swallows it made none: the key was silent.
+     Once the handlers have run, an Esc that no let-go sound answered gets the press tick (never both). */
+  if (typeof window.addEventListener === "function") window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.repeat || !soundOn()) return;
+    const before = heard["let-go"] || 0;
+    setTimeout(() => {
+      if ((heard["let-go"] || 0) !== before) return;
+      let played = false;
+      try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
+      if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* nothing to play */ } }
+      note("ui-press");
+    }, 0);
+  }, true);
   try {
     if (typeof MutationObserver === "undefined") throw new Error("no observer");
     const menuEl = () => document.getElementById("ep-menu") || document.querySelector(".ep-menu");
