@@ -410,6 +410,7 @@ export function createMover(world, cfg) {
   return {
     state: s,
     move: M,
+    standSpot: freeSpotNear,
     start,
     step,
     /* Turn in place to face `yaw` (a cast's aim): linear at TURN_MAX_DEG, 0.15-0.3 s. Returns { deg, dur, step } (step: over 90 deg). */
@@ -485,6 +486,7 @@ function install() {
   let mode = "schedule"; // schedule | control | returning
   let since = 0; // seconds in this mode
   let catchUpAt = 0;
+  let bedSide = null; // the stand-up spot beside the bed for the walk back
   let lastFrame = null;
   const log = []; // what happened, for the playtest: { t, what }
   const mark = (what, detail) => {
@@ -1728,6 +1730,14 @@ function install() {
       text = steeringLines[Math.floor(since / 9) % steeringLines.length];
     } else {
       const target = { x: fr.person.x, z: fr.person.z, room: fr.room, inCar: fr.person.inCar };
+      /* The day has him lying on the bed: walk to the floor beside it, not onto the mattress (he used to stand inside the bed
+         frame and the headboard). The day puts him into the pose from there. */
+      if (["lie", "side", "recline"].includes(fr.person.pose) && !target.inCar && mover.standSpot) {
+        const k = target.x.toFixed(2) + "," + target.z.toFixed(2);
+        if (!bedSide || bedSide.k !== k) bedSide = Object.assign({ k }, mover.standSpot(target.x, target.z, fr.person.yaw || 0));
+        target.x = bedSide.x;
+        target.z = bedSide.z;
+      }
       const r = catchUpAt ? "too-far" : mover.walkBack(dt, target);
       if (r === "arrived") {
         backOnDay("walk");
