@@ -81,7 +81,7 @@ html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(-
 @media (max-width: 700px) {
   .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
 }
-html.touch-ui.in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
+html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
 
 /* ---------- Settings popover (top-right cluster, under the Settings button) ---------- */
 .tools { position: relative; }
@@ -256,8 +256,8 @@ html.touch-ui.in-control .voice-caption {
 .preview-public .hud.bottom { left: auto; right: var(--safe-r); bottom: 40px; width: auto; }
 .preview-public .time-drawer { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; width: min(560px, calc(100vw - var(--safe-l) - var(--safe-r))); }
 html.preview-public:not(.in-control) .hud-left { top: auto; bottom: 40px; left: var(--safe-l); flex-direction: column-reverse; }
-html.touch-ui.preview-public:not(.in-control) .control-btn { bottom: 92px; }
-@media (max-width: 700px) { html.preview-public:not(.in-control) .control-btn { bottom: 92px; } }
+html.touch-ui.preview-public:not(.in-control) .control-btn { bottom: max(92px, calc(env(safe-area-inset-bottom) + 80px)); max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 24px); }
+@media (max-width: 700px) { html.preview-public:not(.in-control) .control-btn { bottom: max(92px, calc(env(safe-area-inset-bottom) + 80px)); } }
 html.preview-public.in-control:not(.touch-ui) .control-btn { bottom: calc(var(--pub-a) + 8px); }
 html.preview-public.in-control:not(.touch-ui) .control-hint { bottom: calc(var(--pub-a) + 56px); }
 html.preview-public.in-control:not(.touch-ui) .voice-caption { bottom: calc(var(--pub-a) + 104px); }
@@ -330,3 +330,9 @@ html.touch-ui .pm-btn { display: inline-flex; order: 0; }
 html.touch-ui .hud-left:not(.menu-open) .ep-btn, html.touch-ui .hud-left:not(.menu-open) .nb-btn { display: none !important; }
 html.touch-ui .hud-left.menu-open .ep-btn, html.touch-ui .hud-left.menu-open .nb-btn { display: inline-flex !important; min-width: 120px; height: 48px; font-size: .95rem; }
 html.touch-ui.preview-public .hud-left.menu-open .nb-btn { display: none !important; }
+
+/* ---------- the first power press while watching: "He's yours now" (js/powers.js pressWatching) ---------- */
+.take-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(340px, calc(env(safe-area-inset-bottom) + 328px)); z-index: 38; max-width: min(86vw, 420px); box-sizing: border-box; padding: 10px 16px; border-radius: 12px; background: rgba(10,14,22,.82); border: 1px solid rgba(126,200,255,.55); color: #e8f4ff; font-size: .85rem; line-height: 1.3; text-align: center; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .25s ease; }
+.take-toast.show { opacity: 1; visibility: visible; }
+html.touch-ui .take-toast { bottom: max(460px, calc(env(safe-area-inset-bottom) + 448px)); }
+html.title-up .take-toast, html.cold-open .take-toast { visibility: hidden; }
