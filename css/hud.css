@@ -26,8 +26,8 @@
   /* edges, with the safe areas */
   --safe-l: max(var(--gutter, 18px), env(safe-area-inset-left));
   --safe-r: max(var(--gutter, 18px), env(safe-area-inset-right));
-  --safe-t: max(12px, env(safe-area-inset-top));
-  --safe-b: max(16px, env(safe-area-inset-bottom));
+  --safe-t: max(12px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px));
+  --safe-b: max(16px, env(safe-area-inset-bottom), var(--hawkes-safe-bottom, 0px));
   /* the timeline's top edge (desktop): nothing but the timeline is under this line */
   --tl: 118px;
   /* bottom row: the ability bar, and the line above it where Let go, Quality, the hint and the tutorial stack */
@@ -85,9 +85,9 @@ html.touch-ui .tools { position: fixed; top: var(--safe-t); right: max(12px, env
 html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(--above-a); }
 .preview-public .control-btn { bottom: 40px; }
 @media (max-width: 700px) {
-  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
+  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
 }
-html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%); }
+html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
 
 /* ---------- Settings popover (top-right cluster, under the Settings button) ---------- */
 .tools { position: relative; }
