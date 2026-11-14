@@ -1975,6 +1975,25 @@ async function warmStart(options, t) {
     if (n > 0) t.problem("bug", `${n} shader effects compiled after the loading card (the casts, snow and god rays must be warm)`);
     else t.event("compiles-after-load", "0 shader effects compiled after the loading card");
   }
+  // footsteps: he walks (W) then stops; they play while he moves and stop within 200 ms; a jump landing makes a sound
+  if (!touch && C.mode() === "control") {
+    await footstepProbe(t, "warm-start walk", async () => { await holdKeys(["w"], 2600); return performance.now(); }, null);
+    await footstepProbe(t, "warm-start run", async () => { await holdKeys(["w", "Shift"], 1200); return performance.now(); }, null);
+    const lands = [];
+    const hl = (e) => lands.push(performance.now());
+    window.addEventListener("day:land-sound", hl);
+    let air = false, down = 0;
+    const poll = setInterval(() => { if (!C.state().grounded) air = true; else if (air && !down) down = performance.now(); }, 8);
+    await tapKey(" ", 150);
+    await t.until(() => lands.length > 0, 4000, "a landing sound").catch(() => {});
+    clearInterval(poll);
+    window.removeEventListener("day:land-sound", hl);
+    const lag = lands.length && down ? Math.round(lands[0] - down) : -1;
+    t.metric("footstep.landLagMs", lag);
+    t.event("landing-sound", `warm-start jump: ${lands.length ? "heard" : "SILENT"}, ${lag} ms after touch-down`);
+    if (!lands.length) t.problem("bug", "A jump landing made no sound");
+    else if (lag > 100) t.problem("bug", `The landing sound came ${lag} ms after touch-down (limit 100)`);
+  }
   // let go inside the first minute: the way back into control must be on screen (a phone has no stick then)
   if (touch) await tapEl($("control")); else pressKey("Escape");
   await t.until(() => C.mode() === "schedule", 8000, "back on the day").catch(() => {});
@@ -11212,6 +11231,45 @@ async function watchPressCheck(t, label) {
   return hit;
 }
 
+/* Footstep probe (sfx.js voicing): listens to day:footstep / day:land-sound while `drive` plays real input, then checks that
+   steps came with the move, stopped within 200 ms of him stopping, that surfaces/ids are tagged, and that a landing sound
+   followed touch-down within 100 ms. Events footsteps-moving / footsteps-stop / landing-sound; metrics footstep.*. */
+async function footstepProbe(t, label, drive, jumpEl) {
+  const D = window.day, C = D.control;
+  const steps = [], lands = [];
+  const hs = (e) => steps.push({ at: performance.now(), ...(e.detail || {}) });
+  const hl = (e) => lands.push({ at: performance.now(), ...(e.detail || {}) });
+  window.addEventListener("day:footstep", hs);
+  window.addEventListener("day:land-sound", hl);
+  const tStopped = await drive();
+  await sleep(450);
+  const X = D.sfx && D.sfx.info ? D.sfx.info() : {};
+  const moving = steps.filter((s) => s.at < tStopped);
+  const late = steps.filter((s) => s.at > tStopped + 200);
+  const ids = [...new Set((X.recentSteps || []).map((s) => s.id).filter(Boolean))];
+  t.metric("footstep.count", moving.length);
+  t.metric("footstep.afterStopMs", steps.length && steps[steps.length - 1].at > tStopped ? Math.round(steps[steps.length - 1].at - tStopped) : 0);
+  t.event("footsteps-moving", `${label}: ${moving.length} steps while moving; surfaces ${[...new Set(moving.map((s) => s.surface))].join(",") || "none"}; sample ids ${ids.join(" | ") || "none"}; step gain ${X.stepGain}`);
+  if (moving.length < 3) t.problem("bug", `${label}: only ${moving.length} footsteps while moving`);
+  t.event("footsteps-stop", `${label}: ${late.length} steps later than 200 ms after he stopped`);
+  if (late.length) t.problem("bug", `${label}: footsteps kept playing ${late.length}x past 200 ms after he stopped`);
+  if (jumpEl && C.mode() === "control") {
+    let landed = 0;
+    const poll = setInterval(() => { if (!landed && C.state().grounded && jumped) landed = performance.now(); if (!C.state().grounded) jumped = true; }, 8);
+    let jumped = false;
+    await tapEl(jumpEl);
+    await t.until(() => lands.length > 0, 4000, "a landing sound").catch(() => {});
+    clearInterval(poll);
+    const lag = lands.length && landed ? Math.round(lands[0].at - landed) : -1;
+    t.metric("footstep.landLagMs", lag);
+    t.event("landing-sound", `${label}: landing ${lands.length ? lands[0].id + " h " + lands[0].h + " m" : "SILENT"}, ${lag} ms after touch-down`);
+    if (!lands.length) t.problem("bug", `${label}: a jump landing made no sound`);
+    else if (lag > 100) t.problem("bug", `${label}: the landing sound came ${lag} ms after touch-down (limit 100)`);
+  }
+  window.removeEventListener("day:footstep", hs);
+  window.removeEventListener("day:land-sound", hl);
+}
+
 async function phoneTouch(options, t) {
   const land = innerWidth > innerHeight;
   t.scene(land ? "Phone touch (landscape)" : "Phone touch (portrait)");
@@ -11288,13 +11346,16 @@ async function phoneTouch(options, t) {
       const reach = sr.width / 2;
       let peak = 0, fastest = 0;
       const sampler = setInterval(() => { const sp = C.state().speed || 0; peak = Math.max(peak, sp); }, 50);
-      touchOn(stickEl, "pointerdown", cx, cy);
-      for (const [k, ms] of [[0.5, 2200], [1, 2200], [0.5, 1800]]) {
-        for (let i = 1; i <= 4; i++) { touchOn(stickEl, "pointermove", cx, cy - (reach * k * i) / 4); await sleep(40); }
-        await sleep(ms);
-        fastest = Math.max(fastest, C.state().speed || 0);
-      }
-      touchOn(stickEl, "pointerup", cx, cy - reach * 0.5);
+      await footstepProbe(t, "phone touch walk/run", async () => {
+        touchOn(stickEl, "pointerdown", cx, cy);
+        for (const [k, ms] of [[0.5, 2200], [1, 2200], [0.5, 1800]]) {
+          for (let i = 1; i <= 4; i++) { touchOn(stickEl, "pointermove", cx, cy - (reach * k * i) / 4); await sleep(40); }
+          await sleep(ms);
+          fastest = Math.max(fastest, C.state().speed || 0);
+        }
+        touchOn(stickEl, "pointerup", cx, cy - reach * 0.5);
+        return performance.now();
+      }, document.querySelector(".touchpad .jump"));
       clearInterval(sampler);
       await sleep(600);
       t.metric("phone.stickPeakSpeed", Math.round(peak * 100) / 100);
