@@ -11858,6 +11858,57 @@ async function footstepProbe(t, label, drive, jumpEl) {
   window.removeEventListener("day:land-sound", hl);
 }
 
+/** The story seen, not read (critic: story through play): Birdie stands on the park lawn visibly waiting, her head lifts to
+    him and she waves while Rain is open, and after the tap on Rain the lawn changes. Events birdie-waiting / birdie-look-up /
+    birdie-wave / birdie-rain-cast / birdie-lawn; metrics birdie.waitDist, birdie.lookUpMs, birdie.waves, birdie.lawnBefore,
+    birdie.lawnAfter. */
+async function birdieWaits(t, label) {
+  const D = window.day;
+  const N = D.neighbors;
+  const C = D.control;
+  const P = window.powers || D.powers;
+  const spot = (window.DAY_CONFIG.coldopen && window.DAY_CONFIG.coldopen.birdie) || { x: -13, z: 22 };
+  if (!N || !N.wait) { t.problem("bug", `${label}: no neighbours module for Birdie's wait`); return; }
+  const t0 = performance.now();
+  await t.until(() => N.waiting("birdie"), 6000, "Birdie to wait for his answer").catch(() => {});
+  const row = () => (N.anim().people || []).find((p) => p.id === "birdie") || {};
+  const me = (N.now().people || []).find((p) => p.id === "birdie") || {};
+  const d = Math.hypot((me.x || 0) - spot.x, (me.z || 0) - spot.z);
+  t.metric("birdie.waitDist", Math.round(d * 10) / 10);
+  const onLawn = !me.inside && d < 3;
+  t.event("birdie-waiting", `${label}: Birdie ${me.inside ? "INSIDE" : "stands"} at ${Math.round(me.x)},${Math.round(me.z)} (${Math.round(d * 10) / 10} m from the lawn spot ${spot.x},${spot.z}), waiting ${N.waiting("birdie")}`);
+  if (!N.waiting("birdie") || !onLawn) t.problem("bug", `${label}: Birdie isn't visibly waiting on the lawn while Rain is open (waiting ${N.waiting("birdie")}, ${Math.round(d)} m from her spot)`);
+  // she looks up: the head pitch lifts past the old +-0.3 limit toward the roof he stands on
+  await t.until(() => row().lookUp && (row().lookPitch || 0) < -0.2, 5000, "Birdie to look up").catch(() => {});
+  const up = row();
+  const lookMs = Math.round(performance.now() - t0);
+  t.metric("birdie.lookUpMs", lookMs);
+  t.event("birdie-look-up", `${label}: Birdie ${up.lookUp ? "looks up" : "does NOT look up"} at him (head pitch ${(up.lookPitch || 0).toFixed(2)} rad, ${lookMs} ms after the cold open)`);
+  if (!up.lookUp || (up.lookPitch || 0) > -0.2) t.problem("bug", `${label}: Birdie never looked up while the rain call was available`);
+  await t.until(() => N.events().some((e) => e.action === "wait-wave" && e.id === "birdie" && e.t >= t0), 9000, "Birdie to wave").catch(() => {});
+  const waves = N.events().filter((e) => e.action === "wait-wave" && e.id === "birdie" && e.t >= t0).length;
+  t.metric("birdie.waves", waves);
+  t.event("birdie-wave", `${label}: Birdie waved ${waves}x while waiting (gesture ${row().gesture || "none"})`);
+  if (!waves) t.problem("bug", `${label}: Birdie never waved up at him while waiting`);
+  // the cast, by tap: the lawn changes
+  const slice = () => (D.slice && D.slice.now && D.slice.now()) || {};
+  const before = slice().lawnK;
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  const rain = $("ability-rain");
+  if (rain && hudVisible(rain)) await tapEl(rain);
+  else { t.problem("bug", `${label}: no Rain button to tap for Birdie`); return; }
+  const findLawn = () => (D.street && D.street.now().log.find((e) => e.action === "lawn-change")) || null;
+  await t.until(() => !!findLawn(), 12000, "the lawn to change after the cast").catch(() => {});
+  const lawn = findLawn();
+  const after = slice().lawnK;
+  t.metric("birdie.lawnBefore", before == null ? -1 : before);
+  t.metric("birdie.lawnAfter", after == null ? -1 : after);
+  t.event("birdie-lawn", `${label}: after the Rain tap the lawn went ${before} -> ${after}, street ${lawn ? "logged lawn-change (" + lawn.from + " -> " + lawn.to + ")" : "logged NO lawn change"}, Birdie ${N.waiting("birdie") ? "still waiting" : "stopped waiting (thanked)"}`);
+  if (!(after != null && (before == null || after > before + 0.4))) t.problem("bug", `${label}: the lawn did not change after Rain (${before} -> ${after})`);
+  if (N.waiting("birdie")) t.problem("bug", `${label}: Birdie kept waiting after her rain came`);
+  await sleep(600);
+}
+
 async function phoneTouch(options, t) {
   const land = innerWidth > innerHeight;
   t.scene(land ? "Phone touch (landscape)" : "Phone touch (portrait)");
@@ -11907,6 +11958,9 @@ async function phoneTouch(options, t) {
     await sleep(800);
   }
   t.progress(0.3);
+
+  // 1b. Birdie waits on the lawn, looks up at him while Rain is open, and the lawn greens after the cast (by tap).
+  if (C.mode() === "control") await birdieWaits(t, land ? "phone landscape" : "phone portrait");
 
   // 2. Let go and Take control again: the tap must hand him over within 1 s.
   const btn = $("control");
@@ -14571,7 +14625,7 @@ installPlaytest({
     { id: "hour-hints", title: "Hour hints: taking control at 03:00, 08:00, 12:00, 16:00 and 20:00 each shows one hint (a verb icon, ring and marker over a place, one line in the toast lane); the verb answers it with a visible result and a reward pop, by touch at 390x844", seconds: 150, tags: ["neighbors", "retention", "phone", "touch"], description: "Load with ?playtest=hour-hints ({\"touch\":true} for 390x844). Setup (named): returning-player keys, clock jumped to each hour, him stood 6 m from the hint place. Real input: Take control, the verb button (key on a keyboard), Let go. Events hint-shown / hint-done; metrics hourHints.shown, hourHints.answered." },
     { id: "any-hour", title: "Any hour: a new visitor at 03:00, 09:00 and 14:00 taps Take control and casts the hinted power; first success within 30 s at each hour with no wall, by touch at 390x844", seconds: 120, tags: ["first-minute", "phone", "touch"], description: "Load with ?playtest=any-hour (390x844 touch for the phone run). Setup (named): new-visitor keys cleared and the clock forced to each hour in option hours (default 03:00, 09:00, 14:00). Real input: tap Take control, then the hinted cast (Tap the street for Rain, else the Lightning button). Events any-hour-setup / any-hour-success; metrics ftue.secondsToFirstSuccess.0300 / .0900 / .1400." },
     { id: "wake-him", title: "Wake him: a visit forced to 03:00 finds him asleep; one tap on Take control stretches him awake, puts him on the roof in night fog and he casts within 10 s of the tap, by touch at 390x844; Let go returns him to bed with the clock still running", seconds: 90, tags: ["opening", "first-minute", "phone", "touch"], description: "Load with ?playtest=wake-him (390x844 touch for the phone run). Setup (named): returning player keys set, clock jumped to 03:00. Real input: tap Take control, tap the Lightning button (E on a keyboard), tap Let go. Events wake-asleep / wake-roof / wake-cast / wake-let-go / wake-back; metrics wake.secondsToReady, wake.secondsToFirstCast, wake.backInBed." },
-    { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
+    { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Birdie waits on the lawn, looks up while Rain is open, and the lawn greens after a tap on Rain (events birdie-waiting / birdie-look-up / birdie-wave / birdie-lawn; metrics birdie.*). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "foley", title: "Foley: recorded jump, landing, crowd, car, bird and UI sounds in lazy groups, taps on the ability arc and Episodes play the UI press, no clip file twice within 60 s, foley transfer under 400 KB", seconds: 130, tags: ["audio", "phone"], description: "Load with ?playtest=foley. Sound on, Take control by touch, taps on the ability arc and Episodes, Jump taps, then a two-minute listen. Events sound-on / ui-arc / sfx-sources / foley-repeats; metrics foley.bytes, foley.indexed." },
     { id: "power-sfx", title: "Power SFX: Lightning crack/body/rumble layers with distance delay at 343 m/s (≤30 m with the flash, ~340 m ≈ 1 s), ≥4 crack variants across 8 casts, tornado roar rises ≥6 dB from 60 m to 10 m; on phone the master limiter holds and the first cast sounds within 100 ms", seconds: 150, tags: ["audio", "powers", "phone"], description: "Load with ?playtest=power-sfx ({\"touch\":true} for 390x844). Sound on, Take control, near then far bolt, eight Lightning casts, Wind hold for Tornado. Events thunder-delay-formula / strike-near / strike-far / crack-variants / tornado-proximity / master-limiter; metrics thunderDelayFarSec, crackVariants, tornadoDbRise, firstCastSoundMs." },

@@ -2584,7 +2584,7 @@ window.DAY_CONFIG = {
       range: 18, // m: how close he must be to answer
       nag: 40, // s: an unanswered call is said once more
       steps: [
-        { id: "rain", who: "birdie", unlock: "rain", answer: ["rain"], color: [0.45, 0.7, 1], spot: { x: -21, z: 9.5 },
+        { id: "rain", who: "birdie", unlock: "rain", answer: ["rain"], color: [0.45, 0.7, 1], spot: { x: -21, z: 9.5 }, range: 26, // she waits on the lawn 23 m from the roof he starts on: Rain from there counts
           call: null, // the cold open's line is her call
           thanks: "Look at them drink. Bless you." },
         { id: "sun", who: "dex", unlock: "sunbreak", answer: ["sunbreak"], color: [1, 0.8, 0.35], spot: { x: 46, z: 9.8 },

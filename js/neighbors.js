@@ -653,7 +653,7 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       const speed = jump || dt <= 0 ? 0 : Math.hypot(pl.x - prevX, pl.z - prevZ) / dt;
       // turn-before-walk: face the route first; during a beat gesture, face him
       let yawErr = 0;
-      const facingHim = !!(p.__gestureWant || (p.__fig.anim && p.__fig.anim.gesture)) && here;
+      const facingHim = !!(p.__gestureWant || (p.__fig.anim && p.__fig.anim.gesture) || (p.__wait && !pl.inside)) && here;
       if (pl.moving && !facingHim) {
         const yaw = pl.yaw != null ? pl.yaw : Math.atan2(pl.x - prevX, pl.z - prevZ);
         yawErr = Math.atan2(Math.sin(yaw - p.__yaw), Math.cos(yaw - p.__yaw));
@@ -693,6 +693,28 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
         const rel = Math.atan2(Math.sin(toHim - p.__yaw), Math.cos(toHim - p.__yaw));
         look = { yaw: rel, pitch: Math.max(-0.3, Math.min(0.3, -((here.y || 0) + 1.6 - (p.__gy + 1.6 * (p.scale || 1))) / Math.max(1.5, dHim))) };
         p.__lookRel = rel;
+      }
+      /* waiting: she has asked and the verb is open. She stands where she is, faces him, looks UP (the roof, the sky he
+         calls from: pitch beyond the usual +-0.3) and gives the same small ask wave every few seconds until it's answered */
+      p.__lookUp = false;
+      if (p.__wait && here && !pl.inside && !pl.moving) {
+        const wt = p.__wait;
+        const toHim = Math.atan2(here.x - pl.x, here.z - pl.z);
+        const rel = Math.atan2(Math.sin(toHim - p.__yaw), Math.cos(toHim - p.__yaw));
+        const rise = Math.atan2((here.y || 0) + 1.6 - (p.__gy + 1.4 * (p.scale || 1)), Math.max(2, dHim));
+        look = { yaw: rel, pitch: -Math.max(0.4, Math.min(0.62, rise)), wide: true };
+        p.__lookUp = true;
+        wt.lookSecs += dt;
+        if (!wt.lookEmitted && wt.lookSecs > 0.25) {
+          wt.lookEmitted = true;
+          emit("look-up", { id: p.id, d: +dHim.toFixed(1), x: pl.x, z: pl.z, why: wt.why });
+        }
+        if (!gest && nowMs >= wt.nextWave) {
+          wt.nextWave = nowMs + 6500;
+          p.__gestureWant = "ask";
+          wt.waves++;
+          emit("wait-wave", { id: p.id, n: wt.waves, x: pl.x, z: pl.z });
+        }
       }
       let greet = null;
       if (p.__reactWant && nowMs < p.__reactWant.until) greet = p.__reactWant.kind;
@@ -850,6 +872,9 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
           speed: s.speed || 0,
           gesture: s.gesture || null,
           look: s.look || 0,
+          waiting: !!p.__wait,
+          lookUp: !!p.__lookUp,
+          lookPitch: s.lookPitch || 0,
           aware: !!(p.__aware && p.__aware.on),
           weather: s.weather || "clear",
           weatherK: s.weatherK || 0,
@@ -892,6 +917,22 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       if (p) p.__gestureWant = kind;
       return !!p;
     },
+    /** Waiting for his answer (the street's open ask): she faces him, looks up at him and waves every few seconds. */
+    wait: (id, on, why) => {
+      const p = people.find((q) => q.id === id);
+      if (!p) return false;
+      if (on === false) {
+        if (p.__wait) emit("wait-end", { id, secs: +(p.__wait.lookSecs).toFixed(1), waves: p.__wait.waves });
+        p.__wait = null;
+        return true;
+      }
+      if (!p.__wait) {
+        p.__wait = { why: why || "ask", since: performance.now(), nextWave: performance.now() + 1200, waves: 0, lookSecs: 0, lookEmitted: false };
+        emit("waiting", { id, x: p.__pos.x, z: p.__pos.z, why: p.__wait.why });
+      }
+      return true;
+    },
+    waiting: (id) => !!(people.find((q) => q.id === id) || {}).__wait,
     /** Hold them at a spot for a staged scene (ending / finale). null clears the hold. */
     stand: (id, x, z) => {
       const p = people.find((q) => q.id === id);
@@ -944,6 +985,19 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       return true;
     },
   };
+  /* Birdie waits for the street's first ask (js/street.js, js/coldopen.js): from the moment Rain is open until the thanks. */
+  window.addEventListener("day:coldopen", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "prompt") api.wait("birdie", true, "rain-open"); // the prompt is Rain being available: she looks up at him
+    else if (d.action === "abort" || d.action === "failed") api.wait("birdie", false);
+  });
+  window.addEventListener("day:street", (e) => {
+    const d = (e && e.detail) || {};
+    if (d.action === "ask" && d.who === "birdie") api.wait("birdie", true, "rain-open");
+    else if (d.action === "answered" || d.action === "thanks" || d.action === "stop") {
+      if (api.waiting("birdie")) { api.wait("birdie", false); api.gesture("birdie", "thanks"); }
+    }
+  });
   window.neighbors = api;
   day.neighbors = api;
   renderPanel();

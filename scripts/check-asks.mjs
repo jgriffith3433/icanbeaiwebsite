@@ -18,6 +18,15 @@ cfg.teach.steps.forEach((s) => {
   const verbs = [s.unlock].concat(s.then ? [s.then.unlock] : []);
   verbs.forEach((v) => ok(!!(marks.places[s.who] && marks.places[s.who][v]), `street: ${s.who}'s ${v} has a place`));
 });
+{ // Birdie waits on the lawn the roof looks onto: Rain from where the cold open leaves him must answer her (no walk needed for the first success)
+  const co = window.DAY_CONFIG.coldopen;
+  const rain = cfg.teach.steps.find((s) => s.id === "rain");
+  const far = Math.hypot(co.birdie.x - co.spot.x, co.birdie.z - co.spot.z);
+  ok(rain && (rain.range || cfg.teach.range) >= far, `Birdie's rain range (${rain && (rain.range || cfg.teach.range)} m) reaches her from the roof (${far.toFixed(1)} m)`);
+  const nSrc = fs.readFileSync(new URL("../js/neighbors.js", import.meta.url), "utf8");
+  ok(nSrc.includes("wait: (id, on, why)") && nSrc.includes('emit("look-up"') && nSrc.includes('emit("wait-wave"'), "neighbors.js has Birdie's wait (look up, wave)");
+  ok(fs.readFileSync(new URL("../js/peoplekit.js", import.meta.url), "utf8").includes("ctx.look.wide"), "peoplekit lets a waiting head tilt past 0.3 rad");
+}
 const p = placeFor(marks, "nobody", "rain", { x: 3, z: 4 });
 ok(p.x === 3 && p.z === 4 && p.r > 0, "no config place falls back to the asker");
 ok(marks.places.birdie.rain.z > 21 && marks.places.birdie.rain.z < 67, "Birdie's rain icon is over the park lawn");
