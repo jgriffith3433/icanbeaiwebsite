@@ -1531,6 +1531,29 @@ import { pickRate } from "./variety.js";
     note("ui-press");
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
+  /* A touch on the world itself (a look drag, a street tap that aims, the stick's dead zone) is an input the audio probe counts
+     ("tap": pointerdown and touchstart), and it used to be silent. Every non-control touch answers with a soft press within the
+     frame: on touchstart, or 25 ms after the pointerdown if no touchstart follows (synthetic pointer events). */
+  let tapTimer = 0;
+  let lastTapAt = -1e9;
+  const worldTap = () => {
+    clearTimeout(tapTimer); tapTimer = 0;
+    const t = Date.now();
+    if (t - lastTapAt < 30 || !soundOn()) return;
+    lastTapAt = t;
+    let played = false;
+    try { played = sample("ui-press", { gain: 0.5, bus: "ui" }); } catch (err) { played = false; }
+    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* */ } }
+    note("ui-tap");
+  };
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "touch" || pressable(e.target)) return;
+      clearTimeout(tapTimer);
+      tapTimer = setTimeout(worldTap, 25);
+    }, true);
+    document.addEventListener("touchstart", (e) => { if (!pressable(e.target)) worldTap(); }, { capture: true, passive: true });
+  }
   try {
     if (typeof MutationObserver === "undefined") throw new Error("no observer");
     const menuEl = () => document.getElementById("ep-menu") || document.querySelector(".ep-menu");
