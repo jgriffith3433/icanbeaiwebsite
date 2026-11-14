@@ -323,6 +323,14 @@ export function startRain(world, dayApi) {
     });
   }
 
+  /* Their shaders first compile the frame Rain is first cast (hidden meshes are never drawn): a multi-hundred-ms stall on a
+     throttled phone. Compile them off the frame once the page has settled. */
+  setTimeout(() => {
+    [rippleB && rippleB.mesh, splashB && splashB.mesh, ...curtains.map((c) => c.mesh)].forEach((m) => {
+      try { if (m && m.material && m.material.forceCompilationAsync) m.material.forceCompilationAsync(m).catch(() => {}); } catch (e) { /* headless */ }
+    });
+  }, 2500);
+
   /* ---- water on the windows: a plugin on the facade, shopfront and skyline materials ---- */
   const wr = { amt: 0, time: 0, hooked: 0, ok: false };
   try {
