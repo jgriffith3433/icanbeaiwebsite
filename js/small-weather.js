@@ -404,7 +404,11 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
         const out = (sh, h) => Math.abs(h.x) - Math.abs(sh.x) >= 0.45 && Math.abs(h.y - sh.y) < 0.15 && Math.abs(h.z - sh.z) < 0.2;
         tpose = out(a, c) && out(b, d) && c.x * d.x < 0;
       }
-      return { state: landT > 0 ? "land" : takeT > 0 ? "takeoff" : clip, weights: w, footSpeed, tpose, held: player.heldSeconds() };
+      /* lookup (clear sky) and shelter (rain) are what standing still looks like in that weather: avatar.js maps both to
+         "idle". The trace reports them as idle so the stuck-state sensor only flags a state that fails to return to it
+         (a cast or jump pose held); `pose` keeps the real clip name. */
+      const idleVariant = clip === "lookup" || clip === "shelter";
+      return { state: landT > 0 ? "land" : takeT > 0 ? "takeoff" : idleVariant ? "idle" : clip, pose: clip, weights: w, footSpeed, tpose, held: player.heldSeconds() };
     },
     /* clip, ground speed (m/s), dt; mine: the player has him (the lightning shows) */
     play(c, speed, dt, mine) {
