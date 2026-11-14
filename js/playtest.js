@@ -10980,6 +10980,11 @@ async function audioCheck(options, t) {
 
   // the first tap: anywhere (the canvas), nothing else touched
   const cv = document.querySelector("canvas") || document.body;
+  // frame gaps from the first tap on: the freeze a tap, Take control or a first cast must not cause (warm-up and preload sit behind the loading bar)
+  const gaps = { tap: 0, take: 0, cast: 0, phase: "tap" };
+  let lastF = performance.now();
+  let gapOn = true;
+  (function gapLoop() { const n = performance.now(); gaps[gaps.phase] = Math.max(gaps[gaps.phase], n - lastF); lastF = n; if (gapOn) requestAnimationFrame(gapLoop); })();
   const t0 = performance.now();
   if (touch) await tapEl(cv); else await clickEl(cv);
   const heard = await t.until(() => audioReport().cityPlaying && audioReport().buses.ambience > 0, 2000, "the city ambience").then(() => true).catch(() => false);
@@ -10993,7 +10998,8 @@ async function audioCheck(options, t) {
 
   // take him (Enter, or the button by touch) and cast the five
   if (touch) { const tk = $("control") || document.querySelector("#take-control,[data-take]"); if (tk) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
-  await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  gaps.phase = "take";
+  await t.until(() => C.mode() === "control", 6000, "Take control").catch(() => {});
   // He may be driving (Take control is disabled in the car) or in bed: the same fallback the cold open uses, the clock to dusk
   // where he is on foot (named setup shortcut), then the real button / Enter again.
   for (let k = 0; k < 3 && C.mode() !== "control"; k++) {
@@ -11014,6 +11020,7 @@ async function audioCheck(options, t) {
   try { ["bolt", "rain", "wind", "fog", "sunbreak"].forEach((id) => P.abilities.unlock && P.abilities.unlock(id)); } catch (e) { /* ok */ }
   if (C.place) C.place(-21, 0.5, 1.5708, {});
   await sleep(400);
+  gaps.phase = "cast";
   const refill = () => { try { P.abilities && P.abilities.reset && P.abilities.reset(100); } catch (e) { /* ok */ } };
   refill();
   const crowdNow = () => (D.crowd && D.crowd.info ? D.crowd.info() : {});
@@ -11057,6 +11064,16 @@ async function audioCheck(options, t) {
   }
   const keys = Object.keys(seen).filter((k) => seen[k]);
   const sig = new Set(keys.map((k) => seen[k].file || k));
+  gapOn = false;
+  const rnd = (v) => Math.round(v);
+  t.metric("firstTapWorstMs", rnd(gaps.tap));
+  t.metric("takeControlWorstMs", rnd(gaps.take));
+  t.metric("castWorstMs", rnd(gaps.cast));
+  let draws = -1;
+  try { const eng = D.world().scene.getEngine(); draws = (eng._drawCalls && eng._drawCalls.current) || -1; } catch (e) { /* none */ }
+  t.metric("sceneDrawCalls", draws);
+  t.event("first-tap-hitch", `worst frame gap: first tap ${rnd(gaps.tap)} ms, Take control ${rnd(gaps.take)} ms, the five casts ${rnd(gaps.cast)} ms; ${draws} draw calls; warm-up idle ${!!window.__warmIdle}`);
+  if (Math.max(gaps.tap, gaps.take, gaps.cast) > 250) t.problem("bug", `A frame took ${rnd(Math.max(gaps.tap, gaps.take, gaps.cast))} ms around the first tap, Take control or a cast (250 ms maximum): shaders or assets weren't warmed behind the loading bar`);
   t.metric("audioCastsDistinct", sig.size);
   t.event("audio-casts", `${keys.length}/5 casts heard, ${sig.size} distinct sounds`);
   if (sig.size < 5) t.problem("bug", `The five casts must each play a distinct sound (${sig.size} distinct)`);
