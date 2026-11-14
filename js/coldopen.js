@@ -122,13 +122,16 @@ export function startColdOpen() {
     const beam = B.MeshBuilder.CreateCylinder("co-beam", { diameter: 1.5, height: 22, tessellation: 20, updatable: false }, scene);
     beam.position.set(R.x, top + 11, R.z);
     beam.material = beamM;
-    [pole, tip, ring, beam].forEach((m) => { m.isPickable = false; m.alwaysSelectAsActiveMesh = true; });
-    ring.renderingGroupId = beam.renderingGroupId = 1; // over the skyline, so it reads from the roof 70 m away
-    return { scene, metal, glow, beamM, pole, tip, ring, beam, top };
+    const arrow = B.MeshBuilder.CreateCylinder("co-arrow", { diameterTop: 1.1, diameterBottom: 0, height: 1.3, tessellation: 4 }, scene);
+    arrow.material = glow;
+    arrow.position.set(R.x, top + 3.4, R.z);
+    [pole, tip, ring, beam, arrow].forEach((m) => { m.isPickable = false; m.alwaysSelectAsActiveMesh = true; });
+    ring.renderingGroupId = beam.renderingGroupId = arrow.renderingGroupId = 1; // over the skyline, so it reads from the roof 70 m away
+    return { scene, metal, glow, beamM, pole, tip, ring, beam, arrow, top };
   }
   function dropMeshes() {
     if (!meshes) return;
-    [meshes.pole, meshes.tip, meshes.ring, meshes.beam].forEach((m) => m.dispose());
+    [meshes.pole, meshes.tip, meshes.ring, meshes.beam, meshes.arrow].forEach((m) => m.dispose());
     [meshes.metal, meshes.glow, meshes.beamM].forEach((m) => m.dispose());
     if (obs) meshes.scene.onBeforeRenderObservable.remove(obs);
     obs = null;
@@ -146,6 +149,8 @@ export function startColdOpen() {
     }
     const s = pulse * (1 - 0.18 * prog);
     meshes.ring.scaling.set(s, s, s);
+    meshes.arrow.position.y = meshes.top + 3.4 + 0.35 * Math.sin(nowS * 4);
+    meshes.arrow.rotation.y += dt * 1.5;
     meshes.ring.rotation.y += dt * (1 + prog * 6);
     meshes.glow.emissiveColor.set(0.45 + 0.55 * prog, 0.78 + 0.22 * prog, 1);
     meshes.beamM.alpha = 0.13 + 0.06 * Math.sin(nowS * 5) + 0.3 * prog;
@@ -342,10 +347,8 @@ export function startColdOpen() {
     const W = window.weather;
     later(() => { if (W && W.triggerFlash) W.triggerFlash(90, -0.3); }, 700);
     later(() => {
-      const L = cfg.lines.he;
-      const V = day.voice;
-      if (V && V.say) V.say("opening", { text: L[1], force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "opening" });
-      emit("line", { text: L[1] });
+      // No story line before the first cast: the frame is him, the rod and one prompt (clarity, critic cold-start).
+      emit("line", { text: "", silent: true });
       phase = "waiting";
       prompt.hidden = false;
       requestAnimationFrame(() => prompt.classList.add("on"));
