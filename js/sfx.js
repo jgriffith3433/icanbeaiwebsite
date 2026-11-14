@@ -1523,6 +1523,10 @@ import { pickRate } from "./variety.js";
   const fillSoon = () => { fillNow(); setTimeout(() => { try { if (ctx() && clockMs() - lastHeardMs > 1500) playFill(hour() % 24); } catch (err) { /* ambience only */ } }, 500); };
   window.addEventListener("day:coldopen", (e) => { const a = e && e.detail && e.detail.action; if (a === "start" || a === "landed" || a === "end" || a === "prompt") fillSoon(); });
   window.addEventListener("day:control", fillSoon);
+  /* Every step of the wake moment (stretch, roof, ready, back, abort) is the start of work that can park a throttled phone (the roof's
+     material compiles, the walk back's scene rebuild): a fill in the same dispatch puts a sound start at the front of each block, so
+     wake-him's longest gap in play is a block's length at worst, not the stretch between two steps that had none. */
+  window.addEventListener("day:wake", fillSoon);
 
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
