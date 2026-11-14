@@ -45,7 +45,13 @@
   /* phone: the right column (tools, Quality, Episodes) */
   --tr-quality: calc(var(--safe-t) + 100px);
   --tr-ep: calc(var(--safe-t) + 150px);
+  /* the ONE toast lane: top centre, under the safe area and the top bar; ep-toast, nb-toast, storm-toast and the like all sit here, nothing else does.
+     --toast-top-px is the same number for js/hud-layout.js (markers keep out of it) */
+  --toast-top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  --toast-top-px: 64;
 }
+html.touch-ui { --toast-top: max(148px, calc(env(safe-area-inset-top) + 140px)); --toast-top-px: 148; }
+@media (orientation: landscape) and (max-height: 520px) { html.touch-ui { --toast-top: calc(var(--safe-t) + 76px); --toast-top-px: 88; } }
 
 /* ---------- side panel ---------- */
 .side {
@@ -198,11 +204,9 @@ html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { 
   html.touch-ui .ep-hud { left: 50%; right: auto; transform: translateX(-50%); top: calc(var(--safe-t) + 8px); width: min(480px, 70vw); max-height: 72px; overflow: hidden; }
 }
 .ep-say { position: fixed; left: 50%; bottom: max(96px, calc(env(safe-area-inset-bottom) + 88px)); }
-.ep-toast { position: fixed; left: 50%; top: max(64px, calc(env(safe-area-inset-top) + 56px)); }
-.storm-toast { position: fixed; left: 50%; top: max(150px, calc(env(safe-area-inset-top) + 140px)); }
+.ep-toast, .nb-toast, .storm-toast { position: fixed; left: 50%; top: var(--toast-top); max-width: min(420px, calc(100vw - 24px)); box-sizing: border-box; }
 .helped-count { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); } /* js/helped.js: neighbours helped today */
 html.touch-ui .helped-count { left: max(12px, env(safe-area-inset-left)); top: var(--safe-t); transform: none; }
-.nb-toast { position: fixed; left: 50%; top: max(110px, calc(env(safe-area-inset-top) + 100px)); }
 .mo-line { position: fixed; left: 50%; bottom: max(230px, calc(env(safe-area-inset-bottom) + 210px)); transform: translateX(-50%); }
 html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); } /* above the ability bar */
 /* a turning-point moment (js/moments.js `play`): one caption line and Skip at the bottom, in the thumb's reach; the rest of the HUD steps aside */

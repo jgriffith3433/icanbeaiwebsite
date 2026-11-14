@@ -87,6 +87,8 @@ function checkHud(t, label) {
       if (txt && HUD_PLACEHOLDER.test(txt)) found.push('placeholder text "' + txt + '" shows in ' + (el.id ? "#" + el.id : el.tagName.toLowerCase() + (el.className ? "." + String(el.className).split(" ")[0] : "")));
     });
   }));
+  // world markers (the ask plumbob) and toasts against every control: js/hud-layout.js keep-out zones and the one toast lane
+  if (window.hudLayout) window.hudLayout.check().forEach((f) => found.push(f));
   const fresh = found.filter((f) => !hudSeen.has(f));
   fresh.forEach((f) => {
     hudSeen.add(f);
@@ -11460,6 +11462,26 @@ async function phoneTouch(options, t) {
   controlButtonCheck(t, (land ? "landscape" : "portrait") + " Let go");
   checkHud(t, land ? "phone landscape" : "phone portrait");
   await checkCharacterClear(t, land ? "phone landscape" : "phone portrait");
+  // the toast lane: every toast shown in turn (a named setup: they are forced on) sits in the one top-centre lane, off every control, the arc and him
+  for (const id of ["neighbor-toast", "ability-toast", "storm-toast"]) {
+    const el = $(id);
+    if (!el) continue;
+    const was = [el.className, el.textContent, el.hidden];
+    el.hidden = false;
+    el.classList.add("on");
+    if (!el.textContent.trim()) el.textContent = "Birdie's lawn is green again";
+    await sleep(350);
+    const ok = checkHud(t, (land ? "landscape" : "portrait") + " toast " + id);
+    const r = el.getBoundingClientRect();
+    const arc = document.querySelector(".abilitybar");
+    const ar = arc && arc.getBoundingClientRect();
+    const lane = window.hudLayout ? window.hudLayout.toastLane() : null;
+    t.event("toast-lane", `${id} at ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)} in the lane (top ${lane ? lane.t : "?"}), ${ok ? "0 overlaps" : "OVERLAPS"}`);
+    if (ar && r.left < ar.right && r.right > ar.left && r.top < ar.bottom && r.bottom > ar.top) t.problem("bug", `${id} covers the ability arc at ${innerWidth}x${innerHeight}`);
+    if (r.left < 0 || r.right > innerWidth + 0.5) t.problem("bug", `${id} runs off the ${innerWidth}x${innerHeight} screen`);
+    el.className = was[0]; el.textContent = was[1]; el.hidden = was[2];
+  }
+  await checkCharacterClear(t, land ? "phone landscape" : "phone portrait");
   // 3b. The ability arc: every verb whole inside the safe area, none touching the Charge ring, none touching a neighbour.
   {
     const ring = document.querySelector(".abilitybar .charge .ring");
@@ -12716,6 +12738,19 @@ async function askMarkers(options, t) {
   // 1. the marker over Birdie and the icon over the dry lawn, from the roof camera
   await t.until(() => D.asks.now().asks.some((a) => a.who === "birdie" && a.visible), 20000, "Birdie's marker").catch(() => {});
   await sleep(900);
+  // the keep-out check, sampled over about 3 s of frames: the marker and any toast never overlap a control (hudLayout.check)
+  {
+    let frames = 0, bad = 0, seen = null;
+    for (let i = 0; i < 40; i++) {
+      const f = window.hudLayout ? window.hudLayout.check() : ["hudLayout missing"];
+      frames++;
+      if (f.length) { bad++; seen = seen || f[0]; }
+      await sleep(75);
+    }
+    t.event("ask-keepout", `${frames} sampled frames at ${innerWidth}x${innerHeight}: ${bad ? bad + " with an overlap (" + seen + ")" : "marker and toasts clear of every control"}`);
+    t.metric("askMarkerOverlapFrames", bad);
+    if (bad) t.problem("bug", `The ask marker, a toast and a control overlap in ${bad} of ${frames} sampled frames (${seen})`);
+  }
   const before = D.asks.now().asks.find((a) => a.who === "birdie");
   const slice0 = D.slice.now();
   t.scene("Roof: Birdie's marker and the rain icon over the dry lawn");
