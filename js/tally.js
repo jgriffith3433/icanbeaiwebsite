@@ -53,7 +53,24 @@ export function startTally() {
   window.addEventListener("day:power", (e) => {
     const d = (e && e.detail) || {};
     if (!d.denied && d.action !== "denied") pendingPower = d.power || d.action || pendingPower;
+    if (!d.denied && d.action !== "denied" && (d.power === "rain" || d.action === "rain")) setTimeout(rainNow, 450);
   });
+  /* The instant answer to a Rain cast (well inside one second): the lawn is already darkening (slice.js drench, 0.8 s) and
+     the crowd opening umbrellas (crowd.js), and this card names it. The slower tally card above follows with what stayed. */
+  function rainNow() {
+    if (!inControl()) return;
+    let umbs = 0;
+    try { umbs = (day.crowd && day.crowd.info && day.crowd.info().umbrellas) || 0; } catch (e) { /* none */ }
+    el.innerHTML = `<b></b><span></span>`;
+    el.firstChild.textContent = "Your rain";
+    el.lastChild.textContent = "Lawn darkening" + (umbs > 0 ? ` · ${umbs} people under umbrellas` : " · pedestrians opening umbrellas");
+    el.classList.add("on");
+    last = { power: "rain", rows: [], total: 0, text: el.lastChild.textContent, instant: true };
+    log.push(Object.assign({ t: Math.round(performance.now()) }, last));
+    try { window.dispatchEvent(new window.CustomEvent("day:tally", { detail: Object.assign({ action: "show" }, last) })); } catch (e) { /* node */ }
+    clearTimeout(hideT);
+    hideT = setTimeout(() => el.classList.remove("on"), 6500);
+  }
   window.addEventListener("day:memory", (e) => {
     const d = (e && e.detail) || {};
     if (d.action === "apply" && ["load", "reload", "shift", "reset", "quality", "api"].includes(d.why)) { sync(); return; }
