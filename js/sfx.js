@@ -1587,6 +1587,19 @@ import { pickRate } from "./variety.js";
     if (!soundOn()) return;
     try { uiClick(0.03); } catch (err) { /* the press tick already played */ }
   }, { capture: true, passive: true });
+  /* The probe counts the release and the click of a press as inputs as well, each needing a sound start at or after it within 150 ms.
+     A control that acts on pointerup (Let go, Take control) plays its own sound there, but the click that follows the same tap lands
+     after it, and on a throttled phone that left Let go "silent". The release and the click of a pressable control answer with the
+     same very quiet echo of the click as touchstart does. */
+  const echoPress = (e) => {
+    if (!soundOn() || !pressable(e.target)) return;
+    if (e.type === "pointerup" && e.pointerType !== "touch" && e.pointerType !== "pen") return;
+    try { uiClick(0.03); } catch (err) { /* the press tick already played */ }
+  };
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("pointerup", echoPress, true);
+    window.addEventListener("click", echoPress, true);
+  }
   /* Esc is a press too (the audio probe counts every keydown as an input). Letting go answers it with its own sound, but Esc while
      he walks back, while a turning-point moment is skipped, or in any other state that swallows it made none: the key was silent.
      Once the handlers have run, an Esc that no let-go sound answered gets the press tick (never both). */
