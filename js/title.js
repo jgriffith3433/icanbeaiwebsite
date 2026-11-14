@@ -209,7 +209,12 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   function camera(on) {
     const w = day.world && day.world();
     if (!w || !w.titleShot) return;
-    if (!on) { w.titleShot(false); return; }
+    if (!on) {
+      w.titleShot(false);
+      // Closing the title hands the camera back to the day's shot (or the take-over's), a cut by design: tell the sensor.
+      try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
+      return;
+    }
     // The key-art crane over the district, landing on Small Weather on the apartment roof (the pose the cold open dives from).
     const opts = {};
     if (cfg.crane) opts.crane = { secs: reduced() ? 0.01 : cfg.crane.secs, from: cfg.crane.from, to: cfg.crane.to };
