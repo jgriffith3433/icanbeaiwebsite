@@ -697,6 +697,7 @@ export function startScore(dayApi) {
     const t = when != null ? when : ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = buf;
+    try { src.__hawkesSampleId = "score-" + String(url).split("/").pop(); } catch (e) { /* */ }
     const g = ctx.createGain();
     g.gain.value = vol;
     if (pan != null && ctx.createStereoPanner) {
