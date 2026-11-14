@@ -2019,6 +2019,24 @@ async function warmStart(options, t) {
   if (snowWorst > (touch ? 150 : 100)) t.problem("bug", `The switch to snow cost a ${Math.round(snowWorst)} ms frame (limit ${touch ? 150 : 100})`);
   else t.event("snow-switch", `worst frame ${Math.round(snowWorst)} ms`);
   try { if (window.weather && window.weather.set) window.weather.set("clear", 0.5, "power"); } catch (e) { /* */ }
+  // the street's routines (setup shortcut: the day bar is put at noon): the neighbours out on their routines over the rest of the run
+  let routineMost = 0;
+  let movedSeen = 0;
+  try {
+    scrubTo(12 * 60);
+    const N = window.day.neighbors;
+    const seenAt = new Map();
+    while (N && total - (performance.now() - t0) > 1200) {
+      await sleep(1000);
+      const ps = N.now().people.filter((p) => !p.inside && p.routine >= 4);
+      routineMost = Math.max(routineMost, ps.length);
+      ps.forEach((p) => { const q = seenAt.get(p.id); if (q && (Math.hypot(q.x - p.x, q.z - p.z) > 0.2 || p.gesture || p.action)) movedSeen++; seenAt.set(p.id, { x: p.x, z: p.z }); });
+    }
+    t.metric("neighboursOnRoutine", routineMost);
+    t.metric("neighbourActingSeconds", movedSeen);
+    t.event("neighbours-routine", `${routineMost} neighbours out on their routines at noon (${N ? N.now().people.map((p) => `${p.id}:${p.action || (p.moving ? "walking" : p.inside ? "home" : "standing")}`).join(" ") : "none"})`);
+    if (routineMost < 4) t.problem("bug", `Only ${routineMost} neighbours are out on routines at noon (needs 4)`);
+  } catch (e) { /* the neighbours module is missing */ }
   const rest = total - (performance.now() - t0);
   if (rest > 0) await sleep(rest);
   const end = performance.now();
@@ -4650,7 +4668,7 @@ async function placementAudit(options, t) {
   let at = 0;
   let live = 0;
   const cache = new Map();
-  const rep = mod.auditPlacement(people, (p, h) => { const r = N.placementAt(p.id, h); if (r) r.y = ground(r.x, r.z) + (r.y - world.surfaceAt(r.x, r.z)); return r; }, world.solids || [], ground, { from: 6, to: 23, stepMin: 5 });
+  const rep = mod.auditPlacement(people, (p, h) => { const r = N.placementAt(p.id, h); if (r) r.y = ground(r.x, r.z) + (r.y - world.surfaceAt(r.x, r.z)); return r; }, (N.pavement ? N.pavement().solids : world.solids) || [], ground, { from: 6, to: 23, stepMin: 5 });
   for (const h of hours) {
     t.progress(at++ / hours.length);
     scrubTo(Math.round(h * 60));
@@ -4666,6 +4684,17 @@ async function placementAudit(options, t) {
   const off = rep.failures.length - inside + cache.size;
   t.metric("placementInside", inside);
   t.metric("placementOffGround", off);
+  // each named neighbour is at a different stop at 08:00, 12:00 and 18:00, and every walk between stops runs on the pavement graph
+  // (the routes keep out of footprints and off the lawn: the audit above used the lawn as a footprint)
+  let sameStop = 0;
+  for (const id of ids) {
+    const at = [8, 12, 18].map((h) => N.placementAt(id, h));
+    const stops = at.map((r) => (r ? r.stop : -1));
+    const acts = at.map((r) => (r && r.action) || (r && r.inside ? "inside" : "walking"));
+    t.event(`routine-${id}`, `08:00 stop ${stops[0]} (${acts[0]}), 12:00 stop ${stops[1]} (${acts[1]}), 18:00 stop ${stops[2]} (${acts[2]})`);
+    if (new Set(stops).size !== 3 || stops.some((i) => i < 0)) { sameStop++; t.problem("bug", `${id} is at stops ${stops.join(", ")} at 08:00, 12:00 and 18:00 (wanted three different stops)`); }
+  }
+  t.metric("routineSameStop", sameStop);
   t.event("placement-audit", `${rep.samples} samples and ${live} live reads from 06:00 to 23:00: ${inside} inside a footprint, ${off} off the ground`);
   rep.failures.forEach((f) => t.problem("bug", "Placement: " + f));
   cache.forEach((f) => t.problem("bug", "Placement: " + f));
