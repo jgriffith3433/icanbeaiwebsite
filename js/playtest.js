@@ -10881,6 +10881,34 @@ function audioReport() {
     casts: X ? X.casts.slice() : [],
   };
 }
+/* ---------------- morning-beats: the day told in animation and sound, no speech pill ----------------
+   Setup (named): he is on his day (let go if driving him), the clock is stepped through 7:30-8:15 in 30 s jumps so each step's
+   frame plays on the next frame. Reads `day:beat` (js/sfx.js: alarm-off, snooze, feet-down, stretch, coffee, sip, stair, roof)
+   and the hidden take-over pill. Events morning-beat-<kind>, morning-beats; metric morningBeats. */
+async function morningBeats(options, t) {
+  const D = window.day;
+  const C = D.control;
+  if (!D.sfx || !D.sfx.beats) { t.problem("bug", "day.sfx.beats is missing"); return; }
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  try { if (D.title && D.title.quiet) D.title.quiet(); } catch (e) { /* ok */ }
+  const seen = {};
+  const onBeat = (e) => { const k = e.detail && e.detail.kind; if (k && !seen[k]) { seen[k] = true; t.event("morning-beat-" + k, `${D.now().minutes.toFixed(1)} min: ${k}`); } };
+  window.addEventListener("day:beat", onBeat);
+  const start = 7.5;
+  for (let h = start; h < 8.3; h += 0.5 / 60) {
+    D.jump(`${Math.floor(h)}:${String(Math.floor((h % 1) * 60)).padStart(2, "0")}`);
+    await sleep(110);
+  }
+  window.removeEventListener("day:beat", onBeat);
+  const want = ["alarm-off", "stretch", "coffee", "stair", "roof"];
+  const got = Object.keys(seen);
+  t.metric("morningBeats", got.length);
+  t.event("morning-beats", `heard ${got.join(", ")}`);
+  want.forEach((k) => { if (!seen[k]) t.problem("bug", `The morning never played its ${k} beat`); });
+  const pill = $("moment-line");
+  if (pill && !pill.hidden && getComputedStyle(pill).display !== "none") t.problem("bug", "A take-over speech pill is on screen");
+  if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The page scrolls sideways");
+}
 /* ---------------- first-rain: clarity. One glowing Rain icon and a pulsing "Tap the street" arrow, the other four verbs hidden until Rain is used once ----------------
    Needs ?playtest=first-rain ({"touch":true} = 390x844 by touch). Setup (named): the saved first-rain flag, the street lesson and
    the cold open cleared, the title quiet. Real input: Take control (the button by touch), a tap on the canvas (the street) which casts Rain.
@@ -11176,6 +11204,11 @@ async function audioCheck(options, t) {
     if (window.day.phoneMenu) window.day.phoneMenu.close();
     checkHud(t, "audio-check: phone controls");
   }
+  // the morning's own sounds: alarm, stretch, coffee, the stair and the roof, each a beat of its own (no speech pill)
+  try {
+    if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+    await morningBeats(options, t);
+  } catch (e) { t.problem("bug", "morning beats: " + (e && e.message)); }
   const fin = audioReport();
   t.event("audio-report", JSON.stringify({ on: fin.on, buses: fin.buses, ambience: fin.ambience, bed: fin.bed, casts: fin.casts.length }));
   t.progress(1);
@@ -12817,6 +12850,7 @@ installPlaytest({
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
     { id: "first-rain", title: "First Rain: after Take control the ability bar is one glowing Rain icon with a pulsing Tap the street arrow (the other four verbs hidden and refused); a tap on the street calls Rain and the bar opens to five", seconds: 40, tags: ["clarity", "phone", "first-minute"], description: "Load with ?playtest=first-rain ({\"touch\":true} for 390x844). Setup: first-rain flag, street lesson cleared, title quiet. Real input: Take control, a tap on the street. Events first-rain-state / first-rain-refused / first-rain-cast / first-rain-open; metrics firstRainVisibleVerbs, firstRainMinPx, firstRainScrollX." },
+    { id: "morning-beats", title: "The morning in animation and sound: the alarm rings and is switched off, he stretches, makes coffee, climbs to the roof; each step has its own sound and no speech pill", seconds: 40, tags: ["story", "audio"], description: "Load with ?playtest=morning-beats. Setup: the clock stepped 7:30-8:15 in 30 s jumps. Events morning-beat-<kind>, morning-beats; metric morningBeats." },
     { id: "audio-check", title: "Audio from the first tap: sound is on by default, the city ambience plays within 2 s of the first tap with no settings change, Rain, Gale, Fog, Sun break and Lightning each play a distinct cast sound, music and ambience duck at least 6 dB under a voice line so the line is the loudest bus, and the 44 px sound toggle keeps the player's mute", seconds: 60, tags: ["audio", "phone", "first-minute"], description: "Load with ?playtest=audio-check ({\"touch\":true} for 390x844). Setup: saved mute cleared, title quiet. Real input: one tap or click on the canvas, Enter or the Take control button, taps on the sound toggle; casts by the named shortcut powers.command; a voiced line by voice.say. Events audio-before-tap / audio-ambience / audio-cast-<power> / audio-casts / audio-duck / audio-report; metrics audioAmbienceMs, audioCastsDistinct, audioDuckMusicDb, audioDuckAmbienceDb, audioToggleMinPx. Run at 1280x720 and 390x844 touch." },
     { id: "stem-score", title: "Stem score: Play opens on the 4-note motif (title, then the cold open), three stems stream after the first input and play in sync, a held bolt raises the tension layer within one bar, a tornado brings the storm layer, an episode success plays the resolution sting; on a phone the stems stay under 1.5 MB", seconds: 90, tags: ["audio", "music", "phone", "opening"], description: "Load with ?playtest=stem-score. Setup: every icanbe.* key cleared, cold open armed, title up. Real input: click or tap Play, hold the bolt (E or the Bolt button). Shortcuts: powers.command('tornado'), a day:episode score event. Events stem-motif-title / -coldopen / -ready / -windup / -storm / -sting / -transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. Run at 1280x720 and 390x844 touch." },
     { id: "day-sound", title: "Diegetic day soundscapes: at 1200× the sound log shows distinct beds for home morning, commute, office, park lunch, evening TV and night; the car radio names a weather the player called today; office keyboard starts within 3 s of the desk and stops when he leaves; on phone low quality at most 3 loops play at once", seconds: 180, tags: ["audio", "phone", "story"], description: "Load with ?playtest=day-sound ({\"touch\":true} for 390x844). Sound on (real pointer), 1200× through the day, scrub to commute and desk. Events day-scape-* / day-radio / day-keyboard-on / day-keyboard-off / day-phone-cap; metrics dayScapes, dayMaxLoops, dayKeyboardSec, dayPhoneLoops." },
@@ -12936,6 +12970,7 @@ installPlaytest({
       else if (id === "power-sfx") await powerSfx(options, t);
       else if (id === "stem-score") await stemScore(options, t);
       else if (id === "audio-check") await audioCheck(options, t);
+      else if (id === "morning-beats") await morningBeats(options, t);
       else if (id === "first-rain") await firstRain(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);

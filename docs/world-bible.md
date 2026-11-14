@@ -422,3 +422,8 @@ One storm-navy HUD language across every player-facing screen (Persona-bold fram
 
 ## Birdie's garden (story through play)
 Birdie's ask is shown before it is spoken. Four planters on the apt stoop (x -20.1..-17.7, z 9.15) stand wilted: leaves hang brown, stems lean, no fruit; dry tufts lie flat on the park lawn. The player's first Rain within 45 m revives them pot by pot over about 2.4 s (leaves lift and go green, tufts stand, tomatoes swell, camera swings to the stoop, a chime), and her voiced thanks lands 1.1 s into it. It stays revived for the real day and wilts on the next date. Module `js/garden.js`; playtest `cold-start` event `cold-start-garden`.
+
+
+## The morning told in play (story through play)
+
+- **What happens:** the alarm rings (red face, beeps), he snoozes it with a slap on the nightstand, rings again, off with a click; feet on the floor with a soft thud; up, in the 7:46 block he stretches both arms overhead and yawns; the coffee machine gurgles and the toaster pops; a sip; before the car he climbs the apt stair to the roof (`aptStairFoot` -> `aptStairTop` -> `aptRoof`), stands there a few seconds reading the sky (door, steps, wind), and walks back down. Each step has its own sound (`js/sfx.js` "the morning told in sound", event `day:beat`). Taking control no longer shows a speech pill: his voice says the line and the camera pushes in.
