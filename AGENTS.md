@@ -177,7 +177,7 @@ each of those is heard and that Sound off is silent. New player-facing beats get
 ## How it's built (Babylon 9, Havok, Vite)
 
 - **Packages:** `@babylonjs/core` 9 and `@babylonjs/havok` from npm (`package.json`, exact versions), bundled by
-  Vite. No CDN. `index.html` loads one module, `js/app.js`, which imports in order: `js/babylon.js` (sets
+  Vite. **Babylon is ONE chunk** (`manualChunks` in `vite.config.js`): never split it by folder or Shaders (circular chunks threw a TDZ "Cannot access 'e' before initialization" and froze the loading card at 50%); `scripts/check-chunks.mjs` (npm test; `node scripts/check-chunks.mjs dist` after a build evaluates each chunk) guards it, and index.html's loader fails with Try again on a boot exception. No CDN. `index.html` loads one module, `js/app.js`, which imports in order: `js/babylon.js` (sets
   `window.BABYLON`), `day.config.js`, `js/schedule.js`, `js/world.js`, `js/main.js`, `js/analytics.js`. Those files
   are still plain-JS IIFEs that put their API on `window` (`DAY_CONFIG`, `DayEngine`, `DayWorld`, `day`); keep that
   pattern so the order is the only coupling. New code can be a real module imported from `js/app.js`.
