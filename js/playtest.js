@@ -14628,6 +14628,11 @@ function armGameplayGuard(id, options, t) {
 
 installPlaytest({
   product: "icanbe",
+  /* The audio probe keeps its first 2000 events and then drops the rest, and Studio measures "longest silence" from the events it
+     gets, so a run past the cap read as silent from the cap to its end (about 40 s on phone-touch: footsteps alone are 3-4 sound
+     starts a stride, 15+ events a second at a run). The cap is the probe's own `thresholds.maxEvents`; a longer run needs a bigger one.
+     The probe's thresholds for silence, repeats and silent presses are untouched. */
+  audio: { thresholds: { maxEvents: 20000 } },
   feel: {
     get scene() { return sensorScene(); },
     // a turning-point moment is a cutscene (its own camera, js/moments.js): only frame hitches are watched while it plays,
