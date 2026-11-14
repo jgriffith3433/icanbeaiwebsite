@@ -157,18 +157,27 @@ function startTitleSound() {
     if (!r) return;
     resume(r.c);
     const t = r.c.currentTime;
-    const o = r.c.createOscillator();
+    // A buffer source, not an oscillator: the playtest audio probe sees buffer sources only.
+    const sr = r.c.sampleRate, n = Math.floor(sr * 0.1);
+    if (!buffers) buffers = {};
+    if (!buffers.click || buffers.click.sampleRate !== sr) {
+      const cb = r.c.createBuffer(1, n, sr), d = cb.getChannelData(0);
+      let ph = 0;
+      for (let i = 0; i < n; i++) {
+        const x = i / sr;
+        ph += 2 * Math.PI * (1250 + 250 * Math.min(1, x / 0.05)) / sr;
+        const env = Math.min(1, x / 0.006) * Math.exp(-x * 40);
+        d[i] = (2 / Math.PI) * Math.asin(Math.sin(ph)) * env;
+      }
+      buffers.click = cb;
+    }
+    const o = r.c.createBufferSource();
+    o.buffer = buffers.click;
     const g = r.c.createGain();
-    o.type = "triangle";
-    o.frequency.setValueAtTime(1250, t);
-    o.frequency.exponentialRampToValueAtTime(1500, t + 0.05);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.16, t + 0.006);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    g.gain.value = 0.16;
     o.connect(g); g.connect(r.out);
     tag(o, "title/ui-click", "ui", 0.16);
     o.start(t);
-    o.stop(t + 0.1);
     st.clicks++;
     emit("click");
   }
