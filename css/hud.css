@@ -164,8 +164,8 @@ html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; botto
 html:not(.preview-public):not(.touch-ui) .abilitybar { bottom: var(--row-a); }
 /* phone: verb arc on the right edge above the thumb zone (Jump), clear of the character */
 html.touch-ui .abilitybar {
-  left: auto; right: max(16px, env(safe-area-inset-right));
-  bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); transform: none;
+  left: auto; right: max(8px, env(safe-area-inset-right));
+  bottom: max(166px, calc(env(safe-area-inset-bottom) + 154px)); transform: none;
 }
 .powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; display: none !important; }
 /* phone: the controls legend shows once, then fades */
@@ -241,7 +241,7 @@ html.touch-ui.in-control .voice-caption {
 
 /* ---------- phone landscape (short window): the ability bar and the tutorial sit between the stick and the pad ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
-  html.touch-ui .abilitybar { right: max(8px, env(safe-area-inset-right)); left: auto; bottom: max(56px, calc(env(safe-area-inset-bottom) + 48px)); }
+  html.touch-ui .abilitybar { right: max(5px, env(safe-area-inset-right)); left: auto; bottom: max(28px, calc(env(safe-area-inset-bottom) + 20px)); }
   html.touch-ui.in-control:not(.preview-public) .tutorial { left: 50%; transform: translateX(-50%); bottom: max(146px, calc(env(safe-area-inset-bottom) + 140px)); }
 }
 

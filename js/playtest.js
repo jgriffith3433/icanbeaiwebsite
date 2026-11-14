@@ -10797,6 +10797,59 @@ async function firstMinute(options, t) {
   t.progress(1);
 }
 
+/* The phone's character box: where he is on screen (28 px each side of his chest, 60 above, 40 below) and whether any control, the ability bar's
+   own box included, touches it; then a one-finger look drag from empty space inside the old 220 px box, which must reach the camera.
+   Real touch input (pointer events). `touch` only: a desktop run has no arc. */
+function characterBox() {
+  try {
+    const W = window.day.world();
+    const st = window.day.control.state();
+    const eng = W.engine, cam = W.camera;
+    const rw = eng.getRenderWidth(), rh = eng.getRenderHeight();
+    const v = window.BABYLON.Vector3.Project(new window.BABYLON.Vector3(st.x, (st.y || 0) + 0.9, st.z), window.BABYLON.Matrix.Identity(), W.scene.getTransformMatrix(), cam.viewport.toGlobal(rw, rh));
+    const rect = eng.getRenderingCanvas().getBoundingClientRect();
+    const cx = rect.left + (v.x / rw) * rect.width, cy = rect.top + (v.y / rh) * rect.height;
+    return { left: cx - 28, right: cx + 28, top: cy - 60, bottom: cy + 40, cx, cy };
+  } catch (e) { return null; }
+}
+async function checkCharacterClear(t, label) {
+  const D = window.day;
+  const cb = characterBox();
+  if (!cb) { t.problem("warning", `${label}: couldn't project the character box`); return; }
+  const sels = ["#control", ".abilitybar", ".abilitybar .ab", ".abilitybar .charge .ring", ".touchpad .jump", ".touchpad .stick", "#sound", "#settings", "#episodes", "#time-btn", "#weather-btn", "#quality", "#voice-caption", ".control-hint"];
+  const hit = [];
+  sels.forEach((sel) => document.querySelectorAll(sel).forEach((el) => {
+    const r = hudVisible(el);
+    if (r && boxesOverlap(cb, r)) hit.push(el.id ? "#" + el.id : sel);
+  }));
+  const bar = document.querySelector(".abilitybar");
+  const br = bar && hudVisible(bar);
+  t.metric("phone.characterCentreYPct", Math.round((cb.cy / innerHeight) * 100));
+  t.event("phone-character-clear", `${label} ${innerWidth}x${innerHeight}: he is at ${Math.round(cb.cx)},${Math.round(cb.cy)} (box ${Math.round(cb.left)}-${Math.round(cb.right)} x ${Math.round(cb.top)}-${Math.round(cb.bottom)}); ability box ${br ? Math.round(br.width) + "x" + Math.round(br.height) : "none"}; ${hit.length ? "OVERLAPS " + hit.join(", ") : "clear of every control"}`);
+  if (hit.length) t.problem("bug", `${label}: the character box overlaps ${hit.join(", ")} at ${innerWidth}x${innerHeight}`);
+  if (br && (br.width > 200 || br.height > 260)) t.problem("bug", `${label}: the ability bar's box is ${Math.round(br.width)}x${Math.round(br.height)}, bigger than the arc`);
+  // a drag from empty space inside the old 220 px box (right/bottom edges of the bar's anchor) must turn the camera
+  if (!br) return;
+  const cv = D.world().engine.getRenderingCanvas();
+  const left = br.right - 220, top = br.bottom - 220;
+  let spot = null;
+  for (let y = top + 8; y < br.bottom && !spot; y += 12) {
+    for (let x = Math.max(left, innerWidth / 2 + 12); x < br.right && !spot; x += 12) {
+      if (document.elementFromPoint(x, y) === cv) spot = { x, y };
+    }
+  }
+  if (!spot) { t.problem("bug", `${label}: no empty canvas point inside the old 220 px box: the arc's box still covers it`); return; }
+  const cam = D.control.camera();
+  const a0 = D.world().camera.alpha, d0 = cam.lookDrags || 0;
+  touchOn(cv, "pointerdown", spot.x, spot.y, 31);
+  for (let i = 1; i <= 8; i++) { await sleep(30); touchOn(cv, "pointermove", spot.x - i * 6, spot.y + 2, 31); }
+  touchOn(cv, "pointerup", spot.x - 48, spot.y + 2, 31);
+  await sleep(250);
+  const moved = Math.abs(D.world().camera.alpha - a0) > 0.01 || (D.control.camera().lookDrags || 0) > d0;
+  t.event("phone-look-in-old-box", `${label}: a one-finger drag from ${Math.round(spot.x)},${Math.round(spot.y)} (inside the old 220 px box, on empty canvas) ${moved ? "turned the camera" : "did NOT reach the camera"}`);
+  if (!moved) t.problem("bug", `${label}: a drag on empty space inside the old ability box didn't look around`);
+}
+
 /* ---------------- phone-touch: cold phone session on the roof, Take control and five casts, all by touch ---------------- */
 // Real input only: touch pointer events (tapEl) on Take control / the Bolt prompt / the ability buttons. Setup (named): a full
 // Charge before each cast. Works at 390x844 and 844x390 (the runner sets the window); reports every control's size and any overlap.
@@ -10874,6 +10927,7 @@ async function phoneTouch(options, t) {
   t.event("phone-controls", `${innerWidth}x${innerHeight}: smallest control ${Math.round(minPx)} px${small.length ? ", SMALL: " + small.join(", ") : ""}`);
   if (small.length) t.problem("bug", `Controls under 44 px at ${innerWidth}x${innerHeight}: ${small.join(", ")}`);
   checkHud(t, land ? "phone landscape" : "phone portrait");
+  await checkCharacterClear(t, land ? "phone landscape" : "phone portrait");
   // 3b. The ability arc: every verb whole inside the safe area, none touching the Charge ring, none touching a neighbour.
   {
     const ring = document.querySelector(".abilitybar .charge .ring");
@@ -11994,6 +12048,7 @@ async function coldStart(options, t) {
     t.event("cold-start-compiles", `${n} shader effects compiled after the loading card; lamp lights ${JSON.stringify(D.cityscape && D.cityscape.info ? D.cityscape.info().dynamicLights : null)}`);
   }
   checkHud(t, "cold-start");
+  if (phone) await checkCharacterClear(t, "cold-start");
   // the episode offer is a corner toast that comes after the first cast: under 40 words that waits until the first minute is over (the 40-word limit), the day clock keeps running, clear of the ability bar
   const m0 = D.now().minutes;
   if (toastEarly) t.problem("bug", "The episode toast showed inside the first minute");
