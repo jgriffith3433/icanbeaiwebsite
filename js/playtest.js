@@ -5053,8 +5053,7 @@ async function weatherAudio(options, t) {
   t.metric("music-beds", distinct.size);
   if (distinct.size < 4) t.problem("bug", `Only ${distinct.size} distinct music beds across weather states`);
 
-  const seams = S.now().seams || {};
-  t.event("loop-seams", `fixed=${seams.fixed || 0} maxJumpAfter=${(seams.maxJumpAfter || 0).toFixed(4)}`);
+  t.event("loop-seams", "baked into the audio files (audio/loop-seams.json); no runtime buffer rewrite");
 
   if (storm && stormThunder < 0.4) t.problem("bug", "Storm has no thunder in the weather sound levels");
   else if (storm) t.event("thunder-level", `storm thunder ${stormThunder.toFixed(2)}`);
