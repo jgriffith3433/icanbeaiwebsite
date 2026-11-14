@@ -511,11 +511,11 @@ export function installMemory(day, world) {
     tally: () => {
       const t = today();
       const rows = tallyOf({ marks: liveMarks(store, t, CAP) }, liveFlag(store, t, parkRain), liveFlag(store, t, birdieRain));
-      return { rows, total: rows.length, text: rows.map((r) => r.text).join(" · "), date: t };
+      /* one shape for every reader: rows/total/text (js/tally.js, the title) and the HUD badge's items/changed/hook/summary */
+      return Object.assign({ rows, total: rows.length, text: rows.map((r) => r.text).join(" · "), date: t }, tally());
     },
     since: (days) => sinceDays(store, today(), Math.max(1, days || 1)),
     marks: () => liveMarks(store, today(), CAP),
-    tally,
     now: () => Object.assign({}, nowInfo, { shift, total: Object.keys(store.days).reduce((n, k) => n + store.days[k].marks.length, 0), tally: tally() }),
     /** The playtest's clock: today is `n` real days on (kept for the session, so a reload keeps it). Rebuilds the marks. */
     shiftDays(n) {
