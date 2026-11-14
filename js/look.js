@@ -643,6 +643,7 @@ export function installLook(world) {
   // toward 3 when fps sits under 28 (a mid-range phone), and eases it back when fps is comfortable (over 44). High is untouched.
   let scaleLow = 2;
   let scaleClock = 0;
+  let scaleSlow = 0;
   scene.onBeforeRenderObservable.add(() => {
     const now = performance.now();
     if (now - scaleClock < 500) return;
@@ -653,7 +654,11 @@ export function installLook(world) {
     let next = scaleLow;
     // measured frame time: under 30 fps steps up fast (0.5), a phone that cannot hold 24 goes to 3.5; eases back only when comfortable
     // one render resolution: the scale holds at 2 (the title's) and only drops, one step to 2.5, for a phone under 20 fps
-    if (fps < 20) next = 2.5;
+    // a clock jump or a shader compile stalls a few frames: the picture only drops resolution after 6 checks (3 s) under 20 fps,
+    // never in a bot's tab (a playtest's picture must not change under it: a stall read as a blurred, pixelated frame)
+    const bot = typeof navigator !== "undefined" && navigator.webdriver;
+    scaleSlow = fps < 20 ? scaleSlow + 1 : 0;
+    if (scaleSlow >= 6 && !bot) next = 2.5;
     else if (fps > 40) next = 2;
     if (next !== scaleLow) { scaleLow = next; engine.setHardwareScalingLevel(scaleLow); }
   });
