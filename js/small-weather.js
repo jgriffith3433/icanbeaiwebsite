@@ -51,6 +51,7 @@ const BOLTS = {
 const EXIT_CLIPS = new Set(["cast", "throw", "triumph", "windbolt", "windrain"]);
 const WINDUPS = new Set(["windbolt", "windrain"]);
 
+const TAKE_LEN = 0.1; // seconds of take-off anticipation
 const FOOT_SLIDE_LIMIT = 0.05; // 5 cm per planted step (acceptance)
 const FOOT_FLOAT_LIMIT = 0.03; // 3 cm sink/float
 
@@ -273,7 +274,10 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
   let traceFeet = null;
   let landT = 0;
   let landDepth = 0;
-  let prevGrounded = true;
+  let seenJump = null;
+  let seenLand = null;
+  let landLen = 0.15;
+  let takeT = 0;
   let triumphLeft = 0;
   let ikWant = false;
   let ikLandK = 0;
@@ -333,7 +337,6 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
   function pickHeroClip(want, ctx) {
     const { st, wx, hour } = ctx;
     if (triumphLeft > 0) return "triumph";
-    if (landT > 0.18) return want; // keep locomotion; IK does the crouch
     // Distinct cast wind-ups while a power is winding
     // Trust powers.pose() / caller: windbolt and windrain stay as asked (don't remap a Lightning tap to rain).
     if (want === "windbolt" || want === "windrain") return named(want) ? want : "cast";
@@ -367,6 +370,8 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
     boltMeshes: bolts.meshes,
     clips: SKIN_CLIPS.filter((c) => named(c)),
     clip: () => clip,
+    /* the state the animation trace reports: take-off and land are the short squash states over the clip underneath */
+    state: () => (landT > 0 ? "land" : takeT > 0 ? "takeoff" : clip),
     /* seconds the current one-shot has sat on its last frame (0 while it plays or a loop runs): a pose that is held, not played */
     held: () => player.heldSeconds(),
     motion: () => Object.assign({}, motion, { exits: exitedAt }, ik.stats()),
@@ -399,24 +404,32 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
         const out = (sh, h) => Math.abs(h.x) - Math.abs(sh.x) >= 0.45 && Math.abs(h.y - sh.y) < 0.15 && Math.abs(h.z - sh.z) < 0.2;
         tpose = out(a, c) && out(b, d) && c.x * d.x < 0;
       }
-      return { state: clip, weights: w, footSpeed, tpose, held: player.heldSeconds() };
+      return { state: landT > 0 ? "land" : takeT > 0 ? "takeoff" : clip, weights: w, footSpeed, tpose, held: player.heldSeconds() };
     },
     /* clip, ground speed (m/s), dt; mine: the player has him (the lightning shows) */
     play(c, speed, dt, mine) {
       const ctx = readCtx();
       if (mine == null) mine = ctx.mine;
-      // Landing anticipation / recovery from hard impacts
+      /* Jump, fall and land are three states with a way out each. Take-off: the press (control's jumpId) starts a 0.1 s
+         anticipation, a quick crouch that springs into the jump clip. Land: each touchdown (landId) squashes the figure for
+         0.12-0.2 s (more for a longer fall) and hands back to idle or walk/run by his speed: the clip underneath is already
+         `want`, so the exit is the normal cross-fade. The trace reports them as "takeoff" and "land". */
       const grounded = ctx.st ? !!ctx.st.grounded : true;
-      const vy = ctx.st && ctx.st.vy != null ? ctx.st.vy : 0;
-      if (!prevGrounded && grounded && vy > -0.5) {
-        // just landed; impact was in airTime — use softLand flag or speed
-        const hard = ctx.st && (ctx.st.softLand === false) && (ctx.st.airTime > 0.35 || speed > 2);
-        landDepth = hard ? 1 : 0.45;
-        landT = hard ? 0.55 : 0.28;
-        motion.landings++;
+      if (ctx.st && ctx.st.jumpId != null) {
+        if (seenJump == null) seenJump = ctx.st.jumpId;
+        else if (ctx.st.jumpId !== seenJump) { seenJump = ctx.st.jumpId; takeT = TAKE_LEN; motion.takeoffs = (motion.takeoffs || 0) + 1; }
+        if (seenLand == null) seenLand = ctx.st.landId;
+        else if (ctx.st.landId !== seenLand) {
+          seenLand = ctx.st.landId;
+          const drop = ctx.st.landDrop || 0;
+          landDepth = Math.max(0.4, Math.min(1.2, 0.4 + drop * 0.18));
+          landLen = Math.min(0.2, 0.12 + drop * 0.02);
+          landT = landLen;
+          motion.landings++;
+        }
       }
-      prevGrounded = grounded;
       if (landT > 0) landT = Math.max(0, landT - dt);
+      if (takeT > 0) takeT = Math.max(0, takeT - dt);
 
       // Triumph after a big cast (storm / tornado)
       try {
@@ -481,8 +494,9 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       player.play(clip, speed, dt);
       offset = clipAnchor(clip);
       // Landing crouch dips the whole figure slightly (anticipation) then recovers
-      const landK = landT > 0 ? Math.sin(Math.min(1, (0.55 - landT) / 0.2) * Math.PI) * landDepth * 0.06 : 0;
-      wrap.position.y = -offset - landK;
+      const landK = landT > 0 ? Math.sin((1 - landT / landLen) * Math.PI) * landDepth * 0.06 : 0;
+      const takeK = takeT > 0 ? Math.sin((1 - takeT / TAKE_LEN) * Math.PI) * 0.05 : 0; // the crouch before the spring
+      wrap.position.y = -offset - landK - takeK;
       bolts.update(mine ? BOLTS[clip] || 0.2 : 0, dt);
 
       // Rim light: behind him, aimed at him from the camera's opposite side

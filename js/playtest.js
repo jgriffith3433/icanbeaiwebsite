@@ -1831,6 +1831,78 @@ async function modelBlocked(options, t) {
   stop();
 }
 
+/** Neighbours notice him (J, 2026-11-14): a neighbour is put on the pavement 12 m ahead (named setup shortcut), he walks up to them by
+ *  the real input (keys, or the touch stick), and inside 6 m the head must turn to him within 1 s and a small hello must show; then a Rain
+ *  (key R, or the Rain button) within 8 m must make them react (point at the sky, umbrella up). Events neighbor-look / neighbor-greet /
+ *  neighbor-react; metrics neighbors.lookMs, neighbors.looks, neighbors.reactions. */
+async function neighborAwareness(t, touch, label) {
+  const D = window.day;
+  const C = D.control;
+  const N = D.neighbors;
+  const P = window.powers || D.powers;
+  if (!N || !N.stand || C.mode() !== "control") { t.problem("bug", `${label}: no neighbours or not in control for the awareness check`); return; }
+  const scene = D.world().scene;
+  const who = "birdie";
+  const sp = C.state();
+  const dirx = Math.sin(sp.yaw || 0), dirz = Math.cos(sp.yaw || 0);
+  const tx = sp.x + dirx * 12, tz = sp.z + dirz * 12;
+  N.stand(who, tx, tz);
+  await sleep(300);
+  const first = (pred) => N.events().filter(pred);
+  const from = performance.now();
+  const stickEl = $("stick");
+  const sr = touch && stickEl ? hudVisible(stickEl) : null;
+  const cx = sr ? sr.left + sr.width / 2 : 0, cy = sr ? sr.top + sr.height / 2 : 0, reach = sr ? sr.width / 2 : 0;
+  let down = false, crossAt = 0, held = null;
+  const dist = () => { const s = C.state(); return Math.hypot(s.x - tx, s.z - tz); };
+  const t1 = performance.now();
+  while (dist() > 5 && performance.now() - t1 < 14000) {
+    const s = C.state();
+    const cam = scene.activeCamera;
+    const f = cam.getForwardRay().direction;
+    const camA = Math.atan2(f.x, f.z);
+    const a = Math.atan2(tx - s.x, tz - s.z) - camA;
+    const ang = Math.atan2(Math.sin(a), Math.cos(a));
+    if (sr) {
+      if (!down) { touchOn(stickEl, "pointerdown", cx, cy); down = true; }
+      touchOn(stickEl, "pointermove", cx + Math.sin(ang) * reach * 0.6, cy - Math.cos(ang) * reach * 0.6);
+    } else {
+      const want = [Math.abs(ang) < 1.9 ? "w" : "s"].concat(ang > 0.35 && ang < 2.8 ? ["d"] : ang < -0.35 && ang > -2.8 ? ["a"] : []);
+      const k = want.join("");
+      if (k !== held) { if (held) held.split("").forEach((c) => keyUp(c)); want.forEach((c) => keyDown(c)); held = k; }
+    }
+    if (!crossAt && dist() < 6) crossAt = performance.now();
+    await sleep(50);
+  }
+  if (sr && down) touchOn(stickEl, "pointerup", cx, cy);
+  if (held) held.split("").forEach((c) => keyUp(c));
+  if (!crossAt) crossAt = performance.now();
+  await sleep(1200);
+  const looks = first((e) => e.action === "look" && e.id === who && e.t >= from);
+  const lookMs = looks.length ? Math.max(0, Math.round(looks[0].t - crossAt)) : -1;
+  const row = (N.anim().people || []).find((p) => p.id === who) || {};
+  t.metric("neighbors.looks", looks.length);
+  t.metric("neighbors.lookMs", lookMs);
+  t.event("neighbor-look", `${label}: ${who} noticed him at ${looks.length ? looks[0].d + " m" : "never"}, ${lookMs} ms after he came within 6 m, head turned ${(row.look || 0).toFixed(2)} rad, ${row.aware ? "still looking" : "not looking"}`);
+  if (!looks.length || lookMs > 1000) t.problem("bug", `${label}: a neighbour within 6 m of him did not turn to him within 1 s (${lookMs} ms)`);
+  const greets = first((e) => e.action === "greet" && e.id === who && e.t >= from);
+  t.event("neighbor-greet", `${label}: ${greets.length ? who + " gave a " + greets[0].kind : "no hello"}`);
+  if (!greets.length) t.problem("bug", `${label}: the neighbour near him gave no wave or nod`);
+  // Rain within 8 m
+  if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await sleep(300);
+  const castAt = performance.now();
+  if (touch && $("ability-rain")) await tapEl($("ability-rain")); else pressKey("r");
+  await sleep(1500);
+  const reacts = first((e) => e.action === "react" && e.id === who && e.t >= castAt);
+  const rr = (N.anim().people || []).find((p) => p.id === who) || {};
+  t.metric("neighbors.reactions", reacts.length);
+  t.event("neighbor-react", `${label}: Rain ${reacts.length ? "answered by " + who + " at " + reacts[0].d + " m (" + reacts[0].kind + ")" : "got no answer"}; pose ${rr.gesture || "none"}, weather pose ${rr.weather} ${(rr.weatherK || 0).toFixed(2)}`);
+  if (!reacts.length) t.problem("bug", `${label}: casting Rain within 8 m made no neighbour react`);
+  await sleep(1800);
+  N.stand(who, null);
+}
+
 /* ---------------- warm-start: the longest frame after loading, each power's first-use cost, shader compile errors ---------------- */
 /** What the street did within about a second of a cast: the crowd's own numbers for Gale / Gust and Fog (logged for the review). */
 function streetReact(t, id) {
@@ -2004,7 +2076,7 @@ async function warmStart(options, t) {
     window.addEventListener("day:land-sound", hl);
     let air = false, down = 0;
     const poll = setInterval(() => { if (!C.state().grounded) air = true; else if (air && !down) down = performance.now(); }, 8);
-    await tapKey(" ", 150);
+    await jumpStatesProbe(t, "warm-start jump", () => tapKey(" ", 150));
     await t.until(() => lands.length > 0, 4000, "a landing sound").catch(() => {});
     clearInterval(poll);
     window.removeEventListener("day:land-sound", hl);
@@ -2014,6 +2086,7 @@ async function warmStart(options, t) {
     if (!lands.length) t.problem("bug", "A jump landing made no sound");
     else if (lag > 100) t.problem("bug", `The landing sound came ${lag} ms after touch-down (limit 100)`);
   }
+  if (C.mode() === "control") await neighborAwareness(t, touch, "warm-start");
   // let go inside the first minute: the way back into control must be on screen (a phone has no stick then)
   if (touch) await tapEl($("control")); else pressKey("Escape");
   await t.until(() => C.mode() === "schedule", 8000, "back on the day").catch(() => {});
@@ -2405,6 +2478,41 @@ async function holdKeys(list, ms) {
   await sleep(ms);
   list.slice().reverse().forEach((k) => keyUp(k));
 }
+/** One jump, played through real input (`press`: a key or a touch on the Jump button), read frame by frame from his skin's own
+ *  state: take-off, air (jump/fall/float) and land must each show, in that order, and he must end on idle, walk or run.
+ *  Logs `jump-states` with the sequence; the metric `jump.<label>Land` is 1 when it was clean. */
+async function jumpStatesProbe(t, label, press) {
+  const C = window.day.control;
+  const sk = () => { try { return skinNow(); } catch (e) { return null; } };
+  const seq = [];
+  let air = false, landedAt = 0, stop = false;
+  const frame = () => {
+    if (stop) return;
+    const k = sk();
+    const st = k && k.state ? k.state() : "";
+    if (st && seq[seq.length - 1] !== st) seq.push(st);
+    const g = C.state().grounded;
+    if (!g) air = true;
+    else if (air && !landedAt) landedAt = performance.now();
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  await sleep(500); // settle on the ground first
+  seq.length = 0;
+  await press();
+  await t.until(() => landedAt > 0, 4000, "him to land after the jump").catch(() => {});
+  await sleep(1100);
+  stop = true;
+  const end = seq[seq.length - 1] || "";
+  const iT = seq.indexOf("takeoff");
+  const iA = seq.findIndex((s) => s === "jump" || s === "fall" || s === "float");
+  const iL = seq.indexOf("land");
+  const clean = iT >= 0 && iA > iT && iL > iA && ["idle", "walk", "run"].includes(end);
+  t.metric(`jump.${label.replace(/\W+/g, "")}Clean`, clean ? 1 : 0);
+  t.event("jump-states", `${label}: ${seq.join(" > ") || "no states"}; ends ${end || "?"}; ${clean ? "take-off, air, land, exit" : "INCOMPLETE"}`);
+  if (!clean) t.problem("bug", `${label}: the jump showed ${seq.join(" > ") || "no states"} (wanted takeoff, air, land, then idle/walk/run)`);
+}
+
 async function tapKey(key, ms = 120) {
   keyDown(key);
   await sleep(ms);
@@ -11491,6 +11599,15 @@ async function phoneTouch(options, t) {
       t.event("phone-stick-walk", `stick half then full tilt then half: peak ${Math.round(peak * 10) / 10} m/s`);
     }
   }
+
+  // 2c. One jump by tapping the Jump button: take-off, air and land states, then back to idle or run (the trace reads stuckState).
+  {
+    const jb = document.querySelector(".touchpad .jump");
+    if (jb && hudVisible(jb) && C.mode() === "control") await jumpStatesProbe(t, land ? "phone landscape jump" : "phone portrait jump", () => tapEl(jb));
+  }
+
+  // 2d. A neighbour on the pavement: walk up by the stick, the head turns, a hello, and Rain gets an answer.
+  if (C.mode() === "control") await neighborAwareness(t, true, land ? "phone landscape" : "phone portrait");
 
   // 3. Every control: 44 px, on screen, no overlap.
   const sels = ["#control", ".abilitybar .ab", ".touchpad .jump", ".touchpad .stick", "#sound", "#settings", "#episodes", "#time-btn", "#weather-btn"];

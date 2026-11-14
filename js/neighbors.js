@@ -230,6 +230,8 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
 
   const FADE_NEAR = 0.6; // m from the camera: fully faded
   const FADE_FAR = 1.4; // m from the camera: fully drawn
+  const LOOK_R = (cfg.awareness && cfg.awareness.look) || 6; // m: a neighbour notices him
+  const REACT_R = (cfg.awareness && cfg.awareness.react) || 8; // m: a cast this near is answered
   const PERSONAL = 1.1; // m between the player's centre and a neighbor's drawn centre
 
   /* ---- who is where ---- */
@@ -508,6 +510,29 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
     } catch (err) { /* */ }
   });
 
+  /* awareness: a cast within REACT_R of a neighbour is answered with their own small act (rain: a point at the sky and the
+     umbrella goes up; lightning: they duck; wind: a hand on the hat via the weather pose). They go back to their routine after. */
+  window.addEventListener("day:power", (e) => {
+    const d = (e && e.detail) || {};
+    const pw = d.power || d.action;
+    if (!pw || pw === "denied") return;
+    const kind = ["bolt", "lightning", "storm"].includes(pw) ? "duck"
+      : ["rain", "sunbreak", "sun", "fog"].includes(pw) ? "point"
+      : ["gust", "gale", "tornado", "wind"].includes(pw) ? "hat" : null;
+    if (!kind) return;
+    const here = hero();
+    if (!here) return;
+    const nowMs = performance.now();
+    people.forEach((p) => {
+      if (!p.__pos || p.__pos.inside) return;
+      const dd = Math.hypot(here.x - p.__pos.x, here.z - p.__pos.z);
+      if (dd > REACT_R) return;
+      if (kind !== "hat") p.__reactWant = { kind, until: nowMs + 350 };
+      p.__reactAt = nowMs;
+      emit("react", { id: p.id, kind, power: pw, d: +dd.toFixed(2), x: p.__pos.x, z: p.__pos.z });
+    });
+  });
+
   /* answering an ask: he calls its ability close to them */
   window.addEventListener("day:power", (e) => {
     const d = (e && e.detail) || {};
@@ -652,7 +677,34 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
       if (gest && gest !== "work" && p.__fig.anim.gesture === gest) p.__gestureWant = null;
       const react = !!(sky.manual && (weatherState === "storm" || weatherState === "rain" || weatherState === "wind")
         && here && Math.hypot(here.x - pl.x, here.z - pl.z) < 22 && !gest && !pl.moving);
+      /* awareness: inside LOOK_R he is noticed (the head turns to him, limited, even while they walk); a stopped neighbour
+         also gives a small hello once per visit; a cast near them is answered (point at rain, hat in wind, duck from a bolt) */
+      const dHim = here ? Math.hypot(here.x - pl.x, here.z - pl.z) : 1e9;
+      const aw = p.__aware || (p.__aware = { on: false, greetAt: -1e9, said: false, lookAt: 0, until: 0 });
+      if (!aw.on && dHim < LOOK_R && !pl.inside) {
+        aw.on = true;
+        aw.lookAt = nowMs;
+        aw.said = false;
+        emit("look", { id: p.id, d: +dHim.toFixed(2), x: pl.x, z: pl.z });
+      } else if (aw.on && (dHim > LOOK_R + 2 || pl.inside)) aw.on = false;
+      let look = null;
+      if (aw.on && here) {
+        const toHim = Math.atan2(here.x - pl.x, here.z - pl.z);
+        const rel = Math.atan2(Math.sin(toHim - p.__yaw), Math.cos(toHim - p.__yaw));
+        look = { yaw: rel, pitch: Math.max(-0.3, Math.min(0.3, -((here.y || 0) + 1.6 - (p.__gy + 1.6 * (p.scale || 1))) / Math.max(1.5, dHim))) };
+        p.__lookRel = rel;
+      }
+      let greet = null;
+      if (p.__reactWant && nowMs < p.__reactWant.until) greet = p.__reactWant.kind;
+      else if (aw.on && !aw.said && !pl.moving && !pl.sit && !gest && nowMs - aw.lookAt > 450 && nowMs - aw.greetAt > 25000) {
+        aw.said = true;
+        aw.greetAt = nowMs;
+        greet = (p.id.length + Math.round(nowMs / 1000)) % 2 ? "wave" : "nod";
+        emit("greet", { id: p.id, kind: greet, d: +dHim.toFixed(2) });
+      }
       const sample = p.__fig.step({
+        look,
+        greet,
         dt,
         speed: pl.moving && !jump ? Math.max(speed, 0.15) : 0,
         moving: !!pl.moving,
@@ -797,6 +849,8 @@ html.touch-ui .nb-btn{display:inline-flex;min-width:44px;min-height:44px;align-i
           state: s.state || "idle",
           speed: s.speed || 0,
           gesture: s.gesture || null,
+          look: s.look || 0,
+          aware: !!(p.__aware && p.__aware.on),
           weather: s.weather || "clear",
           weatherK: s.weatherK || 0,
           sit: s.sit || 0,

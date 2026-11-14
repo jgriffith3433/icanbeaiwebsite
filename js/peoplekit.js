@@ -185,6 +185,10 @@ export function buildFigure(B, scene, id, look, scale = 1) {
     idleKind: (id.charCodeAt(0) || 0) % 4,
     gesture: null,
     gestureT: 0,
+    lookK: 0,
+    lookY: 0,
+    lookX: 0,
+    lookNow: 0,
     sitBlend: 0,
     weather: "clear",
     weatherK: 0,
@@ -376,6 +380,38 @@ export function buildFigure(B, scene, id, look, scale = 1) {
         head.rotation.x = -0.55 * k;
         neck.rotation.x = -0.2 * k;
       }
+    } else if (name === "wave") {
+      // a small hello: free hand up beside the head, wrist waggle, head toward him (the look is added after)
+      const a = arms[1];
+      a.sh.rotation.x = -2.0 * k;
+      a.sh.rotation.z = -a.dir * 0.3 * k;
+      a.el.rotation.x = -0.9 * k;
+      a.wr.rotation.z = Math.sin(t * 11) * 0.5 * k;
+      torso.rotation.x = -0.04 * k;
+    } else if (name === "nod") {
+      // two small nods and a hand half raised
+      head.rotation.x = Math.sin(Math.min(t, 1.1) * 8) * 0.28 * k;
+      arms[1].sh.rotation.x = -0.5 * k;
+      arms[1].el.rotation.x = -0.6 * k;
+    } else if (name === "point") {
+      // point at the sky he made, eyes following the arm
+      arms[1].sh.rotation.x = -2.35 * k;
+      arms[1].sh.rotation.z = -arms[1].dir * 0.1 * k;
+      arms[1].el.rotation.x = -0.1 * k;
+      arms[0].sh.rotation.x = -0.25 * k;
+      head.rotation.x = -0.5 * k;
+      neck.rotation.x = -0.15 * k;
+    } else if (name === "duck") {
+      // flinch from a bolt: crouch, both arms over the head
+      legs.forEach((l) => { l.hip.rotation.x = -0.7 * k; l.knee.rotation.x = 1.2 * k; });
+      hips.position.y = H.hip - 0.2 * k;
+      torso.rotation.x = 0.45 * k;
+      head.rotation.x = 0.3 * k;
+      arms.forEach((a) => {
+        a.sh.rotation.x = -2.5 * k;
+        a.sh.rotation.z = -a.dir * 0.1 * k;
+        a.el.rotation.x = -1.9 * k;
+      });
     } else if (name === "react") {
       // look up / flinch at a bolt or storm he called
       head.rotation.x = -0.7 * k;
@@ -420,6 +456,15 @@ export function buildFigure(B, scene, id, look, scale = 1) {
       umbrellaMeshes.forEach((m) => (m.isVisible = true));
       umb.rotation.x = -0.4;
       umb.rotation.z = 0.3;
+    } else if (weather === "wind") {
+      // lean into it, one hand pinning the hat
+      torso.rotation.x += 0.12 * k;
+      const a = arms[1];
+      a.sh.rotation.x = -2.55 * k;
+      a.sh.rotation.z = -a.dir * 0.15 * k;
+      a.el.rotation.x = -1.6 * k;
+      head.rotation.x += 0.12 * k;
+      umbrellaMeshes.forEach((m) => (m.isVisible = false));
     } else if (weather === "sun" || weather === "clear") {
       // shield eyes when the sky is bright (sun break / clear with sun weight)
       arms[0].sh.rotation.x = -1.5 * k;
@@ -496,6 +541,14 @@ export function buildFigure(B, scene, id, look, scale = 1) {
       anim.gestureT = 0;
       anim.reactCool = 4;
     }
+    // a small greeting (wave / nod) or a reaction to his weather (point / duck) when they are free
+    if (ctx.greet && !anim.gesture && ["wave", "nod", "point", "duck"].includes(ctx.greet)) {
+      anim.gesture = ctx.greet;
+      anim.gestureT = 0;
+    } else if (ctx.greet === "duck" && anim.gesture && anim.gesture !== "duck" && anim.gesture !== "work") {
+      anim.gesture = "duck";
+      anim.gestureT = 0;
+    }
     // gesture request
     if (ctx.gesture && ctx.gesture !== anim.gesture && ctx.gesture !== "react") {
       anim.gesture = ctx.gesture;
@@ -504,6 +557,10 @@ export function buildFigure(B, scene, id, look, scale = 1) {
     const gestDur = anim.gesture === "thanks" ? 1.8
       : anim.gesture === "surprise" ? 1.5
       : anim.gesture === "react" ? 1.2
+      : anim.gesture === "wave" ? 1.9
+      : anim.gesture === "nod" ? 1.3
+      : anim.gesture === "point" ? 2.1
+      : anim.gesture === "duck" ? 1.3
       : anim.gesture === "work" ? 6.5
       : 2.2;
     if (anim.gesture) {
@@ -516,7 +573,7 @@ export function buildFigure(B, scene, id, look, scale = 1) {
     }
 
     // weather blend
-    const wantWeather = ctx.weather === "rain" || ctx.weather === "storm" ? ctx.weather
+    const wantWeather = ctx.weather === "rain" || ctx.weather === "storm" || ctx.weather === "wind" ? ctx.weather
       : (ctx.sunShield || 0) > 0.4 ? "sun" : "clear";
     anim.weather = wantWeather;
     const wTarget = wantWeather === "clear" ? 0 : 1;
@@ -558,10 +615,25 @@ export function buildFigure(B, scene, id, look, scale = 1) {
     }
     if (anim.gesture) applyGesture(anim.gesture, anim.gestureT, gestDur, ctx.personality || null);
     // weather on top (umbrella / shield) when not mid-gesture, or lightly during walk
-    if (!anim.gesture || anim.gesture === "surprise") {
+    if (!anim.gesture || anim.gesture === "surprise" || (anim.gesture === "nod" && anim.weather !== "wind")) {
       applyWeather(anim.weather, anim.weatherK * (anim.gesture === "surprise" && (anim.weather === "rain" || anim.weather === "storm") ? 1 : anim.gesture ? 0.35 : 1));
     } else {
       umbrellaMeshes.forEach((m) => (m.isVisible = false));
+    }
+
+    // head look-at with limits: yaw +-62 deg (the neck takes a third), pitch +-0.3, eased in and out
+    {
+      const want = ctx.look ? 1 : 0;
+      anim.lookK += (want - anim.lookK) * Math.min(1, dt * 7);
+      if (ctx.look) {
+        anim.lookY += (Math.max(-1.08, Math.min(1.08, ctx.look.yaw)) - anim.lookY) * Math.min(1, dt * 10);
+        anim.lookX += (Math.max(-0.3, Math.min(0.3, ctx.look.pitch || 0)) - anim.lookX) * Math.min(1, dt * 10);
+      }
+      const lk = anim.lookK * (anim.gesture === "duck" || anim.gesture === "point" ? 0.2 : 1);
+      head.rotation.y += anim.lookY * 0.68 * lk;
+      neck.rotation.y += anim.lookY * 0.32 * lk;
+      head.rotation.x += anim.lookX * lk;
+      anim.lookNow = anim.lookY * lk;
     }
 
     let plant = { planted: { L: false, R: false }, slide: 0 };
@@ -579,6 +651,7 @@ export function buildFigure(B, scene, id, look, scale = 1) {
       amount: anim.amount,
       speed,
       gesture: anim.gesture,
+      look: anim.lookNow,
       weather: anim.weather,
       weatherK: anim.weatherK,
       sit: anim.sitBlend,
