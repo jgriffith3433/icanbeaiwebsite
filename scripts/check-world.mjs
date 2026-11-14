@@ -649,6 +649,23 @@ ok((world.scene.effectLayers || []).length === 0, `scene still has ${(world.scen
 ok(snap.batching.frozenMeshes >= 400, `only ${snap.batching.frozenMeshes} static meshes are frozen`);
 ok(avgFrameMs < 15, `average NullEngine frame time is ${avgFrameMs.toFixed(2)} ms (expected < 15 ms)`);
 
+// The walk-back camera's sphere cast sees small and rotated solids (roof lips, the stair ramp), not only the big boxes.
+{
+  const sol = world.solids || [];
+  const lip = sol.find((o) => !o.roll && !o.yaw && !o.pitch && o.h < 1.5 && o.h > 0.3 && o.w > 3 && o.d < 1 && o.y > 5);
+  if (lip) {
+    // from 4 m before the lip, 0.2 m under its top, straight at it, the camera 8 m out: the old cast let it sit behind it
+    const ty = lip.y, tx = lip.x, tz = lip.z - lip.d / 2 - 4;
+    const r = world.cameraClear(tx, ty, tz, 0, 0, 1, 8);
+    ok(r < 5, `the camera's sphere cast ignores a ${lip.w.toFixed(1)}x${lip.h.toFixed(1)}x${lip.d.toFixed(1)} roof lip (radius ${r.toFixed(2)} of 8)`);
+    ok(world.cameraClear(tx, ty + 4, tz, 0, 0, 1, 8) === 8, 'the camera is pulled in for a lip 4 m below it');
+  } else ok(false, 'no roof lip solid found to check the camera cast against');
+  const ramp = sol.find((o) => o.roll);
+  if (ramp) {
+    const r = world.cameraClear(ramp.x, ramp.y + 3, ramp.z, 0, -1, 0, 8);
+    ok(r < 4, `the camera's sphere cast ignores the stair ramp (radius ${r.toFixed(2)} of 8, straight down onto it)`);
+  } else ok(false, 'no rotated stair ramp solid found');
+}
 const summary = `Babylon ${core.Engine.Version}, Havok: ${p.colliders} colliders in ${p.bodies} bodies; ${day.actions.length} actions; field ${g && g.y.toFixed(2)}, road ${r && r.y.toFixed(2)}, home floor ${inside && inside.y.toFixed(2)}, bed ${onBed && onBed.y.toFixed(2)}, capsule at ${cap.position.y.toFixed(2)}; control: walk ${walked.toFixed(2)} m/s, three jumps ${(peak - y0).toFixed(2)} m, walked back in ${(steps / 60).toFixed(1)} s; ${modelInfo}; perf: ${avgFrameMs.toFixed(2)} ms/frame, ${snap.geometry.shadowTris} shadow tris, ${snap.batching.frozenMeshes} frozen meshes`;
 if (problems.length) {
   console.error(`check-world: ${problems.length} problem(s)\n- ${problems.join('\n- ')}\n${summary}`);
