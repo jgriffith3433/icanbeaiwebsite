@@ -106,6 +106,7 @@ export function startTutorial() {
     paint();
     emit("step");
   }
+  const mode_control = () => !!(day && day.control && day.control.mode() === "control");
   function finish(how) {
     if (!blocking() && how !== "reset") return;
     const elapsed = shownAt ? (performance.now() - shownAt) / 1000 : 0;
@@ -163,7 +164,7 @@ export function startTutorial() {
     if (!canDom || seen() || blocking()) return false;
     if (!card) build();
     clearTimeout(doneTimer);
-    card.classList.remove("finished");
+    card.classList.remove("finished", "cast-seen");
     index = 0;
     shownAt = performance.now();
     moveFrom = null;
@@ -182,6 +183,7 @@ export function startTutorial() {
 .tutorial{z-index:8;width:min(300px,calc(100vw - 32px));padding:12px 14px 10px;border-radius:16px;background:rgba(14,16,22,.88);border:1px solid rgba(240,194,122,.45);color:#f6f1e8;font:500 0.95rem/1.35 Outfit,system-ui,sans-serif;box-shadow:0 16px 40px rgba(0,0,0,.4);pointer-events:auto}
 .tutorial[hidden]{display:none}
 .tutorial.finished .row{display:none}
+.tutorial.cast-seen{display:none}
 .tutorial p{margin:0}
 .tutorial .do{font:600 1.05rem/1.3 Fraunces,Georgia,serif}
 .tutorial .hint{margin-top:4px;color:rgba(246,241,232,.68);font-size:0.82rem}
@@ -224,6 +226,7 @@ html.touch-ui .tutorial{width:min(280px,calc(100vw - 32px))}
   if (canDom) {
     window.addEventListener("day:power", (e) => {
       const d = (e && e.detail) || {};
+      if (d.action !== "denied" && d.action !== "unlock" && blocking() && mode_control() && card) card.classList.add("cast-seen"); // the pill has done its job once he has cast
       if (d.power === "bolt" && d.action === "bolt") boltLanded = true;
       else if (blocking() && cfg.steps[index] && cfg.steps[index].id === "bolt" && d.action === "denied" && d.power === "bolt" && hintEl) {
         hintEl.textContent = touchy() ? "Charge is still filling. Then tap Bolt." : "Charge is still filling. Then E.";
