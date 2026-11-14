@@ -233,11 +233,11 @@ import { pickRate } from "./variety.js";
   const GROUPS = [
     [/^(jump|land-)/, "move"],
     [/^(crowd-|umbrella-)/, "crowd"],
-    [/^(car-|siren|pigeon|bird)/, "city"],
+    [/^(car-|siren|pigeon|bird|door|dog|chatter|awning)/, "city"],
     [/^ui-/, "ui"],
   ];
   const groupOf = (kind) => { for (const [re, g] of GROUPS) if (re.test(kind)) return g; return "misc"; };
-  const bank = { index: null, indexing: false, files: {}, buffers: {}, groups: {}, last: {}, plays: [], sources: {}, bytes: 0 };
+  const bank = { index: null, indexing: false, files: {}, buffers: {}, groups: {}, last: {}, plays: [], sources: {}, bytes: 0, usedAt: {}, lastSrc: null, lastDur: 0 };
   const lastRate = {};
   function loadGroup(g) {
     if (bank.groups[g] || !bank.index) return;
@@ -280,9 +280,15 @@ import { pickRate } from "./variety.js";
     wantGroup(groupOf(kind));
     const list = bank.buffers[kind];
     if (!list || !list.length) return false;
-    let pick = list[Math.floor(Math.random() * list.length)];
-    if (list.length > 1 && pick.url === bank.last[kind]) pick = list[(list.indexOf(pick) + 1) % list.length];
+    // Never the same file twice inside 60 s while another variant is free (the audio probe counts an identical sample); a caller
+    // that needs it strict (the scheduler) passes `fresh` and gets false, then picks another kind.
+    const nowMs = clockMs();
+    let cands = list.filter((p) => !(bank.usedAt[p.url] > nowMs - 60000));
+    if (!cands.length) { if (o.fresh) return false; cands = list; }
+    let pick = cands[Math.floor(Math.random() * cands.length)];
+    if (cands.length > 1 && pick.url === bank.last[kind]) pick = cands[(cands.indexOf(pick) + 1) % cands.length];
     bank.last[kind] = pick.url;
+    bank.usedAt[pick.url] = nowMs;
     let rate = 1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1); // 5-10% either way
     if (Math.abs(rate - (lastRate[pick.url] || 0)) < 0.01) rate += 0.012;
     lastRate[pick.url] = rate;
@@ -298,6 +304,8 @@ import { pickRate } from "./variety.js";
     const bus = o.bus || (String(kind).startsWith("ui-") ? "ui" : "sfx");
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
     src.start(a.c.currentTime + (o.delay || 0)); started();
+    bank.lastSrc = src;
+    bank.lastDur = (pick.b && pick.b.duration ? pick.b.duration : 2) / rate;
     const tag = groupOf(kind) === "move" ? (kind === "jump" ? "jump" : "landing") : kind.split("-")[0] === "crowd" || kind === "umbrella-pop" ? "crowd" : kind.startsWith("car") || kind === "siren-far" ? "car" : kind === "bird" || kind === "pigeon" ? "bird" : "ui";
     bank.sources[tag] = "file";
     bank.plays.push({ kind, file: pick.url, rate: +rate.toFixed(3), t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
@@ -1320,6 +1328,112 @@ import { pickRate } from "./variety.js";
     }
   }
 
+  /* ---------------- the foley scheduler: the street heard now and then ----------------
+     Event-driven, no polling: each one-shot's own `ended` (or, for a synth stand-in, its length) arms ONE timer for the next, 6-15 s
+     later. Kinds are chosen by the hour and the weather (birds and pigeons by day, cars when the crowd has any, a far siren at night,
+     doors, a dog, chatter from a person near him, rain on the awnings when wet), each placed in the world (x, z around the camera) so
+     it pans and fades by distance. A file is never played twice within 60 s (`fresh`), the pick avoids the kind just heard, and at most
+     3 are alive at once (a phone's voice budget). Clips for door, dog, chatter and awning-rain are recipes in scripts/sync-sfx.mjs;
+     until they're on disk a door is a synth knock and awning rain a few drip ticks, and a dog/chatter turn is skipped. */
+  const folley = { on: false, timer: null, live: 0, count: 0, last: null, plays: [], gaps: [], lastEnd: 0, min: 6, max: 15 };
+  function camXZ() {
+    const cam = scene.activeCamera, p = cam && (cam.globalPosition || cam.position);
+    return p ? { x: p.x, z: p.z } : { x: 0, z: 0 };
+  }
+  function foleyAt(r0, r1) {
+    const c = camXZ(), ang = Math.random() * Math.PI * 2, r = r0 + Math.random() * (r1 - r0);
+    return { x: c.x + Math.cos(ang) * r, z: c.z + Math.sin(ang) * r };
+  }
+  function foleyContext() {
+    let state = "clear", cars = 0, people = [];
+    try { state = (day.weather && day.weather.now().state) || "clear"; } catch (err) { /* default */ }
+    try { cars = (day.crowd && day.crowd.info().cars) || 0; } catch (err) { /* none */ }
+    try {
+      const c = camXZ(), pp = (day.crowd && day.crowd.positions && day.crowd.positions().people) || [];
+      people = pp.filter((q) => Math.hypot(q.x - c.x, q.z - c.z) < 28);
+    } catch (err) { /* none */ }
+    const h = hour() % 24;
+    return { h, state, wet: state === "rain" || state === "storm", fair: state === "clear" || state === "clouds", day: h > 5.5 && h < 20, night: h >= 21 || h < 5, cars, people };
+  }
+  const FOLEY = [
+    { id: "bird", w: (c) => (c.fair && c.day ? (c.h < 9 ? 4 : 3) : 0), play: (c, pos) => sample("bird", { gain: 0.8, ...pos, fresh: true }) },
+    { id: "pigeon", w: (c) => (!c.wet && c.day ? 2 : 0), play: (c, pos) => sample("pigeon", { gain: 0.7, ...pos, fresh: true }) },
+    { id: "car", w: (c) => (c.cars > 0 ? 2 + Math.min(2, c.cars / 20) : c.night ? 0.5 : 0), play: (c, pos) => sample("car-pass", { gain: 0.7, ...pos, fresh: true }) },
+    { id: "siren", w: (c) => (c.night ? 2 : c.h > 17 ? 0.5 : 0), play: (c, pos) => sample("siren-far", { gain: 0.6, ...foleyAt(60, 90), fresh: true }) },
+    { id: "horn", w: (c) => (c.cars > 8 ? 0.8 : 0), play: (c, pos) => sample("car-horn", { gain: 0.5, ...foleyAt(30, 60), fresh: true }) },
+    { id: "door", w: (c) => (c.h > 6 && c.h < 23 ? 1.5 : 0.3), play: (c, pos) => sample("door", { gain: 0.8, ...foleyAt(8, 22), fresh: true }) || foleySynth("door", pos) },
+    { id: "dog", w: (c) => (c.wet ? 0.3 : 1), play: (c, pos) => sample("dog", { gain: 0.7, ...foleyAt(25, 50), fresh: true }) },
+    { id: "chatter", w: (c) => (c.people.length ? 2.5 : 0), play: (c) => { const q = c.people[Math.floor(Math.random() * c.people.length)]; return sample("chatter", { gain: 0.7, x: q.x, z: q.z, fresh: true }); } },
+    { id: "awning", w: (c) => (c.wet ? 4 : 0), play: (c, pos) => sample("awning-rain", { gain: 0.8, ...foleyAt(6, 18), fresh: true }) || foleySynth("awning", pos) },
+  ];
+  function foleySynth(kind, pos) {
+    synthTag(kind === "door" ? "crowd" : "city");
+    if (kind === "door") {
+      noise({ type: "lowpass", freq: 380, dur: 0.14, vol: 0.09, ...pos });
+      noise({ type: "bandpass", freq: 2200, dur: 0.05, vol: 0.03, delay: 0.1, q: 2, ...pos });
+      bank.lastSrc = null; bank.lastDur = 0.4;
+    } else {
+      for (let i = 0; i < 5; i++) S.dripTick(Math.random() * 1.2 - 0.6, 0.5);
+      bank.lastSrc = null; bank.lastDur = 1.2;
+    }
+    return true;
+  }
+  function foleyNext(delaySec) {
+    if (folley.timer) clearTimeout(folley.timer);
+    folley.timer = setTimeout(foleyPlay, Math.max(0, delaySec) * 1000);
+    if (folley.timer && folley.timer.unref) folley.timer.unref();
+  }
+  function foleyPlay() {
+    folley.timer = null;
+    if (!ctx()) { folley.on = false; return; } // Sound off: stop; the arm below restarts it when Sound comes back
+    if (folley.live >= 3) { foleyNext(2); return; }
+    const c = foleyContext();
+    const opts = FOLEY.map((k) => ({ k, w: k.id === folley.last ? 0 : k.w(c) })).filter((o) => o.w > 0);
+    let total = opts.reduce((n, o) => n + o.w, 0);
+    let played = null;
+    while (opts.length && !played) {
+      let r = Math.random() * total, i = 0;
+      while (i < opts.length - 1 && (r -= opts[i].w) > 0) i++;
+      const o = opts.splice(i, 1)[0];
+      total -= o.w;
+      bank.lastSrc = null; bank.lastDur = 0;
+      const pos = foleyAt(10, 36);
+      let ok = false;
+      try { ok = o.k.play(c, pos); } catch (err) { ok = false; }
+      if (ok) played = o.k.id;
+    }
+    const nowMs = clockMs();
+    if (!played) { foleyNext(4); return; } // nothing free this time (all heard in the last minute, or no clip): try again soon
+    if (folley.lastEnd) folley.gaps.push(Math.round((nowMs - folley.lastEnd) / 100) / 10);
+    if (folley.gaps.length > 40) folley.gaps.shift();
+    folley.last = played; folley.count++; folley.live++;
+    folley.plays.push({ id: played, t: Math.round(nowMs) });
+    if (folley.plays.length > 40) folley.plays.shift();
+    note("foley-" + played);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      folley.live = Math.max(0, folley.live - 1);
+      folley.lastEnd = clockMs();
+      foleyNext(folley.min + Math.random() * (folley.max - folley.min)); // from this one's end
+    };
+    const src = bank.lastSrc;
+    const len = bank.lastDur || 1.5;
+    if (src) { try { src.addEventListener("ended", finish); } catch (err) { /* below */ } }
+    const guard = setTimeout(finish, (len + 1.5) * 1000); // a context that never ends the source (suspended tab) can't stall the street
+    if (guard && guard.unref) guard.unref();
+  }
+  /** Start the scheduler once Sound is on (idempotent). */
+  function foleyStart() {
+    if (folley.on || !ctx()) return;
+    folley.on = true;
+    foleyNext(1.5 + Math.random() * 2);
+  }
+  ["pointerdown", "keydown", "touchstart", "day:sound"].forEach((ev) => window.addEventListener(ev, () => { setTimeout(foleyStart, 400); }, { capture: true, passive: true }));
+  window.addEventListener("day:control", foleyStart);
+  setTimeout(foleyStart, 2500);
+
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
     // Each watcher on its own: one that throws every frame must not take the city's ambience down with it.
@@ -1648,6 +1762,7 @@ import { pickRate } from "./variety.js";
         limiter: !!(audio && audio.lim),
       },
       plays: bank.plays.slice(),
+      foley: { on: folley.on, count: folley.count, live: folley.live, gaps: folley.gaps.slice(), plays: folley.plays.slice(), minGap: folley.min, maxGap: folley.max },
       casts: casts.slice(),
       roomTone: !!tone0,
       decoded: { power: Object.keys(power.buffers).filter((k) => (power.buffers[k] || []).length), cast: Object.keys(castBufs).filter((k) => castBufs[k]) },
@@ -1662,6 +1777,7 @@ import { pickRate } from "./variety.js";
     },
     cast: (id) => castPower(id),
     tornadoGainAt: (dist) => tornadoProxGain(dist),
+    foleyNow: () => foleyPlay(),
     _bank: bank, // the check injects buffers here
     _power: power,
     surfaceAt,
