@@ -829,6 +829,8 @@ export function installCityscape(w) {
     lampLights.push(L);
   }
   let lampDynActive = 0;
+  let warmLamps = false; // world.warmLights compiles the lit materials with the lamp lights on, behind the loading card
+  if (world.warmHooks) world.warmHooks.push((g) => { warmLamps = !!(g && g.has("lamps")); });
   function updateLampLights(lampsK) {
     const cam = scene.activeCamera;
     const cx = cam && cam.globalPosition ? cam.globalPosition.x : (cam && cam.position ? cam.position.x : 0);
@@ -955,7 +957,7 @@ export function installCityscape(w) {
     const dayK = Math.max(0, 1 - windows);
     skyMat.fogEnabled = windows < 0.3;
     skyMat.diffuseColor.set(fogV.r * 0.6 + 0.2 * dayK, fogV.g * 0.65 + 0.22 * dayK, fogV.b * 0.7 + 0.26 * dayK);
-    updateLampLights(lamps);
+    updateLampLights(warmLamps ? 1 : lamps);
   });
 
   /* the lamps and nearby windows stutter (the opening's first bolt: `day.cityscape.flicker(secs)`) */
