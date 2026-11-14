@@ -26,7 +26,7 @@
 // camera behind walls, frame hitches. Give it the player for the player checks (falling through the floor, stuck,
 // collision shoves, jitter):
 //   installPlaytest({ ..., feel: { player: () => hero.mesh, input: () => (keys.any ? 1 : 0) } });
-// feel: false turns it off. In start(), t.spot is { x, y, z, yaw? } when the run replays a flagged place
+// feel: false turns it off. feel.trace(dt, sample) is the animation hook point (state, grounded, bodySpeed, footSpeed, weights per frame; see hawkes-feel.js `anim`). In start(), t.spot is { x, y, z, yaw? } when the run replays a flagged place
 // (options.spot): put the player there (a named setup shortcut) and play on from it; t.cut() before a teleport or
 // cutscene the sensor shouldn't count.
 //
@@ -122,6 +122,7 @@ export function installPlaytest(opts) {
       const sincePage = round(performance.now() / 1000);
       run.metrics[`milestone.${key}`] = sincePage; // a reading, not a rubric limit: only the first-five scenario is judged
       tracker.event('milestone', key);
+      if (key === 'gameplay') feelAtGameplay(run);
       if (note) tracker.log(`milestone ${key} at ${sincePage}s: ${note}`);
     },
     /** One tap or click the bot needed to get from the first screen to play (counted up to the 'gameplay' milestone). */
@@ -217,6 +218,16 @@ export function installPlaytest(opts) {
         attach(again);
       }, 5000);
     }
+  }
+  // The feel sensor starts from the shared gameplay event in every scenario: a sensor with no frames by then (its scene was a
+  // menu or not built yet) is attached again to the scene found now; one that has frames just marks play's start.
+  function feelAtGameplay(r) {
+    if (feelOpts === false || r !== run || r.done) return;
+    try {
+      const has = sensor && (sensor.metrics?.()['feel.samples'] ?? 0) > 0;
+      if (!has) startFeel(r); else sensor.gameplay?.();
+      tracker.event('feel-gameplay', JSON.stringify({ adapter: sensor?.info?.().adapter ?? 'none', reattached: !has }));
+    } catch {}
   }
   function feelMetrics() {
     try {

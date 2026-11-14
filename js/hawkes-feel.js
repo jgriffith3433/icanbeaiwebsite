@@ -352,9 +352,12 @@ export function createFeelCore({ emit = () => {}, seed = 0, scene = () => undefi
     metrics() {
       const out = { 'feel.samples': m.samples };
       if (m.tracksActive) out['feel.activeSeconds'] = r2(m.activeSeconds);
-      if (dts.length) out['feel.worstHitchMs'] = Math.round(m.worstFrameMs);
-      if (m.maxCamDegPerSec > 0) out['feel.maxCameraDegPerSec'] = Math.round(m.maxCamDegPerSec);
-      if (prev?.cam) out['feel.cameraClipSeconds'] = r2(m.camClipSeconds);
+      // The three headline numbers are in every report (0 = nothing seen; `feel.cameraTracked` says whether a camera was read),
+      // so a run that never moved the camera or never got a camera still shows the sensor ran.
+      out['feel.worstHitchMs'] = dts.length ? Math.round(m.worstFrameMs) : 0;
+      out['feel.maxCameraDegPerSec'] = Math.round(m.maxCamDegPerSec || 0);
+      out['feel.cameraClipSeconds'] = r2(m.camClipSeconds || 0);
+      out['feel.cameraTracked'] = prev?.cam ? 1 : 0;
       if (m.insideSeconds > 0) out['feel.insideSeconds'] = r2(m.insideSeconds);
       if (a.tracks) {
         out['anim.frames'] = a.frames;
@@ -491,6 +494,9 @@ export function startBabylonFeel(opts = {}) {
   return {
     core,
     cut: (seconds) => core.cut(seconds),
+    // The shared gameplay event (t.milestone('gameplay')): the load and title frames before it are not play, so the hitch worst
+    // and camera numbers start fresh here.
+    gameplay: () => core.cut(1),
     flags: () => core.flags(),
     metrics: () => core.metrics(),
     /** What the sensor is attached to now (the "feel-sensor" event): the adapter, whether it finds a player and a camera. */
