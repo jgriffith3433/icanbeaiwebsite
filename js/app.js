@@ -43,6 +43,7 @@ import "./dialogue.js"; // the story's and neighbors' lines, spoken in each spea
 import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
 import "./garden.js"; // Birdie's wilting pots and dry lawn tufts that the first Rain revives (after slice.js)
 import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)
+import "./tally.js"; // what the storm changed: a card after a deed, the same tally on the title (after memory)
 import "./asks.js"; // asks in the world: a plumbob over the neighbor who asks, the verb icon over the place it is for (after street, neighbors, memory)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
 import "./titlesound.js"; // night-city ambience under the title, a click on its buttons, a whoosh on the first Gust (before title.js)

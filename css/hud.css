@@ -199,6 +199,7 @@ html.in-control:not(.preview-public):not(.touch-ui):not(.x) .tutorial:not(.x) { 
 }
 .ep-say { position: fixed; left: 50%; bottom: max(96px, calc(env(safe-area-inset-bottom) + 88px)); }
 .ep-toast { position: fixed; left: 50%; top: max(64px, calc(env(safe-area-inset-top) + 56px)); }
+.storm-toast { position: fixed; left: 50%; top: max(150px, calc(env(safe-area-inset-top) + 140px)); }
 .nb-toast { position: fixed; left: 50%; top: max(110px, calc(env(safe-area-inset-top) + 100px)); }
 .mo-line { position: fixed; left: 50%; bottom: max(230px, calc(env(safe-area-inset-bottom) + 210px)); transform: translateX(-50%); }
 html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-bottom) + 336px)); } /* above the ability bar */
@@ -209,7 +210,7 @@ html.touch-ui.in-control .mo-line { bottom: max(348px, calc(env(safe-area-inset-
 html.cine-up .hud, html.cine-up .side, html.cine-up .hud-left, html.cine-up .abilitybar, html.cine-up .powerpad, html.cine-up .touchpad,
 html.cine-up .control-btn, html.cine-up .control-hint, html.cine-up .public-toggle, html.cine-up .version-tag, html.cine-up .update-pill,
 html.cine-up .quality-btn, html.cine-up .voices-btn, html.cine-up .tutorial, html.cine-up .nb-btn, html.cine-up .ep-btn, html.cine-up .ep-hud,
-html.cine-up .ep-say, html.cine-up .ep-toast, html.cine-up .nb-toast, html.cine-up .nb-layer, html.cine-up .power-reticle, html.cine-up .pressure,
+html.cine-up .ep-say, html.cine-up .ep-toast, html.cine-up .nb-toast, html.cine-up .storm-toast, html.title-up .storm-toast, html.cold-open .storm-toast, html.cine-up .nb-layer, html.cine-up .power-reticle, html.cine-up .pressure,
 html.cine-up #weather-btn, html.cine-up .mo-line, html.cine-up .voice-caption, html.cine-up .ep-offer, html.cine-up .co-bolt { visibility: hidden; }
 
 /* voice director caption: above the ability bar, never over it */

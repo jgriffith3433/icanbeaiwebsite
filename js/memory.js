@@ -107,7 +107,22 @@ export function liveFlag(store, todayKey, test) {
   Object.keys(store.days).forEach((k) => { if (test(store.days[k])) best = Math.max(best, strength(k, todayKey)); });
   return best;
 }
-export const parkRain = (d) => !!((d.zones.park && d.zones.park.rain) || d.deeds.birdieRain);
+/* Rain anywhere greens the lawn and fills the pond (the first Rain is the first change the player sees); the park's own rain and Birdie's too. */
+export const parkRain = (d) => !!(d.deeds.birdieRain || Object.keys(d.zones || {}).some((z) => z !== "answered" && z !== "botched" && d.zones[z] && d.zones[z].rain));
+/** What the weather changed in the world, as counted rows for the tally (pure): `d.marks` are the live marks. */
+export function tallyOf(d, lawnK, tomatoes) {
+  const marks = (d && d.marks) || [];
+  const n = (kind) => marks.filter((m) => m.kind === kind).length;
+  const rows = [];
+  if (lawnK > 0) rows.push({ id: "lawn", n: 1, text: "Park lawn green" }, { id: "pond", n: 1, text: "Pond full" });
+  const p = n("puddle"), sc = n("scorch"), bn = n("bin") + n("chair") + n("cone") + n("planter") + n("awning") + n("debris"), sg = n("sign");
+  if (p) rows.push({ id: "puddle", n: p, text: p === 1 ? "1 puddle" : `${p} puddles` });
+  if (sc) rows.push({ id: "scorch", n: sc, text: sc === 1 ? "1 scorch" : `${sc} scorches` });
+  if (bn) rows.push({ id: "wreck", n: bn, text: bn === 1 ? "1 thing knocked over" : `${bn} things knocked over` });
+  if (sg) rows.push({ id: "sign", n: sg, text: sg === 1 ? "1 sign leaning" : `${sg} signs leaning` });
+  if (tomatoes > 0) rows.push({ id: "tomato", n: 1, text: "Tomato wall full" });
+  return rows;
+}
 export const endingHalfLawn = (d) => !!(d.deeds && d.deeds.endingHalf);
 export const birdieRain = (d) => !!d.deeds.birdieRain;
 /** Add up the deeds and zones of the last `days` days (today counts as 1). */
@@ -274,7 +289,7 @@ export function installMemory(day, world) {
     prune(store, t);
     save();
     emit("deed", { kind, zone, power, mark: mark ? mark.kind : null });
-    if (mark || kind === "birdieRain" || (kind === "power" && power === "rain" && zone === "park")) apply(kind);
+    if (mark || kind === "birdieRain" || (kind === "power" && power === "rain")) apply(kind);
   }
   const sidewalkZ = (z) => (z < AVENUE_Z ? AVENUE_Z - 2.8 : AVENUE_Z + 2.8);
 
@@ -379,6 +394,12 @@ export function installMemory(day, world) {
     today: () => {
       const d = store.days[today()] || { deeds: {}, zones: {}, marks: [] };
       return { date: today(), deeds: Object.assign({}, d.deeds), zones: JSON.parse(JSON.stringify(d.zones)), marks: d.marks.length };
+    },
+    /** What the storm changed (live marks of the last days, the lawn and pond, the tomatoes): rows { id, n, text } for the title and the toast. */
+    tally: () => {
+      const t = today();
+      const rows = tallyOf({ marks: liveMarks(store, t, CAP) }, liveFlag(store, t, parkRain), liveFlag(store, t, birdieRain));
+      return { rows, total: rows.length, text: rows.map((r) => r.text).join(" · "), date: t };
     },
     since: (days) => sinceDays(store, today(), Math.max(1, days || 1)),
     marks: () => liveMarks(store, today(), CAP),
