@@ -2745,6 +2745,158 @@
    }
   },
   {
+   "id": "foley-door-1",
+   "note": "Foley (city) for js/sfx.js: door, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A wooden apartment door closing with a latch click on a quiet city street, a little distant, no music",
+      "duration": 1.4,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/door-1.mp3"
+   }
+  },
+  {
+   "id": "foley-door-2",
+   "note": "Foley (city) for js/sfx.js: door, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A wooden apartment door closing with a latch click on a quiet city street, a little distant, no music (variation 2, a different take)",
+      "duration": 1.4,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/door-2.mp3"
+   }
+  },
+  {
+   "id": "foley-dog-1",
+   "note": "Foley (city) for js/sfx.js: dog, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A dog barking twice somewhere down a city street, distant, outdoors, no music",
+      "duration": 1.6,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/dog-1.mp3"
+   }
+  },
+  {
+   "id": "foley-dog-2",
+   "note": "Foley (city) for js/sfx.js: dog, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "A dog barking twice somewhere down a city street, distant, outdoors, no music (variation 2, a different take)",
+      "duration": 1.6,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/dog-2.mp3"
+   }
+  },
+  {
+   "id": "foley-chatter-1",
+   "note": "Foley (crowd) for js/sfx.js: chatter, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Two or three people chatting casually on a street, indistinct words, outdoors, no music",
+      "duration": 2.5,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/chatter-1.mp3"
+   }
+  },
+  {
+   "id": "foley-chatter-2",
+   "note": "Foley (crowd) for js/sfx.js: chatter, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Two or three people chatting casually on a street, indistinct words, outdoors, no music (variation 2, a different take)",
+      "duration": 2.5,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/chatter-2.mp3"
+   }
+  },
+  {
+   "id": "foley-awning-rain-1",
+   "note": "Foley (city) for js/sfx.js: awning-rain, variant 1 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Steady rain pattering on a fabric shop awning with a few drips, outdoors, close, no music",
+      "duration": 3,
+      "sampleRate": 22050,
+      "seed": 1000
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/awning-rain-1.mp3"
+   }
+  },
+  {
+   "id": "foley-awning-rain-2",
+   "note": "Foley (city) for js/sfx.js: awning-rain, variant 2 of 2. Mono, under 60 KB.",
+   "steps": [
+    {
+     "tool": "audio.sfx",
+     "params": {
+      "text": "Steady rain pattering on a fabric shop awning with a few drips, outdoors, close, no music (variation 2, a different take)",
+      "duration": 3,
+      "sampleRate": 22050,
+      "seed": 1007
+     },
+     "save": "audio"
+    }
+   ],
+   "files": {
+    "audio": "audio/foley/awning-rain-2.mp3"
+   }
+  },
+  {
    "id": "title-logo",
    "note": "The title's logo lockup \"I Can Be AI\" (js/title.js, day.config.js title.logo): 4 takes of image.generate, the pick goes through image.remove-background, then baked to images/logo-icanbe-ai.webp and title.logo set. Until then the title draws the lockup in type with the same lightning glint. Gen job j_b67c8eedbcff (project org_eb0d5c82e8da8c2d.icanbe).",
    "steps": [

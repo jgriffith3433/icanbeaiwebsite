@@ -12518,6 +12518,15 @@ async function coldStart(options, t) {
     if (D.now().mode === "pause") t.problem("bug", "The day is paused while the episode toast shows");
     if (getComputedStyle(o).position !== "fixed" || tr.width > innerWidth * 0.8) t.problem("bug", "The episode offer is not a small corner toast");
   } else t.event("cold-start-offer-toast", "no episode matches this hour: no toast");
+  {
+    // the foley scheduler (js/sfx.js): one-shots 6-15 s apart from the previous one's end, never a file twice inside 60 s
+    const F = D.sfx && D.sfx.info ? D.sfx.info().foley : null;
+    if (F) {
+      t.event("foley-scheduler", `${F.on ? "on" : "off"}; ${F.count} street one-shots (${F.plays.map((p) => p.id).join(", ") || "none yet"}); gaps from end ${F.gaps.join(", ") || "none"} s; ${F.live} alive`);
+      t.metric("foleyOneShots", F.count);
+      if (F.gaps.some((g) => g < F.minGap - 0.5)) t.problem("bug", `The foley scheduler fired ${F.minGap - 0.5} s too soon after a one-shot: ${F.gaps.join(", ")}`);
+    }
+  }
   t.progress(1);
 }
 
