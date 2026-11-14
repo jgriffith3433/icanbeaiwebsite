@@ -24,6 +24,7 @@ class FakeCtx {
 
 // ---- the page and the day ----
 const listeners = {};
+const docListeners = {};
 let pressed = 'true';
 const soundBtn = { getAttribute: () => pressed };
 const observers = [];
@@ -43,7 +44,7 @@ Object.assign(globalThis, {
   day,
   BABYLON: { Axis: { X: {} } },
   AudioContext: FakeCtx,
-  document: { getElementById: (id) => (id === 'sound' ? soundBtn : null) },
+  document: { getElementById: (id) => (id === 'sound' ? soundBtn : null), addEventListener: (type, fn) => (docListeners[type] = docListeners[type] || []).push(fn) },
   addEventListener: (type, fn) => (listeners[type] = listeners[type] || []).push(fn),
 });
 await import(new URL('../js/sfx.js', import.meta.url).href);
@@ -57,6 +58,25 @@ pressed = 'false';
 send('day:episode', { action: 'goal' });
 ok(started === 0, `sound plays with the Sound button off (${started} sources)`);
 pressed = 'true';
+
+// One touch, one press: a touch on the world (not a control) fires pointerdown then touchstart, and answers with exactly one
+// ui-press. A mouse press on empty world stays silent; a control press is one too.
+{
+  const fire = (type, ev) => (docListeners[type] || []).forEach((fn) => fn(ev));
+  const world = { closest: () => null };
+  const control = { closest: () => ({}) };
+  const presses = () => heard()['ui-press'] || 0;
+  const before = presses();
+  fire('pointerdown', { pointerType: 'touch', target: world });
+  fire('touchstart', { target: world });
+  ok(presses() - before === 1, `a world touch (pointerdown + touchstart) played ${presses() - before} presses, wanted exactly 1`);
+  const b2 = presses();
+  fire('pointerdown', { pointerType: 'touch', target: control });
+  fire('touchstart', { target: control });
+  ok(presses() - b2 === 1, `a control touch played ${presses() - b2} presses, wanted exactly 1`);
+  const noted = Object.keys(heard()).filter((k) => k === 'ui-tap');
+  ok(noted.length === 0, 'a second world-touch handler (ui-tap) is back: one path answers a touch');
+}
 
 // Every beat the player causes is heard.
 const beats = [
