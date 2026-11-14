@@ -33,6 +33,7 @@ import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to powe
 import "./pilot.js"; // Pilot: the AI that runs his day — schedule nudges, take/let-go, wrist ring (after voice.js)
 import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
+import "./phonemenu.js"; // phone: Neighbors and Episodes behind one Menu button (after both)
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
 import "./street.js"; // the street teaches: Rain, Sun, Fog and Wind each arrive on a neighbor's voiced ask (starts on the cold open)
 import "./coldopen.js"; // a new player's first Play: the roof at dusk, one prompt, the first bolt (before title.js calls it)

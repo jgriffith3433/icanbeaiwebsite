@@ -162,37 +162,37 @@ export function startAbilityBar(abilities, onPress, opt) {
 .abilitybar .charge.refused .refuse{display:block}
 .abilitybar .charge.refused .et{display:none}
 /* phone: five verbs in an arc on the right edge above the thumb; Charge is a ring around the arc */
-html.touch-ui .abilitybar{align-items:center;justify-content:center;gap:0;width:220px;height:220px;font-size:.58rem;pointer-events:none}
-html.touch-ui .abilitybar .row{position:relative;width:220px;height:220px;gap:0;pointer-events:none}
+html.touch-ui .abilitybar{align-items:center;justify-content:center;gap:0;width:240px;height:240px;font-size:.8rem;pointer-events:none}
+html.touch-ui .abilitybar .row{position:relative;width:240px;height:240px;gap:0;pointer-events:none}
 html.touch-ui .abilitybar .charge{position:absolute;inset:0;width:auto;min-width:0;pointer-events:none;z-index:0}
-html.touch-ui .abilitybar .charge .et{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.58rem;white-space:nowrap}
+html.touch-ui .abilitybar .charge .et{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:.8rem;font-weight:700;white-space:nowrap}
 html.touch-ui .abilitybar .charge .bar{display:none}
-html.touch-ui .abilitybar .charge .ring{position:absolute;left:50%;top:50%;width:108px;height:108px;margin:-54px 0 0 -54px;border-radius:50%;border:3px solid rgba(240,168,74,.28);box-sizing:border-box;background:conic-gradient(#f0a84a var(--charge-deg,0deg),rgba(20,12,4,.45) 0)}
+html.touch-ui .abilitybar .charge .ring{position:absolute;left:50%;top:50%;width:116px;height:116px;margin:-58px 0 0 -58px;border-radius:50%;border:3px solid rgba(240,168,74,.28);box-sizing:border-box;background:conic-gradient(#f0a84a var(--charge-deg,0deg),rgba(20,12,4,.45) 0)}
 html.touch-ui .abilitybar .charge .ring::after{content:"";position:absolute;inset:5px;border-radius:50%;background:rgba(8,12,20,.55)}
-html.touch-ui .abilitybar .ab{position:absolute;width:48px;height:48px;min-width:44px;min-height:44px;border-radius:50%;gap:0;justify-content:center;padding:0;z-index:1;left:50%;top:50%;margin:-24px 0 0 -24px;pointer-events:auto}
+html.touch-ui .abilitybar .ab{position:absolute;width:56px;height:56px;min-width:44px;min-height:44px;border-radius:50%;gap:0;justify-content:center;padding:0;z-index:1;left:50%;top:50%;margin:-28px 0 0 -28px;pointer-events:auto}
 /* the verbs sit on an 86 px radius round the Charge ring (54 px): 8 px clear of the ring, 10 px between icons, and the
    whole arc inside the 220 px box, so the right-most icon is 9 px from the screen edge, never cut off */
-html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(0,-86px)}
-html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(55px,-66px)}
-html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(85px,-15px)}
-html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(74px,43px)}
-html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(29px,81px)}
+html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(0,-100px)}
+html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(64px,-77px)}
+html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(99px,-17px)}
+html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(86px,50px)}
+html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(34px,94px)}
 html.touch-ui .abilitybar .ab .ico{width:78%;height:78%}
-html.touch-ui .abilitybar .ab .c{top:2px;right:4px;font-size:.58rem}
-html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:.85rem;background:transparent;border-radius:50%}
+html.touch-ui .abilitybar .ab .c{top:0;right:0;min-width:20px;height:20px;line-height:20px;text-align:center;border-radius:10px;background:rgba(8,12,20,.9);border:1px solid rgba(240,168,74,.8);color:#ffe2b0;font-size:.8rem;font-weight:700;padding:0 3px;box-sizing:border-box;z-index:3}
+html.touch-ui .abilitybar .ab .cd{top:0;bottom:auto;height:100%;padding:0;font-size:1.1rem;background:transparent;border-radius:50%}
 html.touch-ui .abilitybar .ab .wipe{border-radius:50%}
 @media (orientation:landscape) and (max-height:520px){
   /* centre near the box's foot: the arc fans across the top */
-  html.touch-ui .abilitybar{width:220px;height:126px}
-  html.touch-ui .abilitybar .row{width:220px;height:126px}
-  html.touch-ui .abilitybar .charge .ring{top:100px}
-  html.touch-ui .abilitybar .charge .et{top:100px}
-  html.touch-ui .abilitybar .ab{top:100px}
-  html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(-85px,-15px)}
-  html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(-55px,-66px)}
-  html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(0,-86px)}
-  html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(55px,-66px)}
-  html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(85px,-15px)}
+  html.touch-ui .abilitybar{width:260px;height:160px}
+  html.touch-ui .abilitybar .row{width:260px;height:160px}
+  html.touch-ui .abilitybar .charge .ring{top:130px}
+  html.touch-ui .abilitybar .charge .et{top:130px}
+  html.touch-ui .abilitybar .ab{top:130px}
+  html.touch-ui .abilitybar .ab[data-verb="0"]{transform:translate(-99px,-17px)}
+  html.touch-ui .abilitybar .ab[data-verb="1"]{transform:translate(-64px,-77px)}
+  html.touch-ui .abilitybar .ab[data-verb="2"]{transform:translate(0,-100px)}
+  html.touch-ui .abilitybar .ab[data-verb="3"]{transform:translate(64px,-77px)}
+  html.touch-ui .abilitybar .ab[data-verb="4"]{transform:translate(99px,-17px)}
 }
 html.in-control:not(.preview-public):not(.touch-ui) .side .log{max-height:22vh}
 html:not(.touch-ui) body:has(.mo-line:not([hidden])) .control-hint,html:not(.touch-ui):not(.in-control) body:has(.tutorial:not([hidden])) .control-hint{visibility:hidden}
