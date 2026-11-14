@@ -10,6 +10,11 @@ execFileSync("ffmpeg", ["-loglevel", "error", "-y", "-i", "textures/city/asphalt
   "scale=256:256:flags=lanczos,format=rgb24,lutrgb=r='clip((val-26)*3.5+68,0,255)':g='clip((val-28)*3.5+71,0,255)':b='clip((val-41)*3.5+80,0,255)'",
   "-c:v", "libwebp", "-quality", "80", "textures/city/low/asphalt-albedo.webp"]);
 
+/* tar roof: the Gen 512 tar albedo (mean 49,56,73) stretched the same way (about 79,88,99), the roof he stands on at dusk */
+execFileSync("ffmpeg", ["-loglevel", "error", "-y", "-i", "textures/city/tar-albedo-512.webp", "-vf",
+  "scale=256:256:flags=lanczos,format=rgb24,lutrgb=r='clip((val-49)*3.5+88,0,255)':g='clip((val-56)*3.5+92,0,255)':b='clip((val-73)*3.5+104,0,255)'",
+  "-c:v", "libwebp", "-quality", "80", "textures/city/low/tar-albedo.webp"]);
+
 const N = 128;
 const hash = (x, y) => { let n = Math.imul(x ^ 0x27d4eb2d, 0x85ebca6b) ^ Math.imul(y ^ 0x165667b1, 0xc2b2ae35); n = Math.imul(n ^ (n >>> 15), n | 1); return ((n ^ (n >>> 13)) >>> 0) / 4294967296; };
 const mod = (a, m) => ((a % m) + m) % m;

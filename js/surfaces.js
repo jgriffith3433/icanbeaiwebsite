@@ -16,8 +16,8 @@ const TARGET = { brick: "brick", glass: "glass", asphalt: "asphalt", tar: "roof"
 const NEAR_NORMALS = new Set(["asphalt", "brick", "pavers"]);
 
 /* Phone-only ground albedos (scripts/make-low-textures.mjs, no GPU): the Gen asphalt albedo is near-black navy and no Gen
-   set covers the lawn, so on low quality the street read as a flat dark plane. material key -> [file, metres per repeat]. */
-const LOW_ALBEDO = { asphalt: "textures/city/low/asphalt-albedo.webp", ground: "textures/city/low/grass-albedo.webp" };
+   set covers the lawn, and the tar roof he stands on at dusk is near-black too, so on low quality the world read as a flat dark plane. material key -> [file, metres per repeat]. */
+const LOW_ALBEDO = { asphalt: "textures/city/low/asphalt-albedo.webp", ground: "textures/city/low/grass-albedo.webp", roof: "textures/city/low/tar-albedo.webp" };
 
 export function installSurfaces(look, scene) {
   const state = { sets: [], loaded: [], failed: [], quality: look.quality(), bytes: 0 };
