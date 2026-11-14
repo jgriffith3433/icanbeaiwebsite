@@ -627,6 +627,7 @@
       }
     });
     let warmInfo = null; // what ended the last warmLights(): { how: done|budget, ms, sets }
+    const warmHooks = []; // fn(groups|null) called whenever warmLights changes the forced light groups
     let warmGroups = null; // set by warmLights(): the light groups forced on while their shaders compile
     const bedsideFill = new B.PointLight("bedside-fill", V3(-5.15, 1.45, -2.35), scene);
     bedsideFill.diffuse = B.Color3.FromHexString("#ffd296");
@@ -2663,7 +2664,7 @@
          freeze the page on the first switch. The frame loop applies each set; resolves when done (or after maxMs). */
       async warmLights(maxMs) {
         const have = new Set(roomLights.map((rl) => rl.building));
-        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"]].filter((g) => g.every((b) => b === "car" || have.has(b) || (b === "office" && officeLights.length)));
+        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"], ["lamps"], ["home", "lamps"], ["office", "lamps"], ["car", "lamps"]].filter((g) => g.every((b) => b === "car" || b === "lamps" || have.has(b) || (b === "office" && officeLights.length)));
         const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
         const t0 = Date.now(), budget = maxMs || 8000;
         /* maxMs is a real deadline: a shader compile or whenReadyAsync that never settles (a slow or software GL, a lost
@@ -2721,6 +2722,7 @@
           for (const g of sets) {
             if (Date.now() - t0 > budget) break;
             warmGroups = new Set(g);
+            warmHooks.forEach((h) => { try { h(warmGroups); } catch (e) { /* */ } });
             await nextFrame();
             await nextFrame();
             /* Wait for the meshes' shaders in this light set, not scene.whenReadyAsync(): that also waits on pending data,
@@ -2732,12 +2734,16 @@
           }
         } catch (e) { /* a warm-up is only a head start */ }
         warmGroups = null;
+        warmHooks.forEach((h) => { try { h(null); } catch (e) { /* */ } });
         info.ms = Date.now() - t0;
         if (!info.how) info.how = "done";
         try { console.info(`[world] shader warm-up ended: ${info.how} after ${info.ms} ms (${info.sets.map((x) => `${x.set} ${x.ms}${x.ok ? "" : "!"}`).join(", ")})`); } catch (e) { /* no console */ }
         return info;
       },
       warmInfo: () => warmInfo,
+      /* js/cityscape.js: the street lamps' point lights are one more light group (dusk switches them on together, which
+         recompiles every lit material: a ~second freeze mid-play unless warmLights compiled that set behind the card) */
+      warmHooks,
       enablePhysics,
       /* js/cityscape.js reads the colliders so far (to find free lots) and adds its own before physics is on */
       solids,
