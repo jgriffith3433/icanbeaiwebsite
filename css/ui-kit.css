@@ -123,7 +123,7 @@ html.ui-kit #loading h2 {
 /* Ability bar: painted icons, press scale, ready glow, radial cooldown wipe */
 .abilitybar .ab {
   border-radius: 14px;
-  transition: transform 80ms ease, box-shadow 120ms ease, border-color 120ms ease, filter 120ms ease;
+  transition: box-shadow 120ms ease, border-color 120ms ease, filter 120ms ease;
 }
 .abilitybar .ab .face {
   position: absolute;
@@ -164,7 +164,7 @@ html.ui-kit #loading h2 {
 }
 .abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor) {
   border-color: #9fd4ff;
-  box-shadow: 0 0 0 1px rgba(159, 212, 255, 0.35), 0 0 18px rgba(126, 200, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(159, 212, 255, 0.35), 0 0 8px rgba(126, 200, 255, 0.75);
 }
 .abilitybar .ab.ready:not(.cooling):not(.locked):not(.poor) .ico {
   filter: drop-shadow(0 0 10px rgba(126, 200, 255, 0.85)) brightness(1.12);
@@ -184,8 +184,8 @@ html.ui-kit #loading h2 {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 html.touch-ui .abilitybar .ab {
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   min-width: 44px;
   min-height: 44px;
 }
