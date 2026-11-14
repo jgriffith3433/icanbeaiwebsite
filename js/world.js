@@ -1551,27 +1551,21 @@
     }
     const boxProps = () => [me.phone, me.phone && me.phone.screen, me.cup, me.bag].filter(Boolean);
     let shadowProxy = null;
-    /* Small Weather is the only model he ever has. The box figure is never drawn: it is only the frame that places,
-       tilts and seats him. While his GLB is on its way nothing shows; if it never loads, nothing shows either
-       (setSkin(null) keeps him hidden). Only a config with no model (control.model null) draws the boxes. */
-    const figureDrawn = !(cfg.control && cfg.control.model);
+    /* Small Weather's GLB is his look. The box figure is the frame that places, tilts and seats him, and it is the stand-in:
+       drawn until the model is on him and again whenever setSkin(null) is called, so he is never hidden. */
+    const figureDrawn = true; // the stand-in is drawn until his model is on him, and again if it is ever lost (J, 2026-11-14)
     const figureMeshes = () => {
       const keep = boxProps();
       return me.root.getChildMeshes(false).filter((m) => m !== shadowProxy && !keep.includes(m) && !(skin && skin.meshes.includes(m)));
     };
-    if (!figureDrawn) {
-      figureMeshes().forEach((m) => {
-        m.setEnabled(false);
-        shadows.removeShadowCaster(m, false);
-      });
-    }
     function setSkin(s) {
       if (skin) skin.root.dispose();
       skin = null;
       figureMeshes().forEach((m) => {
         if (!s || !s.meshes.includes(m)) {
           m.setEnabled(!s && figureDrawn);
-          if (s || !figureDrawn) shadows.removeShadowCaster(m, false);
+          if (s) shadows.removeShadowCaster(m, false);
+          else shadows.addShadowCaster(m, false);
         }
       });
       skin = s;
@@ -1616,6 +1610,27 @@
           if (!L.includedOnlyMeshes.includes(m)) L.includedOnlyMeshes.push(m);
         });
       });
+    }
+
+    /* What the player sees of him right now: the model, the stand-in figure, or (a bug) nothing. */
+    function heroDrawn() {
+      const cam = scene.activeCamera;
+      const fig = figureMeshes().filter((m) => m.isEnabled() && m.getTotalVertices && m.getTotalVertices() > 0);
+      const mod = skin ? skin.meshes.filter((m) => m !== shadowProxy && m.isEnabled() && m.getTotalVertices && m.getTotalVertices() > 0) : [];
+      const list = mod.length ? mod : fig;
+      let inFrustum = false;
+      if (cam && list.length) {
+        const planes = B.Frustum.GetPlanes(cam.getTransformationMatrix());
+        inFrustum = list.some((m) => { m.computeWorldMatrix(true); return m.getBoundingInfo().isInFrustum(planes); });
+      }
+      const rp = me.spin.getAbsolutePosition();
+      let screen = null;
+      const eng = scene.getEngine();
+      if (cam && eng) {
+        const v = B.Vector3.Project(new B.Vector3(rp.x, rp.y + 0.9, rp.z), B.Matrix.Identity(), scene.getTransformMatrix(), cam.viewport.toGlobal(eng.getRenderWidth(), eng.getRenderHeight()));
+        screen = { x: v.x / eng.getRenderWidth(), y: v.y / eng.getRenderHeight(), z: v.z };
+      }
+      return { kind: mod.length ? "model" : fig.length ? "figure" : "none", meshes: list.length, inFrustum, screen };
     }
 
     /* ---------------- sky ---------------- */
@@ -2818,6 +2833,7 @@
       avatar, // the stand-in figure the player moves
       /* his rigged model (js/small-weather.js) over the figure; null takes it off */
       setSkin,
+      heroDrawn,
       skin: () => skin,
       skinHips: FOOT, // his hips' height standing: the model is scaled to it
       rooms,
