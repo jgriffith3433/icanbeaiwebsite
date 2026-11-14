@@ -34,7 +34,8 @@ import { pickRate } from "./variety.js";
   let lastHeardMs = clockMs();
   /* note() only counts. lastHeardMs is stamped where a source really starts (started()): a note() for an event whose sound never
      started (a muted bus, a clip not decoded yet, a one-shot gated off) must not hold the ambient fill back. */
-  const started = () => { lastHeardMs = clockMs(); };
+  let startCount = 0; // every source any path starts (started() and the press click), so a press can tell if anything answered it
+  const started = () => { lastHeardMs = clockMs(); startCount++; };
   const note = (name) => { return (heard[name] = (heard[name] || 0) + 1); };
 
   /* ---------------- the audio graph ---------------- */
@@ -1548,6 +1549,7 @@ import { pickRate } from "./variety.js";
     // A bus that can't be reached must not swallow the click: the press then plays straight to the output.
     try { g.connect(out(a, 0, "ui")); } catch (err) { g.connect(a.c.destination); }
     src.start(a.c.currentTime);
+    startCount++;
   }
   /* Everything the UI probe counts as a control (hawkes-ui.js CONTROL) plus the game's own: the ability slots and the cold open's
      big Rain/Bolt button are divs/buttons the old list could miss. One handler call per event (capture on document), so there is
@@ -1567,11 +1569,19 @@ import { pickRate } from "./variety.js";
     lastPressEv = e;
     lastPressAt = typeof performance !== "undefined" ? performance.now() : 0;
     let played = false;
+    const before = startCount;
     const heardBefore = lastHeardMs;
     try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
     // A clip that reported "played" but never started a source must not leave the press silent.
     if (!played || (lastHeardMs === heardBefore && ctx())) { synthTag("ui"); try { uiClick(); } catch (err) { console.warn("[sfx] press click failed", err); } }
     note("ui-press");
+    /* The net: once every handler of this press has run (the ability slot's own, a locked verb's refusal, the cast), a press that
+       nothing answered gets the click. A locked verb's tap (the street's dashed teaser) ran the refusal and no sound followed, and the
+       press clip alone can fail without a trace (a suspended context, a clip not decoded): the press never stays silent. */
+    setTimeout(() => {
+      if (startCount > before || !soundOn()) return;
+      try { const a = ctx(); if (a && a.c.state === "suspended") a.c.resume(); synthTag("ui"); uiClick(); } catch (err) { /* nothing to play */ }
+    }, 0);
   };
   // Both: the window copy is first in the gesture's order; the document copy is the same handler (one press per event) and
   // keeps working where only the document is listened to.
