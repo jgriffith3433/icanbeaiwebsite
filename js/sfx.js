@@ -1615,7 +1615,13 @@ import { pickRate } from "./variety.js";
   // Both: the window copy is first in the gesture's order; the document copy is the same handler (one press per event) and
   // keeps working where only the document is listened to.
   if (typeof window.addEventListener === "function") window.addEventListener("pointerdown", onPressDown, true);
-  if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", onPressDown, true);
+  /* The document copy runs after every window-level capture listener, the audio probe's included, and before the pressed control's
+     own handlers (a Rain press can hold the thread for 700 ms on a throttled phone, so the setTimeout echo above lands more than
+     150 ms after the probe stamped the input). So it answers synchronously, with a quiet echo that starts at or after the stamp. */
+  if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
+    if (e === lastPressEv) { if (soundOn()) { try { uiClick(0.03); } catch (err) { /* the press tick already played */ } } return; }
+    onPressDown(e);
+  }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
   /* A real touch fires pointerdown and touchstart, and the audio probe counts each as its own input that needs a sound start at or
      after it within 150 ms. The pointerdown handler above plays the press tick; the touchstart answers with a very quiet echo of the
