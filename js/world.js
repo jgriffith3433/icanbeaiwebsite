@@ -2217,7 +2217,7 @@
       /* person */
       if (!skin && state.lastOutfit !== things.outfit) {
         state.lastOutfit = things.outfit;
-        const outfit = outfits[things.outfit] || outfits.work || { top: "#c46b52", bottom: "#3a3e46" };
+        const outfit = outfits[things.outfit] || outfits.work || { top: "#1f2a44", bottom: "#1d222c" };
         me.top.diffuseColor.copyFrom(C(outfit.top));
         me.bottom.diffuseColor.copyFrom(C(outfit.bottom));
         me.shoes.diffuseColor.copyFrom(C(outfit.feet || P.shoes || "#241f1c"));

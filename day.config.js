@@ -122,9 +122,9 @@ window.DAY_CONFIG = {
     hair: "#2a2422",
     shoes: "#241f1c",
     outfits: { // top, bottom, and optional feet (shoes/socks) colours
-      sleep: { top: "#8395b0", bottom: "#5b6884", feet: "#e2b394" },
-      work: { top: "#c46b52", bottom: "#3a3e46" },
-      home: { top: "#6f8f78", bottom: "#4a4f5a" },
+      sleep: { top: "#2a3550", bottom: "#1d222c", feet: "#e2b394" },
+      work: { top: "#1f2a44", bottom: "#1d222c" },
+      home: { top: "#2a3550", bottom: "#1d222c" },
       towel: { top: "#e2b394", bottom: "#f1ede4", feet: "#e2b394" },
     },
   },
