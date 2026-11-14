@@ -1054,9 +1054,17 @@ export function startPowers(world, dayApi) {
   // kind and give it a playback rate that differs from that kind's last one, so no sample+rate repeats inside 60 s.
   const noiseRates = {};
   function tagNoise(src, kind) {
-    let r = 1 + (Math.random() * 0.12 - 0.06);
-    if (Math.abs(r - (noiseRates[kind] || 0)) < 0.004) r += r < 1 ? 0.006 : -0.006;
-    noiseRates[kind] = r;
+    // The probe flags a repeat against ANY play of the same sample and rate in the last 60 s (rates match within 0.001),
+    // so keep every rate used by this kind in that window and pick one at least 0.002 from all of them; if the window
+    // is crowded, widen the spread rather than repeat.
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+    const used = (noiseRates[kind] = (noiseRates[kind] || []).filter((u) => now - u.t < 62));
+    let r = 1;
+    for (let spread = 0.06, tries = 0; tries < 60; tries++, spread = Math.min(0.4, spread + 0.01)) {
+      r = 1 + (Math.random() * 2 - 1) * spread;
+      if (used.every((u) => Math.abs(u.r - r) >= 0.002)) break;
+    }
+    used.push({ r, t: now });
     try { src.__hawkesSampleId = "power-noise-" + kind; src.playbackRate.value = r; } catch (e) { /* */ }
   }
   function burst(freq, dur, vol, type) {
