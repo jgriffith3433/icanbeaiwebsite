@@ -11600,7 +11600,35 @@ async function wakeHim(options, t) {
   const back = $("control");
   if (phone) await tapEl(back); else back.click();
   t.event("wake-let-go", "Let go pressed on the roof");
+  // The walk back is world.js's own damped camera: once a second, name the nearest mesh between the camera and his hips (a roof
+  // lip or slab hiding his legs reads as him sinking into it). A hit within 0.3 m of the hips is his own boots, not a slab.
+  const lens = [];
+  let lensTimer = 0;
+  try {
+    const W = D.world();
+    const BB = window.BABYLON;
+    lensTimer = setInterval(() => {
+      try {
+        const sx = D.control.state();
+        if (!sx || C.mode() === "schedule") return;
+        const hips = new BB.Vector3(sx.x, sx.y + 0.9, sx.z);
+        const from = W.camera.position.clone();
+        const dist = BB.Vector3.Distance(from, hips);
+        if (dist < 0.6) return;
+        const ray = new BB.Ray(from, hips.subtract(from).normalize(), dist);
+        const hit = W.scene.pickWithRay(ray, (m) => m.isPickable !== false && m.isEnabled() && m.isVisible !== false && m.visibility !== 0 && !(W.person && m.isDescendantOf(W.person)), true);
+        const between = hit && hit.hit && hit.distance < dist - 0.3 ? (hit.pickedMesh ? hit.pickedMesh.name : "?") : "";
+        lens.push({ name: between, dist: Math.round(dist * 10) / 10 });
+      } catch (e) { /* the probe never breaks the run */ }
+    }, 1000);
+  } catch (e) { /* no probe */ }
   await t.until(() => C.mode() === "schedule", 70000, "him back on his day").catch(() => {});
+  if (lensTimer) clearInterval(lensTimer);
+  const blocked = lens.filter((l) => l.name);
+  const names = [...new Set(blocked.map((l) => l.name))];
+  t.metric("wake.walkBackBlockedSamples", blocked.length);
+  t.event("wake-walkback-view", `${lens.length} samples on the walk back: ${blocked.length} with a mesh between the camera and his hips${names.length ? " (" + names.slice(0, 6).join(", ") + ")" : ""}`);
+  if (blocked.length > 2) t.problem("warning", `On the walk back the camera sat behind ${names.slice(0, 4).join(", ")} for ${blocked.length} of ${lens.length} samples: his body is hidden by it`);
   await sleep(1200);
   const fr1 = D.now().frame;
   const bedNow = !!fr1 && ["lie", "side", "recline"].includes(fr1.person.pose);
