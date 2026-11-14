@@ -15,6 +15,10 @@ const B = window.BABYLON;
 const TARGET = { brick: "brick", glass: "glass", asphalt: "asphalt", tar: "roof", pavers: "concrete", concrete: "rampLit" };
 const NEAR_NORMALS = new Set(["asphalt", "brick", "pavers"]);
 
+/* Phone-only ground albedos (scripts/make-low-textures.mjs, no GPU): the Gen asphalt albedo is near-black navy and no Gen
+   set covers the lawn, so on low quality the street read as a flat dark plane. material key -> [file, metres per repeat]. */
+const LOW_ALBEDO = { asphalt: "textures/city/low/asphalt-albedo.webp", ground: "textures/city/low/grass-albedo.webp" };
+
 export function installSurfaces(look, scene) {
   const state = { sets: [], loaded: [], failed: [], quality: look.quality(), bytes: 0 };
   const apply = (name, mat, files, low) => {
@@ -38,6 +42,19 @@ export function installSurfaces(look, scene) {
     }
     state.loaded.push(name);
   };
+  const lowDone = new Set();
+  const applyLow = () => {
+    if (look.quality() !== "low") return;
+    for (const key of Object.keys(LOW_ALBEDO)) {
+      const mat = look.mats[key];
+      if (!mat || lowDone.has(key)) continue;
+      lowDone.add(key);
+      const t = new B.Texture(LOW_ALBEDO[key], scene, false, true, B.Texture.TRILINEAR_SAMPLINGMODE);
+      t.wrapU = t.wrapV = B.Texture.WRAP_ADDRESSMODE;
+      mat.albedoTexture = t;
+      state.low = (state.low || []).concat(key);
+    }
+  };
   const run = async () => {
     let list;
     try {
@@ -47,6 +64,7 @@ export function installSurfaces(look, scene) {
     } catch (e) { return; }
     const low = look.quality() === "low";
     state.quality = low ? "low" : "high";
+    lowDone.clear(); // the Gen set below replaces the albedo; the lighter low one goes back on top after it
     for (const name of Object.keys(list)) {
       const mat = look.mats[TARGET[name]];
       if (!mat) continue;
@@ -57,8 +75,11 @@ export function installSurfaces(look, scene) {
         apply(name, mat, { albedo: pick("albedo"), normal: pick("normal"), roughness: pick("roughness") }, low);
       } catch (e) { state.failed.push(name); }
     }
+    applyLow();
   };
   /* After the first frames: the page is playing before any map downloads. */
   setTimeout(run, 1500);
+  applyLow(); // a phone gets the lighter ground at once, before any Gen map has downloaded
+  window.addEventListener("day:quality", () => { state.quality = look.quality(); lowDone.clear(); applyLow(); });
   return { info: () => ({ ...state }) };
 }
