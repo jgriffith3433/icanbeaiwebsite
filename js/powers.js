@@ -1533,7 +1533,16 @@ html.touch-ui.in-control .side{display:none}
       cloud.position.set(p.x, under + cloudR * 0.425, p.z);
       shelf.scaling.set(cloudR * 2.4, 1, cloudR * 2.4);
       shelf.position.set(p.x, under + 0.2, p.z);
-      cloudMat.alpha = Math.min(0.84, 0.35 + cloudR / 40);
+      // Belt and braces: whatever the camera does between frames (a pull-back, a zoom, a wall swing), a cloud close to the lens fades out
+      // instead of showing as an opaque dark disc over his head (the playtest's camera-inside, phone landscape).
+      let near = 1;
+      if (world.camera && world.camera.position) {
+        const cp = world.camera.position;
+        const d = Math.hypot(cp.x - p.x, cp.y - cloud.position.y, cp.z - p.z);
+        const reach = cloudR * 0.6 + 2;
+        near = Math.max(0, Math.min(1, (d - reach) / 4));
+      }
+      cloudMat.alpha = Math.min(0.84, 0.35 + cloudR / 40) * near;
     }
     if (rainPs) {
       const p = who();
