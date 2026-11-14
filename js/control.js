@@ -16,6 +16,7 @@
    ========================================================================== */
 
 const TAU = Math.PI * 2;
+const POSE_MAX_SPEED = 0.45; // m/s: the cast/throw pose (standing, boots still) shows only below this
 const damp = (cur, target, dt, speed) => cur + (target - cur) * (1 - Math.exp(-speed * dt));
 const dampAngle = (cur, target, dt, speed) => {
   const d = ((((target - cur + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
@@ -1738,7 +1739,10 @@ function install() {
     // The cast and throw poses stand still: on the move or in the air he keeps his walk, run, jump or float (a
     // standing pose sliding along the ground reads as gliding feet).
     const wantPose = day.powers && day.powers.pose ? day.powers.pose() : null;
-    const posed = wantPose && s.grounded && s.speed < 0.8 ? wantPose : null;
+    /* The cast pose plays at 1x and stands still, so it may only show where the body is (nearly) still: the animation trace
+       counts boots under 30% of the body's speed from 0.5 m/s as foot slide, and a cast posed at 0.5-0.8 m/s slid. Above
+       POSE_MAX_SPEED he keeps his walk. */
+    const posed = wantPose && s.grounded && s.speed < POSE_MAX_SPEED ? wantPose : null;
     // a turn of more than 90 deg is a step: he walks round (his feet move) instead of spinning on the spot
     const stepping = s.face && s.face.step && s.grounded && s.speed < 0.8;
     const shownAnim = (stepping ? "walk" : null) || posed || (animOverride && mode === "control" ? animOverride : null) || s.anim;
