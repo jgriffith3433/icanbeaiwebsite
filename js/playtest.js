@@ -12118,6 +12118,10 @@ async function phoneTouchRun(options, t) {
   let drive = 0;
   while (btn.disabled && drive++ < 20) { if (D.jump) D.jump("19:00"); await sleep(400); } // he can't be taken while driving: setup shortcut
   // 2a. Watching, a tap on each power takes control and casts it (the refusal this replaces: audio-check heard 0 of 5).
+  // Setup shortcut: the street lesson (Birdie, Dex, Ines) holds Wind and Fog locked and hidden until a neighbour asks; this check is
+  // about a tap while watching taking control and casting, so the lesson is ended first (every verb open, as after any episode start).
+  try { if (D.street && D.street.stop) D.street.stop("check"); } catch (e) { /* ok */ }
+  await sleep(300);
   await watchPressCheck(t, land ? "phone landscape" : "phone portrait");
   if (C.mode() === "control") await tapEl(btn);
   await t.until(() => C.mode() === "schedule", 40000, "him back on his day").catch(() => {});
