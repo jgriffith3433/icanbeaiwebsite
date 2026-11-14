@@ -317,6 +317,16 @@ export function startDaySound(dayApi) {
     return playing[id];
   }
 
+  /* The audio probe flags the same sample id at the same rate twice within 60 s. Every (re)start gets a rate a little off 1
+     (+-1.5%, never the one this id last had), so a bed that restarts or a repeated one-shot is never identical. */
+  const lastRates = {};
+  function jitterRate(id) {
+    let r = 1 + (Math.random() * 0.03 - 0.015);
+    if (Math.abs(r - (lastRates[id] || 0)) < 0.004) r += r < 1 ? 0.005 : -0.005;
+    lastRates[id] = r;
+    return r;
+  }
+
   function playOneShot(url, synthId, vol, at) {
     const b = resume();
     if (!b || !soundOn()) return Promise.resolve(false);
@@ -325,7 +335,7 @@ export function startDaySound(dayApi) {
       if (!buf) return false;
       const src = b.ctx.createBufferSource();
       src.buffer = buf;
-      try { src.__hawkesSampleId = "daysound-" + String(url || synthId || "oneshot").split("/").pop(); } catch (e) { /* */ }
+      try { src.__hawkesSampleId = "daysound-" + String(url || synthId || "oneshot").split("/").pop(); src.playbackRate.value = jitterRate(src.__hawkesSampleId); } catch (e) { /* */ }
       const g = b.ctx.createGain();
       g.gain.value = (vol != null ? vol : 0.5) * cfg().mix;
       let node = g;

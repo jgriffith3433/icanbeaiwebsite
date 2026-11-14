@@ -1097,6 +1097,7 @@
           try { src.__hawkesSampleId = "syn-tornado-" + kind; src.__hawkesBus = "sfx"; } catch (e) { /* */ }
         }
         src.loop = true;
+        src.playbackRate.value = 0.97 + Math.random() * 0.06; // a second tornado is never the same sample at the same rate
         const f = a.c.createBiquadFilter();
         f.type = "lowpass";
         f.frequency.value = lpHz;
