@@ -1105,7 +1105,7 @@ export function installCrowd(world) {
       else put(mBag, i, p.x + Math.cos(p.yaw) * -0.26, y + 0.9 * h, p.z + Math.sin(p.yaw) * 0.26, p.yaw, p.scale, h);
       if (!lk.dog || quality === "low" || !near) hide(mDog, i);
       else put(mDog, i, p.x + Math.cos(p.yaw) * 0.65 + Math.sin(p.yaw) * 0.3, PED_Y + Math.abs(Math.sin(p.phase * 2)) * 0.015, p.z - Math.sin(p.yaw) * 0.65 + Math.cos(p.yaw) * 0.3, p.yaw, 1, 1);
-      if (gale > 0.3) { put(mHand, i, p.x + Math.sin(p.yaw) * lean * 1.6, y + 1.76 * h, p.z + Math.cos(p.yaw) * lean * 1.6, p.yaw, p.scale * 1.1, 1); hats++; }
+      if (gale > 0.3 && rKind !== "sun") { put(mHand, i, p.x + Math.sin(p.yaw) * lean * 1.6, y + 1.76 * h, p.z + Math.cos(p.yaw) * lean * 1.6, p.yaw, p.scale * 1.1, 1); hats++; }
       else if ((rKind === "sun" || dancing) && rk > 0.3) { put(mHand, i, p.x, y + 1.95 * h + cheer, p.z, p.yaw, p.scale * 2.2, 1); cheering++; }
       else hide(mHand, i);
       /* Umbrellas: up in the rain; a strong gust (js/windfog.js) snatches the ones carried open, then turns each inside out

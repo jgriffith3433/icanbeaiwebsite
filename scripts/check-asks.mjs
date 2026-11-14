@@ -28,7 +28,7 @@ ok(fs.readFileSync(new URL("../js/app.js", import.meta.url), "utf8").includes('"
 const ctrlSrc = fs.readFileSync(new URL("../js/control.js", import.meta.url), "utf8");
 const coldSrc = fs.readFileSync(new URL("../js/coldopen.js", import.meta.url), "utf8");
 ok(ctrlSrc.includes("resolveGlanceSpot") && ctrlSrc.includes("cancelGlance") && ctrlSrc.includes("glanceBeta"), "control.js has resolveGlanceSpot, glanceBeta and cancelGlance");
-ok(coldSrc.includes("P.aimAt({ x: -1, y: 0.06, z: 39 })"), "coldopen.js aims the first Rain cast at the park lawn and pond sightline");
+ok(coldSrc.includes('if (verb === "rain") P.aimAt({ x: -19.3, y: 0.4, z: 9.15 })'), "coldopen.js aims the first Rain cast at Birdie's pots (#439: the player's own cast waters the lawn)");
 
 // Verify exact 3D projection at 1280x720 desktop and 390x844 portrait phone from the apartment roof (-21, 6.16, 0.5)
 import * as B from "@babylonjs/core";
