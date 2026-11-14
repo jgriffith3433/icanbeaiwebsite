@@ -74,14 +74,20 @@ export async function loadSmallWeather(world, url, data, opts = {}) {
 
 async function loadExtraClipGroups(B, scene, extras) {
   const out = [];
-  for (const name of EXTRA_CLIPS) {
+  /* all the clip files are requested at once (they used to be fetched one after another: six round trips on a slow phone link,
+     which kept his model, and so the stand-in, on screen for tens of seconds); they are still decoded one at a time */
+  const payloads = await Promise.all(EXTRA_CLIPS.map(async (name) => {
     try {
-      let payload = extras && extras[name];
-      if (!payload && typeof fetch === "function") {
-        const r = await fetch(`models/clips/${name}.glb`, { cache: "force-cache" });
-        if (!r.ok) continue;
-        payload = await r.arrayBuffer();
-      }
+      if (extras && extras[name]) return extras[name];
+      if (typeof fetch !== "function") return null;
+      const r = await fetch(`models/clips/${name}.glb`, { cache: "force-cache" });
+      return r.ok ? await r.arrayBuffer() : null;
+    } catch (err) { return null; }
+  }));
+  for (let i = 0; i < EXTRA_CLIPS.length; i++) {
+    const name = EXTRA_CLIPS[i];
+    try {
+      const payload = payloads[i];
       if (!payload) continue;
       const c = await B.LoadAssetContainerAsync(new Uint8Array(payload), scene, { pluginExtension: ".glb" });
       const g = c.animationGroups[0];
