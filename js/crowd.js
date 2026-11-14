@@ -271,7 +271,12 @@ export function installCrowd(world) {
   const pTop = colorsFor(MAXP, (i) => looks[i].top);
   const pSkin = colorsFor(MAXP, (i) => looks[i].skin);
   const pPants = colorsFor(MAXP, (i) => looks[i].pants);
-  const legsMesh = cyl(0.8, 0.3, 6);
+  /* Closer to the player's model: two legs with a gap, shoes, and arms at the sides (still thin instances, +2 draw calls). */
+  const legPart = (x) => { const m = cyl(0.8, 0.15, 6); m.position.set(x, 0, 0); m.bakeCurrentTransformIntoVertices(); return m; };
+  const legsMesh = merge([legPart(-0.085), legPart(0.085)]);
+  const shoesMesh = merge([box(0.15, 0.09, 0.27, -0.085, -0.355, 0.05), box(0.15, 0.09, 0.27, 0.085, -0.355, 0.05)]);
+  const armPart = (x) => { const m = cyl(0.56, 0.1, 6); m.position.set(x, 0, 0); m.bakeCurrentTransformIntoVertices(); return m; };
+  const armsMesh = merge([armPart(-0.27), armPart(0.27)]);
   const torsoMesh = cyl(0.6, 0.42, 8);
   const headMesh = B.MeshBuilder.CreateSphere("h", { diameter: 0.25, segments: 6 }, scene);
   const umbMesh = cyl(0.07, 0.95, 10);
@@ -284,6 +289,8 @@ export function installCrowd(world) {
   const mHand = instanced("crowd-hand", handMesh, MAXP, colorsFor(MAXP, (i) => SKINS[(i * 5 + 1) % SKINS.length]), stdMat("crowd-hand"));
   handMesh.setEnabled(false);
   const mLegs = instanced("crowd-legs", legsMesh, MAXP, pPants, stdMat("crowd-legs"));
+  const mShoes = instanced("crowd-shoes", shoesMesh, MAXP, colorsFor(MAXP, (i) => ["#1b1a1c", "#2a2420", "#d8d4cc", "#3a2a22"][(i * 7) % 4]), stdMat("crowd-shoes"));
+  const mArms = instanced("crowd-arms", armsMesh, MAXP, pTop, stdMat("crowd-arms"));
   const mTorso = instanced("crowd-torso", torsoMesh, MAXP, pTop, stdMat("crowd-torso"));
   const mHead = instanced("crowd-head", headMesh, MAXP, pSkin, stdMat("crowd-head"));
   const umbColors = colorsFor(MAXP, (i) => ["#1a2740", "#5a2a2a", "#2a4a3a", "#3a3a48", "#7a5a1e", "#4a2a5a", "#a63d3d", "#2f5f8f"][i % 8]);
@@ -366,11 +373,11 @@ export function installCrowd(world) {
   let flareCount = 0;
   const mWipers = instanced("crowd-wipers", wiperMesh, MAXC, colorsFor(MAXC, () => "#101012"), stdMat("crowd-wipers"));
   wiperMesh.setEnabled(false);
-  [legsMesh, torsoMesh, headMesh, hairMesh, bagMesh, dogMesh, umbMesh, umbFlipMesh, handMesh, bodyMesh, cabinMesh, wheelsMesh, lampF, lampR, wiperMesh].forEach((m) => {
+  [legsMesh, shoesMesh, armsMesh, torsoMesh, headMesh, hairMesh, bagMesh, dogMesh, umbMesh, umbFlipMesh, handMesh, bodyMesh, cabinMesh, wheelsMesh, lampF, lampR, wiperMesh].forEach((m) => {
     m.receiveShadows = false;
     m.checkCollisions = false;
   });
-  const bufs = [[hairMesh, "matrix"], [bagMesh, "matrix"], [dogMesh, "matrix"], [legsMesh, "matrix"], [torsoMesh, "matrix"], [headMesh, "matrix"], [umbMesh, "matrix"], [umbFlipMesh, "matrix"], [handMesh, "matrix"], [bodyMesh, "matrix"], [cabinMesh, "matrix"], [wheelsMesh, "matrix"], [lampF, "matrix"], [lampR, "matrix"], [wiperMesh, "matrix"]];
+  const bufs = [[hairMesh, "matrix"], [bagMesh, "matrix"], [dogMesh, "matrix"], [legsMesh, "matrix"], [shoesMesh, "matrix"], [armsMesh, "matrix"], [torsoMesh, "matrix"], [headMesh, "matrix"], [umbMesh, "matrix"], [umbFlipMesh, "matrix"], [handMesh, "matrix"], [bodyMesh, "matrix"], [cabinMesh, "matrix"], [wheelsMesh, "matrix"], [lampF, "matrix"], [lampR, "matrix"], [wiperMesh, "matrix"]];
 
   for (let i = 0; i < MAXP; i++) {
     people.push({
@@ -1000,7 +1007,7 @@ export function installCrowd(world) {
     let reacting = 0, lookingUp = 0, hats = 0, cheering = 0;
     for (let i = 0; i < MAXP; i++) {
       const p = people[i];
-      if (!p.active || p.scale <= 0.01) { hide(mLegs, i); hide(mTorso, i); hide(mHead, i); hide(mUmb, i); hide(mUmbF, i); hide(mHand, i); hide(mHair, i); hide(mBag, i); hide(mDog, i); continue; }
+      if (!p.active || p.scale <= 0.01) { hide(mLegs, i); hide(mShoes, i); hide(mArms, i); hide(mTorso, i); hide(mHead, i); hide(mUmb, i); hide(mUmbF, i); hide(mHand, i); hide(mHair, i); hide(mBag, i); hide(mDog, i); continue; }
       active++;
       if (bystanders.length && (p.state === "walk" || p.state === "wait")) {
         for (let b = 0; b < bystanders.length; b++) {
@@ -1052,6 +1059,8 @@ export function installCrowd(world) {
       const hx = looking ? -Math.sin(p.yaw) * 0.07 * rk : 0;
       const hz = looking ? -Math.cos(p.yaw) * 0.07 * rk : 0;
       put(mLegs, i, p.x, PED_Y + 0.4 * h, p.z, p.yaw, p.scale, h); // feet stay on the ground; the bob is the upper body
+      put(mShoes, i, p.x, PED_Y + 0.4 * h, p.z, p.yaw, p.scale, h);
+      put(mArms, i, p.x + Math.sin(p.yaw) * lean, y + 1.12 * h, p.z + Math.cos(p.yaw) * lean, p.yaw + sway, p.scale * looks[i].girth, h);
       put(mTorso, i, p.x + Math.sin(p.yaw) * lean, y + 1.1 * h, p.z + Math.cos(p.yaw) * lean, p.yaw + sway, p.scale * looks[i].girth, h);
       put(mHead, i, p.x + Math.sin(p.yaw) * lean * 1.6 + hx, y + (1.58 + (looking ? 0.05 * rk : 0)) * h, p.z + Math.cos(p.yaw) * lean * 1.6 + hz, p.yaw, p.scale, h);
       const lk = looks[i];
