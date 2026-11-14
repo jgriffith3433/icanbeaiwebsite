@@ -279,6 +279,22 @@ window.DAY_CONFIG = {
   },
 
   /* ------------------------------------------------------------------------
+     WAKE HIM (js/wakeup.js) — Take control while he is asleep in bed (any hour he sleeps, so a visit at 03:00 finds him
+     under the quilt). He stretches (the lookup clip, arms up to the window), a flash covers the cut, and he is on the
+     apartment roof facing the sky, ready to cast, in night weather: fog rolling in with far lightning. Let go sends him
+     back to bed by the day's own routes (or the quick catch-up) and the day carries on.
+     ------------------------------------------------------------------------ */
+  wake: {
+    stretch: { clip: "lookup", secs: 1.3 }, // beside the bed: arms up, a look at the window
+    cutSecs: 0.35, // the flash that hides the move to the roof
+    spot: { x: -21, z: 0.5, yaw: 0.92, from: 14 }, // the apartment roof, as the cold open's
+    camera: { alpha: -2.45, beta: 1.22, radius: 5.6, from: 9, secs: 1.0 }, // dives in from 9 m behind him
+    sky: { state: "fog", intensity: 0.6, flash: [90, -0.3], flashAgainSecs: 2.2 }, // fog and far lightning: both read at night
+    charge: 100,
+    log: "Awake. The sky is open.",
+  },
+
+  /* ------------------------------------------------------------------------
      OPENING — the first Play only (js/opening.js), skippable
      ------------------------------------------------------------------------
      Small Weather on screen (his model) with a few plain lines, then he is

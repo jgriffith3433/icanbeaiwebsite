@@ -1527,6 +1527,7 @@ function install() {
   // Game seconds he has really been simulated as the player's (each control step's dt, which main.js caps at 0.1 s a
   // frame): the clock a playtest measures a climb in, so a slow browser doesn't read as a stuck one.
   let simT = 0;
+  let animOverride = null; // a staged beat (js/wakeup.js) names the clip he plays while it holds him
   const pilotFrame = (fr, dt) => {
     lastFrame = fr;
     const driving = !!(fr && fr.person.inCar);
@@ -1594,9 +1595,10 @@ function install() {
     // standing pose sliding along the ground reads as gliding feet).
     const wantPose = day.powers && day.powers.pose ? day.powers.pose() : null;
     const posed = wantPose && s.grounded && s.speed < 0.8 ? wantPose : null;
-    avatar.play(posed || s.anim, posed ? 1 : s.speed, dt);
+    const shownAnim = posed || (animOverride && mode === "control" ? animOverride : null) || s.anim;
+    avatar.play(shownAnim, posed ? 1 : s.speed, dt);
     cameraFollow(dt, { x: gp.lx, y: gp.ly });
-    return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: posed || s.anim, text };
+    return { x: s.x, y: s.y, z: s.z, yaw: s.yaw, speed: s.speed, anim: shownAnim, text };
   };
   /* main.js runs this inside the render loop: a throw here stops the loop, so the clock freezes and the HUD is left in
      control mode for good. Give the day back to him instead (the error is still raised, on its own turn, so the
@@ -1705,6 +1707,8 @@ function install() {
     take: () => take("console"),
     push: (spec) => pushStart(spec),
     hold: (on) => { holdIn = !!on; return holdIn; },
+    /** A staged beat shows this clip instead of his movement clip (null clears it). */
+    anim: (name) => { animOverride = name || null; return animOverride; },
     pushing: () => push.on,
     letGo: () => letGo("console"),
     spawnUpdraft: (x, z, opt) => {

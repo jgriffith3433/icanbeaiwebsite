@@ -11007,6 +11007,89 @@ async function checkCharacterClear(t, label) {
   if (!moved) t.problem("bug", `${label}: a drag on empty space inside the old ability box didn't look around`);
 }
 
+/* ---------------- wake-him: a visit at 03:00, one tap on Take control, he wakes, is on the roof and casts within 10 s; Let go sends him back to bed ---------------- */
+async function wakeHim(options, t) {
+  const phone = innerWidth <= 700 || !!(window.day && window.day.control && window.day.control.state().touch);
+  t.scene(phone ? "Wake him (phone, 03:00)" : "Wake him (03:00)");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const C = D.control;
+  const P = window.powers || D.powers;
+  try { localStorage.setItem("icanbe.opening", "wake-him"); localStorage.setItem("icanbe.tutorial", "wake-him"); localStorage.setItem("icanbe.firstrain", "done"); localStorage.setItem("icanbe.street", JSON.stringify({ done: true })); } catch (e) { /* private mode */ }
+  if (D.tutorial && D.tutorial.skip) D.tutorial.skip();
+  if (D.title && D.title.quiet) D.title.quiet();
+  if (phone && !C.state().touch) C.touch(true);
+  // named setup: the visit is forced to 03:00 (he is asleep in bed)
+  if (C.mode() === "control") C.letGo();
+  await t.until(() => C.mode() === "schedule", 20000, "the day to have him").catch(() => {});
+  D.jump("03:00");
+  await t.until(() => { const f = D.now().frame; return f && ["lie", "side", "recline"].includes(f.person.pose); }, 8000, "him asleep in bed").catch(() => {});
+  await sleep(600);
+  const fr0 = D.now().frame;
+  const asleep = !!fr0 && ["lie", "side", "recline"].includes(fr0.person.pose);
+  t.event("wake-asleep", `03:00: pose ${fr0 ? fr0.person.pose : "?"}, room ${fr0 ? fr0.room : "?"}, bed ${asleep ? "yes" : "NO"}`);
+  if (!asleep) { t.problem("blocker", "At 03:00 he is not asleep in bed, so the wake moment can't be played"); return; }
+  const min0 = D.now().minutes;
+  const evs = [];
+  const hw = (e) => evs.push({ ...(e.detail || {}), at: performance.now() });
+  window.addEventListener("day:wake", hw);
+  const pw = [];
+  const hp = (e) => { const d = e.detail || {}; if (d.action !== "denied") pw.push({ ...d, at: performance.now() }); };
+  window.addEventListener("day:power", hp);
+  // 1. the first tap: Take control
+  const btn = $("control");
+  if (!btn || !hudVisible(btn)) { t.problem("blocker", "No visible Take control button at 03:00"); return; }
+  const tTap = performance.now();
+  if (phone) await tapEl(btn); else btn.click();
+  t.milestone && t.milestone("first-input-accepted", "Take control tapped");
+  await t.until(() => D.wake.now().phase === "ready", 8000, "the wake moment to finish").catch(() => {});
+  const wk = D.wake.now();
+  const toReady = (wk.readyAt ? wk.readyAt - tTap : 99999) / 1000;
+  const st = C.state();
+  t.event("wake-roof", `${toReady.toFixed(2)}s after the tap: phase ${wk.phase}, he is at ${st.x.toFixed(1)}, ${st.y.toFixed(1)}, ${st.z.toFixed(1)}; weather ${window.weather ? window.weather.now().state : "?"}`);
+  t.metric("wake.secondsToReady", Math.round(toReady * 100) / 100);
+  if (wk.phase !== "ready") t.problem("blocker", "Taking control at night never put him on the roof ready to cast");
+  else if (st.y < 5) t.problem("bug", `He is not on the roof after waking (y ${st.y.toFixed(2)})`);
+  if (!evs.some((e) => e.action === "stretch")) t.problem("bug", "The wake moment never played its stretch");
+  // 2. the first cast: Lightning by touch (the button) or key
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  const bolt = $("ability-bolt");
+  const tCast = performance.now();
+  if (phone) { if (bolt && hudVisible(bolt)) await tapEl(bolt); else t.problem("bug", "No visible Lightning button after waking"); }
+  else window.dispatchEvent(new KeyboardEvent("keydown", { key: "e", code: "KeyE", bubbles: true }));
+  await t.until(() => pw.length > 0, 4000, "the first cast").catch(() => {});
+  if (!phone) window.dispatchEvent(new KeyboardEvent("keyup", { key: "e", code: "KeyE", bubbles: true }));
+  const first = pw[0];
+  const secs = first ? (first.at - tTap) / 1000 : 99999;
+  t.metric("wake.secondsToFirstCast", Math.round(secs * 100) / 100);
+  t.event("wake-cast", first ? `first cast (${first.power}) ${secs.toFixed(2)}s after the first tap (${((first.at - tCast) / 1000).toFixed(2)}s after the button)` : "NO CAST after waking");
+  if (!first) t.problem("blocker", "No cast after waking him at night");
+  else {
+    t.milestone && t.milestone("first-success", "first cast after waking");
+    if (secs > 10) t.problem("bug", `First cast came ${secs.toFixed(1)}s after the first tap (limit 10 s)`);
+  }
+  await sleep(1500);
+  checkHud(t, phone ? "wake (phone)" : "wake");
+  if (phone) await checkCharacterClear(t, "wake (phone)");
+  // 3. Let go: back to bed with the day still running
+  const back = $("control");
+  if (phone) await tapEl(back); else back.click();
+  t.event("wake-let-go", "Let go pressed on the roof");
+  await t.until(() => C.mode() === "schedule", 70000, "him back on his day").catch(() => {});
+  await sleep(1200);
+  const fr1 = D.now().frame;
+  const bedNow = !!fr1 && ["lie", "side", "recline"].includes(fr1.person.pose);
+  const min1 = D.now().minutes;
+  t.event("wake-back", `mode ${C.mode()}, pose ${fr1 ? fr1.person.pose : "?"}, room ${fr1 ? fr1.room : "?"}, clock ${Math.round(min0)} -> ${Math.round(min1)} min, play mode ${D.now().mode}`);
+  t.metric("wake.backInBed", bedNow ? 1 : 0);
+  if (C.mode() !== "schedule") t.problem("blocker", "Let go at night never gave him back to his day");
+  else if (!bedNow) t.problem("bug", `After Let go at night he is not back in bed (pose ${fr1 ? fr1.person.pose : "?"})`);
+  if (!(min1 > min0)) t.problem("bug", "The day's clock did not run while he was the player's");
+  window.removeEventListener("day:wake", hw);
+  window.removeEventListener("day:power", hp);
+}
+
 /* ---------------- phone-touch: cold phone session on the roof, Take control and five casts, all by touch ---------------- */
 // Real input only: touch pointer events (tapEl) on Take control / the Bolt prompt / the ability buttons. Setup (named): a full
 // Charge before each cast. Works at 390x844 and 844x390 (the runner sets the window); reports every control's size and any overlap.
@@ -13489,6 +13572,7 @@ installPlaytest({
     { id: "model-blocked", title: "Model blocked: with the GLB refused the stand-in stays visible through casts and walking, play continues, and the model arrives on the background retry", seconds: 90, tags: ["phone", "characters"], description: "Load with ?playtest=model-blocked ({\"touch\":true} for 390x844). The model is dropped and blocked (window.__blockModel, or ?blockmodel=1 from load); real input: Take control, Rain and Lightning, walk; he must be on screen each time; then the block lifts and the retry brings the real model." },
     { id: "warm-start", title: "Warm start: no frame over 100 ms (phone 150) in the first 30 s after the loading bar, the first cast of each of the five powers costs no long frame, no shader compile errors, phone median fps >= 30 over 60 s", seconds: 90, tags: ["performance", "phone", "powers"], description: "Load with ?playtest=warm-start ({\"touch\":true} for 390x844 low quality). Real input: Take control, the five verb buttons one by one. Frame times by the render observable; metrics worstFrame30sMs, firstCastWorstMs.<power>, medianFps, shaderErrors, lightCapWorst." },
     { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
+    { id: "wake-him", title: "Wake him: a visit forced to 03:00 finds him asleep; one tap on Take control stretches him awake, puts him on the roof in night fog and he casts within 10 s of the tap, by touch at 390x844; Let go returns him to bed with the clock still running", seconds: 90, tags: ["opening", "first-minute", "phone", "touch"], description: "Load with ?playtest=wake-him (390x844 touch for the phone run). Setup (named): returning player keys set, clock jumped to 03:00. Real input: tap Take control, tap the Lightning button (E on a keyboard), tap Let go. Events wake-asleep / wake-roof / wake-cast / wake-let-go / wake-back; metrics wake.secondsToReady, wake.secondsToFirstCast, wake.backInBed." },
     { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
     { id: "foley", title: "Foley: recorded jump, landing, crowd, car, bird and UI sounds in lazy groups, taps on the ability arc and Episodes play the UI press, no clip file twice within 60 s, foley transfer under 400 KB", seconds: 130, tags: ["audio", "phone"], description: "Load with ?playtest=foley. Sound on, Take control by touch, taps on the ability arc and Episodes, Jump taps, then a two-minute listen. Events sound-on / ui-arc / sfx-sources / foley-repeats; metrics foley.bytes, foley.indexed." },
@@ -13539,7 +13623,7 @@ installPlaytest({
       else localStorage.setItem("icanbe.skyStudio", "off");
     } catch (e) { /* private mode */ }
     try {
-      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "ask-markers", "quiet-ui", "phone-touch"].includes(id)) forcePublicView();
+      if (["smoke", "hud-layout", "phone", "cold-start", "first-minute", "title-key-art", "title-progress", "street-teaches", "ask-markers", "quiet-ui", "phone-touch", "wake-him"].includes(id)) forcePublicView();
       if (id !== "title" && id !== "cold-start" && id !== "first-minute" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch" && window.day && window.day.title && window.day.title.quiet) window.day.title.quiet();
       if (id !== "smoke" && id !== "first-visit" && id !== "phone" && window.day && window.day.tutorial && window.day.tutorial.quiet) {
         window.day.tutorial.quiet();
@@ -13549,6 +13633,7 @@ installPlaytest({
       else if (id === "moments") await momentsScenario(options, t);
       else if (id === "cold-start") await coldStart(options, t);
       else if (id === "phone-touch") await phoneTouch(options, t);
+      else if (id === "wake-him") await wakeHim(options, t);
       else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "warm-start") await warmStart(options, t);
       else if (id === "model-blocked") await modelBlocked(options, t);
