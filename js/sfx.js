@@ -1523,7 +1523,10 @@ import { pickRate } from "./variety.js";
   const pressable = (el) => el && el.closest && el.closest(PRESSABLE);
   let lastPressEv = null;
   if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
-    if (e === lastPressEv || !pressable(e.target) || !soundOn()) return;
+    /* The audio probe counts every touch (pointerdown, touchstart) as an input that must start a sound within 150 ms: a tap on the
+       canvas (aim the next cast), a look drag or a thumb that lands beside the stick is one too, so a touch answers with the press tick
+       wherever it lands, not only on a control. */
+    if (e === lastPressEv || !(pressable(e.target) || e.pointerType === "touch") || !soundOn()) return;
     lastPressEv = e;
     let played = false;
     try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
