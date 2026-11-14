@@ -1202,6 +1202,33 @@
   /* UI: a press on any button plays the press clip at once (the ability arc, Episodes, cards); the Episodes menu opens and closes
      with its own swish. Capture phase, so it sounds even where a handler stops the event. Sound also starts loading the
      `ui` and `move` groups on the first press (or when Sound turns on), so the first press already has its clip. */
+  /* The press fallback (the clip isn't loaded yet, or isn't in the build): a rendered click played as a buffer source, tagged
+     "ui-click". The audio probe sees buffer sources only, so the oscillator this used to be left a press silent to it. */
+  let clickBuf = null;
+  function uiClick() {
+    const a = ctx();
+    if (!a) return;
+    const sr = a.c.sampleRate;
+    if (!clickBuf || clickBuf.sampleRate !== sr) {
+      const n = Math.floor(sr * 0.08), cb = a.c.createBuffer(1, n, sr), d = cb.getChannelData(0);
+      let ph = 0;
+      for (let i = 0; i < n; i++) {
+        const x = i / sr;
+        ph += 2 * Math.PI * (1250 + 250 * Math.min(1, x / 0.05)) / sr;
+        d[i] = (2 / Math.PI) * Math.asin(Math.sin(ph)) * Math.min(1, x / 0.005) * Math.exp(-x * 45);
+      }
+      clickBuf = cb;
+    }
+    const src = a.c.createBufferSource();
+    src.buffer = clickBuf;
+    src.playbackRate.value = 0.97 + Math.random() * 0.06;
+    try { src.__hawkesSampleId = "ui-click"; src.__hawkesBus = "ui"; src.__hawkesGain = 0.2; } catch (e) { /* */ }
+    const g = a.c.createGain();
+    g.gain.value = 0.2;
+    src.connect(g);
+    g.connect(out(a, 0, "ui"));
+    src.start(a.c.currentTime);
+  }
   let lastPress = 0;
   const pressable = (el) => el && el.closest && el.closest("button, [role=button], .ability, a[href], #sound, #time-btn");
   if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
@@ -1209,7 +1236,7 @@
     const t = performance.now();
     if (t - lastPress < 60) return;
     lastPress = t;
-    if (!sample("ui-press", { gain: 0.8, bus: "ui" })) { synthTag("ui"); tone({ freq: 1250, to: 1500, dur: 0.05, vol: 0.04, wave: "triangle", bus: "ui" }); }
+    if (!sample("ui-press", { gain: 0.8, bus: "ui" })) { synthTag("ui"); uiClick(); }
     note("ui-press");
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
