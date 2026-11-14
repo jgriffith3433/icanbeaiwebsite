@@ -83,7 +83,8 @@ const effectCount = () => { try { const e = window.BABYLON && window.BABYLON.Eng
 let loadBase = null;
 /* perf.compilesAfterLoad: shader effects compiled after the loading card went (the playtest reads window.__compilesAfterLoad()) */
 window.__compilesAfterLoad = () => (loadBase == null || loadBase < 0 ? 0 : Math.max(0, effectCount() - loadBase));
-const maybeDone = () => { if (ready.frame && ready.title && ready.lights) { if (loadBase == null) loadBase = effectCount(); loading.done(); } };
+const MODEL_CAP_MS = 9000;
+const maybeDone = () => { if (ready.frame && ready.title && ready.lights && ready.model) { if (loadBase == null) loadBase = effectCount(); loading.done(); } };
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
@@ -153,6 +154,9 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
 const skinWorld = control.model && window.day && window.day.world();
 if (skinWorld) {
   const w = skinWorld;
+  /* no box stand-in while the real model is coming; the loading card waits for it (capped, so a slow network can't hold it forever) */
+  if (w.holdStandIn) w.holdStandIn(true);
+  setTimeout(() => { if (!ready.model) { ready.model = true; console.info(`[app] loading card: model gate capped at ${MODEL_CAP_MS} ms`); maybeDone(); } }, MODEL_CAP_MS);
   // Streams the GLB so the loading card's bar follows the bytes (Content-Length), not a guess.
   const readBody = async (r) => {
     const total = Number(r.headers.get("content-length")) || 0;
