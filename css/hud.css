@@ -81,13 +81,16 @@ html.in-control:not(.preview-public):not(.touch-ui) .side { max-height: calc(100
 html.touch-ui .tools { position: fixed; top: var(--safe-t); right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; gap: 6px; }
 
 /* ---------- Let go / Take control (centre, above the bottom row) ---------- */
-.control-btn { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tl) + 32px); }
+.control-btn { position: fixed; left: 50%; translate: -50% 0; bottom: calc(var(--tl) + 32px); }
+/* The kit's pressed state is transform: scale(.95), which shrank this button under 44 px and (when it carried the centring transform) threw it off centre.
+   Centre with `translate`, and keep the press feedback to the kit's filter and inset shadow. */
+.control-btn[data-hawkes-pressed] { transform: none; }
 html.in-control:not(.preview-public):not(.touch-ui) .control-btn { bottom: var(--above-a); }
 .preview-public .control-btn { bottom: 40px; }
 @media (max-width: 700px) {
-  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
+  .in-control .control-btn { bottom: auto; top: max(10px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; translate: -50% 0; }
 }
-html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; transform: translateX(-50%); }
+html.touch-ui.in-control .control-btn { bottom: auto; top: max(12px, env(safe-area-inset-top), var(--hawkes-safe-top, 0px)); left: 50%; right: auto; translate: -50% 0; }
 
 /* ---------- Settings popover (top-right cluster, under the Settings button) ---------- */
 .tools { position: relative; }
@@ -159,7 +162,7 @@ html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; botto
 /* phone portrait, in control: Let go, Rain (weather), Neighbors and Episodes sit in the left thumb's reach, stacked above the stick
    (stick top is 148 px up); Pressure and the weather chip ride the same column. */
 @media (orientation: portrait) {
-  html.touch-ui.in-control .control-btn { top: auto; left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px), calc(var(--safe-b) + 148px)); }
+  html.touch-ui.in-control .control-btn { top: auto; left: max(12px, env(safe-area-inset-left)); translate: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px), calc(var(--safe-b) + 148px)); }
   html.touch-ui.in-control .hud-left { top: auto; bottom: max(220px, calc(env(safe-area-inset-bottom) + 208px), calc(var(--safe-b) + 204px)); flex-direction: column-reverse; gap: 10px; }
   html.touch-ui.in-control .hud-left .ep-btn { order: 1; }
   html.touch-ui.in-control .control-hint { bottom: max(470px, calc(env(safe-area-inset-bottom) + 458px), calc(var(--safe-b) + 454px)); }
@@ -175,7 +178,7 @@ html.touch-ui .abilitybar {
 }
 .powerpad { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: 268px; display: none !important; }
 /* phone: the controls legend shows once, then fades */
-html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 160px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
+html.touch-ui .control-hint { left: max(12px, env(safe-area-inset-left)); translate: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); width: min(200px, calc(100vw - 160px)); max-width: none; font-size: .68rem; line-height: 1.3; text-align: left; }
 .control-hint.hint-faded { opacity: 0; visibility: hidden; transition: opacity .6s ease; }
 html.touch-ui .powerpad { display: none !important; }
 
