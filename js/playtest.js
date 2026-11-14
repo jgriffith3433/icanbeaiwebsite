@@ -12087,6 +12087,18 @@ async function phoneTouch(options, t) {
     const castMs = Math.round(performance.now() - tc);
     t.event("phone-cast-" + id, `${fx ? "cast" : "NO CAST"} ${castMs} ms after the tap; ${cast.map((g) => g.power).join(",") || "nothing"}`);
     t.metric("phone.castMs." + id, castMs);
+    if (fx) { // the first-time pills step aside once he has cast, and the toast lane stays clear of the top-left status/clock
+      const vis = (q) => { const n = document.querySelector(q); if (!n || n.hidden) return false; const r = n.getBoundingClientRect(); const cs = getComputedStyle(n); return r.width > 0 && r.height > 0 && cs.display !== "none" && cs.visibility !== "hidden"; };
+      const pills = [".control-hint", ".tutorial"].filter(vis);
+      t.event("phone-pill-after-cast", pills.length ? "STILL SHOWING: " + pills.join(",") : "hidden after the cast");
+      if (pills.length) t.problem("bug", "A first-time pill is still on screen after the player cast: " + pills.join(", "));
+      const lane = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--toast-top-px")) || 0;
+      const corner = [...document.querySelectorAll(".hud, .hud-left > *")].filter((n) => n.getBoundingClientRect().width > 0).map((n) => n.getBoundingClientRect()).filter((r) => r.left < 200 && r.top < lane && r.bottom > 0);
+      const worst = corner.reduce((m, r) => Math.max(m, r.bottom), 0);
+      t.metric("phone.toastLaneTop", lane);
+      t.metric("phone.cornerBottom", Math.round(worst));
+      if (worst > lane) t.problem("bug", `The toast lane (${lane}px) starts above the top-left stack's bottom edge (${Math.round(worst)}px)`);
+    }
     if (fx && castMs > 300) t.problem("bug", `A tap on ${id} took ${castMs} ms to its first effect (wind-up included; limit 300)`);
     if (fx) ok++; else t.problem("bug", `A tap on ${id} didn't cast it (events: ${got.map((g) => g.power + ":" + g.action).join(", ") || "none"})`);
     await sleep(1800); // the effect on screen: the recording shows the sky, bolt, rain, wind or sun
