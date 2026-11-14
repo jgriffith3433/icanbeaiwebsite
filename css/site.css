@@ -622,7 +622,7 @@ html.in-control.preview-public .hud.bottom { display: none; }
   position: fixed;
   z-index: 5;
   right: var(--gutter);
-  bottom: max(8px, env(safe-area-inset-bottom));
+  bottom: max(8px, env(safe-area-inset-bottom), var(--hawkes-safe-bottom, 0px));
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   color: var(--accent);
@@ -641,7 +641,7 @@ html.in-control .version-tag, html.in-control .privacy-tag { display: none !impo
   position: fixed;
   z-index: 5;
   left: var(--gutter);
-  bottom: max(8px, env(safe-area-inset-bottom));
+  bottom: max(8px, env(safe-area-inset-bottom), var(--hawkes-safe-bottom, 0px));
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   color: var(--accent);
