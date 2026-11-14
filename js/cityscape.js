@@ -822,7 +822,7 @@ export function installCityscape(w) {
     const L = new B.PointLight("cs-lamp-dyn-" + i, new B.Vector3(0, 4.2, 0), scene);
     L.diffuse = new B.Color3(1.0, 0.86, 0.62);
     L.specular = new B.Color3(0.4, 0.35, 0.25);
-    L.intensity = 0;
+    L.intensity = 0; // enabled from boot at 0: dusk fades the intensity, it never toggles the light (a toggle changes every lit material's light count and recompiles it mid-play)
     L.range = 14;
     L.falloffType = B.Light.FALLOFF_STANDARD;
     try { L.shadowEnabled = false; } catch (e) { /* */ }
@@ -848,11 +848,9 @@ export function installCityscape(w) {
         const p = ranked[i].p;
         L.position.set(p[0], 4.15, p[1]);
         L.intensity = 0.55 * lampsK;
-        L.setEnabled(true);
         lampDynActive++;
       } else {
         L.intensity = 0;
-        L.setEnabled(false);
       }
     }
   }
@@ -971,7 +969,7 @@ export function installCityscape(w) {
     const l = lit.lamps;
     headM.emissiveColor.set(l * 1.5 * k, l * 1.35 * k, l * 1.05 * k);
     poolM.emissiveColor.set(l * 0.85 * k, l * 0.85 * k, l * 0.85 * k);
-    lampLights.forEach((L) => { if (L.isEnabled()) L.intensity = 0.55 * l * k; });
+    lampLights.forEach((L) => { if (L.intensity > 0) L.intensity = 0.55 * l * k; });
     const winK = (lit.windows > 0.02 ? 1.15 : 0) * (Math.random() < 0.4 ? 0.15 : 1);
     facadeMats.forEach((m) => m.emissiveColor.set(winK, winK, winK));
     aptMat.emissiveColor.set(winK, winK, winK);

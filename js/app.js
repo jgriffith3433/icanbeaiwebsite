@@ -72,7 +72,11 @@ const ready = { model: false, frame: false, title: false, lights: false };
    the first use of each power never compile. It is still bounded: LIGHTS_CAP_MS ends the gate whatever the GPU does (a slow or
    software GL, a compile that never settles), and the warm-up carries on behind the title. One timeout, no polling. */
 const LIGHTS_CAP_MS = (typeof window !== "undefined" && (window.innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches))) ? 3500 : 6000;
-const maybeDone = () => { if (ready.frame && ready.title && ready.lights) loading.done(); };
+const effectCount = () => { try { const e = window.BABYLON && window.BABYLON.EngineStore && window.BABYLON.EngineStore.LastCreatedEngine; return e && e._compiledEffects ? Object.keys(e._compiledEffects).length : -1; } catch (err) { return -1; } };
+let loadBase = null;
+/* perf.compilesAfterLoad: shader effects compiled after the loading card went (the playtest reads window.__compilesAfterLoad()) */
+window.__compilesAfterLoad = () => (loadBase == null || loadBase < 0 ? 0 : Math.max(0, effectCount() - loadBase));
+const maybeDone = () => { if (ready.frame && ready.title && ready.lights) { if (loadBase == null) loadBase = effectCount(); loading.done(); } };
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
