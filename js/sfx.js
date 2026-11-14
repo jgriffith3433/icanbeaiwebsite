@@ -226,7 +226,9 @@ import { pickRate } from "./variety.js";
     const t = a.c.currentTime + (o.delay || 0);
     const osc = a.c.createOscillator();
     osc.type = o.wave || "sine";
-    const pj = (0.97 + Math.random() * 0.06) * curVar; // +-3% pitch: musical notes stay in tune, repeats still differ
+    const sid = (curTag ? curTag + ":" : "") + "syn-tone-" + o.freq + (o.to ? ">" + o.to : "") + "-" + (o.wave || "sine");
+    // +-3% pitch (musical notes stay in tune), but never the same rate for one tone id twice in 60 s (the audio probe's rule)
+    const pj = pickRate(sid, curVar, { min: 0.004, max: 0.03 });
     osc.frequency.setValueAtTime(o.freq * pj, t);
     if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
     const g = a.c.createGain();
@@ -250,7 +252,7 @@ import { pickRate } from "./variety.js";
     osc.stop(t + o.dur + 0.05);
     // An oscillator isn't a buffer source, so the audio probe can't see it: say so through the sound kit's event.
     try {
-      window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { type: "sound-start", sample: (curTag ? curTag + ":" : "") + "syn-tone-" + o.freq + (o.to ? ">" + o.to : "") + "-" + (o.wave || "sine"), bus: o.bus || "sfx", rate: Math.round(pj * 1000) / 1000, gain: o.vol, dur: o.dur } }));
+      window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { type: "sound-start", sample: sid, bus: o.bus || "sfx", rate: Math.round(pj * 1000) / 1000, gain: o.vol, dur: o.dur } }));
     } catch (e) { /* */ }
   }
   const notes = (freqs, gap, vol, wave, dur) => freqs.forEach((f, i) => tone({ freq: f, dur: dur || 0.5, vol, wave: wave || "triangle", delay: i * gap }));
