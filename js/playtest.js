@@ -10968,7 +10968,14 @@ async function audioCheck(options, t) {
   if (!D.audio || !D.score || !D.sfx || !P) { t.problem("bug", "day.audio, day.score, day.sfx or powers is missing"); return; }
   if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
   if (touch) { document.documentElement.classList.add("touch-ui"); if (C.touch) C.touch(true); }
-  if (D.title && D.title.quiet) D.title.quiet();
+  // A new player's first minute is the scenario's start: the title hands him to the roof with Rain armed (named setup: the saved
+  // opening keys cleared so the cold open is pending). If it can't run, the old quiet title applies.
+  let cold = false;
+  try {
+    if (C.mode() === "schedule" && D.coldopen && !D.coldopen.now().on) { ["icanbe.opening", "icanbe.tutorial", "icanbe.firstrain", "icanbe.street"].forEach((k) => localStorage.removeItem(k)); if (D.firstrain && D.firstrain.reset) D.firstrain.reset(); D.coldopen.arm(); cold = D.coldopen.pending(); }
+    cold = cold || (D.coldopen && D.coldopen.now().on);
+  } catch (e) { cold = false; }
+  if (!cold && D.title && D.title.quiet) D.title.quiet();
   const btn = $("sound");
   const r0 = btn.getBoundingClientRect();
   t.metric("audioToggleMinPx", Math.round(Math.min(r0.width, r0.height)));
@@ -10996,8 +11003,24 @@ async function audioCheck(options, t) {
   if (!rep.on) t.problem("bug", "The first tap changed Sound to off");
   t.progress(0.25);
 
+  // The cold open (if it ran): he is on the roof with Rain armed; one real tap (the Rain button by touch, R on a keyboard) is the first cast
+  if (cold) {
+    if (D.title && D.title.showing() && D.title.play) D.title.play("tap");
+    await t.until(() => D.coldopen.now().phase === "waiting" || D.coldopen.now().cast != null, 20000, "the cold open's prompt").catch(() => {});
+    if (D.coldopen.now().phase === "waiting") {
+      const rb = $("coldopen-bolt");
+      if (touch && rb && !rb.hidden) { await tapEl(rb); } else pressKey("r");
+      t.milestone && t.milestone("first-input-accepted", "one tap: Rain");
+      await t.until(() => D.coldopen.now().cast != null, 3000, "the first Rain").catch(() => {});
+      if (D.coldopen.now().cast != null) t.milestone && t.milestone("first-success", "first Rain");
+    }
+    t.event("audio-cold-open", `cold open ${D.coldopen.now().phase}, first input ${D.coldopen.now().firstInput}s, cast ${D.coldopen.now().cast}s`);
+    if (D.coldopen.now().cast == null) t.problem("bug", "The first tap on the roof didn't cast Rain");
+    await t.until(() => !D.coldopen.now().on, 25000, "the story line and the cold open's end").catch(() => {});
+  }
+
   // take him (Enter, or the button by touch) and cast the five
-  if (touch) { const tk = $("control") || document.querySelector("#take-control,[data-take]"); if (tk) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+  if (C.mode() === "control") { /* already his */ } else if (touch) { const tk = $("control") || document.querySelector("#take-control,[data-take]"); if (tk) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
   gaps.phase = "take";
   await t.until(() => C.mode() === "control", 6000, "Take control").catch(() => {});
   // He may be driving (Take control is disabled in the car) or in bed: the same fallback the cold open uses, the clock to dusk
