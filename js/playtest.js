@@ -3683,6 +3683,85 @@ async function renderGrade(options, t) {
   t.progress(1);
 }
 
+/* ---------------- city-hours: a black street or a flat sky is caught at every hour ---------------- */
+// Setup shortcuts (named): the day bar to each hour (scrubTo), control.place onto the apt roof and the avenue, on the phone control.touch.
+// Everything else is real input (Take control by Enter / a tap). Per hour (03:00, 07:00, 12:00, 18:00, 22:00) and view (roof, street) the
+// canvas is read after a rendered frame: mean luminance of the ground band (bottom 40%), the darkest tenth of it, and a sky-colour spread
+// (RGB standard deviation of the top 30%). Floors: ground mean >= GROUND_MEAN and darkest tenth >= GROUND_P10 (0-255) so no frame is a black
+// street; sky spread >= SKY_SPREAD so the sky is not one flat colour. Metrics city.minLuma (worst ground mean), city.minDark (worst
+// darkest tenth), city.skySpread (smallest spread). Option {"noGround":true} strips the ground, road and kerb to flat black first, so the run must
+// fail naming the hour. Option {"touch":true} is 390x844 low quality.
+async function cityHours(options, t) {
+  const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  const GROUND_MEAN = 6, GROUND_P10 = 1.5, SKY_SPREAD = 2.5;
+  t.scene("Apt roof");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.world && window.day.control && window.day.render, 8000, "the world");
+  const D = window.day, C = D.control, w = D.world();
+  if (touch && C.touch) C.touch(true);
+  D.title && D.title.quiet && D.title.quiet();
+  scrubTo(12 * 60);
+  await sleep(500);
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  if (options && options.noGround) {
+    const B = window.BABYLON;
+    const flat = new B.StandardMaterial("city-hours-flat", w.scene);
+    flat.diffuseColor = B.Color3.Black(); flat.specularColor = B.Color3.Black(); flat.emissiveColor = B.Color3.Black(); flat.disableLighting = true;
+    let n = 0;
+    w.scene.meshes.forEach((m) => {
+      const nm = m.name || "";
+      if (nm === "ground" || nm === "road" || nm === "lot" || /^(ave|cross)\d+r\d+$/.test(nm) || /^walk[SN]\d+$/.test(nm) || /^ave[SN]\d+_\d+$/.test(nm) || /^cross[WE]\d+_\d+$/.test(nm)) { m.material = flat; n++; }
+    });
+    t.event("city-hours-no-ground", `ground texture removed from ${n} meshes (test option)`);
+  }
+  const probe = document.createElement("canvas");
+  probe.width = 64; probe.height = 64;
+  const pc = probe.getContext("2d", { willReadFrequently: true });
+  const frame = async () => {
+    await new Promise((r) => w.scene.onAfterRenderObservable.addOnce(r));
+    pc.drawImage(w.scene.getEngine().getRenderingCanvas(), 0, 0, 64, 64);
+    return pc.getImageData(0, 0, 64, 64).data;
+  };
+  const luma = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+  const measure = (d) => {
+    const g = [];
+    for (let y = Math.floor(64 * 0.6); y < 64; y++) for (let x = 0; x < 64; x++) g.push(luma(d, (y * 64 + x) * 4));
+    g.sort((a, b) => a - b);
+    const mean = g.reduce((a, b) => a + b, 0) / g.length;
+    const dark = g.slice(0, Math.max(1, Math.floor(g.length / 10))).reduce((a, b) => a + b, 0) / Math.max(1, Math.floor(g.length / 10));
+    const px = [];
+    for (let y = 0; y < Math.floor(64 * 0.3); y++) for (let x = 0; x < 64; x++) { const i = (y * 64 + x) * 4; px.push([d[i], d[i + 1], d[i + 2]]); }
+    const mc = [0, 1, 2].map((k) => px.reduce((a, p) => a + p[k], 0) / px.length);
+    const spread = Math.sqrt(px.reduce((a, p) => a + [0, 1, 2].reduce((s, k) => s + (p[k] - mc[k]) ** 2, 0) / 3, 0) / px.length);
+    return { mean, dark, spread };
+  };
+  const views = [
+    ["roof", () => C.place(-21, 0.5, 1.5708, { from: 14, alpha: 4.1, beta: 1.15, radius: 11 })],
+    ["street", () => C.place(60, 12.6, 1.5708, { from: 14, alpha: 4.71, beta: 1.2, radius: 7 })],
+  ];
+  const hours = [["03:00", 3], ["07:00", 7], ["12:00", 12], ["18:00", 18], ["22:00", 22]];
+  let minLuma = 255, minDark = 255, minSky = 255, k = 0;
+  for (const [label, h] of hours) {
+    scrubTo(h * 60);
+    for (const [view, put] of views) {
+      t.scene(`${view} at ${label}`);
+      put();
+      await sleep(touch ? 2600 : 2200); // the grade and the sky fade in over a few seconds
+      const m = measure(await frame());
+      minLuma = Math.min(minLuma, m.mean); minDark = Math.min(minDark, m.dark); minSky = Math.min(minSky, m.spread);
+      t.event(`city-hours-${label.replace(":", "")}-${view}`, `${label} ${view}: ground mean ${m.mean.toFixed(1)}, darkest tenth ${m.dark.toFixed(1)}, sky spread ${m.spread.toFixed(1)}`);
+      if (m.mean < GROUND_MEAN || m.dark < GROUND_P10) t.problem("bug", `${label} ${view}: the ground is black (mean ${m.mean.toFixed(1)}, darkest tenth ${m.dark.toFixed(1)}; floor ${GROUND_MEAN} / ${GROUND_P10})`);
+      if (m.spread < SKY_SPREAD) t.problem("bug", `${label} ${view}: the sky is one flat colour (spread ${m.spread.toFixed(1)}, floor ${SKY_SPREAD})`);
+      t.progress(++k / (hours.length * views.length));
+    }
+  }
+  t.metric("city.minLuma", Math.round(minLuma * 10) / 10);
+  t.metric("city.minDark", Math.round(minDark * 10) / 10);
+  t.metric("city.skySpread", Math.round(minSky * 10) / 10);
+  t.progress(1);
+}
+
 /* ---------------- sky-cast: five painted skies by the clock, the storm shelf, Sun break's god rays, each strike lighting the deck ---------------- */
 // Setup shortcuts (named): the day bar to each hour (scrubTo), control.place onto the apt roof, a full Charge, and on the phone
 // control.touch + low quality. Everything else is real input: Take control (Enter / a tap), a camera drag up at the sky, E or the
@@ -13719,6 +13798,7 @@ installPlaytest({
     { id: "npc-spots", title: "NPC spots: every neighbor, daily citizen and rescue person stands in open ground (none inside a building collider, each with room to walk up); a screenshot of each spot; neighbors' name tags fully on screen; the phone (390x844) the same", seconds: 120, tags: ["control", "quality", "phone"], description: "Load with ?playtest=npc-spots ({\"touch\":true} for 390x844). Runs the js/npc-spots.js audit on world.solids, takes control, then stands 1.6 m from each NPC spot (neighbors at the hour they are there) with a screenshot per spot. Events npc-spots / npc-spot-<who>; metric npcSpotFailures." },
     { id: "city-audit", title: "City audit: every prop from props.js and cityscape.js sits on its roof or pavement (nothing floating, sunk, coplanar or inside out); six probe cameras (three rooftops, three streets) show no flicker between two frames; he walks each walkable roof along its AC units; shots at desktop and 844x390", seconds: 240, tags: ["look", "photos"], description: "Setup: scrubs to noon, runs day.cityscape.audit(), places six probe cameras for two frames each (the second moved 2 cm). Real input: Enter, WASD with Shift up each walkable roof's ramp and along its row of units, Esc. Events city-audit / city-shots-size / flicker-<spot> / roof-walk-<block>; metrics cityAuditFailures, flickerBlocks." },
     { id: "fill-out", title: "The filled-out city: a rooftop, street props and shop signs, the plaza and clock tower; neon and lamps at night; the street reflects only in the rain he calls", seconds: 200, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, WASD with Shift, the ramp, key 3. Events photo-rooftop / photo-street / photo-plaza / photo-night-* / reflect-forecast / reflect-ability; metrics propsTrees, propsSigns, nightNeon, nightBloom, reflectAbility." },
+    { id: "city-hours", title: "City hours: at 03:00, 07:00, 12:00, 18:00 and 22:00 the roof and the street each show a lit ground (no black street) and a sky with more than one colour; the phone (390x844 low quality) the same", seconds: 60, tags: ["quality", "look", "phone"], description: "Load with ?playtest=city-hours ({\"touch\":true} for 390x844). Takes control, then per hour and view (apt roof, avenue) reads the canvas: ground mean and darkest-tenth luminance, sky RGB spread. Events city-hours-<hhmm>-<view>; metrics city.minLuma, city.minDark, city.skySpread; a problem names the hour that fails. Option {\"noGround\":true} removes the ground texture so the run must fail." },
     { id: "night-glow", title: "District glow after dusk: windows light on schedules with interior-mapped rooms, neon flickers, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares; wet street uses SSR on high and a reflection probe on low; a bolt flickers windows", seconds: 160, tags: ["look", "photos", "phone", "feel"], description: "Day bar beside the car (setup), Enter / Take control tap, scrub 17→01 for window counts, walk the avenue at 22:00, key 3 for rain reflections. Events night-glow-schedule / -street / -reflect / -fps / -flicker; metrics windowOnDusk, windowOnNight, windowOnLate, dynamicLights, nightNeonSigns, nightReflect, nightFps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
@@ -13830,6 +13910,7 @@ installPlaytest({
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "render-grade") await renderGrade(options, t);
+      else if (id === "city-hours") await cityHours(options, t);
       else if (id === "sky-cast") await skyCast(options, t);
       else if (id === "photos") await photos(options, t);
       else if (id === "fill-out") await fillOut(options, t);
