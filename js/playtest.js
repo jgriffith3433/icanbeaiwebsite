@@ -31,7 +31,7 @@ const HUD_PARTS = [
   ["#neighbors-panel", "Neighbors list"], [".abilitybar .ab", "ability"], [".abilitybar .charge", "Charge"],
   [".powerpad button", "power pad"], [".touchpad .stick", "stick"], [".touchpad .jump", "jump"],
   [".tutorial", "tutorial card"], [".ep-hud", "episode HUD"], [".control-hint", "controls hint"],
-  ["#voice-caption", "voice caption"], ["#voices", "Voices"], ["#time-btn", "Time control"], ["#time-drawer", "Time drawer"], ["#update-pill", "New version"],
+  ["#storm-toast", "storm tally card"], ["#voice-caption", "voice caption"], ["#voices", "Voices"], ["#time-btn", "Time control"], ["#time-drawer", "Time drawer"], ["#update-pill", "New version"],
 ];
 /* HUD regions: the parts above grouped as a player sees them (the status card and the tools are the top bar, an ability
    bar of six buttons is one region). The public view holds these to six at any time. */
@@ -10990,6 +10990,69 @@ async function firstRain(options, t) {
   if (after.length < 5) t.problem("bug", `After the first Rain the bar shows ${after.length} verbs (5 expected)`);
   t.progress(1);
 }
+/* The first Rain changes the world and the page says so: the lawn greens and the pond fills (even far from the park), a card
+   names what changed, and the title shows the same tally. Touch: the tap on the street, then the title's line at 390x844. */
+async function stormTally(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Phone: what the storm changed" : "What the storm changed");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day;
+  const P = window.powers || D.powers;
+  const C = D.control;
+  if (!D.memory || !D.slice || !D.tally || !P) { t.problem("bug", "day.memory, day.slice, day.tally or powers is missing"); return; }
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  try { D.memory.reset(); D.firstrain.reset(); if (D.street && D.street.stop) D.street.stop("check"); if (D.title && D.title.quiet) D.title.quiet(); } catch (e) { /* ok */ }
+  if (touch) { document.documentElement.classList.add("touch-ui"); if (C.touch) C.touch(true); }
+  for (let k = 0; k < 4 && C.mode() !== "control"; k++) {
+    if (k > 0 && D.jump) D.jump("19:00");
+    await sleep(400);
+    if (touch) { const tk = $("control"); if (tk && !tk.disabled) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+    await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  }
+  if (C.mode() !== "control") { t.problem("bug", "Take control never handed him over"); return; }
+  if (C.place) C.place(-21, 0.5, 1.5708, {}); // the apt roof side of the avenue: far from the park
+  await t.until(() => document.documentElement.classList.contains("first-rain"), 3000, "the first-Rain bar").catch(() => {});
+  await sleep(500);
+  const before = D.slice.now();
+  t.event("storm-before", `lawn ${before.lawn} shown ${before.lawnShown}, pond ${before.pond}, tally ${D.memory.tally().total}`);
+  const cv = document.querySelector("canvas");
+  const rc = cv.getBoundingClientRect();
+  const x = rc.left + rc.width / 2, y = rc.top + rc.height * 0.62;
+  const sendPtr = (type) => cv.dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: touch ? "touch" : "mouse", isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true }));
+  sendPtr("pointerdown"); await sleep(90); sendPtr("pointerup");
+  const toast = await t.until(() => D.tally.now().on, 6000, "the tally card").then(() => true).catch(() => false);
+  const tn = D.tally.now();
+  const el = $("storm-toast");
+  const r = el ? el.getBoundingClientRect() : null;
+  const inside = !!r && r.left >= 0 && r.right <= window.innerWidth && r.top >= 0 && r.bottom <= window.innerHeight;
+  t.event("storm-card", toast ? `card: ${tn.text}` : "the tally card never showed");
+  if (!toast) t.problem("bug", "After the first Rain no card said what the storm changed");
+  else if (!inside) t.problem("bug", "The tally card runs off the screen");
+  await t.until(() => D.slice.now().lawnShown >= 0.99, 9000, "the lawn to green").catch(() => {});
+  const after = D.slice.now();
+  t.metric("stormLawnShown", after.lawnShown);
+  t.metric("stormPond", after.pond);
+  t.metric("stormTallyRows", D.memory.tally().total);
+  t.metric("stormScrollX", Math.max(0, document.documentElement.scrollWidth - window.innerWidth));
+  t.event("storm-after", `lawn ${after.lawn} shown ${after.lawnShown}, pond ${after.pond}`);
+  if (!(after.lawnShown > before.lawnShown + 0.5)) t.problem("bug", "The park lawn did not green after the first Rain");
+  if (!(after.pond > before.pond + 0.1)) t.problem("bug", "The pond did not fill after the first Rain");
+  await sleep(400);
+  // the title shows it too
+  pressKey("Escape");
+  await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {});
+  if (D.title && D.title.show) D.title.show("check");
+  await sleep(900);
+  const te = $("title-tally");
+  const tr = te && !te.hidden ? te.getBoundingClientRect() : null;
+  const tIn = !!tr && tr.width > 0 && tr.left >= 0 && tr.right <= window.innerWidth && tr.bottom <= window.innerHeight;
+  t.event("storm-title", tr ? `title tally: ${te.textContent}` : "no tally on the title");
+  t.metric("stormTitleTally", tr ? 1 : 0);
+  if (!tIn) t.problem("bug", "The title does not show the tally of what the storm changed");
+  const lw = D.slice.now();
+  if (!(lw.lawnShown >= 0.99)) t.problem("bug", "The lawn is not green on the title screen");
+  t.progress(1);
+}
 async function audioCheck(options, t) {
   const touch = !!(options && options.touch);
   t.scene(touch ? "Phone: first tap" : "First tap");
@@ -11613,6 +11676,16 @@ async function coldStart(options, t) {
       if (jr && !(r.bottom <= jr.top + 2 || r.top >= jr.bottom - 2 || r.right <= jr.left || r.left >= jr.right)) t.problem("bug", "The Bolt button overlaps Jump");
     }
   }
+  {
+    // the late chunk (js/late.js): nothing of episodes, the tornado, wind and fog or moments may be in before the first cast
+    const L0 = D.late && D.late.now ? D.late.now() : null;
+    const early = L0 ? Object.keys(L0.modules).filter((k) => L0.modules[k]) : ["no day.late"];
+    t.event("cold-start-late-before", `modules loaded before gameplay: ${early.join(", ") || "none"} (started ${L0 ? L0.started : "?"})`);
+    t.metric("lateModulesBeforeGameplay", early.length);
+    if (!L0 || early.length) t.problem("bug", `Late modules were loaded before gameplay: ${early.join(", ") || "day.late is missing"}`);
+    if (D.episodes) t.problem("bug", "day.episodes exists before the first cast (episodes.js is in the first chunk)");
+    if (D.powers && D.powers.tornadoLoaded && D.powers.tornadoLoaded()) t.problem("bug", "The tornado module is loaded before the first cast");
+  }
   t.progress(0.4);
 
   // follow the cue (Rain: "Press R for rain" / the Rain button tap): no card is clicked anywhere before it
@@ -11644,6 +11717,24 @@ async function coldStart(options, t) {
   const cast = await waitFor(() => T.bolt != null, 4000);
   if (!cast) { t.problem("blocker", `Pressing the prompted rain never cast it (${cueText})`); return; }
   t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
+  {
+    // after the first cast the late chunk arrives; a tap on Episodes then (loaded or still loading) opens the menu, never nothing
+    const tl = performance.now();
+    const loaded = await waitFor(() => D.late && D.late.now().loaded, 8000);
+    t.event("cold-start-late-after", `late chunk ${loaded ? "loaded" : "NOT loaded"} ${((performance.now() - tl) / 1000).toFixed(1)}s after the cast: ${JSON.stringify(D.late ? D.late.now().modules : {})}`);
+    if (!loaded) t.problem("bug", "The late chunk (episodes, tornado, wind and fog, moments) never loaded after the first cast");
+    const epb = $("episodes");
+    if (!epb) t.problem("bug", "No Episodes button after the first cast");
+    else {
+      if (phone) { const pm = $("phone-menu-btn"); if (pm && !D.phoneMenu.isOpen()) await tapEl(pm); await sleep(200); }
+      if (phone) await tapEl(epb); else await clickEl(epb);
+      const opened = await waitFor(() => { const m = $("episode-menu"); return m && !m.hidden; }, 4000);
+      t.event("cold-start-episodes-tap", `Episodes ${opened ? "opened" : "did NOT open"} after the first cast (button "${epb.textContent}")`);
+      if (!opened) t.problem("bug", "Tapping Episodes after the first cast did nothing");
+      else { epb.click(); await sleep(150); }
+    }
+    if (D.powers && D.powers.tornadoLoaded) t.metric("tornadoLoadedAfterCast", D.powers.tornadoLoaded() ? 1 : 0);
+  }
   // sound: the context woke on that first click/tap/key, the cast made a sound (rain bed up, a cast clip), a step and a UI tick follow
   {
     const ar = audioReport();
@@ -11714,6 +11805,12 @@ async function coldStart(options, t) {
   const free = !document.documentElement.classList.contains("cold-open");
   t.event("cold-start-free", `${since().toFixed(1)}s after Play: HUD ${free ? "back" : "STILL HIDDEN"}, cold open ${D.coldopen.now().phase}`);
   if (!free) t.problem("bug", "The HUD never came back after the first bolt");
+  if (window.__compilesAfterLoad) {
+    // the dusk switch (the cold open's jump to 19:00) must not compile anything: the lamp lights stay enabled and only fade
+    const n = window.__compilesAfterLoad();
+    t.metric("perf.compilesAfterLoad", n);
+    t.event("cold-start-compiles", `${n} shader effects compiled after the loading card; lamp lights ${JSON.stringify(D.cityscape && D.cityscape.info ? D.cityscape.info().dynamicLights : null)}`);
+  }
   checkHud(t, "cold-start");
   // the episode offer is a corner toast that comes after the first cast: under 40 words that waits until the first minute is over (the 40-word limit), the day clock keeps running, clear of the ability bar
   const m0 = D.now().minutes;
@@ -12892,6 +12989,7 @@ installPlaytest({
     { id: "night-glow", title: "District glow after dusk: windows light on schedules with interior-mapped rooms, neon flickers, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares; wet street uses SSR on high and a reflection probe on low; a bolt flickers windows", seconds: 160, tags: ["look", "photos", "phone", "feel"], description: "Day bar beside the car (setup), Enter / Take control tap, scrub 17→01 for window counts, walk the avenue at 22:00, key 3 for rain reflections. Events night-glow-schedule / -street / -reflect / -fps / -flicker; metrics windowOnDusk, windowOnNight, windowOnLate, dynamicLights, nightNeonSigns, nightReflect, nightFps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
+    { id: "storm-tally", title: "What the storm changed: the first Rain (anywhere) greens the park lawn and fills the pond, a card names what changed, and the title shows the same tally", seconds: 45, tags: ["retention", "phone", "first-minute"], description: "Load with ?playtest=storm-tally ({\"touch\":true} for 390x844). Setup: memory reset, first-rain flag, title quiet. Real input: Take control, a tap on the street (far from the park), then Let go and the title. Events storm-before / storm-card / storm-after / storm-title; metrics stormLawnShown, stormPond, stormTallyRows, stormTitleTally, stormScrollX." },
     { id: "first-rain", title: "First Rain: after Take control the ability bar is one glowing Rain icon with a pulsing Tap the street arrow (the other four verbs hidden and refused); a tap on the street calls Rain and the bar opens to five", seconds: 40, tags: ["clarity", "phone", "first-minute"], description: "Load with ?playtest=first-rain ({\"touch\":true} for 390x844). Setup: first-rain flag, street lesson cleared, title quiet. Real input: Take control, a tap on the street. Events first-rain-state / first-rain-refused / first-rain-cast / first-rain-open; metrics firstRainVisibleVerbs, firstRainMinPx, firstRainScrollX." },
     { id: "morning-beats", title: "The morning in animation and sound: the alarm rings and is switched off, he stretches, makes coffee, climbs to the roof; each step has its own sound and no speech pill", seconds: 40, tags: ["story", "audio"], description: "Load with ?playtest=morning-beats. Setup: the clock stepped 7:30-8:15 in 30 s jumps. Events morning-beat-<kind>, morning-beats; metric morningBeats." },
     { id: "audio-check", title: "Audio from the first tap: sound is on by default, the city ambience plays within 2 s of the first tap with no settings change, Rain, Gale, Fog, Sun break and Lightning each play a distinct cast sound, music and ambience duck at least 6 dB under a voice line so the line is the loudest bus, and the 44 px sound toggle keeps the player's mute", seconds: 60, tags: ["audio", "phone", "first-minute"], description: "Load with ?playtest=audio-check ({\"touch\":true} for 390x844). Setup: saved mute cleared, title quiet. Real input: one tap or click on the canvas, Enter or the Take control button, taps on the sound toggle; casts by the named shortcut powers.command; a voiced line by voice.say. Events audio-before-tap / audio-ambience / audio-cast-<power> / audio-casts / audio-duck / audio-report; metrics audioAmbienceMs, audioCastsDistinct, audioDuckMusicDb, audioDuckAmbienceDb, audioToggleMinPx. Run at 1280x720 and 390x844 touch." },
@@ -13015,6 +13113,7 @@ installPlaytest({
       else if (id === "audio-check") await audioCheck(options, t);
       else if (id === "morning-beats") await morningBeats(options, t);
       else if (id === "first-rain") await firstRain(options, t);
+      else if (id === "storm-tally") await stormTally(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "ui-art-kit") await uiArtKit(options, t);

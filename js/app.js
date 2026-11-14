@@ -27,11 +27,10 @@ import "./rain.js"; // heavy rain: splashes and ripples from a height map, skyli
 import "./aftermath.js"; // Sun break after rain: steam, rainbow at 42°, dripping gutters, pigeons home, umbrellas fold (after rain + sky)
 import "./ui-art.js"; // UI art kit: verb icons, frames, ranks, busts, fonts (before powers paints the bar)
 import "./powers.js"; // Pressure, and the storm, lightning, gust and tornado he spends it on
-import "./windfog.js"; // wind and fog you can see: a shader bend, ribbons, leaves, flags, cloth, umbrellas, ground-fog slices (after powers, weather, crowd)
 import "./barks.js"; // Small Weather's needs and weather reactions in the log, once each per day (docs/voice-style.md)
 import "./voice.js"; // Small Weather's spoken lines (DoD Eric); listens to power / weather / control
 import "./pilot.js"; // Pilot: the AI that runs his day — schedule nudges, take/let-go, wrist ring (after voice.js)
-import "./episodes.js"; // chapter episodes: offer on take, goals, forecast score card
+import { loadLate } from "./late.js"; // the Episodes button now; episodes.js (+finale), windfog.js, moments.js and tornado.js load after the first cast or on idle
 import "./neighbors.js"; // three neighbors: look, home, day, speech-bubble beats, rewards
 import "./phonemenu.js"; // phone: Neighbors and Episodes behind one Menu button (after both)
 import "./tutorial.js"; // first visit: take control, move, jump, one bolt, let go; skippable
@@ -40,11 +39,11 @@ import "./coldopen.js"; // a new player's first Play: the roof at dusk, one prom
 import "./firstrain.js"; // clarity: one glowing Rain icon and a "Tap the street" arrow until the first Rain; the other four verbs wait
 import "./heroprompt.js"; // one in-world prompt over him until the first cast: "Hold V to call wind"
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
-import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build
 import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
 import "./garden.js"; // Birdie's wilting pots and dry lawn tufts that the first Rain revives (after slice.js)
 import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)
+import "./tally.js"; // what the storm changed: a card after a deed, the same tally on the title (after memory)
 import "./asks.js"; // asks in the world: a plumbob over the neighbor who asks, the verb icon over the place it is for (after street, neighbors, memory)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
 import "./titlesound.js"; // night-city ambience under the title, a click on its buttons, a whoosh on the first Gust (before title.js)
@@ -54,6 +53,14 @@ import "./title.js"; // the title screen: the skyline, Play and Episodes (opens 
 import { installHawkesPerf } from "./hawkes-perf.js"; // Babylon 9 root-cause perf & leak monitor (window.hawkesPerf)
 import HavokPhysics from "@babylonjs/havok";
 import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
+
+/* The late chunk (js/late.js) normally starts after the first cast. A bot's tab for any scenario but cold-start loads it here, before the
+   page is up, so those scenarios see episodes, wind and fog, moments and the tornado as they always did (cold-start measures the real order). */
+{
+  let botParam = null;
+  try { botParam = new URLSearchParams(location.search).get("playtest"); } catch (e) { /* no location */ }
+  if (botParam && botParam !== "cold-start") await loadLate();
+}
 
 /* The loading card (index.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
 const loading = window.__loading || { set() {}, done() {}, fail() {} };
@@ -65,7 +72,11 @@ const ready = { model: false, frame: false, title: false, lights: false };
    the first use of each power never compile. It is still bounded: LIGHTS_CAP_MS ends the gate whatever the GPU does (a slow or
    software GL, a compile that never settles), and the warm-up carries on behind the title. One timeout, no polling. */
 const LIGHTS_CAP_MS = (typeof window !== "undefined" && (window.innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches))) ? 3500 : 6000;
-const maybeDone = () => { if (ready.frame && ready.title && ready.lights) loading.done(); };
+const effectCount = () => { try { const e = window.BABYLON && window.BABYLON.EngineStore && window.BABYLON.EngineStore.LastCreatedEngine; return e && e._compiledEffects ? Object.keys(e._compiledEffects).length : -1; } catch (err) { return -1; } };
+let loadBase = null;
+/* perf.compilesAfterLoad: shader effects compiled after the loading card went (the playtest reads window.__compilesAfterLoad()) */
+window.__compilesAfterLoad = () => (loadBase == null || loadBase < 0 ? 0 : Math.max(0, effectCount() - loadBase));
+const maybeDone = () => { if (ready.frame && ready.title && ready.lights) { if (loadBase == null) loadBase = effectCount(); loading.done(); } };
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
