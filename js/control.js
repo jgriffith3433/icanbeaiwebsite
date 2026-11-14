@@ -16,6 +16,7 @@
    ========================================================================== */
 
 const TAU = Math.PI * 2;
+const POSE_MAX_SPEED = 0.45; // m/s: the cast/throw pose (standing, boots still) shows only below this
 const damp = (cur, target, dt, speed) => cur + (target - cur) * (1 - Math.exp(-speed * dt));
 const dampAngle = (cur, target, dt, speed) => {
   const d = ((((target - cur + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
@@ -741,7 +742,10 @@ function install() {
     cs.lookAt = performance.now();
   }
   function cameraTake() {
-    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit", "angularSensibilityX", "angularSensibilityY"].forEach((k) => (saved[k] = camera[k]));
+    // a hand-back still waiting on its limits keeps the day's own (saved) ones: the control's wider ones are on the camera now
+    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit"].forEach((k) => { if (!limitsPending[k]) saved[k] = camera[k]; });
+    limitsPending = {};
+    ["angularSensibilityX", "angularSensibilityY"].forEach((k) => (saved[k] = camera[k]));
     const watch = { alpha: camera.alpha, beta: camera.beta, radius: camera.radius, x: camera.target.x, y: camera.target.y, z: camera.target.z };
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => ((saved[k] = kb[k]), (kb[k] = [])));
     camera.lowerRadiusLimit = 0.2; // a wall behind him may pull the camera in this close, inside his own head (the wheel stops at 1.5)
@@ -806,9 +810,26 @@ function install() {
     himVis = v;
     if (world.person) world.person.getChildMeshes(false).forEach((m) => (m.visibility = v));
   }
+  let limitsPending = {};
+  function settleLimits() {
+    const ok = {
+      lowerRadiusLimit: () => camera.radius >= saved.lowerRadiusLimit,
+      upperRadiusLimit: () => camera.radius <= saved.upperRadiusLimit,
+      lowerBetaLimit: () => camera.beta >= saved.lowerBetaLimit,
+      upperBetaLimit: () => camera.beta <= saved.upperBetaLimit,
+    };
+    for (const k of Object.keys(limitsPending)) {
+      if (saved[k] == null || ok[k]()) { camera[k] = saved[k]; delete limitsPending[k]; }
+    }
+  }
   function cameraGive() {
     if (himVis !== 1) setHimVis(1);
-    ["lowerRadiusLimit", "upperRadiusLimit", "lowerBetaLimit", "upperBetaLimit", "angularSensibilityX", "angularSensibilityY"].forEach((k) => (camera[k] = saved[k]));
+    ["angularSensibilityX", "angularSensibilityY"].forEach((k) => (camera[k] = saved[k]));
+    /* The day's camera limits (radius >= 2.5, beta 0.35..1.42) are tighter than the control's (0.2, 0.25..1.62). Babylon clamps
+       at once when a limit is restored under a camera outside it, which moved the camera metres in one frame (the feel sensor's
+       camera-jump on a Let go from a squeezed or low camera). Restore each when the damped day camera is inside it. */
+    limitsPending = { lowerRadiusLimit: 1, upperRadiusLimit: 1, lowerBetaLimit: 1, upperBetaLimit: 1 };
+    settleLimits();
     camReset();
     if (kb) ["keysUp", "keysDown", "keysLeft", "keysRight"].forEach((k) => (kb[k] = saved[k] || kb[k]));
     glidePull = 0;
@@ -1670,7 +1691,10 @@ function install() {
       syncUi();
     }
     const gp = readGamepad();
-    if (mode === "schedule") return null;
+    if (mode === "schedule") {
+      if (limitsPending.lowerRadiusLimit || limitsPending.upperRadiusLimit || limitsPending.lowerBetaLimit || limitsPending.upperBetaLimit) settleLimits();
+      return null;
+    }
     since += dt;
     let text;
     if (mode === "control") {
@@ -1728,7 +1752,10 @@ function install() {
     // The cast and throw poses stand still: on the move or in the air he keeps his walk, run, jump or float (a
     // standing pose sliding along the ground reads as gliding feet).
     const wantPose = day.powers && day.powers.pose ? day.powers.pose() : null;
-    const posed = wantPose && s.grounded && s.speed < 0.8 ? wantPose : null;
+    /* The cast pose plays at 1x and stands still, so it may only show where the body is (nearly) still: the animation trace
+       counts boots under 30% of the body's speed from 0.5 m/s as foot slide, and a cast posed at 0.5-0.8 m/s slid. Above
+       POSE_MAX_SPEED he keeps his walk. */
+    const posed = wantPose && s.grounded && s.speed < POSE_MAX_SPEED ? wantPose : null;
     // a turn of more than 90 deg is a step: he walks round (his feet move) instead of spinning on the spot
     const stepping = s.face && s.face.step && s.grounded && s.speed < 0.8;
     const shownAnim = (stepping ? "walk" : null) || posed || (animOverride && mode === "control" ? animOverride : null) || s.anim;
