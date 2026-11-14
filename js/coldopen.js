@@ -341,7 +341,6 @@ export function startColdOpen() {
     if (B0 && day.neighbors && day.neighbors.stand) day.neighbors.stand("birdie", B0.x, B0.z);
     const pushMs = ((dive ? dive.secs : cfg.camera.secs) + 0.2) * 1000;
     const gSecs = (cfg.glance && cfg.glance.secs) || 0;
-    const speakAt = pushMs + (gSecs ? gSecs * 1000 + 300 : 0);
     if (gSecs) later(() => { if (on) glance("birdie", gSecs); }, pushMs);
     // the cell: far thunder as it arrives, then his line, then the prompt
     const W = window.weather;
@@ -353,7 +352,7 @@ export function startColdOpen() {
       prompt.hidden = false;
       requestAnimationFrame(() => prompt.classList.add("on"));
       emit("prompt", { text: promptTxt.textContent });
-    }, Math.max((cfg.firstLine || 1.4) * 1000, speakAt));
+    }, Math.max((cfg.firstLine || 1.4) * 1000, pushMs)); // the prompt waits for the push-in only, not the glance at Birdie: the first instruction comes first
   }
   function tryTake(frames) {
     const C = day.control;
