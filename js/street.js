@@ -135,6 +135,9 @@ html.street-wait .abilitybar .ab.locked{display:none}
     cue.ring.rotation.y += dt * 1.2;
     cue.beam.position.set(t.x, gy + 10, t.z);
     cue.beamM.alpha = 0.14 + 0.05 * Math.sin(performance.now() / 200);
+    // a 1.3 m shaft is a solid blue wall at arm's length: it fades out as the camera comes within 22 m and is gone by 9 m
+    const cam = cue.scene.activeCamera;
+    if (cam) cue.beam.visibility = Math.max(0, Math.min(1, (Math.hypot(cam.position.x - t.x, cam.position.z - t.z) - 9) / 13));
     cue.at = t;
   }
   function placeCue(s) {
