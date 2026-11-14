@@ -11002,6 +11002,7 @@ async function coldStart(options, t) {
   if (D.tutorial && D.tutorial.reset) { /* the cold open replaces its card: a new player must not get both */ }
   D.title.show("playtest");
   await sleep(700);
+  if (D.coldopen.now().on) t.problem("blocker", "A cold open from before the setup is still running (letting go must end it)");
   if (!D.coldopen.pending()) t.problem("blocker", "A player with no saved keys isn't pending the cold open");
 
   const T = {}; // seconds since Play, by name
