@@ -1674,6 +1674,8 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
     if (!offerArmed || active || !offer.hidden || declinedTake) return;
     const co = window.day.coldopen;
     if (co && co.active && co.active()) return; // shown when the cold open ends
+    // a new player's first minute stays under 40 words: the toast waits until `first-min` (js/coldopen.js) is over
+    if (document.documentElement.classList.contains("first-min")) { setTimeout(offerAfterCast, 3000); return; }
     offerArmed = false;
     const ep = pickOffer();
     if (ep) showOffer(ep);
