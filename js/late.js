@@ -59,18 +59,29 @@ export function loadLate() {
     });
   });
 
-  // the first cast that wasn't denied, or idle once he's the player's
+  /* The chunk's parse and the shader compiles windfog/tornado start must not land inside a cast: the first Rain used to start it
+     the instant it fired (a 1155 ms frame). It waits for QUIET_MS without a cast (each cast pushes it back), then for an idle
+     callback; a take with no cast starts it after QUIET_MS + a cap. One timer at a time, no polling. */
+  const QUIET_MS = 4000;
+  let timer = 0;
+  let armed = false;
+  const later = (ms) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (window.requestIdleCallback) requestIdleCallback(() => loadLate(), { timeout: 6000 });
+      else loadLate();
+    }, ms);
+  };
   const onPower = (e) => {
     const d = e.detail || {};
     if (d.action === "denied" || d.denied) return;
-    window.removeEventListener("day:power", onPower);
-    loadLate();
+    armed = true;
+    later(QUIET_MS); // every real cast pushes the load back
   };
   const onControl = (e) => {
     if (((e.detail || {}).action) !== "take") return;
     window.removeEventListener("day:control", onControl);
-    if (window.requestIdleCallback) requestIdleCallback(() => loadLate(), { timeout: 8000 });
-    else loadLate();
+    if (!armed) later(QUIET_MS + 2000);
   };
   window.addEventListener("day:power", onPower);
   window.addEventListener("day:control", onControl);
