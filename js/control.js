@@ -994,7 +994,9 @@ function install() {
       headPickRay.origin.set(hx, hy, hz);
       headPickRay.direction.set((cx - hx) / len, (cy - hy) / len, (cz - hz) / len);
       headPickRay.length = len;
-      const hit = world.scene.pickWithRay(headPickRay, notHim, true);
+      // nearest hit (fastCheck false): a fast check returns the first mesh found, not the closest, so a far hit read as "clear"
+      // while a nearer wall sat between his head and the camera (the feel sensor's camera-blocked)
+      const hit = world.scene.pickWithRay(headPickRay, notHim, false);
       if (!hit || !hit.hit || hit.distance >= len - 0.3) return r;
       r = Math.max(0.2, r * Math.max(0.1, (hit.distance - 0.6) / len));
     }
