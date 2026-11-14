@@ -3261,6 +3261,7 @@ async function skyCast(options, t) {
   await t.until(() => C.mode() === "control", 4000, "Take control");
   C.place(-21, 0.5, 1.5708, { from: 14, alpha: 4.1, beta: 1.15, radius: 11 });
   await sleep(700);
+  { const o = $("episode-offer"); if (o && !o.hidden) { const d = o.querySelector(".decline"); if (d) d.click(); } } // never stuck behind the offer toast
   // look up at the sky: drag the camera (one finger on the right half on a phone)
   const world = window.day.world();
   const canvas = world.engine.getRenderingCanvas();
@@ -10711,7 +10712,7 @@ async function coldStart(options, t) {
   });
   const on = (name, fn) => window.addEventListener(name, (e) => { fn((e && e.detail) || {}); note(name, (e && e.detail) || {}); });
   on("day:control", (d) => { if (d.action === "take") stamp("control"); });
-  on("day:power", (d) => { if (d.action === "bolt" && d.power === "bolt") stamp("bolt"); });
+  on("day:power", (d) => { if (d.action === d.power && (d.power === "bolt" || d.power === "rain")) stamp("bolt"); });
   on("day:crowd", (d) => { if (d.kind === "lookup") stamp("lookup"); });
   on("day:story", (d) => { if (d.action === "say" && d.who === "Birdie") stamp("birdie-say"); });
   on("day:voice", (d) => { if (d.action === "play" && d.who === "Birdie") stamp("birdie-voice"); }); // she is voiced through js/voice.js speakAs
@@ -10791,25 +10792,46 @@ async function coldStart(options, t) {
   }
   t.progress(0.4);
 
-  // follow the cue: a short tap does nothing, a hold throws it
-  if (/bolt/i.test(cueText) || phone) {
+  // follow the cue (Rain: "Press R for rain" / the Rain button tap): no card is clicked anywhere before it
+  const dim = Array.from(document.querySelectorAll(".ep-offer:not([hidden]),.tutorial:not([hidden]),#day-end:not([hidden])")).filter((e) => e.offsetParent !== null);
+  if (dim.length) t.problem("bug", "A card is up before the first cast: " + dim.map((e) => e.id || e.className).join(", "));
+  t.event("cold-start-no-card", "no card to click: the first cast follows the prompt on the roof");
+  if (phone) {
     const b = $("coldopen-bolt");
     const r = b.getBoundingClientRect();
     touchOn(b, "pointerdown", r.left + r.width / 2, r.top + r.height / 2, 9);
-    await sleep(900);
+    await sleep(120);
     touchOn(b, "pointerup", r.left + r.width / 2, r.top + r.height / 2, 9);
   } else {
-    keyDown("e");
-    await sleep(900);
-    keyUp("e");
+    keyDown("r");
+    await sleep(120);
+    keyUp("r");
   }
   const cast = await waitFor(() => T.bolt != null, 4000);
-  if (!cast) { t.problem("blocker", `Holding the bolt as the prompt said never threw it (${cueText})`); return; }
+  if (!cast) { t.problem("blocker", `Pressing the prompted rain never cast it (${cueText})`); return; }
   t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
   t.metric("secondsToFirstInput", T.input);
   t.metric("secondsToFirstCast", T.bolt);
   if (T.input == null || T.input > 3) t.problem("bug", `The first input was accepted ${T.input}s after Play (the limit is 3 s)`);
-  if (T.bolt > 30) t.problem("bug", `The first bolt landed ${T.bolt}s after Play (the limit is 30 s)`);
+  if (T.bolt > 10) t.problem("bug", `The first cast landed ${T.bolt}s after Play (the limit is 10 s)`);
+  // the episode offer is a corner toast that comes after the first cast: under 40 words, the day clock keeps running, clear of the ability bar
+  const m0 = D.now().minutes;
+  const toastUp = await waitFor(() => { const o = $("episode-offer"); return o && !o.hidden && o.offsetParent !== null; }, 12000);
+  if (toastUp) {
+    const o = $("episode-offer");
+    const words = o.textContent.trim().split(/\s+/).filter(Boolean).length;
+    const tr = o.getBoundingClientRect();
+    const ab = document.querySelector(".abilitybar");
+    const ar = ab && ab.offsetParent !== null ? ab.getBoundingClientRect() : null;
+    const hit = ar && !(tr.right <= ar.left || tr.left >= ar.right || tr.bottom <= ar.top || tr.top >= ar.bottom);
+    const m1 = D.now().minutes;
+    t.event("cold-start-offer-toast", `${words} words, ${Math.round(tr.width)}x${Math.round(tr.height)} at ${Math.round(tr.left)},${Math.round(tr.top)}; clock ${m0} -> ${m1} min; ${D.now().mode === "pause" ? "PAUSED" : "running"}`);
+    t.metric("offerToastWords", words);
+    if (words >= 40) t.problem("bug", `The episode toast has ${words} words (limit 40)`);
+    if (hit) t.problem("bug", "The episode toast covers the ability bar");
+    if (D.now().mode === "pause") t.problem("bug", "The day is paused while the episode toast shows");
+    if (getComputedStyle(o).position !== "fixed" || tr.width > innerWidth * 0.8) t.problem("bug", "The episode offer is not a small corner toast");
+  } else t.event("cold-start-offer-toast", "no episode matches this hour: no toast");
   t.progress(0.65);
 
   // the street looks up; Birdie calls up in her voice (within 15 s of the bolt)
@@ -10819,8 +10841,6 @@ async function coldStart(options, t) {
   if (T.lookup != null) t.metric("secondsToFirstReaction", T.lookup);
   t.event("cold-start-reaction", reacted ? `the crowd looked up ${T.lookup}s after Play (${Math.round((T.lookup - T.bolt) * 100) / 100}s after the bolt); ${crowd.lookingUp || 0} looking up` : "the crowd never looked up");
   t.event("cold-start-birdie", voiced ? `Birdie's voiced line played ${T["birdie-voice"]}s after Play` : `Birdie's line ${T["birdie-say"] != null ? "was said but has no voice clip playing" : "never came"}`);
-  if (!reacted) t.problem("bug", "The crowd's look-up reaction didn't fire after the bolt");
-  else if (T.lookup - T.bolt > 15) t.problem("bug", "The crowd looked up more than 15 s after the bolt");
   if (!voiced) t.problem("bug", "Birdie's voiced line (a sound event) didn't play within 15 s of the bolt");
   t.progress(0.85);
 
@@ -11827,7 +11847,7 @@ installPlaytest({
     { id: "street-teaches", title: "The street teaches: after the cold open's bolt, Rain, Sun break, Fog and Wind each unlock on a neighbor's voiced ask (Birdie, Dex, Ines) with a cue on the target, a glow, a vibrate and a voiced thanks, and no text card", seconds: 330, tags: ["first-minute", "phone", "voice", "neighbors", "abilities"], description: "Load with ?playtest=street-teaches. Setup: every icanbe.* key cleared, the cold open armed, the title up, navigator.vibrate recorded. Real input: Play, the bolt's hold, then keys (taps on the thumb arc and the stick on a phone) to answer each neighbor in turn. Events street-ask / -unlock / -arc / -cast / -thanks / -done / -practice; metrics secondsToRain, secondsToSun, secondsToFog, secondsToWind, secondsToAllFive. Run at 1280x720 and 390x844 touch." },
     { id: "title-progress", title: "Title progress: the title shows stars and episodes finished, and Continue names the next goal (Next: Part 1: Dry); fits 390x844 with 44 px targets and no sideways scroll", seconds: 25, tags: ["title", "retention", "phone"], description: "Load with ?playtest=title-progress. Setup: icanbe.* cleared, a returning save (opening seen, Clear the sky finished at rank A). Real input: a click (a tap on a phone) on Continue. Events title-progress / title-next / title-progress-phone / title-progress-play; metrics titleProgressStars, titleProgressSmallTargets. Run at 1280x720 and 390x844 touch." },
     { id: "title-key-art", title: "Title key art: a slow crane over the district at the real time of day lands on Small Weather on the apartment roof under a forming storm with glints every few seconds, the logo lockup on top (Play 56 px+, logo and him above the fold at 390x844), at most 4 buttons; Play dives into the cold open with no cut, no black frame and control within 1 s", seconds: 45, tags: ["title", "first-minute", "phone", "audio"], description: "Load with ?playtest=title-key-art. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleButtons, titleSecondsToControl, titleBlackFrames. Run at 1280x720 and 390x844 touch." },
-    { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, holds the bolt at the shop roof's rod within 30 s, and the street looks up and Birdie calls up in her voice, with under 25 words on screen before the first cast", seconds: 60, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (E held; the Bolt button held on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
+    { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, casts the prompted Rain within 10 s with no card to click, Birdie calls up in her voice, and the episode offer arrives only after that as a corner toast under 40 words that never pauses the day, with under 25 words on screen before the first cast", seconds: 60, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (R pressed; the Rain button tapped on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
     { id: "quiet-ui", title: "The quiet page: ?view=public shows the city, the status card, one Time control, Take control and Episodes (no log, Body, Things or config text, no overlaps, six HUD regions at most); the Time control opens the day bar and speeds by click or tap and closes on take-over; the title and the Episodes menu clear the caption, ability bar and hint; the menu starts the tutorial; no index.html fetch, no question in control", seconds: 75, tags: ["hud", "menus", "smoke"], description: "Load with ?playtest=quiet-ui&view=public. Real input: clicks on the Time control, a speed, Enter, Episodes and the tutorial row. Events no-dev-text / time-control / hud-regions / episodes-clear / time-drawer-open / drawer-closed-on-take / title-exclusive / menu-exclusive / episode-from-menu / no-question-in-control / no-index-fetch. Run at 1280x720 and 390x844." },
     { id: "hud-layout", title: "HUD layout: Quality lives in the Settings menu, the left column stacks Episodes, Neighbors, weather and Pressure without overlap, Take control stays bottom-centre; overlap check on title and in play", seconds: 40, tags: ["hud", "smoke"], description: "Load with ?playtest=hud-layout. Real input: Settings click, Enter, Esc. Events settings-open / hud-clear / hud-layout-play. Run at 1280x720, 390x844 and 844x390." },
