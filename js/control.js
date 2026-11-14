@@ -1013,7 +1013,7 @@ function install() {
   const notHim = (m) => m.isPickable !== false && m.isEnabled() && m.isVisible !== false && !(world.person && m.isDescendantOf(world.person));
   function headClear(t, dx, dy, dz, r) {
     const hx = s.x, hy = s.y + 1.5, hz = s.z;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6; i++) { // each hit pulls the camera in front of it; more than one wall (a room's wall, then its furniture) needs more passes
       const cx = t.x + dx * r, cy = t.y + dy * r, cz = t.z + dz * r;
       const len = Math.hypot(cx - hx, cy - hy, cz - hz);
       if (len < 0.5) return r;
@@ -1028,6 +1028,16 @@ function install() {
     }
     return r;
   }
+  /* The camera's own input pass (a pinch's or wheel's inertia) runs after cameraFollow and used to push the radius past the wall-safe
+     one for a frame or more, so the camera sat behind a wall (the feel sensor's camera-blocked, on a phone's pinch). Keep it to what
+     cameraFollow found safe; the asked-for zoom is remembered (cs.zoomIn) and becomes wantRadius next frame. */
+  camera.onAfterCheckInputsObservable.add(() => {
+    if (mode !== "control" || lastRadius == null || cs.safeR == null || cs.blend || push.on) return;
+    if (camera.radius > lastRadius + 1e-3 && camera.radius > cs.safeR + 0.02) {
+      cs.zoomIn = camera.radius;
+      camera.radius = Math.min(camera.radius, Math.max(lastRadius, cs.safeR));
+    }
+  });
   function cameraFollow(dt, look) {
     if (cine()) return; // a moment's cut-away camera (js/moments.js) has the view
     const nowMs = performance.now();
@@ -1048,7 +1058,9 @@ function install() {
       }
     }
     // the player's zoom (wheel, pinch) since the last frame is what they want; walls only ever shorten it
-    if (!push.on && lastRadius != null && !cs.blend && Math.abs(camera.radius - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, camera.radius - glidePull));
+    const zoomSeen = cs.zoomIn != null ? cs.zoomIn : camera.radius; // the zoom the player asked for, even if the input pass was held back from it
+    cs.zoomIn = null;
+    if (!push.on && lastRadius != null && !cs.blend && Math.abs(zoomSeen - lastRadius) > 1e-3) wantRadius = Math.max(1.5, Math.min(16, zoomSeen - glidePull));
     if (cs.lookDown || Math.abs(stick.x) > 0.35 || keys.has("l") || keys.has("r")) cs.lookAt = nowMs; // steering sideways is turning, not idling (the camera would chase him round)
     const touch = touchMode();
     if (!push.on && !cs.cast && !cs.blend && nowMs - cs.lookAt > CAM.recenterAfter * 1000) {
@@ -1275,6 +1287,7 @@ function install() {
     const dz = Math.sin(camera.alpha) * sbF;
     r = Math.min(r, sphereClear(t.x, t.y, t.z, dx, dy, dz, r));
     if (r > 0.3) r = headClear(t, dx, dy, dz, r);
+    cs.safeR = r; // the most the camera may sit out this frame: the input pass below must not push it past this
     /* Pull in fast but never in one jump: a thin edge entering the cast used to cut the radius by metres in a single frame, a
        visible camera snap. A slow frame (dt up to 0.1 s) is capped at 2.4 m so it stays under the feel sensor's 3 m, and it eases
        out slowly after. */
