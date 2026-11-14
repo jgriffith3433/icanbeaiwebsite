@@ -1240,8 +1240,11 @@ function install() {
     /* Pull in fast but never in one jump: a thin edge entering the cast used to cut the radius by metres in a single frame, a
        visible camera snap. A slow frame (dt up to 0.1 s) is capped at 2.4 m so it stays under the feel sensor's 3 m, and it eases
        out slowly after. */
-    if (cs.blend) camera.radius = Math.min(r, cs.blend.r + (r - cs.blend.r) * smooth01(cs.blend.t / CAM.blendSecs));
-    else if (push.on) camera.radius = r;
+    /* The blend and the take-over push also pull in by at most CAM.stepM a frame: taking control in a room with the watch camera
+       at 10+ m used to set the radius straight to the wall's room (3+ m in one frame, the feel sensor's camera-jump). */
+    const stepDown = (to) => (to < camera.radius ? Math.max(to, camera.radius - Math.min(CAM.stepM, Math.max(0.5, 60 * dt))) : to);
+    if (cs.blend) camera.radius = stepDown(Math.min(r, cs.blend.r + (r - cs.blend.r) * smooth01(cs.blend.t / CAM.blendSecs)));
+    else if (push.on) camera.radius = stepDown(r);
     else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(CAM.stepM, Math.max(0.5, 60 * dt)));
     else { // eases out on a critically damped spring (about 0.4 s to settle), never overshooting the room there is
       let nr;
