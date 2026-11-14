@@ -40,9 +40,19 @@ function makeCloudField() {
       let f = 1;
       let amp = 0.55;
       for (let o = 0; o < 3; o++) {
-        const xi = Math.floor((x / N) * 5 * f);
-        const yi = Math.floor((y / N) * 4 * f);
-        a += amp * hash(xi, yi);
+        // smooth value noise (bilinear on a smoothstep): the old nearest-cell lookup scaled up to a navy mosaic of hard
+        // rectangles, which a long wipe (a throttled phone's clock jump) showed as a failed render
+        const fx = (x / N) * 5 * f;
+        const fy = (y / N) * 4 * f;
+        const xi = Math.floor(fx);
+        const yi = Math.floor(fy);
+        let tx = fx - xi;
+        let ty = fy - yi;
+        tx = tx * tx * (3 - 2 * tx);
+        ty = ty * ty * (3 - 2 * ty);
+        const top = hash(xi, yi) + (hash(xi + 1, yi) - hash(xi, yi)) * tx;
+        const bot = hash(xi, yi + 1) + (hash(xi + 1, yi + 1) - hash(xi, yi + 1)) * tx;
+        a += amp * (top + (bot - top) * ty);
         f *= 2.1;
         amp *= 0.5;
       }
