@@ -1525,6 +1525,13 @@ import { pickRate } from "./variety.js";
     if (d.action === "start" || d.action === "ready") { sceneWhoosh(d.action === "start", 0.06); setTimeout(() => { try { if (ctx()) playFill(hour() % 24); } catch (err) { /* */ } }, 600); }
   });
 
+  /* The cold open's start, landing and end, and every take/let-go, are the moments a throttled phone compiles shaders and parks the
+     main thread (phone-touch read 42.64 s between two sound starts). Each hands the city one street fill 0.5 s after, so the next
+     stretch begins with a sound start whatever the 1 s timer did during the block. */
+  const fillSoon = () => setTimeout(() => { try { if (ctx() && clockMs() - lastHeardMs > 1500) playFill(hour() % 24); } catch (err) { /* ambience only */ } }, 500);
+  window.addEventListener("day:coldopen", (e) => { const a = e && e.detail && e.detail.action; if (a === "start" || a === "landed" || a === "end" || a === "prompt") fillSoon(); });
+  window.addEventListener("day:control", fillSoon);
+
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
     // Each watcher on its own: one that throws every frame must not take the city's ambience down with it.
