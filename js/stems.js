@@ -267,12 +267,21 @@ export function startStems(dayApi) {
     if (!b || !b.on) return false;
     S.loading = true;
     try {
-      const filePromise = Promise.all(LAYERS.map((k) => make(b.ctx, k)));
+      const filePromise = (async () => {
+        const out = [];
+        for (const k of LAYERS) { out.push(await make(b.ctx, k)); await new Promise((r) => setTimeout(r, 60)); }
+        return out;
+      })();
       let timedOut = false;
       const got = await Promise.race([
         filePromise,
         new Promise((res) => setTimeout(() => { timedOut = true; res(null); }, 1800)),
-      ]).then((res) => res || Promise.all(LAYERS.map((k) => renderSynth(k))));
+      ]).then(async (res) => {
+        if (res) return res;
+        const out = []; // one graph at a time with a frame between, so no single task holds the page
+        for (const k of LAYERS) { out.push(await renderSynth(k)); await new Promise((r) => setTimeout(r, 60)); }
+        return out;
+      });
       if (got.some((g) => !g.buf)) { S.loading = false; return false; }
       const len = Math.min(...got.map((g) => g.buf.length));
       const t0 = b.ctx.currentTime + 0.06;
@@ -423,7 +432,9 @@ export function startStems(dayApi) {
   const first = () => {
     if (S.firstInput) return;
     S.firstInput = true;
-    setTimeout(() => prepare(), 0);
+    // Not inside the cast: building and rendering three 32 s offline graphs on the tap's own tick was a ~1.9 s frame on a phone.
+    // Wait a beat past the cast, then an idle slice (the ambience covers the roof meanwhile).
+    setTimeout(() => { if (window.requestIdleCallback) requestIdleCallback(() => prepare(), { timeout: 2000 }); else prepare(); }, 1500);
   };
   window.addEventListener("day:power", (ev) => {
     const d = (ev && ev.detail) || {};
