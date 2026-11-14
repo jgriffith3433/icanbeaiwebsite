@@ -1580,6 +1580,15 @@
       const keep = boxProps();
       return me.root.getChildMeshes(false).filter((m) => m !== shadowProxy && !keep.includes(m) && !(skin && skin.meshes.includes(m)));
     };
+    /* While his model is on its way the stand-in stays hidden (app.js calls this at boot): the player never sees the box body swap
+       for the real one. setSkin(model) keeps it hidden; setSkin(null) (the load failed) draws it. */
+    function holdStandIn(on) {
+      if (skin) return;
+      figureMeshes().forEach((m) => {
+        m.setEnabled(!on && figureDrawn);
+        if (on) shadows.removeShadowCaster(m, false); else shadows.addShadowCaster(m, false);
+      });
+    }
     function setSkin(s) {
       if (skin) skin.root.dispose();
       skin = null;
@@ -2956,6 +2965,7 @@
       avatar, // the stand-in figure the player moves
       /* his rigged model (js/small-weather.js) over the figure; null takes it off */
       setSkin,
+      holdStandIn,
       heroDrawn,
       skin: () => skin,
       skinHips: FOOT, // his hips' height standing: the model is scaled to it
