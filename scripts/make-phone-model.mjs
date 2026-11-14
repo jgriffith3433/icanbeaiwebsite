@@ -32,5 +32,5 @@ console.log(`${OUT}: ${(statSync(OUT).size / 1024).toFixed(0)} KB (full ${(statS
 
 // The decoder as a classic script that defines window.MeshoptDecoder (what Babylon's MeshoptCompression waits for).
 const cjs = readFileSync("node_modules/meshoptimizer/meshopt_decoder.cjs", "utf8");
-writeFileSync("models/meshopt_decoder.js", `/* meshoptimizer ${JSON.parse(readFileSync("node_modules/meshoptimizer/package.json", "utf8")).version} decoder (MIT), as a classic script. Made by scripts/make-phone-model.mjs */\nvar MeshoptDecoder = (function () { var module = { exports: {} }; var exports = module.exports;\n${cjs}\nreturn module.exports.MeshoptDecoder; })();\n`);
+writeFileSync("models/meshopt_decoder.js", `/* meshoptimizer ${JSON.parse(readFileSync("node_modules/meshoptimizer/package.json", "utf8")).version} decoder (MIT), as a classic script. Made by scripts/make-phone-model.mjs */\nvar MeshoptDecoder = (function () { var module = { exports: {} }; var exports = module.exports;\n${cjs}\nvar d = module.exports.MeshoptDecoder; (typeof globalThis !== "undefined" ? globalThis : self).MeshoptDecoder = d; return d; })();\n`);
 console.log(`models/meshopt_decoder.js: ${(statSync("models/meshopt_decoder.js").size / 1024).toFixed(0)} KB`);
