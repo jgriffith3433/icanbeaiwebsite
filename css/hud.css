@@ -32,7 +32,7 @@
   --tl: 118px;
   /* bottom row: the ability bar, and the line above it where Let go, Quality, the hint and the tutorial stack */
   --row-a: calc(var(--tl) + 10px);
-  --row-a-h: 104px;
+  --row-a-h: 120px;
   --above-a: calc(var(--row-a) + var(--row-a-h));
   /* left stack, bottom-up: one step per item */
   --l1: var(--tl);
@@ -261,7 +261,7 @@ html.touch-ui.in-control .voice-caption {
    Watching: one row along the bottom: Episodes left, Take control centre, the Time control right; the status card and the
    tools (Sound, Settings) are the top bar. On a phone Take control rises a row so the three never touch.
    In control (desktop): Let go, the hint, the caption and the tutorial stack above the ability bar, never over it. */
-:root { --pub-a: calc(var(--safe-b) + var(--row-a-h)); }
+:root { --pub-a: calc(var(--safe-b) + var(--row-a-h) + 16px); } /* +16: the bar's Charge row and cost badges stand taller than its 64 px buttons, so Take control / Let go stacks clear above the whole bar */
 .preview-public .hud.bottom { left: auto; right: var(--safe-r); bottom: 40px; width: auto; }
 .preview-public .time-drawer { position: absolute; right: 0; bottom: calc(100% + 8px); box-sizing: border-box; width: min(560px, calc(100vw - var(--safe-l) - var(--safe-r))); }
 html.preview-public:not(.in-control) .hud-left { top: auto; bottom: 40px; left: var(--safe-l); flex-direction: column-reverse; }
@@ -317,7 +317,9 @@ html.first-min:not(.in-control):not(.cold-open):not(.title-up) .control-btn { vi
 .co-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); z-index: 37; }
 .co-bolt { position: fixed; right: var(--safe-r); bottom: calc(var(--safe-b) + 124px); z-index: 37; }
 .co-say { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); z-index: 37; }
-html.touch-ui .co-prompt { left: auto; right: var(--safe-r); transform: none; bottom: calc(var(--safe-b) + 232px); }
+/* phone: the goal card rides the top of the screen, clear of the verb arc and the Rain / Bolt button (critic: it sat on Rain) */
+html.touch-ui .co-prompt { left: 50%; right: auto; transform: translateX(-50%); bottom: auto; top: max(56px, calc(var(--safe-t, 0px) + 48px)); max-width: calc(100vw - 24px); box-sizing: border-box; text-align: center; }
+@media (orientation: landscape) and (max-height: 520px) { html.touch-ui .co-prompt { top: calc(var(--safe-t, 0px) + 8px); } }
 html.touch-ui .co-say { bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px)); }
 html.title-up .co-prompt, html.title-up .co-bolt, html.title-up .co-say { visibility: hidden; }
 /* The R / Tap Rain hint steps aside (fades) while any story card or caption is on screen, so it never sits over card text. */
