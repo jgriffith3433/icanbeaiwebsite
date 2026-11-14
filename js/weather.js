@@ -651,7 +651,9 @@ export function startWeather(world, dayApi) {
     let gpu = false;
     try {
       if (B.GPUParticleSystem && B.GPUParticleSystem.IsSupported) {
-        ps = new B.GPUParticleSystem(name, { capacity: gpuCount }, scene);
+        // a phone never emits past tierScale (0.24) of the desktop rate, so its buffers are 30% (rain 2700 vs 9000): less to allocate and update
+        const capacity = isLowTier() ? Math.max(256, Math.round(gpuCount * 0.3)) : gpuCount;
+        ps = new B.GPUParticleSystem(name, { capacity }, scene);
         gpu = true;
       }
     } catch (err) {
