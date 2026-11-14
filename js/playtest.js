@@ -14443,6 +14443,9 @@ installPlaytest({
       try {
         const pw = window.day.powers && window.day.powers.now();
         action = !!(pw && (pw.windup || (pw.cast && pw.cast.age != null && pw.cast.age < 2.2)));
+        // The wind-up arms (windbolt / windrain) are drawn from the first frame a cast key or button is held (powers.pose()),
+        // before the charge passes 0.05 and `windup` turns on: that pose is asked for, not a T-pose.
+        if (!action && window.day.powers.pose) action = !!window.day.powers.pose();
       } catch (e) { /* none */ }
       return { ...tr, grounded: !!st.grounded, bodySpeed: st.speed || 0, action, tpose: tr.tpose && !action };
     },
