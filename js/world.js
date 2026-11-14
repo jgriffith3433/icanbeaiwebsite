@@ -1636,6 +1636,7 @@
     /* ---------------- sky ---------------- */
     const SR = window.DayEngine.parseClock(((cfg.sky || {}).sunrise) || "6:45") / 60;
     const SS = window.DayEngine.parseClock(((cfg.sky || {}).sunset) || "18:45") / 60;
+    const NIGHT_FLOOR = { hemi: 1.0, exposure: 0.92 };
     function daylight(h) {
       if (h < SR - 1 || h > SS + 1.2) return 0.03;
       if (h < SR + 0.8) return 0.03 + 0.67 * ((h - (SR - 1)) / 1.8);
@@ -1978,14 +1979,20 @@
       sun.direction.set(-Math.cos(ang) * 0.7, -Math.max(0.3, elev), -0.55);
       sun.intensity = hour > SR - 0.3 && hour < SS + 0.3 ? 0.18 + elev * 0.54 : 0.02;
       sun.diffuse = elev > 0.35 ? C("#fff4e2") : C("#ffb47e");
-      hemi.intensity = 0.46 + day * 0.4; // dusk/night floor: the street and people must stay readable; the shaded faces of the city's buildings must still read in the morning
-      B.Color3.LerpToRef(C("#6a7fb8"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
+      // THE NIGHT FLOOR (the one place to tune it; weather.js and look.js read scene.metadata.nightFloor): the hemisphere light and the
+      // exposure never fall below these, so the street, roofs and Small Weather stay readable at 23:00 on both qualities. The
+      // blue tint (hemi colour) and the lit windows still make it night.
+      const NF = NIGHT_FLOOR;
+      scene.metadata = scene.metadata || {};
+      scene.metadata.nightFloor = NF;
+      hemi.intensity = Math.max(NF.hemi, 0.46 + day * 0.4);
+      B.Color3.LerpToRef(C("#7088c4"), C("#eef2f6"), Math.min(1, day * 1.2), hemi.diffuse);
       // Vertical faces get half this ground colour: keep the dusk/night floor bright enough that brick facades and
       // the street beside the apt ramp don't go near-black before weather.js can lift it with cover.
-      B.Color3.LerpToRef(C("#586878"), C("#3a362c"), day, hemi.groundColor);
-      if (!scene.metadata || !scene.metadata.dayLook) {
+      B.Color3.LerpToRef(C("#6a7c92"), C("#3a362c"), day, hemi.groundColor);
+      if (!scene.metadata.dayLook) {
         const ipc = pipeline.imageProcessing && pipeline.imageProcessing.imageProcessingConfiguration;
-        if (ipc) ipc._exposure = 0.84 + day * 0.1;
+        if (ipc) ipc._exposure = Math.max(NF.exposure, 0.84 + day * 0.1);
       }
       const night = 1 - Math.min(1, day * 1.6);
       windows.forEach((w) => {

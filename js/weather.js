@@ -1371,7 +1371,8 @@ export function startWeather(world, dayApi) {
     if (hemi) {
       // floor: a dusk storm must leave the street, ramp and people readable, not black. Dark asphalt and lawn
       // (albedo ~0.1) at 0.5 of a blue-grey light came out near black, so the floor is higher and the fill lifts toward a soft grey-blue.
-      const baseHemi = Math.max(0.85 + 0.2 * L.cover + 0.3 * L.cover * L.cover, hemi.intensity * L.hemi * (1 + sunK * 0.2));
+      const nf = (scene.metadata && scene.metadata.nightFloor) || { hemi: 0.85 };
+      const baseHemi = Math.max(nf.hemi, 0.85 + 0.2 * L.cover + 0.3 * L.cover * L.cover, hemi.intensity * L.hemi * (1 + sunK * 0.2));
       hemi.intensity = baseHemi + flash * Math.max(0.5, L.lightning) * 2.1;
       // A hemisphere light lights a vertical face with half sky, half ground colour: the near-black ground colour left every wall
       // (facades, the ramp's side) black at dusk in a storm, so the ground colour lifts toward the fill too.
