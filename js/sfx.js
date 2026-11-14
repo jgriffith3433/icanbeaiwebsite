@@ -28,7 +28,9 @@
   const scene = world.scene;
 
   const heard = {}; // name -> count, for info()
-  const note = (name) => (heard[name] = (heard[name] || 0) + 1);
+  const clockMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  let lastHeardMs = clockMs();
+  const note = (name) => { lastHeardMs = clockMs(); return (heard[name] = (heard[name] || 0) + 1); };
 
   /* ---------------- the audio graph ---------------- */
   let audio = null;
@@ -1170,7 +1172,9 @@
     // Never more than ~8 s with nothing heard: birds need fair weather and day, cars need a crowd, sirens need night, so a
     // storm at dusk (the cold open) could go 45 s on the roof with only the one looping bed. Whatever else fired resets it.
     amb.fill -= dt;
-    if (amb.fill <= 0) {
+    // Real time since anything was heard (note() stamps every sound): a fill is due after 7 s whatever the frame timing did to
+    // the timers above, so a stall or a throttled tab can't leave play silent for 20 s.
+    if (amb.fill <= 0 || clockMs() - lastHeardMs > 7000) {
       amb.fill = 4.5 + Math.random() * 2.5;
       const pan = Math.random() * 1.6 - 0.8;
       if (state === "rain" || state === "storm") S.dripTick(pan, 0.7);
@@ -1186,12 +1190,11 @@
 
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
-    try {
-      watchHim(dt);
-      watchTornado(dt);
-      watchCity(cityDt());
-    } catch (err) {
-      if (!watchHim.warned) { watchHim.warned = true; console.warn("[sfx]", err); }
+    // Each watcher on its own: one that throws every frame must not take the city's ambience down with it.
+    for (const run of [() => watchHim(dt), () => watchTornado(dt), () => watchCity(cityDt())]) {
+      try { run(); } catch (err) {
+        if (!watchHim.warned) { watchHim.warned = true; console.warn("[sfx]", err); }
+      }
     }
   });
 
