@@ -531,6 +531,9 @@ export function startScore(dayApi) {
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
+    // Several clips share one length after the seam fix (the 8 s beds all become 7.15 s), so the probe's automatic
+    // "buf:<secs>x<len>" id would read different files as one sample: name each loop by its own file.
+    if (o.id) { try { src.__hawkesSampleId = o.id; src.__hawkesBus = o.bus || "ambience"; } catch (e) { /* */ } }
     const filter = o.filter && ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
     if (filter) {
       filter.type = o.filterType || "lowpass";
@@ -584,7 +587,7 @@ export function startScore(dayApi) {
     const url = bedUrl(bed, c);
     const buf = buffers[url];
     if (!buf) return null;
-    music[bed] = startLoop(buf, bedBus || musicBus, 0);
+    music[bed] = startLoop(buf, bedBus || musicBus, 0, { id: "bed-" + (url || bed).split("/").pop(), bus: "music" });
     return music[bed];
   }
 
@@ -597,6 +600,7 @@ export function startScore(dayApi) {
     const needFilter = key === "air" || key === "rainRoof" || key === "rainDownpour";
     const needPan = key === "wind" || key === "awning" || key === "umbrella" || key === "birds" || key === "gutter";
     amb[key] = startLoop(buf, ambBus, 0, {
+      id: "amb-" + (url || key).split("/").pop(),
       filter: needFilter,
       filterType: key === "rainRoof" ? "highpass" : "lowpass",
       filterFreq: key === "rainRoof" ? 1200 : 4200,
