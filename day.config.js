@@ -208,6 +208,20 @@ window.DAY_CONFIG = {
     hint: "Enter to play",
     settings: "Settings",
     continue: "Continue", // Play's word when a save exists
+    // The title's "what you left behind" line for a returning player: the latest deed (js/deeds.js DEED_ORDER name) from the city's memory.
+    left: {
+      birdie: "Birdie's tomatoes are still thriving.",
+      flood: "The park is still green from your rain.",
+      rain: "The roads still shine from your rain.",
+      storm: "The scorch marks from your storm are still on the roofs.",
+      wind: "The bins are still where your gale left them.",
+      fog: "The fog you called left the street quiet.",
+      sun: "The sky you opened is still warm.",
+      roofs: "The roofs are waiting for you.",
+      rescue: "The people you got down said thanks.",
+      answered: "A neighbour is still thanking you.",
+      botched: "A neighbour is still waiting on you.",
+    },
     logoText: ["I Can Be", "AI"], // the lockup in type until the Gen-made logo (logo) is in the repo
     logo: "images/logo-icanbe-ai.webp", // Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
     // the key-art crane: ends on Small Weather on the apartment roof (the pose the cold open's camera starts from)
@@ -218,7 +232,7 @@ window.DAY_CONFIG = {
     },
     hero: { x: -21, y: 6.16, z: 0.5, yaw: 1.5708 },
     glintEvery: [2.6, 5.2], // seconds between the storm's glints in the clouds
-    autoStart: { secs: 2.4 }, // a new player (cold open pending) is on the roof this long after the title shows: no Play wall. 0/absent = off
+    autoStart: { secs: 2.4, phoneSecs: 0.3 }, // a new player (cold open pending) is on the roof this long after the title shows: no Play wall. 0/absent = off
     day: "Day",
     night: "Night",
   },
@@ -256,9 +270,9 @@ window.DAY_CONFIG = {
     dive: { from: 9, secs: 1.0 }, // Play from the title: the title's last shot is this pose at radius 9; the camera dives in over this long
     firstLine: 0.8, // seconds after he lands before he speaks
     reactDelay: 1.0, // seconds from the look-up to Birdie's call
-    prompt: { keys: "Press E", touch: "Tap" },
+    prompt: { keys: "Press R for rain", touch: "Tap Rain" },
     lines: {
-      he: ["He", "That storm isn't mine. That rod is."],
+      he: ["He", "That storm isn't mine. That rod is."], // not spoken before the first cast (kept for later use)
       birdie: ["Birdie", "Small Weather! Send my tomatoes some rain."],
       after: ["He", "Rain. I can do that."],
     },
@@ -2500,8 +2514,22 @@ window.DAY_CONFIG = {
        (a follow-up ask that the next verb answers; Ines: Fog, then a Wind gust to clear it). `spot` is where the cue
        stands when they are inside. Birdie's call is the cold open's own line (coldopen.lines.birdie) and unlocks Rain.
        Voice clips: Hawkes Gen audio.voice in their voices (scripts/sync-dialogue.mjs lists them). */
+    /* ASK MARKERS (js/asks.js): what a neighbor wants is seen in the world, not read. A plumbob marker (a 48 px tap target)
+       floats over the one who asks; the verb's icon (the UI kit's, the same one on the bar) hangs over the PLACE it is for,
+       on a stem and a ground ring that sit on the surface. `places` is [who][verb] -> where it is for. Tapping the marker
+       takes control if he's on his day and swings the camera to the ask (`day.control.frame`). Answered or missed, they go. */
+    askMarks: {
+      iconHeight: 6.5, // m over the ground
+      markHeight: 0.85, // m over the asker's head
+      places: {
+        birdie: { rain: { x: -6, z: 33, r: 7, name: "the park lawn" }, fog: { x: -21, z: 9.5, r: 5, name: "her pots" }, wind: { x: -6, z: 33, r: 7, name: "the park lawn" } },
+        dex: { sunbreak: { x: 46, z: 9.8, r: 5, name: "the shop stoop" } },
+        quill: { fog: { x: 154, z: 9.8, r: 6, name: "the annex" }, wind: { x: 154, z: 9.8, r: 6, name: "the annex" }, bolt: { x: 154, z: 14, r: 5, name: "the annex" } },
+      },
+    },
     teach: {
       storageKey: "icanbe.street",
+      promise: "The street remembers this. Come back: more of the sky is waiting.", // one line after the first thanks (the teaser on the bar shows what is next)
       gap: 4.5, // s from a thanks to the next neighbor's call
       near: 14, // m: closer than this and they ask in person
       range: 18, // m: how close he must be to answer

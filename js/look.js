@@ -319,7 +319,10 @@ export function installLook(world) {
     concrete: pbr("concrete", maps.concrete, { roughness: 0.86, wet: true, coat: 0.38, bump: 0.32 }),
     brick: pbr("brick", maps.brick, { roughness: 0.88, bump: 0.65 }),
     glass: pbr("glass", maps.glass, { metallic: 0.35, roughness: 0.24, wet: true, coat: 0.45, bump: 0.2 }),
-    roof: pbr("roof", maps.roof, { roughness: 0.85, wet: true, coat: 0.42, bump: 0.12 }),
+    /* No clear coat (wet: false), like the ramp: a flat tar roof seen at a grazing angle in a storm turned the coat's
+       reflection of the sky, curtains and probe into long wavy smears (the playtest's missing-texture in cold-start).
+       It still darkens with the rain through the shared surface loop. The normal bump is nearly flat for the same reason. */
+    roof: pbr("roof", maps.roof, { roughness: 0.8, bump: 0.04 }),
     ground: pbr("park", maps.ground, { roughness: 0.9, bump: 0.45 }),
   };
   /* Rooftop ramp + its end/side walls: same concrete maps, but a faint emissive of their own. dress() used to
@@ -331,6 +334,12 @@ export function installLook(world) {
   mats.rampLit = pbr("rampLit", maps.concrete, { roughness: 0.8, bump: 0.32 });
   mats.rampLit.emissiveColor = new B.Color3(0.16, 0.19, 0.22);
   mats.rampLit.albedoColor = new B.Color3(1.1, 1.12, 1.14);
+
+  /* The wedge under the ramp is a building's own wall (a buttress down its north face), so it wears the block's brick,
+     with the same faint emissive as the ramp so it isn't a black slab after dusk. Flat concrete read as an untextured
+     placeholder prism at that size (a 6 m tall slab, the playtest's missing-texture). */
+  mats.rampWall = mats.brick.clone("rampWall");
+  mats.rampWall.emissiveColor = new B.Color3(0.1, 0.075, 0.075);
 
   function dress(mesh, mat, tile) {
     if (!mesh) return;
@@ -345,6 +354,7 @@ export function installLook(world) {
     const n = mesh.name || "";
     if (n === "ground") dress(mesh, mats.ground, 4);
     else if (roadName(n)) dress(mesh, mats.asphalt, 2.8);
+    else if (/rampside-?[\d.]+$/.test(n)) dress(mesh, mats.rampWall, 2.4);
     else if (rampName(n)) dress(mesh, mats.rampLit, 2.4);
     else if (walkName(n)) dress(mesh, mats.concrete, 2.4);
   });
@@ -617,13 +627,13 @@ export function installLook(world) {
     if (via === "click" || via === "api") { try { localStorage.setItem("icanbe.quality", quality); } catch (e) { /* private mode */ } }
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     // phones (low) render below CSS resolution: fewer pixels to fill is what holds fps on a mid-range GPU
-    engine.setHardwareScalingLevel(low ? 1.3 : 1 / Math.min(dpr, 1.5));
+    engine.setHardwareScalingLevel(low ? 2 : 1 / Math.min(dpr, 1.5));
     if (pipeline) {
       // Low (phones) keeps the tonemap, the grade and a half-res bloom; FXAA stays high-only (js/render-pipeline.js does the rest:
       // one 1024 shadow cascade, no SSAO, no aberration).
       pipeline.bloomEnabled = true;
       pipeline.bloomKernel = low ? 16 : 24;
-      pipeline.bloomScale = 0.5;
+      pipeline.bloomScale = low ? 0.35 : 0.5;
       pipeline.samples = 1;
       pipeline.fxaaEnabled = !low;
     }

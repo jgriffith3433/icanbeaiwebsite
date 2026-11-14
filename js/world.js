@@ -34,7 +34,7 @@
   function create(canvas, cfg, spots, rooms) {
     const engine = new B.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: false });
     const coarse = typeof matchMedia === "function" && (matchMedia("(pointer:coarse)").matches || window.innerWidth <= 700);
-    engine.setHardwareScalingLevel(coarse ? 1.3 : 1 / Math.min(window.devicePixelRatio || 1, 1.5));
+    engine.setHardwareScalingLevel(coarse ? 2 : 1 / Math.min(window.devicePixelRatio || 1, 1.5));
     // Plain uniforms, no uniform blocks: every light, the scene, mesh and material each take a vertex UBO, and with the plugins
     // (wind bend, window rain/interior) plus the SSAO prepass some GPUs (ANGLE/SwiftShader allow 14) refuse the shader and Babylon
     // retries the compile every frame. This must be set before the first material is made (they read it in their constructor).
@@ -134,6 +134,9 @@
     camera.maxZ = 600;
     camera.fov = 0.78;
     camera.attachControl(canvas, false); // false = the camera takes the wheel/pinch, the page doesn't
+    // Babylon gives the canvas tabindex=1; the UI probe then counts the full-screen view as a control sitting under the
+    // notch and home bar. The scene isn't a control (keys are read on window), so it isn't a tab stop.
+    canvas.removeAttribute("tabindex");
 
     const hemi = new B.HemisphericLight("sky", V3(0.1, 1, 0.3), scene);
     hemi.groundColor = new B.Color3(0.14, 0.13, 0.15);
@@ -624,6 +627,7 @@
       }
     });
     let warmInfo = null; // what ended the last warmLights(): { how: done|budget, ms, sets }
+    const warmHooks = []; // fn(groups|null) called whenever warmLights changes the forced light groups
     let warmGroups = null; // set by warmLights(): the light groups forced on while their shaders compile
     const bedsideFill = new B.PointLight("bedside-fill", V3(-5.15, 1.45, -2.35), scene);
     bedsideFill.diffuse = B.Color3.FromHexString("#ffd296");
@@ -1071,14 +1075,22 @@
        drawn only while the camera is outside the cutaway (cutawayWalls). Visual only: it is built after the colliders
        were collected, so the door and the open front stay walkable as before. */
     const homeFront = [];
-    if (homeB && frontDoorNode) {
-      const [fx0, , fx1, fz] = homeB;
-      const dx = frontDoorNode.position.x + 0.44;
+    const officeCfg = cfg.buildings.office;
+    const fronts = [];
+    if (homeB && frontDoorNode) fronts.push({ id: "home", b: homeB, dx: frontDoorNode.position.x + 0.44, win: [-4.4, -1.8, 3.6, 6.4, 9], trimC: "#8d5a45" });
+    if (officeCfg && officeCfg.bounds) {
+      const o = (officeCfg.origin || [0, 0])[0];
+      const ob = officeCfg.bounds;
+      /* the office's open front read as a wall-less box from the street too: same face, door gap at the lobby door */
+      fronts.push({ id: "office", b: [ob[0] + o, ob[1], ob[2] + o, ob[3]], dx: o + 6, win: [2, 4, 8, 10.5, 13.5, 16].map((x) => x + o), trimC: "#59636e" });
+    }
+    fronts.forEach(({ id, b, dx, win, trimC }) => {
+      const [fx0, , fx1, fz] = b;
       const H = 2.75;
       const outer = mat("#c9bfb0");
-      const trim = mat("#8d5a45");
+      const trim = mat(trimC);
       const part = (name, w, h, d, x, y, z, m) => {
-        const mesh = box("homefront-" + name, w, h, d, x, y, z, m, null, false);
+        const mesh = box(id + "front-" + name, w, h, d, x, y, z, m, null, false);
         homeFront.push(mesh);
         return mesh;
       };
@@ -1088,11 +1100,11 @@
       part("crown", fx1 - fx0 + 0.3, 0.14, 0.3, (fx0 + fx1) / 2, H + 0.07, fz, trim);
       const glass = mat("#1b2635", { unique: true, spec: 0.02 });
       glass.emissiveColor = new B.Color3(0.4, 0.55, 0.7);
-      [-4.4, -1.8, 3.6, 6.4, 9].forEach((wx, i) => {
+      win.forEach((wx, i) => {
         part("win" + i + "f", 1.4 + 0.16, 1.1 + 0.16, 0.06, wx, 1.5, fz + 0.1, trim);
         part("win" + i + "g", 1.4, 1.1, 0.04, wx, 1.5, fz + 0.14, glass);
       });
-    }
+    });
 
     /* Parked cars that never move, in the work lot */
     function makeCar(color) {
@@ -2185,6 +2197,9 @@
         if (skin) skin.play(skinClip(myPose, myHand), pp.walking && dt > 0 ? Math.min(moved / dt, 3) : 0, dt, false);
       }
       if (me.bag) me.bag.setEnabled(String(things.carrying || "").includes("bag") && !pp.inCar);
+      /* Under control his model is bare: the day's held box props (the bag's tan slab across his back, the phone's
+         square on his hip) belong to the autopilot's hands and would clip through the jacket and trousers. */
+      if (player && skin) boxProps().forEach((m) => m.setEnabled(false));
 
       npcs.forEach((n) => {
         let show = true;
@@ -2649,7 +2664,7 @@
          freeze the page on the first switch. The frame loop applies each set; resolves when done (or after maxMs). */
       async warmLights(maxMs) {
         const have = new Set(roomLights.map((rl) => rl.building));
-        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"]].filter((g) => g.every((b) => b === "car" || have.has(b) || (b === "office" && officeLights.length)));
+        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"], ["lamps"], ["home", "lamps"], ["office", "lamps"], ["car", "lamps"]].filter((g) => g.every((b) => b === "car" || b === "lamps" || have.has(b) || (b === "office" && officeLights.length)));
         const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
         const t0 = Date.now(), budget = maxMs || 8000;
         /* maxMs is a real deadline: a shader compile or whenReadyAsync that never settles (a slow or software GL, a lost
@@ -2675,17 +2690,39 @@
         try {
           /* Materials of meshes outside the first view (the city the title orbits over, the skin once on) would
              otherwise compile the frame they first come into view. One mesh per material, in the current light set. */
+          /* In parallel batches: with KHR_parallel_shader_compile the compiles overlap on the driver's threads, so ~8 at a time
+             finish in about the time of one, where one-by-one ran out of budget with materials left to compile on first draw
+             (the 900 ms hitches just after the card lifted). Whatever the budget leaves over carries on after the card is gone,
+             a few per frame, rather than being dropped. */
           const seen = new Set();
+          const todo = [];
           for (const m of scene.meshes) {
             const mat = m.material;
             if (!mat || seen.has(mat) || !m.getTotalVertices || !m.getTotalVertices() || !mat.forceCompilationAsync) continue;
             seen.add(mat);
-            if (Date.now() - t0 > budget / 2) break;
-            if (!(await within(mat.forceCompilationAsync(m), budget / 2 - (Date.now() - t0)))) break;
+            todo.push(m);
+          }
+          const BATCH = 8;
+          let at = 0;
+          for (; at < todo.length; at += BATCH) {
+            const left = budget / 2 - (Date.now() - t0);
+            if (left <= 0) break;
+            const ok = await within(Promise.all(todo.slice(at, at + BATCH).map((m) => m.material.forceCompilationAsync(m).catch(() => {}))), left);
+            if (!ok) { at += BATCH; break; }
+          }
+          if (at < todo.length) {
+            const rest = todo.slice(at);
+            (async () => {
+              for (let i = 0; i < rest.length; i += 2) {
+                await nextFrame();
+                try { await Promise.all(rest.slice(i, i + 2).map((m) => (m.isDisposed() || !m.material ? null : m.material.forceCompilationAsync(m).catch(() => {})))); } catch (e) { /* head start only */ }
+              }
+            })();
           }
           for (const g of sets) {
             if (Date.now() - t0 > budget) break;
             warmGroups = new Set(g);
+            warmHooks.forEach((h) => { try { h(warmGroups); } catch (e) { /* */ } });
             await nextFrame();
             await nextFrame();
             /* Wait for the meshes' shaders in this light set, not scene.whenReadyAsync(): that also waits on pending data,
@@ -2697,12 +2734,16 @@
           }
         } catch (e) { /* a warm-up is only a head start */ }
         warmGroups = null;
+        warmHooks.forEach((h) => { try { h(null); } catch (e) { /* */ } });
         info.ms = Date.now() - t0;
         if (!info.how) info.how = "done";
         try { console.info(`[world] shader warm-up ended: ${info.how} after ${info.ms} ms (${info.sets.map((x) => `${x.set} ${x.ms}${x.ok ? "" : "!"}`).join(", ")})`); } catch (e) { /* no console */ }
         return info;
       },
       warmInfo: () => warmInfo,
+      /* js/cityscape.js: the street lamps' point lights are one more light group (dusk switches them on together, which
+         recompiles every lit material: a ~second freeze mid-play unless warmLights compiled that set behind the card) */
+      warmHooks,
       enablePhysics,
       /* js/cityscape.js reads the colliders so far (to find free lots) and adds its own before physics is on */
       solids,

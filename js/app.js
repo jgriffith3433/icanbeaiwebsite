@@ -41,7 +41,9 @@ import "./opening.js"; // the first Play: a short skippable intro on Small Weath
 import "./moments.js"; // the take-over push and line, the day-end recap; both skippable
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build
 import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
+import "./garden.js"; // Birdie's wilting pots and dry lawn tufts that the first Rain revives (after slice.js)
 import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)
+import "./asks.js"; // asks in the world: a plumbob over the neighbor who asks, the verb icon over the place it is for (after street, neighbors, memory)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
 import "./titlesound.js"; // night-city ambience under the title, a click on its buttons, a whoosh on the first Gust (before title.js)
 import "./daily.js"; // today's request: one neighbour asks for one bit of weather, by the real date (before title.js shows it)
@@ -57,7 +59,11 @@ const ready = { model: false, frame: false, title: false, lights: false };
 /* The card does NOT wait for his 3 MB model: on a phone over Slow 4G that download alone kept it up past 20 s. He is hidden
    until the model is on (world.js), the card goes once the scripts, first frame, title and shader warm-up are in, and the
    model streams in behind the title (ready.model is kept for the record). */
-const maybeDone = () => { if (ready.frame && ready.title) loading.done(); }; // the shader warm-up (ready.lights) is not a gate: it carries on behind the title
+/* The bar now covers the shader warm-up (city, his skin, the five weather effects, the light sets) so the first frame of play and
+   the first use of each power never compile. It is still bounded: LIGHTS_CAP_MS ends the gate whatever the GPU does (a slow or
+   software GL, a compile that never settles), and the warm-up carries on behind the title. One timeout, no polling. */
+const LIGHTS_CAP_MS = (typeof window !== "undefined" && (window.innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches))) ? 3500 : 6000;
+const maybeDone = () => { if (ready.frame && ready.title && ready.lights) loading.done(); };
 loading.set("scripts", 1); // this module has run: every import above is in
 (function waitFrame() {
   const d = window.day;
@@ -89,8 +95,13 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
      card goes once the model, the frame and the title are in. */
   const go = () => {
     const t0 = Date.now();
+    setTimeout(() => { if (!ready.lights) { ready.lights = true; console.info(`[app] loading card: warm-up gate capped at ${LIGHTS_CAP_MS} ms`); maybeDone(); } }, LIGHTS_CAP_MS);
     const lightsDone = (how) => { if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
-    w.warmLights(8000).catch(() => {}).finally(() => lightsDone("the warm-up")); // runs behind the title; the card no longer waits for it (2.5 s of a 4x-CPU phone's budget)
+    /* then rain, fog, a sun break and wind drawn for a few frames each (weather.warmCasts): the first cast of each used to pay
+       its compile and allocation as a 400-1000 ms frame */
+    w.warmLights(8000).catch(() => {})
+      .then(() => (window.weather && window.weather.warmCasts ? window.weather.warmCasts() : null)).catch(() => {})
+      .finally(() => lightsDone("the warm-up")); // the card waits for it, up to LIGHTS_CAP_MS
   };
   window.__warmLights = () => (function afterFrame() {
     if (window.day.now && window.day.now().frame) go(); else requestAnimationFrame(afterFrame);

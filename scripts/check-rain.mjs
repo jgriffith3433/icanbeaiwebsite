@@ -20,8 +20,8 @@ const ok = (c, m) => { if (!c) problems.push(m); return c; };
 
 ok(budget("low").lens === 0, "no lens drops on low quality");
 ok(budget("high").lens >= 40, "lens drops on high quality");
-ok(streakBudget("low") === 4000 && streakBudget("high") > 4000, "phone streak cap is 4000");
-ok(streakRate(100000, 0.6, "low") * 0.6 <= 4000 + 1e-6, "streakRate keeps a phone under 4000 alive");
+ok(streakBudget("low") === 2500 && streakBudget("high") > 4000, "phone streak cap is 2500");
+ok(streakRate(100000, 0.6, "low") * 0.6 <= 2500 + 1e-6, "streakRate keeps a phone under 2500 alive");
 ok(streakRate(50, 0.6, "low") === 50, "a light rain isn't cut");
 ok(RAIN_BUDGET.low.hits < RAIN_BUDGET.high.hits && RAIN_BUDGET.low.curtains === 2 && budget("high").curtains === CURTAIN_R.length, "phone has fewer hits and 2 curtains");
 ok(fogBoost(0.2, 0) === 1 && fogBoost(1, 1) > 1.7 && fogBoost(0.8, 0) > fogBoost(0.5, 0), "heavy rain thickens fog, light rain doesn't");
@@ -101,7 +101,7 @@ world.look.quality("low");
 for (let i = 0; i < 40; i++) world.update(fr, 0.05, {});
 const lo = rain.info();
 ok(lo.quality === "low" && !lo.lens.enabled && lo.hits.live <= lo.hits.cap, `phone: ${JSON.stringify(lo.hits)}`);
-ok(lo.streaks.cap === 4000, "phone streak cap");
+ok(lo.streaks.cap === 2500, "phone streak cap");
 console.warn = warn0;
 if (problems.length) { console.error("check-rain FAILED:\n  " + problems.join("\n  ")); process.exit(1); }
 console.log("check-rain ok: budgets, height map, lens drops, fog, quad batch, the world under NullEngine");

@@ -48,7 +48,9 @@
         try { forced = new URLSearchParams(location.search).get("view") === "public"; } catch (e) {}
         if (!local) root.classList.add("public", "preview-public");
         else if (forced) root.classList.add("preview-public", "view-forced");
-        try { if (new URLSearchParams(location.search).get("report") === "1") root.classList.add("show-report"); } catch (e) {}
+        /* No shipped page (live or beta) shows Studio's debug badge / bug button; ?debug or ?report=1 brings it back. */
+        if (/(^|\.)icanbe\.ai$/.test(h)) root.classList.add("live");
+        try { var qs = new URLSearchParams(location.search); if (qs.get("report") === "1" || qs.has("debug")) root.classList.add("show-report"); } catch (e) {}
       })();
     </script>
     <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
@@ -167,7 +169,7 @@
         <p class="next" id="next"></p>
       </section>
       <div class="tools">
-        <button type="button" id="sound" aria-pressed="false">Sound off</button>
+        <button type="button" id="sound" aria-pressed="true">Sound on</button>
         <button type="button" id="details" aria-pressed="true">Details</button>
         <button type="button" id="settings" aria-haspopup="true" aria-expanded="false" aria-controls="settings-pop">Settings</button>
         <div class="settings-pop" id="settings-pop" role="group" aria-label="Settings" hidden></div>

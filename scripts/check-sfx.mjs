@@ -27,7 +27,8 @@ const listeners = {};
 let pressed = 'true';
 const soundBtn = { getAttribute: () => pressed };
 const observers = [];
-const scene = { onBeforeRenderObservable: { add: (fn) => observers.push(fn) }, getEngine: () => ({ getDeltaTime: () => 16 }), activeCamera: null };
+let frameMs = 16;
+const scene = { onBeforeRenderObservable: { add: (fn) => observers.push(fn) }, getEngine: () => ({ getDeltaTime: () => frameMs }), activeCamera: null };
 let st = { mode: 'schedule', x: 0, y: 0, z: 0, speed: 0, grounded: true, jumps: 0 };
 const day = {
   world: () => ({ scene }),
@@ -128,6 +129,21 @@ ok(!(heard().bird || 0), 'birds sing in the rain');
 day.weather.now = () => ({ state: 'clear', wet: 0 });
 frames(60 * 20);
 ok((heard().bird || 0) >= 1, 'no birds in 20 s of a clear morning');
+
+// A slow phone (4 fps under a CPU throttle) on the cold open's roof: a dusk storm, no cars, no birds. Something is still
+// heard at least every 10 s of real time (the city's timers must not run on the 0.1 s-capped frame dt).
+day.weather.now = () => ({ state: 'storm', wet: 1 });
+day.crowd.info = () => ({ cars: 0 });
+day.now = () => ({ minutes: 19 * 60 });
+frameMs = 250;
+for (let w = 0; w < 4; w++) {
+  const before = (heard().drip || 0) + (heard().car || 0);
+  frames(40); // 10 s of real time
+  ok((heard().drip || 0) + (heard().car || 0) > before, `10 s of silence at 4 fps in a dusk storm (window ${w + 1})`);
+}
+frameMs = 16;
+day.crowd.info = () => ({ cars: 20 });
+day.now = () => ({ minutes: 8 * 60 });
 
 // The foley bank: a recorded clip plays when one is loaded (never the same file twice in a row, pitch jittered), else synthesis.
 ok(day.sfx.info().sources.ui === 'synth' || day.sfx.info().sources.ui === 'file', 'info().sources has no ui entry');

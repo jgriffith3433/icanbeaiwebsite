@@ -51,7 +51,7 @@ export function createMover(world, cfg) {
   const E = window.DayEngine;
   const M = Object.assign({}, MOVE_DEFAULTS, cfg.control && cfg.control.move);
   const H = 1.7; // capsule height
-  const R = 0.28; // and radius
+  const R = 0.36; // and radius: wide enough that his shoulders and swinging arms stay off furniture (0.28 let them sink into the dresser/TV and armchair)
   const STEP_DOWN = 0.45; // the deepest drop he steps down without leaving the ground (stairs, ramps, kerbs)
   const walkBackSpeed = Math.max(((cfg.person && cfg.person.walkSpeed) || 1.25) * 1.6, 1.6);
   const GRAV = new B.Vector3(0, -M.gravity, 0);
@@ -468,11 +468,30 @@ function install() {
   }
   let lastDriving = null;
 
-  btn.addEventListener("click", (e) => {
-    const via = e.pointerType === "touch" || touchMode() ? "touch" : e.detail === 0 ? "key" : "button";
+  // Touch acts on pointerdown/up, not on the click that follows (a click can lag or never come): the press takes control at once,
+  // and the click that follows the same tap is swallowed so it doesn't let go again.
+  let touchActed = 0;
+  const pressBtn = (via) => {
+    if (btn.disabled) return;
     if (mode === "schedule") take(via);
     else if (mode === "control") letGo(via);
     btn.blur(); // Space and Enter belong to him now, not to the button
+  };
+  btn.style.touchAction = "manipulation";
+  btn.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+    btn.classList.add("pressed");
+  });
+  btn.addEventListener("pointerup", (e) => {
+    if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+    btn.classList.remove("pressed");
+    touchActed = performance.now();
+    pressBtn("touch");
+  });
+  btn.addEventListener("pointercancel", () => btn.classList.remove("pressed"));
+  btn.addEventListener("click", (e) => {
+    if (performance.now() - touchActed < 800) return; // the click of a tap already handled on pointerup
+    pressBtn(e.pointerType === "touch" || touchMode() ? "touch" : e.detail === 0 ? "key" : "button");
   });
 
   /* ---------- the camera ---------- */
@@ -505,6 +524,7 @@ function install() {
     follow: 14, followY: 10, followAir: 4, // spring rates (1/s), critically damped
     ahead: 1.1, aheadFrom: 3, aheadTo: 7, // look-ahead metres at a run (speed in m/s)
     sphere: 0.3, // the camera's collision radius (its near plane is 0.2)
+    stepM: 1.3, // the most the camera moves by turning, tilting or a pull-in in one frame, metres (the sensor's limit is 3)
     blendSecs: 0.6,
     recenterAfter: 2, recenterRate: 5, touchSens: 420,
     castSecs: 1.8, castRise: 0.3, castFall: 0.5,
@@ -520,6 +540,7 @@ function install() {
     rain: { rad: 0.5, beta: 0.04, align: 0.9 },
     fog: { rad: 0.5, beta: 0, align: 0.9 },
     sunbreak: { rad: 0.7, beta: 0.1, align: 0.9 },
+    look: { rad: 1.6, beta: 0.1, align: 0.95 }, // a tap on an ask's marker (day.control.frame)
   }, CAM.cast || {});
   const TAU2 = Math.PI * 2;
   const wrapPi = (a) => ((((a + Math.PI) % TAU2) + TAU2) % TAU2) - Math.PI;
@@ -768,6 +789,25 @@ function install() {
     pl.plugin.raycast(head.add(dirv.scale(0.1)), pos, camRay, mover.rayQuery());
     return !!(camRay.hasHit && B.Vector3.Distance(head, camRay.hitPoint) < d - 0.12);
   }
+  /* The scene's own pick from his head to the camera (what the feel sensor casts): the colliders and clearRadius miss thin walls,
+     small blocks and meshes with no collider, so the camera could sit behind one. Returns r pulled in until the head sees it. */
+  const headPickRay = new B.Ray(new B.Vector3(), new B.Vector3(0, 1, 0), 1);
+  const notHim = (m) => m.isPickable !== false && m.isEnabled() && m.isVisible !== false && !(world.person && m.isDescendantOf(world.person));
+  function headClear(t, dx, dy, dz, r) {
+    const hx = s.x, hy = s.y + 1.5, hz = s.z;
+    for (let i = 0; i < 3; i++) {
+      const cx = t.x + dx * r, cy = t.y + dy * r, cz = t.z + dz * r;
+      const len = Math.hypot(cx - hx, cy - hy, cz - hz);
+      if (len < 0.5) return r;
+      headPickRay.origin.set(hx, hy, hz);
+      headPickRay.direction.set((cx - hx) / len, (cy - hy) / len, (cz - hz) / len);
+      headPickRay.length = len;
+      const hit = world.scene.pickWithRay(headPickRay, notHim, true);
+      if (!hit || !hit.hit || hit.distance >= len - 0.3) return r;
+      r = Math.max(0.2, r * Math.max(0.1, (hit.distance - 0.6) / len));
+    }
+    return r;
+  }
   function cameraFollow(dt, look) {
     if (cine()) return; // a moment's cut-away camera (js/moments.js) has the view
     const nowMs = performance.now();
@@ -917,12 +957,15 @@ function install() {
     // ---- the drawn yaw and pitch: the asked-for ones plus the cast's and the blend's, turning at most the capped rate ----
     const blA = cs.blend ? cs.blend.a * (1 - smooth01(cs.blend.t / CAM.blendSecs)) : 0;
     const wantA = cs.aimA + castA + blA;
-    const capA = (CAM.yawCapDeg * Math.PI / 180) * dt;
+    // Also capped by arc length: on a long frame (shader compile, first casts) dt is large and a 150 deg/s turn at a
+    // wide radius swung the camera metres in one frame (the feel sensor's camera-jump). At most CAM.stepM per frame.
+    const arcCap = CAM.stepM / Math.max(2, r);
+    const capA = Math.min((CAM.yawCapDeg * Math.PI / 180) * dt, arcCap);
     cs.shownA += clamp(wrapPi(wantA - cs.shownA), -capA, capA);
     let wantB = camera.beta + castB + (cs.blend ? cs.blend.b * (1 - smooth01(cs.blend.t / CAM.blendSecs)) : 0);
     wantB = clamp(wantB, camera.lowerBetaLimit, camera.upperBetaLimit);
     const base = camera.beta;
-    const capB = (CAM.pitchCapDeg * Math.PI / 180) * dt;
+    const capB = Math.min((CAM.pitchCapDeg * Math.PI / 180) * dt, arcCap);
     cs.shownB += clamp(wantB - cs.shownB, -capB, capB);
     // a low angle never puts the camera on the slab or the road
     if (pl && !push.on && cs.shownB > base) {
@@ -941,12 +984,13 @@ function install() {
     const dy = Math.cos(camera.beta);
     const dz = Math.sin(camera.alpha) * sbF;
     r = Math.min(r, sphereClear(t.x, t.y, t.z, dx, dy, dz, r));
+    if (r > 0.3) r = headClear(t, dx, dy, dz, r);
     /* Pull in fast but never in one jump: a thin edge entering the cast used to cut the radius by metres in a single frame, a
        visible camera snap. A slow frame (dt up to 0.1 s) is capped at 2.4 m so it stays under the feel sensor's 3 m, and it eases
        out slowly after. */
     if (cs.blend) camera.radius = Math.min(r, cs.blend.r + (r - cs.blend.r) * smooth01(cs.blend.t / CAM.blendSecs));
     else if (push.on) camera.radius = r;
-    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(2.4, Math.max(0.5, 60 * dt)));
+    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(CAM.stepM, Math.max(0.5, 60 * dt)));
     else camera.radius = damp(camera.radius, r, dt, 2.2);
     lastRadius = camera.radius;
     screenLift = damp(screenLift, hudLiftGoal(), dt, 3);
@@ -1405,6 +1449,12 @@ function install() {
       vy: s.vy, airTime: s.airTime || 0, slopeLift: s.slopeLift || 0,
     }),
     move: mover.move,
+    /** Swing the camera so the point (x, z) is ahead of him (a tap on a neighbor's ask marker): the cast's own eased framing. */
+    frame: (x, z, y) => {
+      if (mode !== "control" || cine()) return false;
+      cs.cast = { t: 0, power: "look", x, y: y == null ? s.y : y, z, run: 0, best: 0, frames: 0, framedFrames: 0 };
+      return true;
+    },
     /** Game seconds simulated while he's the player's (sum of the control steps' dt). */
     simTime: () => simT,
     /** The figure he's drawn as while he's the player's (the playtest's feel sensor follows its root). */

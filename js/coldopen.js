@@ -22,7 +22,7 @@ export function startColdOpen() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "cold-start" && id !== "title-key-art") quiet = true;
+    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "phone-touch") quiet = true;
     // a cold bot (the first-five run, no ?playtest) plays it like a stranger; a runner's start(id) quiets the title first, which cancels the auto-start
   } catch (e) { /* no location */ }
 
@@ -53,8 +53,8 @@ export function startColdOpen() {
   bolt.className = "co-bolt";
   bolt.id = "coldopen-bolt";
   bolt.hidden = true;
-  bolt.textContent = "Bolt";
-  bolt.setAttribute("aria-label", "Bolt");
+  bolt.textContent = "Rain";
+  bolt.setAttribute("aria-label", "Rain");
   const say = document.createElement("div");
   say.className = "co-say";
   say.id = "coldopen-say";
@@ -122,13 +122,16 @@ export function startColdOpen() {
     const beam = B.MeshBuilder.CreateCylinder("co-beam", { diameter: 1.5, height: 22, tessellation: 20, updatable: false }, scene);
     beam.position.set(R.x, top + 11, R.z);
     beam.material = beamM;
-    [pole, tip, ring, beam].forEach((m) => { m.isPickable = false; m.alwaysSelectAsActiveMesh = true; });
-    ring.renderingGroupId = beam.renderingGroupId = 1; // over the skyline, so it reads from the roof 70 m away
-    return { scene, metal, glow, beamM, pole, tip, ring, beam, top };
+    const arrow = B.MeshBuilder.CreateCylinder("co-arrow", { diameterTop: 1.1, diameterBottom: 0, height: 1.3, tessellation: 4 }, scene);
+    arrow.material = glow;
+    arrow.position.set(R.x, top + 3.4, R.z);
+    [pole, tip, ring, beam, arrow].forEach((m) => { m.isPickable = false; m.alwaysSelectAsActiveMesh = true; });
+    ring.renderingGroupId = beam.renderingGroupId = arrow.renderingGroupId = 1; // over the skyline, so it reads from the roof 70 m away
+    return { scene, metal, glow, beamM, pole, tip, ring, beam, arrow, top };
   }
   function dropMeshes() {
     if (!meshes) return;
-    [meshes.pole, meshes.tip, meshes.ring, meshes.beam].forEach((m) => m.dispose());
+    [meshes.pole, meshes.tip, meshes.ring, meshes.beam, meshes.arrow].forEach((m) => m.dispose());
     [meshes.metal, meshes.glow, meshes.beamM].forEach((m) => m.dispose());
     if (obs) meshes.scene.onBeforeRenderObservable.remove(obs);
     obs = null;
@@ -146,15 +149,22 @@ export function startColdOpen() {
     }
     const s = pulse * (1 - 0.18 * prog);
     meshes.ring.scaling.set(s, s, s);
+    meshes.arrow.position.y = meshes.top + 3.4 + 0.35 * Math.sin(nowS * 4);
+    meshes.arrow.rotation.y += dt * 1.5;
     meshes.ring.rotation.y += dt * (1 + prog * 6);
     meshes.glow.emissiveColor.set(0.45 + 0.55 * prog, 0.78 + 0.22 * prog, 1);
     meshes.beamM.alpha = 0.13 + 0.06 * Math.sin(nowS * 5) + 0.3 * prog;
+    // up close the 1.5 m shaft reads as a solid blue pillar: fade it out within 22 m, gone by 9 m
+    const cam = meshes.scene.activeCamera;
+    if (cam) meshes.beam.visibility = Math.max(0, Math.min(1, (Math.hypot(cam.position.x - meshes.beam.position.x, cam.position.z - meshes.beam.position.z) - 9) / 13));
     promptBar.style.width = Math.round(prog * 100) + "%";
   }
 
   /* ---- the hold ---- */
-  function press(via) {
+  let castVerb = "rain"; // the verb the press asked for: Rain is the prompted first cast, the rod's bolt still works
+  function press(via, name) {
     if (phase !== "waiting" && phase !== "landing") return;
+    castVerb = name === "bolt" ? "bolt" : "rain";
     if (!firstInputAt) {
       firstInputAt = performance.now();
       emit("input", { via, kind: "hold" });
@@ -174,13 +184,14 @@ export function startColdOpen() {
     if (phase === "waiting" || phase === "landing") emit("release", { via: was.via, held: Math.round(was.t * 100) / 100 });
   }
   function fire(via) {
+    const verb = castVerb;
     held = null;
     bolt.classList.remove("held");
     const P = window.powers || day.powers;
     if (!P) return;
     passing = true;
     let ok = false;
-    try { ok = P.command("bolt", via === "touch" ? "touch" : via); } finally { passing = false; }
+    try { ok = P.command(verb, via === "touch" ? "touch" : via); } finally { passing = false; }
     if (!ok) { held = null; return; }
     phase = "cast";
     castAt = performance.now();
@@ -212,11 +223,11 @@ export function startColdOpen() {
     const V = day.voice;
     const N = day.neighbors && day.neighbors.now && day.neighbors.now();
     const me = N && N.people && N.people.find((p) => p.id === "birdie");
+    // The story is the one line she calls (voiced, one caption); his reply is no second caption: the street's lesson
+    // answers it by play (Rain is open now), so the first minute stays under the 40-word limit.
     const afterLine = () => {
-      const A = cfg.lines.after;
-      if (V && V.say) V.say("opening", { text: A[1], force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "opening" });
-      emit("after", { text: A[1] });
-      later(finish, 3400); // her call opened Rain: the bolt's gate comes off once he has answered her
+      emit("after", { text: "" });
+      later(finish, 600); // her call opened Rain: the bolt's gate comes off once she has spoken
     };
     // Birdie calls from her pots (js/voice.js: her voice, from where she stands, one caption with her name on it, never
     // over his line); the street's lesson (js/street.js) starts on this event: her call is Rain's ask.
@@ -265,6 +276,13 @@ export function startColdOpen() {
     later(() => birdie("look-up"), (cfg.reactDelay || 1) * 1000);
   });
 
+  // Letting go (Esc, B) while the cold open is up ends it: otherwise its gate, prompt and rod stay up with him back on his
+  // day, and `on` stays true so the next Play is refused ("Play didn't hand him over", cold-start blocker).
+  window.addEventListener("day:control", (e) => {
+    const d = (e && e.detail) || {};
+    if (on && d.action === "let-go") { emit("abort", { via: d.via }); finish(); }
+  });
+
   /* ---- the glance: Birdie on the lawn, seen before any word ---- */
   // A cut-away that starts on a neighbor where they stand (waving) and eases back to the camera's own pose over
   // `secs`, so the end hands over with no snap. The player sees who is asking before anyone says anything.
@@ -303,11 +321,12 @@ export function startColdOpen() {
     const P = window.powers || day.powers;
     if (P) {
       P.abilities.reset(100);
+      if (P.abilities.unlock) P.abilities.unlock("rain"); // the street's lessons lock the verbs from the start: the first cast is Rain
       P.aimAt({ x: cfg.rod.x, y: cfg.rod.roofY + cfg.rod.height, z: cfg.rod.z });
       P.gate((name, via) => {
         if (passing) return true;
-        if (name === "bolt") press(via);
-        return false; // nothing but the bolt, and the bolt only as a hold
+        if (name === "rain" || name === "bolt") press(via, name);
+        return false; // nothing but Rain (the prompted gesture) and the rod's bolt
       });
     }
     meshes = build();
@@ -322,21 +341,18 @@ export function startColdOpen() {
     if (B0 && day.neighbors && day.neighbors.stand) day.neighbors.stand("birdie", B0.x, B0.z);
     const pushMs = ((dive ? dive.secs : cfg.camera.secs) + 0.2) * 1000;
     const gSecs = (cfg.glance && cfg.glance.secs) || 0;
-    const speakAt = pushMs + (gSecs ? gSecs * 1000 + 300 : 0);
     if (gSecs) later(() => { if (on) glance("birdie", gSecs); }, pushMs);
     // the cell: far thunder as it arrives, then his line, then the prompt
     const W = window.weather;
     later(() => { if (W && W.triggerFlash) W.triggerFlash(90, -0.3); }, 700);
     later(() => {
-      const L = cfg.lines.he;
-      const V = day.voice;
-      if (V && V.say) V.say("opening", { text: L[1], force: true, ignoreCooldown: true, ignoreLineCooldown: true, via: "opening" });
-      emit("line", { text: L[1] });
+      // No story line before the first cast: the frame is him, the rod and one prompt (clarity, critic cold-start).
+      emit("line", { text: "", silent: true });
       phase = "waiting";
       prompt.hidden = false;
       requestAnimationFrame(() => prompt.classList.add("on"));
       emit("prompt", { text: promptTxt.textContent });
-    }, Math.max((cfg.firstLine || 1.4) * 1000, speakAt));
+    }, Math.max((cfg.firstLine || 1.4) * 1000, pushMs)); // the prompt waits for the push-in only, not the glance at Birdie: the first instruction comes first
   }
   function tryTake(frames) {
     const C = day.control;
@@ -355,7 +371,7 @@ export function startColdOpen() {
   const api = {
     pending: () => !quiet && !on && !returning(),
     active: () => on,
-    arm() { quiet = false; return true; },
+    arm() { if (on) finish(); quiet = false; return true; },
     /** Called by the title's Play, in the click: the same frame the title closes. */
     start(via, opts) {
       if (on || quiet || returning()) return false;
@@ -380,7 +396,7 @@ export function startColdOpen() {
     },
     glance: (id, secs) => glance(id || "birdie", secs || ((cfg.glance && cfg.glance.secs) || 2.6)),
     glancing: () => glancing,
-    now: () => ({ on, phase, glancing, held: !!held, firstInput: firstInputAt ? (firstInputAt - t0) / 1000 : null, cast: castAt ? (castAt - t0) / 1000 : null, react: reactAt ? (reactAt - t0) / 1000 : null, log: log.slice() }),
+    now: () => ({ on, phase, startedAt: t0, glancing, held: !!held, firstInput: firstInputAt ? (firstInputAt - t0) / 1000 : null, cast: castAt ? (castAt - t0) / 1000 : null, react: reactAt ? (reactAt - t0) / 1000 : null, log: log.slice() }),
   };
   day.coldopen = api;
   window.coldopen = api;

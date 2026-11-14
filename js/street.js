@@ -37,7 +37,7 @@ export function startStreet() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches") quiet = true; // other scenarios never meet the lesson
+    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches" && id !== "ask-markers") quiet = true; // other scenarios never meet the lesson
     else if (!id && navigator.webdriver) quiet = true;
   } catch (e) { /* no location */ }
 
@@ -53,12 +53,44 @@ export function startStreet() {
 
   const style = document.createElement("style");
   style.textContent = `
-html.street-wait .abilitybar .ab.locked{display:none}
+html.street-wait .abilitybar .ab.locked:not(.st-teaser){display:none}
+.abilitybar .ab.st-teaser{display:flex;opacity:.62;filter:none;border:2px dashed #f0c27a;animation:stTease 2.2s ease-in-out infinite}
+.abilitybar .ab.st-teaser .ico{filter:grayscale(1) brightness(.85);opacity:.7}
+.abilitybar .ab.st-teaser::after{content:"\\1F512";position:absolute;right:-4px;top:-6px;font-size:14px;line-height:1;text-shadow:0 1px 6px #000}
+@keyframes stTease{0%,100%{box-shadow:0 0 6px rgba(240,194,122,.35)}50%{box-shadow:0 0 18px 3px rgba(240,194,122,.85)}}
+#street-promise{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b,0px) + 262px);max-width:min(86vw,360px);padding:8px 16px;border-radius:14px;background:rgba(10,13,22,.8);color:#f0c27a;font:600 .95rem/1.3 Outfit,system-ui,sans-serif;text-align:center;z-index:30;pointer-events:none;opacity:0;transition:opacity .4s}
+#street-promise.on{opacity:1}
 .abilitybar .ab.st-new{animation:stNew 4.6s ease-out 1;border-color:#f0c27a;box-shadow:0 0 22px 6px rgba(240,194,122,.95)}
 @keyframes stNew{0%{transform-origin:center;filter:brightness(2.2);box-shadow:0 0 34px 12px rgba(255,226,154,1)}30%{filter:brightness(1.5)}100%{filter:none;box-shadow:0 0 14px rgba(240,194,122,.9)}}
 `;
   document.head.appendChild(style);
 
+  /* The next verb stays on the bar as a dashed, locked teaser (name on the slot's label), so a new player sees what is coming. */
+  let teased = null;
+  function paintTeaser() {
+    if (teased) { teased.classList.remove("st-teaser"); teased = null; }
+    const i = phase === "gap" ? n : n + 1;
+    const s = n >= 0 && i < stages.length ? stages[i] : null;
+    const slot = s ? document.getElementById("ability-" + s.unlock) : null;
+    const A = abil();
+    if (slot && A && A.isLocked(s.unlock)) {
+      slot.classList.add("st-teaser");
+      slot.setAttribute("aria-label", `${s.unlock} (locked): ${firstName(s.who)} will ask for it`);
+      teased = slot;
+    }
+    emit("teaser", { verb: teased ? s.unlock : null });
+  }
+  /* One line after the first thanks: the street remembers, and what is waiting tomorrow. */
+  function promise(text) {
+    if (!text) return;
+    let el = document.getElementById("street-promise");
+    if (!el) { el = document.createElement("p"); el.id = "street-promise"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+    el.textContent = text;
+    void el.offsetWidth;
+    el.classList.add("on");
+    setTimeout(() => el.classList.remove("on"), 6500);
+    emit("promise", { text });
+  }
   const save = () => { try { localStorage.setItem(key, JSON.stringify({ n })); } catch (e) { /* private mode */ } };
   const loadN = () => {
     try { const j = JSON.parse(localStorage.getItem(key)); return j && Number.isInteger(j.n) ? j.n : null; } catch (e) { return null; }
@@ -135,6 +167,9 @@ html.street-wait .abilitybar .ab.locked{display:none}
     cue.ring.rotation.y += dt * 1.2;
     cue.beam.position.set(t.x, gy + 10, t.z);
     cue.beamM.alpha = 0.14 + 0.05 * Math.sin(performance.now() / 200);
+    // a 1.3 m shaft is a solid blue wall at arm's length: it fades out as the camera comes within 22 m and is gone by 9 m
+    const cam = cue.scene.activeCamera;
+    if (cam) cue.beam.visibility = Math.max(0, Math.min(1, (Math.hypot(cam.position.x - t.x, cam.position.z - t.z) - 9) / 13));
     cue.at = t;
   }
   function placeCue(s) {
@@ -189,6 +224,7 @@ html.street-wait .abilitybar .ab.locked{display:none}
     nagged = false;
     placeCue(s);
     unlock(s);
+    paintTeaser();
     const c = callText(s);
     if (!spokenAlready && c.text) speak(s.who, c.text, target(s));
     lastAsk = { id: s.id, who: s.who, text: c.text, spoken: !spokenAlready, close: c.close, inside: c.inside, called: !c.close };
@@ -200,11 +236,14 @@ html.street-wait .abilitybar .ab.locked{display:none}
     if (n >= stages.length) return finish();
     phase = "gap";
     wait = secs;
+    paintTeaser();
+    if (i === 1 && cfg.promise) promise(cfg.promise);
   }
   function finish() {
     phase = "off";
     dropCue();
     html.classList.remove("street-wait");
+    paintTeaser();
     emit("done", {});
     n = stages.length;
     save();
@@ -298,6 +337,7 @@ html.street-wait .abilitybar .ab.locked{display:none}
     phase = "off";
     n = stages.length;
     save();
+    paintTeaser();
     emit("stop", { why: why || "stop" });
   }
   function reset() {
@@ -306,6 +346,7 @@ html.street-wait .abilitybar .ab.locked{display:none}
     try { localStorage.removeItem(key); } catch (e) { /* private mode */ }
     dropCue();
     html.classList.remove("street-wait");
+    paintTeaser();
   }
 
   // the cold open's Birdie call starts the lesson (her line is the Rain ask)
@@ -341,6 +382,7 @@ html.street-wait .abilitybar .ab.locked{display:none}
     // the verbs already asked for are open
     const A = abil();
     if (A) stages.slice(0, n).forEach((s) => A.unlock(s.unlock));
+    setTimeout(paintTeaser, 1500); // the bar is built a moment after the page
   }
   requestAnimationFrame(tick);
 
@@ -351,6 +393,13 @@ html.street-wait .abilitybar .ab.locked{display:none}
     stop,
     answer,
     reset,
+    /** The ask that is open now (for the world markers): who, verb, where they stand (or their window). */
+    open: () => {
+      if (phase !== "open" || n < 0 || n >= stages.length) return null;
+      const s = stages[n];
+      const t = target(s);
+      return { who: s.who, verb: s.unlock, answer: s.answer, x: t.x, z: t.z, inside: t.inside, id: "street-" + s.id };
+    },
     cueAt: () => (cue && cue.at ? { x: cue.at.x, z: cue.at.z } : null),
   };
   day.street = api;

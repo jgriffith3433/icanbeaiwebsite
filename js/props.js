@@ -828,7 +828,12 @@ export function installProps(ctx) {
     meshes.push(roof.mesh("props-roof", roofMat, scene));
   }
   if (!flat.empty) {
-    const fm = flat.mesh("props-flat", solidMat, scene);
+    /* The paving, lawn and path tiles are lit only by the weak dusk/night hemisphere light (and the rain's grey), so the
+       plaza read as a near-black floor with no detail (cold-start, bad lighting). Same ambient fill as the roof units, a
+       little lower so the tiles stay darker than daylight and the lamp pools still show. */
+    const flatMat = solidMat.clone("props-flat-mat");
+    flatMat.ambientColor = new B.Color3(2, 2, 2.1);
+    const fm = flat.mesh("props-flat", flatMat, scene);
     fm.receiveShadows = true;
     meshes.push(fm);
   }

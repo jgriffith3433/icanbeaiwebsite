@@ -9,6 +9,8 @@
    the playtest calls day.title.quiet() for every other scenario.
    ========================================================================== */
 
+import { deedsFrom } from "./deeds.js";
+
 const DEFAULTS = {
   kicker: "I Can Be",
   name: "Small Weather",
@@ -40,7 +42,7 @@ export function startTitle() {
   let autoTimer = 0;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
@@ -59,7 +61,8 @@ export function startTitle() {
 @keyframes t-glint{0%,55%{background-position:140% 0}85%,100%{background-position:-40% 0}}
 .title-screen .daily{margin:14px 0 0;max-width:30em;color:#f0c27a;font:600 1rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen.fresh .clock{display:none}
-.title-screen .daily[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
+.title-screen .yday.left{color:#f0c27a}
+.title-screen .daily[hidden],.title-screen .left[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
 .title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:rgba(10,13,22,.62);color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
 .title-screen .prog b{color:#f0c27a;letter-spacing:.12em;font-weight:700}
 .title-screen .nextgoal{margin:0;max-width:min(86vw,340px);color:#f0c27a;font:600 .95rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.9);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
@@ -94,7 +97,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   el.hidden = true;
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", `${cfg.logoText.join(" ")}`);
-  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
+  el.innerHTML = `<p class="clock" id="title-clock"><i></i><span></span></p><div class="top"><h1 class="logo" id="title-logo"><span class="sr"></span></h1><p class="daily" id="title-daily" hidden></p><p class="yday" id="title-yday" hidden></p><p class="prog" id="title-prog" hidden></p><p class="yday left" id="title-left" hidden></p></div><div class="bottom"><p class="tset" id="title-settings-panel" hidden></p><div class="actions"><p class="nextgoal" id="title-next" hidden></p><button type="button" class="play" id="title-play"></button><div class="row"><button type="button" class="episodes" id="title-episodes"></button><button type="button" id="title-settings" aria-expanded="false"></button><button type="button" id="title-music" aria-pressed="true"></button></div><span class="hint"></span></div></div>`;
   const logoEl = el.querySelector("#title-logo");
   logoEl.setAttribute("aria-label", cfg.logoText.join(" ")); // not a text node: a hidden-by-clip line still counts as words on screen
   if (cfg.logo) {
@@ -119,6 +122,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   }
   const dailyEl = el.querySelector("#title-daily");
   const ydayEl = el.querySelector("#title-yday");
+  const leftEl = el.querySelector("#title-left");
   const progEl = el.querySelector("#title-prog");
   const nextEl = el.querySelector("#title-next");
   const playBtn = el.querySelector("#title-play");
@@ -163,9 +167,18 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     const night = day.score && day.score.isNight ? day.score.isNight(m / 60) : h >= 20 || h < 6;
     clockEl.textContent = `Live · ${((h + 11) % 12) + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"} · ${night ? cfg.night : cfg.day}`;
   }
+  /* What he left behind: the city's memory (js/memory.js) of the last deeds, as one line on the title. */
+  function paintLeft() {
+    const m = day.memory;
+    const names = m && m.facts ? deedsFrom(m.facts()) : [];
+    const k = names.find((n) => cfg.left && cfg.left[n]);
+    leftEl.textContent = k ? cfg.left[k] : "";
+    leftEl.hidden = !k;
+  }
   /* Today's request (js/daily.js) in one line under the name, and yesterday's when it was answered. */
   function paintDaily() {
     const d = day.daily;
+    paintLeft();
     const t = d && d.line ? d.line() : "";
     const y = d && d.yesterdayLine ? d.yesterdayLine() : "";
     dailyEl.textContent = t;
@@ -196,7 +209,12 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
   function camera(on) {
     const w = day.world && day.world();
     if (!w || !w.titleShot) return;
-    if (!on) { w.titleShot(false); return; }
+    if (!on) {
+      w.titleShot(false);
+      // Closing the title hands the camera back to the day's shot (or the take-over's), a cut by design: tell the sensor.
+      try { window.hawkesPlaytest && window.hawkesPlaytest.cut && window.hawkesPlaytest.cut(); } catch (e) { /* no sensor */ }
+      return;
+    }
     // The key-art crane over the district, landing on Small Weather on the apartment roof (the pose the cold open dives from).
     const opts = {};
     if (cfg.crane) opts.crane = { secs: reduced() ? 0.01 : cfg.crane.secs, from: cfg.crane.from, to: cfg.crane.to };
@@ -291,7 +309,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     // A stranger's first title is the name and the buttons: the day's request, progress, the clock and the key hint wait for a returning player.
     const fresh = !!(day.coldopen && day.coldopen.pending && day.coldopen.pending());
     if (fresh) {
-      dailyEl.hidden = true; ydayEl.hidden = true; progEl.hidden = true; nextEl.hidden = true;
+      dailyEl.hidden = true; ydayEl.hidden = true; leftEl.hidden = true; progEl.hidden = true; nextEl.hidden = true;
       el.querySelector(".hint").textContent = "";
     }
     el.classList.toggle("fresh", fresh);
@@ -300,8 +318,10 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     try { playBtn.focus({ preventScroll: true }); } catch (e) { /* old browser */ }
     emit("show", { via: via || "load" });
     clearTimeout(autoTimer);
-    if (!quiet && via === "load" && cfg.autoStart && cfg.autoStart.secs > 0 && day.coldopen && day.coldopen.pending()) {
-      autoTimer = setTimeout(() => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); }, cfg.autoStart.secs * 1000);
+    // On a phone a cold session goes straight to the roof (no title wall): `autoStart.phoneSecs`.
+    const autoSecs = cfg.autoStart ? (touchy() && cfg.autoStart.phoneSecs != null ? cfg.autoStart.phoneSecs : cfg.autoStart.secs) : 0;
+    if (!quiet && via === "load" && autoSecs > 0 && day.coldopen && day.coldopen.pending()) {
+      autoTimer = setTimeout(() => { if (up && !quiet && setPanel.hidden && day.coldopen.pending()) play("auto"); }, autoSecs * 1000);
     }
     return true;
   }
@@ -356,8 +376,19 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
     return true;
   }
 
-  playBtn.addEventListener("click", () => play("click"));
-  epBtn.addEventListener("click", () => episodes("click"));
+  // A touch acts on pointerup (the click after the same tap is swallowed), so a tap takes the roof at once.
+  let tapAt = 0;
+  const onTap = (btnEl, fn, via) => {
+    btnEl.style.touchAction = "manipulation";
+    btnEl.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+      tapAt = performance.now();
+      fn("touch");
+    });
+    btnEl.addEventListener("click", () => { if (performance.now() - tapAt > 800) fn(via); });
+  };
+  onTap(playBtn, play, "click");
+  onTap(epBtn, episodes, "click");
   musicBtn.addEventListener("click", () => {
     musicWanted = !(musicBtn.getAttribute("aria-pressed") === "true");
     setSound(musicWanted); // a click: the browser lets the title music start right here
@@ -403,6 +434,7 @@ html.title-up .hud,html.title-up .side,html.title-up #control,html.title-up .con
       progress: progEl.hidden ? "" : progEl.textContent,
       next: nextEl.hidden ? "" : nextEl.textContent,
       yesterday: ydayEl.hidden ? "" : ydayEl.textContent,
+      left: leftEl.hidden ? "" : leftEl.textContent,
       sound: soundOn(),
       crane: day.world && day.world() && day.world().titleCrane ? day.world().titleCrane() : null,
       logo: cfg.logo ? "image" : "type",

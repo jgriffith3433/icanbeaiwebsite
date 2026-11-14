@@ -3,7 +3,7 @@
    limiter → destination. World sounds get HRTF (or stereo pan on low) with
    inverse-distance roll-off and a building occlusion low-pass. Six synthesised
    convolution reverb zones crossfade over 0.5 s. Voice ducks music −8 dB and
-   ambience −4 dB (150 ms attack). Settings: Music / Effects / Voice sliders
+   ambience −6 dB (150 ms attack). Settings: Music / Effects / Voice sliders
    (icanbe.mix.*). day.audio.info() for playtests.
 
    Import before score.js / sfx.js / voice.js so they can share this context.
@@ -708,7 +708,7 @@ export function startMix(dayApi) {
 
   const soundBtn = document.getElementById && document.getElementById("sound");
   if (soundBtn) soundBtn.addEventListener("click", () => { if (soundOn()) unlock(); });
-  window.addEventListener("pointerdown", () => { if (soundOn()) unlock(); }, true);
+  ["pointerdown", "keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, () => { if (soundOn()) unlock(); }, true));
 
   // Tick with the day (no setInterval network polling: the render loop is fine).
   try {

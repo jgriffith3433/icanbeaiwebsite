@@ -102,7 +102,7 @@ Definition of done (all required):
 - **Build:** AC fans spin with wind (code); one extra traverse prop between shop and annex roofs after queue 1.
 
 ### Acoustics (the ear knows where he is)
-- **In (`js/mix.js`, `js/mix-core.js`):** six convolution reverb zones — open rooftop, street canyon, plaza, apartment interior, car cabin, office — synthesised IRs (no GPU), crossfaded over 0.5 s as he moves. Buses: music, ambience, sfx, voice, UI → makeup → compressor → limiter (~−16 LUFS). World sources: HRTF + inverse distance on high; stereo pan on low/phone. A building between source and camera low-passes (~1.1 kHz, −6 dB), one raycast per active source, throttled. Voice ducks music −8 dB and ambience −4 dB (150 ms attack). Settings: Music / Effects / Voice sliders (`icanbe.mix`). `day.audio.info()` / playtest `audio-mix`.
+- **In (`js/mix.js`, `js/mix-core.js`):** six convolution reverb zones — open rooftop, street canyon, plaza, apartment interior, car cabin, office — synthesised IRs (no GPU), crossfaded over 0.5 s as he moves. Buses: music, ambience, sfx, voice, UI → makeup → compressor → limiter (~−16 LUFS). World sources: HRTF + inverse distance on high; stereo pan on low/phone. A building between source and camera low-passes (~1.1 kHz, −6 dB), one raycast per active source, throttled. Voice ducks music −8 dB and ambience −6 dB (150 ms attack). Settings: Music / Effects / Voice sliders (`icanbe.mix`). `day.audio.info()` / playtest `audio-mix`.
 - **Heard as:** the avenue rings; the apt and car stay dry and close; every voiced line cuts through the beds.
 
 ### Main Avenue Commute
@@ -307,6 +307,13 @@ Every beat below is lived as gameplay, an in-world staged event (camera, props, 
 | 13 | Crowd weather breath | any day under control | Manual weather → look-up, run, hats, cheer, umbrellas, wipers; hold then fade | none |
 | 14 | Pilot on the wrist | every day / take / let-go | Schedule nudge + radio chirp + wrist-ring pulse; take-over and let-go Pilot lines (let-go names the deed); worried on chaos; night hold | caption ≤1 line labelled Pilot |
 
+### Asks in the world (*In*, `js/asks.js`)
+- **Player feel:** a neighbour's want is read at a glance, the way a Sim's plumbob says it: a glowing plumbob (a 48 px tap target) floats over whoever is asking, and the verb's icon hangs over the place it is for, on a stem and a dashed ground ring: a rain icon over the dry park lawn. Tap the plumbob and the camera swings round to the place. Nobody reads a card.
+- **Heard / seen:** Birdie's ask is her voiced call; her thanks ("Look at them drink. Bless you.") plays as the lawn eases from straw to green and the pond fills from a mud-ringed low to full over about 5 s (js/slice.js; no new lines). The same marker and icon serve Dex (sun break over the shop stoop), Ines (fog, then a gust, over the annex) and every day-window ask (`neighbors.askMarks`).
+- **Remembered:** the green lawn and fuller pond are the "city remembers" deed (`birdieRain` in js/memory.js): they stay for the rest of that real day, through a reload, and fade over three days.
+- **Characters:** Birdie — Want: rain for her pots and the park; Moment: the marker over her and the rain icon over the dry lawn, then the lawn greening as she thanks him.
+- **Playtest:** `ask-markers` (desktop and `{"touch":true}`).
+
 ### Beats that must not stay text-only (hard fails until fixed)
 - Opening lines → voice (Eric) or cut.
 - Board advisories → loudspeaker mesh pulse + voice + world audio duck.
@@ -411,3 +418,7 @@ One storm-navy HUD language across every player-facing screen (Persona-bold fram
 - **Characters:** Dex — Want: dry parcels; Moment: Sun break after rain, he says "Dry as a bone. I owe you a delivery." if he is within ~28 m (no new line).
 - **What happens:** Rain or a storm marks the game clock; a Sun break within 2 game minutes fires the aftermath — steam ~20 s, rainbow ~28 s (fades with cloud cover), drips ~30 s (js/rain.js `afterDrip`), puddle sparkles, birds home, umbrellas close, shop owners step out; the render grade already warms from `weather.now().sun`. Phone: half steam and drip counts; rainbow stays. Playtest: `sun-aftermath`.
 - **Story beats:** clearing a storm feels like a reward — told by steam, the rainbow, dripping gutters, umbrellas folding and Dex's voice, not a text card.
+
+
+## Birdie's garden (story through play)
+Birdie's ask is shown before it is spoken. Four planters on the apt stoop (x -20.1..-17.7, z 9.15) stand wilted: leaves hang brown, stems lean, no fruit; dry tufts lie flat on the park lawn. The player's first Rain within 45 m revives them pot by pot over about 2.4 s (leaves lift and go green, tufts stand, tomatoes swell, camera swings to the stoop, a chime), and her voiced thanks lands 1.1 s into it. It stays revived for the real day and wilts on the next date. Module `js/garden.js`; playtest `cold-start` event `cold-start-garden`.

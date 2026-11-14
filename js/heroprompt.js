@@ -62,6 +62,9 @@ export function startHeroPrompt() {
     if (held > 0) finish();
   });
 
+  // the cold open's first cast (Rain, or the rod's bolt) is his first weather: nothing left to prompt
+  window.addEventListener("day:coldopen", (e) => { const d = e && e.detail; if (d && d.action === "bolt") finish(); });
+
   const touchy = () => html.classList.contains("touch-ui") || !!(day.control && day.control.state && day.control.state().touch);
   const wording = () => (touchy() ? "Hold <b>Wind</b> to call wind" : "Hold <b>V</b> to call wind");
 

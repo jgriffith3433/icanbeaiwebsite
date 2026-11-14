@@ -450,12 +450,16 @@ html.touch-ui .ep-hud .skip,html.touch-ui .ep-panel button{min-height:44px;min-w
 .ep-score.scarred .forecast,.ep-score.scarred .strainline{color:#e58a7a}
 .ep-toast{z-index:9;transform:translate(-50%,-8px);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;padding:10px 18px;border-radius:999px;background:rgba(14,16,22,.9);border:1px solid #f0c27a;color:#f6f1e8;font:600 0.95rem Outfit,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap;max-width:calc(100vw - 24px)}
 .ep-toast.on{opacity:1;transform:translate(-50%,0)}
-.ep-offer,.ep-score,.ep-menu,.ep-ending{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
-body:has(.ep-offer:not([hidden])) .mo-line,body:has(.ep-offer:not([hidden])) .control-hint{visibility:hidden}
-html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abilitybar,html.ep-offer-up #control,html.ep-offer-up .tutorial{visibility:hidden}
-.ep-offer{z-index:60;background:rgba(6,8,14,.82)}
-.ep-offer .ep-panel{background:#0e1016}
+.ep-score,.ep-menu,.ep-ending{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,8,14,.55);padding:18px}
+.ep-offer{z-index:21;pointer-events:none}
+.ep-offer .ep-panel{pointer-events:auto;width:auto;max-width:min(280px,calc(100vw - 24px));padding:12px 14px;border-radius:14px;background:rgba(14,16,22,.9);backdrop-filter:blur(6px)}
+.ep-offer h2{margin:0;font-size:1rem}
+.ep-offer .tagline{margin:2px 0 0;font-size:.85rem;color:rgba(246,241,232,.8)}
+.ep-offer .hint{margin:2px 0 0;font-size:.8rem;color:rgba(246,241,232,.6)}
+.ep-offer .actions{display:flex;gap:8px;margin-top:10px}
+.ep-offer .actions button{min-height:44px;min-width:44px;flex:1}
 .ep-offer[hidden],.ep-score[hidden],.ep-menu[hidden],.ep-ending[hidden]{display:none}
+.ep-score[hidden],.ep-menu[hidden],.ep-ending[hidden]{display:none}
 .ep-panel{width:min(420px,100%);background:rgba(14,16,22,.92);border:1px solid rgba(246,241,232,.18);border-radius:20px;padding:22px 22px 18px;color:#f6f1e8;font:500 0.95rem/1.4 Outfit,system-ui,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.45)}
 .ep-panel h2{margin:0 0 6px;font-size:1.25rem}
 .ep-panel p{margin:0 0 14px;color:rgba(246,241,232,.72)}
@@ -534,7 +538,7 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   offer.id = "episode-offer";
   offer.className = "ep-offer";
   offer.hidden = true;
-  offer.innerHTML = `<div class="ep-panel" role="dialog" aria-modal="true"><h2></h2><p class="tagline"></p><p class="hint"></p><div class="actions"><button type="button" class="primary accept"></button><button type="button" class="decline"></button></div></div>`;
+  offer.innerHTML = `<div class="ep-panel" role="status"><h2></h2><p class="tagline"></p><p class="hint"></p><div class="actions"><button type="button" class="primary accept"></button><button type="button" class="decline"></button></div></div>`;
 
   const scoreEl = document.createElement("div");
   scoreEl.id = "episode-score";
@@ -1641,17 +1645,40 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
   function showOffer(ep) {
     offerEp = ep;
     offerTitle.textContent = ep.title;
-    offerTag.textContent = ep.tagline || "";
-    offerHint.textContent = ep.tutorial ? "" : L.offer;
-    offerHint.hidden = !offerHint.textContent;
+    // a small corner toast, under 40 words in all: the day keeps running under it and nothing waits on it
+    offerTag.textContent = (ep.tagline || "").split(/\s+/).slice(0, 18).join(" ");
+    offerHint.textContent = "";
+    offerHint.hidden = true;
     offer.hidden = false;
-    document.documentElement.classList.add("ep-offer-up");
-    mark("offer", { id: ep.id });
+    clearTimeout(offerTimer);
+    offerTimer = setTimeout(() => { if (offerEp === ep && !offer.hidden) { hideOffer(); mark("offer-expired", { id: ep.id }); } }, 25000);
+    mark("offer", { id: ep.id, words: offer.textContent.trim().split(/\s+/).length });
   }
+  let offerTimer = 0;
+  let offerArmed = false; // he is the player's and hasn't cast yet: the offer waits for the first cast
   function hideOffer() {
     offer.hidden = true;
-    document.documentElement.classList.remove("ep-offer-up");
+    clearTimeout(offerTimer);
     offerEp = null;
+  }
+  function pickOffer() {
+    const fr = day.now && day.now().frame;
+    const chapter = (fr && (fr.chapter || (fr.action && fr.action.chapter))) || "";
+    const minutes = (day.now && day.now().minutes) || 0;
+    const inCar = !!(fr && fr.person && fr.person.inCar);
+    // "Learn the weather" is practice now, in the Episodes menu only: the street's neighbors teach each verb by asking
+    // for it out loud (js/street.js), so no card is offered to a new player.
+    return matchEpisode(list, chapter, minutes, { inCar, arc: loadArc() });
+  }
+  function offerAfterCast() {
+    if (!offerArmed || active || !offer.hidden || declinedTake) return;
+    const co = window.day.coldopen;
+    if (co && co.active && co.active()) return; // shown when the cold open ends
+    // a new player's first minute stays under 40 words: the toast waits until `first-min` (js/coldopen.js) is over
+    if (document.documentElement.classList.contains("first-min")) { setTimeout(offerAfterCast, 3000); return; }
+    offerArmed = false;
+    const ep = pickOffer();
+    if (ep) showOffer(ep);
   }
   /* ---- the finale: the show's cues, judged on timing; the stage is js/finale.js ---- */
   let stage = null; // the plaza stage (spectators, beams, fireworks, aurora), alive from the start to the closing card
@@ -2539,20 +2566,13 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
       lastControl = "control";
       declinedTake = false;
       if (cfg.offerOnTake === false) return;
-      if (window.day.coldopen && window.day.coldopen.active && window.day.coldopen.active()) return; // the cold open first: no offer
-      // The first-visit card is the only prompt until it is skipped or finished.
+      // The offer is a corner toast that comes after his first cast (never before, never a modal): arm it here.
       if (window.day.tutorial && window.day.tutorial.blocking && window.day.tutorial.blocking()) return;
       if (active || !offer.hidden) return;
-      const fr = day.now && day.now().frame;
-      const chapter = (fr && (fr.chapter || (fr.action && fr.action.chapter))) || "";
-      const minutes = (day.now && day.now().minutes) || 0;
-      const inCar = !!(fr && fr.person && fr.person.inCar);
-      // "Learn the weather" is practice now, in the Episodes menu only: the street's neighbors teach each verb by asking
-      // for it out loud (js/street.js), so no card is offered to a new player.
-      const ep = matchEpisode(list, chapter, minutes, { inCar, arc: loadArc() });
-      if (ep) showOffer(ep);
+      offerArmed = true;
     } else if (action === "let-go") {
       lastControl = "returning";
+      offerArmed = false;
       hideOffer();
       if (active) finish("let-go");
     } else if (action === "back") {
@@ -2566,7 +2586,12 @@ html.ep-offer-up .mo-line,html.ep-offer-up .control-hint,html.ep-offer-up .abili
     if (active) tryGoalsFromSnap("weather");
   });
 
+  window.addEventListener("day:coldopen", (e) => {
+    if (e && e.detail && (e.detail.action === "end" || e.detail.action === "failed")) setTimeout(offerAfterCast, 2500);
+  });
   window.addEventListener("day:power", (e) => {
+    const pd = (e && e.detail) || {};
+    if (offerArmed && !active && !pd.denied && pd.action === pd.power) setTimeout(offerAfterCast, 1500);
     if (!active) return;
     const d = (e && e.detail) || {};
     const power = d.power || d.action;

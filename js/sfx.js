@@ -28,7 +28,9 @@
   const scene = world.scene;
 
   const heard = {}; // name -> count, for info()
-  const note = (name) => (heard[name] = (heard[name] || 0) + 1);
+  const clockMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  let lastHeardMs = clockMs();
+  const note = (name) => { lastHeardMs = clockMs(); return (heard[name] = (heard[name] || 0) + 1); };
 
   /* ---------------- the audio graph ---------------- */
   let audio = null;
@@ -151,12 +153,20 @@
     const t = a.c.currentTime + (o.delay || 0);
     const src = a.c.createBufferSource();
     src.buffer = a.white;
-    src.playbackRate.value = o.rate || 1;
+    // Tagged for the audio probe (hawkes-audio.js): the id names the voicing, the rate carries the pitch jitter, so
+    // the shared white-noise buffer isn't read as one sample repeating.
+    const pj = 0.94 + Math.random() * 0.12;
+    src.playbackRate.value = (o.rate || 1) * (0.97 + Math.random() * 0.06);
+    try {
+      src.__hawkesSampleId = "syn-noise-" + (o.type || "lowpass") + "-" + Math.round(o.freq || 0) + (o.to ? ">" + Math.round(o.to) : "");
+      src.__hawkesBus = o.bus || "sfx";
+      src.__hawkesGain = Math.max(0.0002, o.vol);
+      src.__hawkesDur = o.dur;
+    } catch (e) { /* */ }
     const f = a.c.createBiquadFilter();
     f.type = o.type || "lowpass";
     f.Q.value = o.q || 0.8;
     // Every synthesized hit varies a little (pitch ~+-6%, level ~+-8%) so repeats never sound identical.
-    const pj = 0.94 + Math.random() * 0.12;
     f.frequency.setValueAtTime(o.freq * pj, t);
     if (o.to) f.frequency.exponentialRampToValueAtTime(o.to * pj, t + o.dur);
     const g = a.c.createGain();
@@ -201,6 +211,10 @@
     g.connect(o.x != null && o.z != null ? outAt(a, o.x, o.z, bus) : out(a, o.pan, bus));
     osc.start(t);
     osc.stop(t + o.dur + 0.05);
+    // An oscillator isn't a buffer source, so the audio probe can't see it: say so through the sound kit's event.
+    try {
+      window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { type: "sound-start", sample: "syn-tone-" + o.freq + (o.to ? ">" + o.to : "") + "-" + (o.wave || "sine"), bus: o.bus || "sfx", rate: Math.round(pj * 1000) / 1000, gain: o.vol, dur: o.dur } }));
+    } catch (e) { /* */ }
   }
   const notes = (freqs, gap, vol, wave, dur) => freqs.forEach((f, i) => tone({ freq: f, dur: dur || 0.5, vol, wave: wave || "triangle", delay: i * gap }));
 
@@ -269,6 +283,8 @@
     const vol = (o.gain == null ? 1 : o.gain) * (1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1));
     const src = a.c.createBufferSource();
     src.buffer = pick.b;
+    // Name it by its file: same-length foley clips would otherwise share the probe's "buf:<secs>x<len>" id.
+    try { src.__hawkesSampleId = "foley-" + String(pick.url).split("/").pop(); } catch (e) { /* */ }
     src.playbackRate.value = rate;
     const g = a.c.createGain();
     g.gain.value = Math.max(0.0002, vol);
@@ -360,6 +376,7 @@
     const t = a.c.currentTime + (o.delay || 0);
     const src = a.c.createBufferSource();
     src.buffer = pick.b;
+    try { src.__hawkesSampleId = "power-" + String(pick.url).split("/").pop(); } catch (e) { /* */ }
     src.playbackRate.value = o.rate || 1 + (Math.random() * 0.06 - 0.03);
     let node = src;
     if (o.lp != null && a.c.createBiquadFilter) {
@@ -469,6 +486,60 @@
     }
     return true;
   }
+  /* ---------------- cast clips (audio/sfx/*.mp3, already in the repo) ----------------
+     Rain and Fog have no clip of their own in the power bank, so they play the page's existing recordings, shaped per cast
+     (an envelope, a low-pass, a rate): Rain = rain-roof-light, Fog = wind-awning slowed and muffled. Loaded when Sound
+     comes on (first gesture) so the first cast answers at once. `casts` logs every cast (power, file or synth, time):
+     day.sfx.info().casts, what the playtest's audio check reads. */
+  const CAST_CLIPS = { rain: "audio/sfx/rain-roof-light.mp3", fog: "audio/sfx/wind-awning.mp3" };
+  const castBufs = {};
+  const casts = [];
+  const logCast = (power, source, file) => {
+    casts.push({ power, source, file: file || null, t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
+    if (casts.length > 40) casts.shift();
+  };
+  function loadCastClips() {
+    const a = audio;
+    if (!a || typeof fetch !== "function") return;
+    Object.keys(CAST_CLIPS).forEach((k) => {
+      if (castBufs[k] !== undefined) return;
+      castBufs[k] = null;
+      fetch(CAST_CLIPS[k]).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+        .then((buf) => new Promise((ok, no) => a.c.decodeAudioData(buf, ok, no)))
+        .then((b) => { castBufs[k] = b; }).catch(() => {});
+    });
+  }
+  /** One clip shaped as a cast: swell in, hold, fade out over `dur`, optional low-pass and rate. */
+  function playCastClip(k, o) {
+    const a = ctx();
+    const b = castBufs[k];
+    if (!a || !b) return false;
+    const t = a.c.currentTime;
+    const src = a.c.createBufferSource();
+    src.buffer = b;
+    try { src.__hawkesSampleId = "castclip-" + k; } catch (e) { /* */ }
+    src.playbackRate.value = (o.rate || 1) * (1 + (Math.random() * 0.06 - 0.03));
+    let node = src;
+    if (o.lp) {
+      const f = a.c.createBiquadFilter();
+      f.type = "lowpass";
+      f.frequency.value = o.lp;
+      src.connect(f);
+      node = f;
+    }
+    const g = a.c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(o.gain, t + o.attack);
+    g.gain.setValueAtTime(o.gain, t + Math.max(o.attack, o.dur - o.release));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+    node.connect(g);
+    g.connect(out(a, 0, "sfx"));
+    src.__hawkesSampleId = "cast-" + k;
+    src.start(t, Math.random() * Math.max(0, b.duration - o.dur - 0.1));
+    try { src.stop(t + o.dur + 0.05); } catch (err) { /* ok */ }
+    return true;
+  }
+
   let liveThunder = null;
   let galeLoop = null;
 
@@ -502,21 +573,27 @@
         galeLoop = { until: t + 3.5 };
         setTimeout(() => { galeLoop = null; }, 3600);
         note("gale-loop");
+        logCast("gale", "file", pick.url);
         return true;
       }
-      if (whoosh) return true;
+      if (whoosh) { logCast("gale", "file", "audio/sfx/power/whoosh"); return true; }
       note("gale-whoosh");
+      logCast("gale", "synth", null);
       return false;
     }
     if (id === "fog") {
       note("fog-veil");
       if (day.score && day.score.fogColor) day.score.fogColor(1);
       pad2Fog();
+      // wind-awning slowed and muffled under the pad: a low, wet hush no other cast has
+      const hush = playCastClip("fog", { gain: 0.5, attack: 0.9, dur: 4.2, release: 1.6, rate: 0.62, lp: 650 });
+      logCast("fog", hush ? "file" : "synth", hush ? CAST_CLIPS.fog : null);
       return true;
     }
     if (id === "sunbreak") {
       const shimmer = powerSample("sun-shimmer", { gain: 0.75 });
       note("sun-shimmer");
+      logCast("sunbreak", shimmer ? "file" : "synth", shimmer ? "audio/sfx/power/sun-shimmer" : null);
       if (!shimmer) {
         tone({ freq: 523.25, dur: 1.2, vol: 0.08, wave: "triangle", attack: 0.15 });
         tone({ freq: 783.99, dur: 1.4, vol: 0.06, wave: "triangle", attack: 0.2, delay: 0.1 });
@@ -527,7 +604,10 @@
     }
     if (id === "rain") {
       note("rain-cast");
-      return false; // keep the powers.js hiss (or a future rain-cast clip)
+      // the roof-rain recording swells in, holds and thins out: bright, steady, with no pitch movement (Gale sweeps, Fog is low)
+      const ok = playCastClip("rain", { gain: 0.55, attack: 0.5, dur: 3.6, release: 1.4, rate: 1 });
+      logCast("rain", ok ? "file" : "synth", ok ? CAST_CLIPS.rain : null);
+      return ok; // false keeps the powers.js hiss until the clip has decoded
     }
     return false;
   }
@@ -830,6 +910,9 @@
       const t = a.c.currentTime;
       const src = a.c.createBufferSource();
       src.buffer = a.white;
+      // Tagged for the audio probe: the shared white buffer isn't "buf:2x88200" repeating; the rate varies per pass.
+      src.playbackRate.value = 0.94 + Math.random() * 0.12;
+      try { src.__hawkesSampleId = "syn-car-pass"; src.__hawkesBus = "sfx"; src.__hawkesGain = 0.07 * gain; } catch (e) { /* */ }
       const f = a.c.createBiquadFilter();
       f.type = "lowpass";
       f.frequency.setValueAtTime(300, t);
@@ -1011,6 +1094,7 @@
           power.sources[kind] = "file";
         } else {
           src.buffer = a.white;
+          try { src.__hawkesSampleId = "syn-tornado-" + kind; src.__hawkesBus = "sfx"; } catch (e) { /* */ }
         }
         src.loop = true;
         const f = a.c.createBiquadFilter();
@@ -1063,10 +1147,31 @@
   }
 
   /* ---------------- the city ---------------- */
-  const amb = { bird: 4, car: 3, siren: 60 };
+  const amb = { bird: 4, car: 3, siren: 60, fill: 5 };
   function hour() {
     try { return (day.now().minutes || 0) / 60; } catch (err) { return 12; }
   }
+  /* The city's timers run on the real frame time, not the dt above: that is capped at 0.1 s a frame, so on a slow phone (7 fps
+     under a 4x CPU throttle in cold-start) a 5 s fill took 25-50 s of real time and play went silent that long. Capped at
+     2 s so a tab coming back from the background plays one thing, not a burst. */
+  const cityDt = () => Math.min(2, Math.max(0, scene.getEngine().getDeltaTime() / 1000));
+  /* One ambient fill: a drip tick in rain or storm, a bird by day in fair weather, else a car. */
+  function playFill(h) {
+    let state = "clear";
+    try { state = (day.weather && day.weather.now().state) || "clear"; } catch (err) { /* default */ }
+    const fair = state === "clear" || state === "clouds";
+    amb.fill = 4.5 + Math.random() * 2.5;
+    const pan = Math.random() * 1.6 - 0.8;
+    if (state === "rain" || state === "storm") S.dripTick(pan, 0.7);
+    else if (fair && h > 5.5 && h < 20) S.bird(pan, 1);
+    else S.car(pan < 0 ? -0.8 : 0.8, 0.5);
+  }
+  /* A render frame can stall for many seconds (shader compiles, a software-GL machine, a background tab), and the fill above
+     runs in the frame loop, so it stalled too (18 s of silence in cold-start). A plain 1 s timer (no network) covers that. */
+  const fillTimer = setInterval(() => {
+    try { if (ctx() && clockMs() - lastHeardMs > 7000) playFill(hour() % 24); } catch (err) { /* ambience only */ }
+  }, 1000);
+  if (fillTimer && fillTimer.unref) fillTimer.unref(); // Node checks must be able to exit
   function watchCity(dt) {
     if (!ctx()) return; // ambience only with the Sound button on
     const h = hour() % 24;
@@ -1085,6 +1190,12 @@
       amb.car = cars > 0 ? Math.max(1.8, 14 - Math.min(12, cars / 4)) * (0.6 + Math.random() * 0.8) : 8;
       if (cars > 0) S.car(Math.random() < 0.5 ? -0.8 : 0.8, Math.min(1, 0.4 + cars / 60));
     }
+    // Never more than ~8 s with nothing heard: birds need fair weather and day, cars need a crowd, sirens need night, so a
+    // storm at dusk (the cold open) could go 45 s on the roof with only the one looping bed. Whatever else fired resets it.
+    amb.fill -= dt;
+    // Real time since anything was heard (note() stamps every sound): a fill is due after 7 s whatever the frame timing did to
+    // the timers above, so a stall or a throttled tab can't leave play silent for 20 s.
+    if (amb.fill <= 0 || clockMs() - lastHeardMs > 7000) playFill(h);
     amb.siren -= dt;
     if (amb.siren <= 0) {
       amb.siren = 90 + Math.random() * 120;
@@ -1094,12 +1205,11 @@
 
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
-    try {
-      watchHim(dt);
-      watchTornado(dt);
-      watchCity(dt);
-    } catch (err) {
-      if (!watchHim.warned) { watchHim.warned = true; console.warn("[sfx]", err); }
+    // Each watcher on its own: one that throws every frame must not take the city's ambience down with it.
+    for (const run of [() => watchHim(dt), () => watchTornado(dt), () => watchCity(cityDt())]) {
+      try { run(); } catch (err) {
+        if (!watchHim.warned) { watchHim.warned = true; console.warn("[sfx]", err); }
+      }
     }
   });
 
@@ -1107,14 +1217,45 @@
   /* UI: a press on any button plays the press clip at once (the ability arc, Episodes, cards); the Episodes menu opens and closes
      with its own swish. Capture phase, so it sounds even where a handler stops the event. Sound also starts loading the
      `ui` and `move` groups on the first press (or when Sound turns on), so the first press already has its clip. */
-  let lastPress = 0;
-  const pressable = (el) => el && el.closest && el.closest("button, [role=button], .ability, a[href], #sound, #time-btn");
+  /* The press fallback (the clip isn't loaded yet, or isn't in the build): a rendered click played as a buffer source, tagged
+     "ui-click". The audio probe sees buffer sources only, so the oscillator this used to be left a press silent to it. */
+  let clickBuf = null;
+  function uiClick() {
+    const a = ctx();
+    if (!a) return;
+    const sr = a.c.sampleRate;
+    if (!clickBuf || clickBuf.sampleRate !== sr) {
+      const n = Math.floor(sr * 0.08), cb = a.c.createBuffer(1, n, sr), d = cb.getChannelData(0);
+      let ph = 0;
+      for (let i = 0; i < n; i++) {
+        const x = i / sr;
+        ph += 2 * Math.PI * (1250 + 250 * Math.min(1, x / 0.05)) / sr;
+        d[i] = (2 / Math.PI) * Math.asin(Math.sin(ph)) * Math.min(1, x / 0.005) * Math.exp(-x * 45);
+      }
+      clickBuf = cb;
+    }
+    const src = a.c.createBufferSource();
+    src.buffer = clickBuf;
+    src.playbackRate.value = 0.97 + Math.random() * 0.06;
+    try { src.__hawkesSampleId = "ui-click"; src.__hawkesBus = "ui"; src.__hawkesGain = 0.2; } catch (e) { /* */ }
+    const g = a.c.createGain();
+    g.gain.value = 0.2;
+    src.connect(g);
+    g.connect(out(a, 0, "ui"));
+    src.start(a.c.currentTime);
+  }
+  /* Everything the UI probe counts as a control (hawkes-ui.js CONTROL) plus the game's own: the ability slots and the cold open's
+     big Rain/Bolt button are divs/buttons the old list could miss. One handler call per event (capture on document), so there is
+     no time debounce: a second press 40 ms after the first (two fingers, a tap during a hold) must answer too. */
+  const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, #sound, #time-btn";
+  const pressable = (el) => el && el.closest && el.closest(PRESSABLE);
+  let lastPressEv = null;
   if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
-    if (!pressable(e.target) || !soundOn()) return;
-    const t = performance.now();
-    if (t - lastPress < 60) return;
-    lastPress = t;
-    if (!sample("ui-press", { gain: 0.8, bus: "ui" })) { synthTag("ui"); tone({ freq: 1250, to: 1500, dur: 0.05, vol: 0.04, wave: "triangle", bus: "ui" }); }
+    if (e === lastPressEv || !pressable(e.target) || !soundOn()) return;
+    lastPressEv = e;
+    let played = false;
+    try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
+    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* no audio yet */ } }
     note("ui-press");
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
@@ -1146,6 +1287,7 @@
       try { s = day.powers.now().strike; } catch (err) { s = null; }
       const at = s ? place(s.x, s.z) : { pan: 0, gain: 1 };
       S.crack(at.pan, at.gain, s && s.dist, s ? { x: s.x, z: s.z } : null);
+      logCast("lightning", power.sources.crack === "file" ? "file" : "synth", power.last.crack || null);
       if (day.score && day.score.duckStrike) day.score.duckStrike(1.5);
     } else if (d.action === "tornado") wantPower("tornado-roar");
   });
@@ -1153,13 +1295,16 @@
   if (typeof document !== "undefined" && document.getElementById) {
     const soundBtn = document.getElementById("sound");
     if (soundBtn && typeof soundBtn.addEventListener === "function") {
-      soundBtn.addEventListener("click", () => { if (soundOn()) { powerIndex(); if (ctx()) loadPowerKinds(POWER_EAGER); } });
+      soundBtn.addEventListener("click", () => { if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER); loadCastClips(); } } });
     }
   }
   if (typeof window.addEventListener === "function") {
     window.addEventListener("pointerdown", () => {
-      if (soundOn()) { powerIndex(); if (ctx()) loadPowerKinds(POWER_EAGER); }
+      if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER); loadCastClips(); } }
     }, true);
+    ["keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, () => {
+      if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER.concat(["gale-loop", "sun-shimmer", "body", "rumble"])); loadCastClips(); } }
+    }, { capture: true, passive: true }));
   }
   window.addEventListener("day:episode", (e) => {
     const d = e.detail || {};
@@ -1294,6 +1439,8 @@
         limiter: !!(audio && audio.lim),
       },
       plays: bank.plays.slice(),
+      casts: casts.slice(),
+      castClips: { rain: !!castBufs.rain, fog: !!castBufs.fog },
     }),
     sample,
     thunder: (meta) => {

@@ -24,7 +24,7 @@
 
 export const RAIN_BUDGET = {
   high: { hits: 150, spawn: 120, drips: 40, curtains: 3, lens: 56, streaks: 9000 },
-  low: { hits: 44, spawn: 34, drips: 12, curtains: 2, lens: 0, streaks: 4000 }, // phone: at most 4000 streak particles, no lens drops
+  low: { hits: 28, spawn: 22, drips: 8, curtains: 2, lens: 0, streaks: 2500 }, // phone: at most 2500 streak particles, no lens drops
 };
 export const REACH = 15; // metres around the camera where drops land
 export const CURTAIN_R = [56, 84, 118];
@@ -322,6 +322,14 @@ export function startRain(world, dayApi) {
       curtains.push({ mesh: m, tex: tx, r, speed: 0.55 + i * 0.22 });
     });
   }
+
+  /* Their shaders first compile the frame Rain is first cast (hidden meshes are never drawn): a multi-hundred-ms stall on a
+     throttled phone. Compile them off the frame once the page has settled. */
+  setTimeout(() => {
+    [rippleB && rippleB.mesh, splashB && splashB.mesh, ...curtains.map((c) => c.mesh)].forEach((m) => {
+      try { if (m && m.material && m.material.forceCompilationAsync) m.material.forceCompilationAsync(m).catch(() => {}); } catch (e) { /* headless */ }
+    });
+  }, 2500);
 
   /* ---- water on the windows: a plugin on the facade, shopfront and skyline materials ---- */
   const wr = { amt: 0, time: 0, hooked: 0, ok: false };

@@ -10,7 +10,7 @@ const ok = (c, m) => { if (!c) { bad++; console.error("FAIL", m); } };
 
 ok(ZONES.length === 6, "six reverb zones");
 ok(ZONES.includes("rooftop") && ZONES.includes("car") && ZONES.includes("office"), "named zones present");
-ok(DUCK.musicDb === -8 && DUCK.ambienceDb === -4, "duck −8 / −4 dB");
+ok(DUCK.musicDb === -8 && DUCK.ambienceDb === -6, "duck −8 / −6 dB");
 ok(DUCK.attackMs === 150, "duck attack 150 ms");
 ok(Math.abs(dbToGain(-8) - 0.398107) < 0.01, "−8 dB ≈ 0.4 linear");
 ok(Math.abs(duckGains(true).music - dbToGain(-8)) < 1e-9, "duckGains music");

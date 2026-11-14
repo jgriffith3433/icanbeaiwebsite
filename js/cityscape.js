@@ -201,14 +201,32 @@ function facadeTextures(st, seed, special) {
       g.fillStyle = "rgba(20,14,14,0.35)";
       for (let y = 0; y < H; y += 8) g.fillRect(0, y, W, 1);
     }
+    // piers between bays, a soft floor-by-floor tone drift and grime under each sill: the wall reads as built, not a flat slab
+    for (let f = 0; f < FLOORS; f++) {
+      g.fillStyle = rng() < 0.5 ? "rgba(0,0,0,0.07)" : "rgba(255,240,220,0.05)";
+      g.fillRect(0, (FLOORS - 1 - f) * CELL, W, CELL);
+    }
+    for (let b = 0; b <= BAYS; b++) {
+      g.fillStyle = "rgba(0,0,0,0.18)";
+      g.fillRect(b * CELL - 2, 0, 4, H);
+      g.fillStyle = "rgba(255,245,230,0.08)";
+      g.fillRect(b * CELL + 2, 0, 2, H);
+    }
     for (let f = 0; f < FLOORS; f++) {
       g.fillStyle = st.wall2;
       g.fillRect(0, (FLOORS - 1 - f) * CELL + CELL - 5, W, 5);
+      const gr = g.createLinearGradient(0, (FLOORS - 1 - f) * CELL + CELL - 22, 0, (FLOORS - 1 - f) * CELL + CELL);
+      gr.addColorStop(0, "rgba(0,0,0,0)");
+      gr.addColorStop(1, "rgba(0,0,0,0.22)");
+      g.fillStyle = gr;
+      g.fillRect(0, (FLOORS - 1 - f) * CELL + CELL - 22, W, 22);
       for (let b = 0; b < BAYS; b++) {
         const [x, y, w, h] = rect(b, f);
         g.fillStyle = st.sill;
         g.fillRect(x - 3, y + h, w + 6, 4);
         const k = rng();
+        g.fillStyle = "rgba(0,0,0,0.55)"; // a dark reveal frame round every pane
+        g.fillRect(x - 3, y - 3, w + 6, h + 3);
         g.fillStyle = st.pane;
         g.fillRect(x, y, w, h);
         g.fillStyle = "rgba(150,190,230," + (0.1 + k * 0.18).toFixed(2) + ")";
@@ -386,7 +404,7 @@ export function installCityscape(w) {
     m.diffuseTexture = tex.albedo;
     m.emissiveTexture = tex.emissive;
     m.emissiveColor = new B.Color3(0, 0, 0);
-    m.diffuseColor = new B.Color3(1.35, 1.35, 1.35);
+    m.diffuseColor = new B.Color3(1.12, 1.12, 1.12); // was 1.35: dusk light blew the walls out to lavender-white
     m.specularColor = new B.Color3(0.05, 0.05, 0.06);
     m.maxSimultaneousLights = lights;
     return m;
@@ -811,6 +829,8 @@ export function installCityscape(w) {
     lampLights.push(L);
   }
   let lampDynActive = 0;
+  let warmLamps = false; // world.warmLights compiles the lit materials with the lamp lights on, behind the loading card
+  if (world.warmHooks) world.warmHooks.push((g) => { warmLamps = !!(g && g.has("lamps")); });
   function updateLampLights(lampsK) {
     const cam = scene.activeCamera;
     const cx = cam && cam.globalPosition ? cam.globalPosition.x : (cam && cam.position ? cam.position.x : 0);
@@ -937,7 +957,7 @@ export function installCityscape(w) {
     const dayK = Math.max(0, 1 - windows);
     skyMat.fogEnabled = windows < 0.3;
     skyMat.diffuseColor.set(fogV.r * 0.6 + 0.2 * dayK, fogV.g * 0.65 + 0.22 * dayK, fogV.b * 0.7 + 0.26 * dayK);
-    updateLampLights(lamps);
+    updateLampLights(warmLamps ? 1 : lamps);
   });
 
   /* the lamps and nearby windows stutter (the opening's first bolt: `day.cityscape.flicker(secs)`) */

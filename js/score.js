@@ -496,13 +496,21 @@ export function startScore(dayApi) {
 
   async function loadAll() {
     const c = cfg();
+    // The city hum first, alone: it is the ambience bed heard from the first tap, so it must not queue behind the beds.
+    if (c.ambience.air) await loadUrl(c.ambience.air);
     const urls = new Set();
     BEDS.forEach((b) => c.music[b] && urls.add(c.music[b]));
     urls.add(c.music.wind);
     urls.add(c.sting);
     if (c.whoosh) urls.add(c.whoosh);
     Object.keys(c.ambience).forEach((k) => c.ambience[k] && urls.add(c.ambience[k]));
-    await Promise.all([...urls].map(loadUrl));
+    // Secondary beds must not compete with the first minute's bundle, shaders and models on a slow link: wait for the
+    // page to settle (and idle), then fetch two at a time, the weather-critical ones (rain, wind) first.
+    await new Promise((ok) => setTimeout(ok, 8000));
+    await new Promise((ok) => (typeof requestIdleCallback === "function" ? requestIdleCallback(ok, { timeout: 4000 }) : setTimeout(ok, 0)));
+    const queue = [...urls].sort((x, y) => (/rain|wind/.test(x) ? 0 : 1) - (/rain|wind/.test(y) ? 0 : 1));
+    const lane = async () => { while (queue.length) await loadUrl(queue.shift()); };
+    await Promise.all([lane(), lane()]);
     live.samples = BEDS.some((b) => !!buffers[c.music[b]]) || AMB_LOOPS.some((k) => !!buffers[c.ambience[k]]);
     return live.samples;
   }
@@ -523,6 +531,9 @@ export function startScore(dayApi) {
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;
+    // Several clips share one length after the seam fix (the 8 s beds all become 7.15 s), so the probe's automatic
+    // "buf:<secs>x<len>" id would read different files as one sample: name each loop by its own file.
+    if (o.id) { try { src.__hawkesSampleId = o.id; src.__hawkesBus = o.bus || "ambience"; } catch (e) { /* */ } }
     const filter = o.filter && ctx.createBiquadFilter ? ctx.createBiquadFilter() : null;
     if (filter) {
       filter.type = o.filterType || "lowpass";
@@ -576,7 +587,7 @@ export function startScore(dayApi) {
     const url = bedUrl(bed, c);
     const buf = buffers[url];
     if (!buf) return null;
-    music[bed] = startLoop(buf, bedBus || musicBus, 0);
+    music[bed] = startLoop(buf, bedBus || musicBus, 0, { id: "bed-" + (url || bed).split("/").pop(), bus: "music" });
     return music[bed];
   }
 
@@ -589,6 +600,7 @@ export function startScore(dayApi) {
     const needFilter = key === "air" || key === "rainRoof" || key === "rainDownpour";
     const needPan = key === "wind" || key === "awning" || key === "umbrella" || key === "birds" || key === "gutter";
     amb[key] = startLoop(buf, ambBus, 0, {
+      id: "amb-" + (url || key).split("/").pop(),
       filter: needFilter,
       filterType: key === "rainRoof" ? "highpass" : "lowpass",
       filterFreq: key === "rainRoof" ? 1200 : 4200,
@@ -685,6 +697,7 @@ export function startScore(dayApi) {
     const t = when != null ? when : ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = buf;
+    try { src.__hawkesSampleId = "score-" + String(url).split("/").pop(); } catch (e) { /* */ }
     const g = ctx.createGain();
     g.gain.value = vol;
     if (pan != null && ctx.createStereoPanner) {
@@ -1210,13 +1223,7 @@ export function startScore(dayApi) {
       if (soundOn()) unlock();
     });
   }
-  window.addEventListener(
-    "pointerdown",
-    () => {
-      if (soundOn()) unlock();
-    },
-    true
-  );
+  ["pointerdown", "keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, () => { if (soundOn()) unlock(); }, true));
 
   // His spoken lines (js/voice.js): the music dips under them for a couple of seconds.
   // When js/mix.js is up it owns the −8 dB / −4 dB duck on the shared buses — skip the

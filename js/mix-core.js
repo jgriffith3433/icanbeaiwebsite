@@ -7,10 +7,10 @@
 /** The six places the ear knows. Names match day.audio.info().zone. */
 export const ZONES = Object.freeze(["rooftop", "street", "plaza", "apartment", "car", "office"]);
 
-/** Voice duck targets (linear gain). Music −8 dB, ambience −4 dB. */
+/** Voice duck targets (linear gain). Music −8 dB, ambience −6 dB. */
 export const DUCK = Object.freeze({
   musicDb: -8,
-  ambienceDb: -4,
+  ambienceDb: -6,
   attackMs: 150,
   releaseMs: 600,
 });
