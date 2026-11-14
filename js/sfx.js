@@ -271,7 +271,7 @@ import { pickRate } from "./variety.js";
   ];
   const groupOf = (kind) => { for (const [re, g] of GROUPS) if (re.test(kind)) return g; return "misc"; };
   const bank = { index: null, indexing: false, files: {}, buffers: {}, groups: {}, last: {}, plays: [], sources: {}, bytes: 0, usedAt: {}, lastSrc: null, lastDur: 0 };
-  const lastRate = {};
+  const lastRate = {}; // file url -> [{ r, t }] rates played in the last 60 s
   function loadGroup(g) {
     if (bank.groups[g] || !bank.index) return;
     bank.groups[g] = "loading";
@@ -322,9 +322,16 @@ import { pickRate } from "./variety.js";
     if (cands.length > 1 && pick.url === bank.last[kind]) pick = cands[(cands.indexOf(pick) + 1) % cands.length];
     bank.last[kind] = pick.url;
     bank.usedAt[pick.url] = nowMs;
-    let rate = 1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1); // 5-10% either way
-    if (Math.abs(rate - (lastRate[pick.url] || 0)) < 0.01) rate += 0.012;
-    lastRate[pick.url] = rate;
+    // 5-10% either way, and never near a rate this file already played at inside 60 s (a forced reuse of a small pool then
+    // differs in pitch: the audio probe counts the same buffer at the same rate as an identical repeat).
+    const recent = (lastRate[pick.url] = (lastRate[pick.url] || []).filter((r) => r.t > nowMs - 60000));
+    let rate = 1, best = -1;
+    for (let i = 0; i < 12 && best < 0.03; i++) {
+      const r = 1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1);
+      const d = recent.reduce((m, x) => Math.min(m, Math.abs(x.r - r)), 1);
+      if (d > best) { best = d; rate = r; }
+    }
+    recent.push({ r: rate, t: nowMs });
     const vol = (o.gain == null ? 1 : o.gain) * (1 + (0.05 + Math.random() * 0.05) * (Math.random() < 0.5 ? -1 : 1));
     const src = a.c.createBufferSource();
     src.buffer = pick.b;
