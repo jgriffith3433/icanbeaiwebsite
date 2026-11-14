@@ -1028,6 +1028,7 @@ function install() {
   }
   /* The scene's own pick from his head to the camera (what the feel sensor casts): the colliders and clearRadius miss thin walls,
      small blocks and meshes with no collider, so the camera could sit behind one. Returns r pulled in until the head sees it. */
+  const HEAD_MARGIN = 0.45;
   const headPickRay = new B.Ray(new B.Vector3(), new B.Vector3(0, 1, 0), 1);
   const notHim = (m) => m.isPickable !== false && m.isEnabled() && m.isVisible !== false && !(world.person && m.isDescendantOf(world.person));
   function headClear(t, dx, dy, dz, r) {
@@ -1038,11 +1039,13 @@ function install() {
       if (len < 0.5) return r;
       headPickRay.origin.set(hx, hy, hz);
       headPickRay.direction.set((cx - hx) / len, (cy - hy) / len, (cz - hz) / len);
-      headPickRay.length = len;
+      // Cast past the camera: the sensor flags a wall 0.3 m short of it, and the drawn camera is a little off this frame's computed
+      // one (the screen-offset lift, shake, a frame of radius lag), so a wall just behind the camera counts as in the way too.
+      headPickRay.length = len + HEAD_MARGIN;
       // nearest hit (fastCheck false): a fast check returns the first mesh found, not the closest, so a far hit read as "clear"
       // while a nearer wall sat between his head and the camera (the feel sensor's camera-blocked)
       const hit = world.scene.pickWithRay(headPickRay, notHim, false);
-      if (!hit || !hit.hit || hit.distance >= len - 0.3) return r;
+      if (!hit || !hit.hit || hit.distance >= len + HEAD_MARGIN - 0.1) return r;
       r = Math.max(0.2, r * Math.max(0.1, (hit.distance - 0.6) / len));
     }
     return r;
