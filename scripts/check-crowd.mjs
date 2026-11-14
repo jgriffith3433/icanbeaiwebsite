@@ -28,7 +28,7 @@ core.Logger.LogLevels = core.Logger.NoneLogLevel; // NullEngine can't instance; 
 const { densityAt, signalAt, installCrowd, SIDE } = await import(new URL('js/crowd.js', root).href);
 const cfg = globalThis.DAY_CONFIG;
 const day = globalThis.DayEngine.build(cfg, '2026-10-19');
-const world = globalThis.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
+const world = globalThis.DayWorld.create({ ...events, removeAttribute() {}, setAttribute() {}, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 
 // the curve alone: rush hour and lunch are busy, night is quiet, midnight wraps
 const curve = cfg.crowd.curve;
