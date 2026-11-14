@@ -101,7 +101,7 @@ world.look.quality("low");
 for (let i = 0; i < 40; i++) world.update(fr, 0.05, {});
 const lo = rain.info();
 ok(lo.quality === "low" && !lo.lens.enabled && lo.hits.live <= lo.hits.cap, `phone: ${JSON.stringify(lo.hits)}`);
-ok(lo.streaks.cap === 2500, "phone streak cap");
+ok(lo.streaks.cap === 1400, "phone streak cap");
 console.warn = warn0;
 if (problems.length) { console.error("check-rain FAILED:\n  " + problems.join("\n  ")); process.exit(1); }
 console.log("check-rain ok: budgets, height map, lens drops, fog, quad batch, the world under NullEngine");
