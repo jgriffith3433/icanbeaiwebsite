@@ -1023,6 +1023,68 @@ export function startScore(dayApi) {
     };
   }
 
+  /* The floor bed: rain hiss, wind and a low room tone, all procedural, on the ambience bus from the first unlock. It never
+     depends on a file, so no stretch of play (a phone still decoding, a clear sky with the Gen beds at 0) is silent. Rain and
+     wind rise with the weather; the room tone (55 + 110 Hz with a slow swell) never drops out. */
+  let floorBed = null;
+  function ensureFloorBed() {
+    if (floorBed || !ctx || !ambBus) return floorBed;
+    try {
+      const len = ctx.sampleRate * 4;
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const ch = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+      const noise = () => {
+        const s = ctx.createBufferSource();
+        s.buffer = buf; s.loop = true;
+        s.start(0, Math.random() * 3);
+        return s;
+      };
+      const out = ctx.createGain();
+      out.gain.value = 1;
+      out.connect(ambBus);
+      const rainBp = ctx.createBiquadFilter();
+      rainBp.type = "bandpass"; rainBp.frequency.value = 3200; rainBp.Q.value = 0.4;
+      const rainG = ctx.createGain(); rainG.gain.value = 0;
+      noise().connect(rainBp); rainBp.connect(rainG); rainG.connect(out);
+      const windLp = ctx.createBiquadFilter();
+      windLp.type = "lowpass"; windLp.frequency.value = 420; windLp.Q.value = 1.2;
+      const windG = ctx.createGain(); windG.gain.value = 0;
+      noise().connect(windLp); windLp.connect(windG); windG.connect(out);
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.13;
+      const lfoG = ctx.createGain(); lfoG.gain.value = 160;
+      lfo.connect(lfoG); lfoG.connect(windLp.frequency); lfo.start();
+      const roomG = ctx.createGain(); roomG.gain.value = 0;
+      [55, 110.4].forEach((f, i) => {
+        const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+        const g = ctx.createGain(); g.gain.value = i ? 0.35 : 1;
+        o.connect(g); g.connect(roomG); o.start();
+      });
+      const swell = ctx.createOscillator(); swell.frequency.value = 0.07;
+      const swellG = ctx.createGain(); swellG.gain.value = 0.12;
+      swell.connect(swellG); swellG.connect(roomG.gain); swell.start();
+      const roomHiss = ctx.createBiquadFilter();
+      roomHiss.type = "lowpass"; roomHiss.frequency.value = 260;
+      const hissG = ctx.createGain(); hissG.gain.value = 0.35;
+      noise().connect(roomHiss); roomHiss.connect(hissG); hissG.connect(roomG);
+      roomG.connect(out);
+      floorBed = { rainG, windG, roomG, level: { rain: 0, wind: 0, room: 0 } };
+    } catch (e) { floorBed = null; }
+    return floorBed;
+  }
+  function tickFloorBed(on, rain, wind) {
+    const F = ensureFloorBed();
+    if (!F) return;
+    // Floors: a thin steady rain and breeze always, the weather raises them.
+    const rainK = on ? 0.05 + 0.2 * Math.min(1, rain) : 0;
+    const windK = on ? 0.04 + 0.16 * Math.min(1, wind) : 0;
+    const roomK = on ? 0.05 : 0;
+    setGainSmooth(F.rainG, rainK, 0.4);
+    setGainSmooth(F.windG, windK, 0.4);
+    setGainSmooth(F.roomG, roomK, 0.4);
+    F.level = { rain: rainK, wind: windK, room: roomK };
+  }
+
   function tick(L, dt) {
     const on = soundOn();
     live.on = on;
@@ -1105,6 +1167,8 @@ export function startScore(dayApi) {
     setGainSmooth(musicBus, musicGoal, 0.05);
     setGainSmooth(bedBus, bedGoal, 0.25);
     setGainSmooth(ambBus, c.ambVol * masterK * (titleUp ? 0.5 : 1), 0.05);
+
+    tickFloorBed(on, Math.max(live.amb.rainRoof || 0, live.amb.rainDownpour || 0), live.amb.wind || 0);
 
     const T = ensureTension();
     if (T) {
@@ -1198,6 +1262,7 @@ export function startScore(dayApi) {
       rate: live.rate,
       pulse: live.pulse,
       bedLevel: bedGoal,
+      floorBed: floorBed ? floorBed.level : null,
       mix: Object.assign({}, cfg().mix),
       // which file each of the day/night beds is playing (its own, or the fallback until Gen's file lands)
       files: { day: ctx ? bedUrl("day", cfg()) : null, night: ctx ? bedUrl("night", cfg()) : null },
