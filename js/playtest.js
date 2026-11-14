@@ -1862,8 +1862,10 @@ async function neighborAwareness(t, touch, label, whoId, quiet) {
   let mark = { t: performance.now(), d: dist() }, moved = false;
   while (dist() > 5 && performance.now() - t1 < 14000) {
     const s = C.state();
+    // a rolling window: sliding along a wall for the first second must not count as headway for the whole walk
     if (!moved && performance.now() - mark.t > 1200) {
-      if (mark.d - dist() < 0.5) {
+      if (mark.d - dist() >= 0.5) mark = { t: performance.now(), d: dist() };
+      else {
         if (sr && down) { touchOn(stickEl, "pointerup", cx, cy); down = false; }
         if (held) { held.split("").forEach((c) => keyUp(c)); held = null; }
         if (C.place) {
@@ -1876,7 +1878,7 @@ async function neighborAwareness(t, touch, label, whoId, quiet) {
           await sleep(600);
         }
         moved = true;
-      } else { moved = true; }
+      }
     }
     const cam = scene.activeCamera;
     const f = cam.getForwardRay().direction;
