@@ -524,6 +524,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
       if (done) return;
       done = true;
       if (playing && playing.id === id) { playing = null; playPri = 0; live.playing = false; }
+      emit({ action: "end", id, group: "neighbor", positional: true }); // js/mix.js lets the duck go
       if (opts.onend) opts.onend();
       drainPilot();
     };
@@ -752,6 +753,7 @@ html.touch-ui .voice-caption span{white-space:nowrap;overflow:hidden;text-overfl
           live.playing = false;
         }
         if (day.pilot && day.pilot.pulse) day.pilot.pulse(false);
+        emit({ action: "end", id: line.id, group: "pilot" }); // js/mix.js lets the duck go
         if (opts.onend) opts.onend();
         drainPilot();
       };

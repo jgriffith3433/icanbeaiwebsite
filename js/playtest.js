@@ -10454,6 +10454,124 @@ async function firstMinute(options, t) {
 
 /* ---------------- cold-start: a new player's first Play to the first bolt and the street's reaction ---------------- */
 
+/* ---------------- audio-check: sound from the first tap, a distinct cast sound per power, the voice ducking the bed ----------------
+   Needs ?playtest=audio-check ({"touch":true} = 390x844 by touch). Setup (named): the saved mute cleared, the title quiet.
+   Real input: one tap (a click on desktop) on the canvas, then Enter / the Take control button; the casts are the named shortcut
+   `powers.command` (Lightning, Rain, Gale, Fog, Sun break) after a Charge refill; a voiced line `voice.say`.
+   `audioReport()` is the measure: the context, each bus's level (js/mix.js, after the duck), the ambience loops, the music bed,
+   every cast `day.sfx.info().casts` (power, file or synth). Events audio-before-tap / audio-ambience / audio-toggle /
+   audio-cast-<power> / audio-casts / audio-duck / audio-report; metrics audioAmbienceMs, audioCastsDistinct, audioDuckMusicDb,
+   audioDuckAmbienceDb, audioToggleMinPx. */
+function audioReport() {
+  const D = window.day;
+  const A = D.audio && D.audio.info ? D.audio.info() : null;
+  const S = D.score && D.score.now ? D.score.now() : null;
+  const X = D.sfx && D.sfx.info ? D.sfx.info() : null;
+  const btn = $("sound");
+  const amb = {};
+  if (S) Object.keys(S.amb || {}).forEach((k) => { if ((S.amb[k] || 0) > 0.01) amb[k] = S.amb[k]; });
+  const music = {};
+  if (S) Object.keys(S.music || {}).forEach((k) => { if ((S.music[k] || 0) > 0.01) music[k] = S.music[k]; });
+  return {
+    on: !!btn && btn.getAttribute("aria-pressed") === "true",
+    unlocked: !!(A && A.unlocked) || !!(S && S.unlocked),
+    buses: A ? Object.assign({}, A.buses) : {},
+    duck: A ? Object.assign({}, A.duck) : {},
+    ambience: amb,
+    music,
+    bed: S ? S.bed : null,
+    cityPlaying: !!(S && S.on && S.unlocked && (S.amb.air || 0) > 0.02),
+    casts: X ? X.casts.slice() : [],
+  };
+}
+async function audioCheck(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Phone: first tap" : "First tap");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day;
+  const P = window.powers || D.powers;
+  const C = D.control;
+  if (!D.audio || !D.score || !D.sfx || !P) { t.problem("bug", "day.audio, day.score, day.sfx or powers is missing"); return; }
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  if (touch) { document.documentElement.classList.add("touch-ui"); if (C.touch) C.touch(true); }
+  if (D.title && D.title.quiet) D.title.quiet();
+  const btn = $("sound");
+  const r0 = btn.getBoundingClientRect();
+  t.metric("audioToggleMinPx", Math.round(Math.min(r0.width, r0.height)));
+  t.event("audio-toggle", `Sound toggle ${Math.round(r0.width)}x${Math.round(r0.height)} px, "${btn.textContent}", saved ${localStorage.getItem("icanbe.sound")}`);
+  if (r0.width < 44 || r0.height < 44) t.problem("bug", `The sound toggle is ${Math.round(r0.width)}x${Math.round(r0.height)} px (44 minimum)`);
+  const before = audioReport();
+  t.event("audio-before-tap", `on ${before.on}, city playing ${before.cityPlaying}`);
+  if (!before.on) t.problem("bug", "Sound isn't on by default (no saved mute): the first tap must start it with no settings change");
+
+  // the first tap: anywhere (the canvas), nothing else touched
+  const cv = document.querySelector("canvas") || document.body;
+  const t0 = performance.now();
+  if (touch) await tapEl(cv); else await clickEl(cv);
+  const heard = await t.until(() => audioReport().cityPlaying && audioReport().buses.ambience > 0, 2000, "the city ambience").then(() => true).catch(() => false);
+  const ms = Math.round(performance.now() - t0);
+  const rep = audioReport();
+  t.metric("audioAmbienceMs", heard ? ms : -1);
+  t.event("audio-ambience", `${heard ? "city ambience playing " + ms + " ms after the first tap" : "NO ambience within 2 s of the first tap"}; loops ${JSON.stringify(rep.ambience)}, bed ${rep.bed}, bus levels ${JSON.stringify(rep.buses)}`);
+  if (!heard) t.problem("bug", "The city ambience wasn't playing within 2 s of the first tap");
+  if (!rep.on) t.problem("bug", "The first tap changed Sound to off");
+  t.progress(0.25);
+
+  // take him (Enter, or the button by touch) and cast the five
+  if (touch) { const tk = $("control") || document.querySelector("#take-control,[data-take]"); if (tk) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 6000, "Take control").catch(() => {});
+  const refill = () => { try { P.abilities && P.abilities.reset && P.abilities.reset(100); } catch (e) { /* ok */ } };
+  const seen = {};
+  for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"], ["gale", "gale"], ["fog", "fog"], ["sunbreak", "sunbreak"]]) {
+    refill();
+    const n0 = D.sfx.info().casts.length;
+    const ok = P.command(id, touch ? "touch" : "key");
+    await t.until(() => D.sfx.info().casts.some((c, i) => i >= n0 - 0 && c.power === name), 2500, `the ${name} cast sound`).catch(() => {});
+    const c = D.sfx.info().casts.filter((x) => x.power === name).pop();
+    seen[name] = c || null;
+    t.event("audio-cast-" + name, c ? `${name}: ${c.source}${c.file ? " " + c.file : ""}` : `${name}: no cast sound (command ${ok ? "accepted" : "refused"})`);
+    if (!c) t.problem("bug", `${name} played no cast sound`);
+    else if (c.source !== "file") t.problem("warning", `${name}'s cast sound was the synth stand-in, not a clip (the clip hadn't decoded yet)`);
+    await sleep(900);
+  }
+  const keys = Object.keys(seen).filter((k) => seen[k]);
+  const sig = new Set(keys.map((k) => seen[k].file || k));
+  t.metric("audioCastsDistinct", sig.size);
+  t.event("audio-casts", `${keys.length}/5 casts heard, ${sig.size} distinct sounds`);
+  if (sig.size < 5) t.problem("bug", `The five casts must each play a distinct sound (${sig.size} distinct)`);
+  t.progress(0.6);
+
+  // a voiced line over the bed: the bed ducks, the line is louder, and it comes back
+  await sleep(2500);
+  const bed = audioReport();
+  const line = D.voice && D.voice.say ? D.voice.say("bolt", { force: true, ignoreCooldown: true }) : null;
+  await sleep(450);
+  const dk = audioReport();
+  t.metric("audioDuckMusicDb", dk.duck.musicDb);
+  t.metric("audioDuckAmbienceDb", dk.duck.ambienceDb);
+  const bv = dk.buses;
+  t.event("audio-duck", `line ${line ? "spoken" : "NOT spoken"}; music ${dk.duck.musicDb} dB, ambience ${dk.duck.ambienceDb} dB; bus levels voice ${(bv.voice || 0).toFixed(2)} vs music ${(bv.music || 0).toFixed(2)} / ambience ${(bv.ambience || 0).toFixed(2)} (before ${(bed.buses.music || 0).toFixed(2)} / ${(bed.buses.ambience || 0).toFixed(2)})`);
+  if (!line) t.problem("bug", "The voiced line didn't play, so the duck couldn't be measured");
+  else {
+    if (dk.duck.musicDb > -6) t.problem("bug", `Music is only ${dk.duck.musicDb} dB under a voice line (6 dB minimum)`);
+    if (dk.duck.ambienceDb > -5.5) t.problem("bug", `Ambience is only ${dk.duck.ambienceDb} dB under a voice line (about 6 dB)`);
+    if (!((bv.voice || 0) > (bv.music || 0) && (bv.voice || 0) > (bv.ambience || 0))) t.problem("bug", "While a voice line plays, the line isn't louder than the music and ambience buses");
+  }
+  await t.until(() => audioReport().duck.musicDb > -1, 9000, "the duck to release").then(() => t.event("audio-duck-release", "the bed came back after the line")).catch(() => t.problem("bug", "Music and ambience stayed ducked after the voice line ended"));
+  t.progress(0.85);
+
+  // the mute is the player's: off is remembered, on again
+  if (touch) await tapEl(btn); else await clickEl(btn);
+  await sleep(300);
+  if (localStorage.getItem("icanbe.sound") !== "off" || btn.getAttribute("aria-pressed") === "true") t.problem("bug", "The sound toggle didn't mute and save the choice");
+  if (touch) await tapEl(btn); else await clickEl(btn);
+  await sleep(300);
+  if (btn.getAttribute("aria-pressed") !== "true") t.problem("bug", "The sound toggle didn't turn Sound back on");
+  const fin = audioReport();
+  t.event("audio-report", JSON.stringify({ on: fin.on, buses: fin.buses, ambience: fin.ambience, bed: fin.bed, casts: fin.casts.length }));
+  t.progress(1);
+}
+
 /* ---------------- stem-score: one motif, three synced stems, intent-driven gains (js/stems.js) ----------------
    Needs ?playtest=stem-score. Setup (named): every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap
    on a phone) on Play, a hold of the bolt (E held, or a touch held on the Bolt button), and after the cold open a Tornado (named
@@ -11879,6 +11997,7 @@ installPlaytest({
     { id: "night-glow", title: "District glow after dusk: windows light on schedules with interior-mapped rooms, neon flickers, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares; wet street uses SSR on high and a reflection probe on low; a bolt flickers windows", seconds: 160, tags: ["look", "photos", "phone", "feel"], description: "Day bar beside the car (setup), Enter / Take control tap, scrub 17→01 for window counts, walk the avenue at 22:00, key 3 for rain reflections. Events night-glow-schedule / -street / -reflect / -fps / -flicker; metrics windowOnDusk, windowOnNight, windowOnLate, dynamicLights, nightNeonSigns, nightReflect, nightFps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
+    { id: "audio-check", title: "Audio from the first tap: sound is on by default, the city ambience plays within 2 s of the first tap with no settings change, Rain, Gale, Fog, Sun break and Lightning each play a distinct cast sound, music and ambience duck at least 6 dB under a voice line so the line is the loudest bus, and the 44 px sound toggle keeps the player's mute", seconds: 60, tags: ["audio", "phone", "first-minute"], description: "Load with ?playtest=audio-check ({\"touch\":true} for 390x844). Setup: saved mute cleared, title quiet. Real input: one tap or click on the canvas, Enter or the Take control button, taps on the sound toggle; casts by the named shortcut powers.command; a voiced line by voice.say. Events audio-before-tap / audio-ambience / audio-cast-<power> / audio-casts / audio-duck / audio-report; metrics audioAmbienceMs, audioCastsDistinct, audioDuckMusicDb, audioDuckAmbienceDb, audioToggleMinPx. Run at 1280x720 and 390x844 touch." },
     { id: "stem-score", title: "Stem score: Play opens on the 4-note motif (title, then the cold open), three stems stream after the first input and play in sync, a held bolt raises the tension layer within one bar, a tornado brings the storm layer, an episode success plays the resolution sting; on a phone the stems stay under 1.5 MB", seconds: 90, tags: ["audio", "music", "phone", "opening"], description: "Load with ?playtest=stem-score. Setup: every icanbe.* key cleared, cold open armed, title up. Real input: click or tap Play, hold the bolt (E or the Bolt button). Shortcuts: powers.command('tornado'), a day:episode score event. Events stem-motif-title / -coldopen / -ready / -windup / -storm / -sting / -transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. Run at 1280x720 and 390x844 touch." },
     { id: "day-sound", title: "Diegetic day soundscapes: at 1200× the sound log shows distinct beds for home morning, commute, office, park lunch, evening TV and night; the car radio names a weather the player called today; office keyboard starts within 3 s of the desk and stops when he leaves; on phone low quality at most 3 loops play at once", seconds: 180, tags: ["audio", "phone", "story"], description: "Load with ?playtest=day-sound ({\"touch\":true} for 390x844). Sound on (real pointer), 1200× through the day, scrub to commute and desk. Events day-scape-* / day-radio / day-keyboard-on / day-keyboard-off / day-phone-cap; metrics dayScapes, dayMaxLoops, dayKeyboardSec, dayPhoneLoops." },
     { id: "audio-mix", title: "Mastered mix: day.audio.info() reports six reverb zones (rooftop, street, plaza, apartment, car, office); a voiced line ducks music ≥6 dB within 200 ms; a source behind a building is low-passed in the audio log; on phone Settings Music/Effects/Voice sliders are ≥44 px and persist", seconds: 150, tags: ["audio", "phone", "feel"], description: "Load with ?playtest=audio-mix ({\"touch\":true} for 390x844). Sound on, visit each zone (place/scrub shortcuts), speak a line, place a world source behind a block, open Settings and drag the three sliders, reload levels from localStorage. Events mix-zone-* / mix-duck / mix-occlusion / mix-sliders / mix-persist; metrics mixDuckMusicDb, mixSliderMinPx." },
@@ -11988,6 +12107,7 @@ installPlaytest({
       else if (id === "weather-audio") await weatherAudio(options, t);
       else if (id === "power-sfx") await powerSfx(options, t);
       else if (id === "stem-score") await stemScore(options, t);
+      else if (id === "audio-check") await audioCheck(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "ui-art-kit") await uiArtKit(options, t);

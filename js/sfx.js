@@ -469,6 +469,59 @@
     }
     return true;
   }
+  /* ---------------- cast clips (audio/sfx/*.mp3, already in the repo) ----------------
+     Rain and Fog have no clip of their own in the power bank, so they play the page's existing recordings, shaped per cast
+     (an envelope, a low-pass, a rate): Rain = rain-roof-light, Fog = wind-awning slowed and muffled. Loaded when Sound
+     comes on (first gesture) so the first cast answers at once. `casts` logs every cast (power, file or synth, time):
+     day.sfx.info().casts, what the playtest's audio check reads. */
+  const CAST_CLIPS = { rain: "audio/sfx/rain-roof-light.mp3", fog: "audio/sfx/wind-awning.mp3" };
+  const castBufs = {};
+  const casts = [];
+  const logCast = (power, source, file) => {
+    casts.push({ power, source, file: file || null, t: Math.round(typeof performance !== "undefined" ? performance.now() : Date.now()) });
+    if (casts.length > 40) casts.shift();
+  };
+  function loadCastClips() {
+    const a = audio;
+    if (!a || typeof fetch !== "function") return;
+    Object.keys(CAST_CLIPS).forEach((k) => {
+      if (castBufs[k] !== undefined) return;
+      castBufs[k] = null;
+      fetch(CAST_CLIPS[k]).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+        .then((buf) => new Promise((ok, no) => a.c.decodeAudioData(buf, ok, no)))
+        .then((b) => { castBufs[k] = b; }).catch(() => {});
+    });
+  }
+  /** One clip shaped as a cast: swell in, hold, fade out over `dur`, optional low-pass and rate. */
+  function playCastClip(k, o) {
+    const a = ctx();
+    const b = castBufs[k];
+    if (!a || !b) return false;
+    const t = a.c.currentTime;
+    const src = a.c.createBufferSource();
+    src.buffer = b;
+    src.playbackRate.value = (o.rate || 1) * (1 + (Math.random() * 0.06 - 0.03));
+    let node = src;
+    if (o.lp) {
+      const f = a.c.createBiquadFilter();
+      f.type = "lowpass";
+      f.frequency.value = o.lp;
+      src.connect(f);
+      node = f;
+    }
+    const g = a.c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(o.gain, t + o.attack);
+    g.gain.setValueAtTime(o.gain, t + Math.max(o.attack, o.dur - o.release));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + o.dur);
+    node.connect(g);
+    g.connect(out(a, 0, "sfx"));
+    src.__hawkesSampleId = "cast-" + k;
+    src.start(t, Math.random() * Math.max(0, b.duration - o.dur - 0.1));
+    try { src.stop(t + o.dur + 0.05); } catch (err) { /* ok */ }
+    return true;
+  }
+
   let liveThunder = null;
   let galeLoop = null;
 
@@ -502,21 +555,27 @@
         galeLoop = { until: t + 3.5 };
         setTimeout(() => { galeLoop = null; }, 3600);
         note("gale-loop");
+        logCast("gale", "file", pick.url);
         return true;
       }
-      if (whoosh) return true;
+      if (whoosh) { logCast("gale", "file", "audio/sfx/power/whoosh"); return true; }
       note("gale-whoosh");
+      logCast("gale", "synth", null);
       return false;
     }
     if (id === "fog") {
       note("fog-veil");
       if (day.score && day.score.fogColor) day.score.fogColor(1);
       pad2Fog();
+      // wind-awning slowed and muffled under the pad: a low, wet hush no other cast has
+      const hush = playCastClip("fog", { gain: 0.5, attack: 0.9, dur: 4.2, release: 1.6, rate: 0.62, lp: 650 });
+      logCast("fog", hush ? "file" : "synth", hush ? CAST_CLIPS.fog : null);
       return true;
     }
     if (id === "sunbreak") {
       const shimmer = powerSample("sun-shimmer", { gain: 0.75 });
       note("sun-shimmer");
+      logCast("sunbreak", shimmer ? "file" : "synth", shimmer ? "audio/sfx/power/sun-shimmer" : null);
       if (!shimmer) {
         tone({ freq: 523.25, dur: 1.2, vol: 0.08, wave: "triangle", attack: 0.15 });
         tone({ freq: 783.99, dur: 1.4, vol: 0.06, wave: "triangle", attack: 0.2, delay: 0.1 });
@@ -527,7 +586,10 @@
     }
     if (id === "rain") {
       note("rain-cast");
-      return false; // keep the powers.js hiss (or a future rain-cast clip)
+      // the roof-rain recording swells in, holds and thins out: bright, steady, with no pitch movement (Gale sweeps, Fog is low)
+      const ok = playCastClip("rain", { gain: 0.55, attack: 0.5, dur: 3.6, release: 1.4, rate: 1 });
+      logCast("rain", ok ? "file" : "synth", ok ? CAST_CLIPS.rain : null);
+      return ok; // false keeps the powers.js hiss until the clip has decoded
     }
     return false;
   }
@@ -1146,6 +1208,7 @@
       try { s = day.powers.now().strike; } catch (err) { s = null; }
       const at = s ? place(s.x, s.z) : { pan: 0, gain: 1 };
       S.crack(at.pan, at.gain, s && s.dist, s ? { x: s.x, z: s.z } : null);
+      logCast("lightning", power.sources.crack === "file" ? "file" : "synth", power.last.crack || null);
       if (day.score && day.score.duckStrike) day.score.duckStrike(1.5);
     } else if (d.action === "tornado") wantPower("tornado-roar");
   });
@@ -1153,13 +1216,16 @@
   if (typeof document !== "undefined" && document.getElementById) {
     const soundBtn = document.getElementById("sound");
     if (soundBtn && typeof soundBtn.addEventListener === "function") {
-      soundBtn.addEventListener("click", () => { if (soundOn()) { powerIndex(); if (ctx()) loadPowerKinds(POWER_EAGER); } });
+      soundBtn.addEventListener("click", () => { if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER); loadCastClips(); } } });
     }
   }
   if (typeof window.addEventListener === "function") {
     window.addEventListener("pointerdown", () => {
-      if (soundOn()) { powerIndex(); if (ctx()) loadPowerKinds(POWER_EAGER); }
+      if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER); loadCastClips(); } }
     }, true);
+    ["keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, () => {
+      if (soundOn()) { powerIndex(); if (ctx()) { loadPowerKinds(POWER_EAGER.concat(["gale-loop", "sun-shimmer", "body", "rumble"])); loadCastClips(); } }
+    }, { capture: true, passive: true }));
   }
   window.addEventListener("day:episode", (e) => {
     const d = e.detail || {};
@@ -1294,6 +1360,8 @@
         limiter: !!(audio && audio.lim),
       },
       plays: bank.plays.slice(),
+      casts: casts.slice(),
+      castClips: { rain: !!castBufs.rain, fog: !!castBufs.fog },
     }),
     sample,
     thunder: (meta) => {

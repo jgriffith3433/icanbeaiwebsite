@@ -102,7 +102,7 @@ Definition of done (all required):
 - **Build:** AC fans spin with wind (code); one extra traverse prop between shop and annex roofs after queue 1.
 
 ### Acoustics (the ear knows where he is)
-- **In (`js/mix.js`, `js/mix-core.js`):** six convolution reverb zones — open rooftop, street canyon, plaza, apartment interior, car cabin, office — synthesised IRs (no GPU), crossfaded over 0.5 s as he moves. Buses: music, ambience, sfx, voice, UI → makeup → compressor → limiter (~−16 LUFS). World sources: HRTF + inverse distance on high; stereo pan on low/phone. A building between source and camera low-passes (~1.1 kHz, −6 dB), one raycast per active source, throttled. Voice ducks music −8 dB and ambience −4 dB (150 ms attack). Settings: Music / Effects / Voice sliders (`icanbe.mix`). `day.audio.info()` / playtest `audio-mix`.
+- **In (`js/mix.js`, `js/mix-core.js`):** six convolution reverb zones — open rooftop, street canyon, plaza, apartment interior, car cabin, office — synthesised IRs (no GPU), crossfaded over 0.5 s as he moves. Buses: music, ambience, sfx, voice, UI → makeup → compressor → limiter (~−16 LUFS). World sources: HRTF + inverse distance on high; stereo pan on low/phone. A building between source and camera low-passes (~1.1 kHz, −6 dB), one raycast per active source, throttled. Voice ducks music −8 dB and ambience −6 dB (150 ms attack). Settings: Music / Effects / Voice sliders (`icanbe.mix`). `day.audio.info()` / playtest `audio-mix`.
 - **Heard as:** the avenue rings; the apt and car stay dry and close; every voiced line cuts through the beds.
 
 ### Main Avenue Commute
