@@ -625,6 +625,26 @@ export function installRenderPipeline(world) {
     return { fill: Number(fill.toFixed(3)), sky: Number(lum(fog).toFixed(3)), ratio: Number((fill / Math.max(0.01, lum(fog))).toFixed(2)) };
   }
 
+  /* No material may ask for more lights than the shader's uniform budget allows (the beta's 'Unable to compile effect' came
+     from maxSimultaneousLights 10+ with the prepass and plugins on top). Clamp every material now and every one added
+     later (an event, not a poll); a plain default of 4 is under the cap. */
+  const LIGHT_CAP = 6;
+  const lightCap = { max: LIGHT_CAP, clamped: 0 };
+  const clampLights = (m) => {
+    if (m && typeof m.maxSimultaneousLights === "number" && m.maxSimultaneousLights > LIGHT_CAP) {
+      m.maxSimultaneousLights = LIGHT_CAP; lightCap.clamped++;
+      if (m.markAsDirty) m.markAsDirty(B.Material.LightDirtyFlag);
+    }
+  };
+  scene.materials.forEach(clampLights);
+  scene.onNewMaterialAddedObservable.add(clampLights);
+  api.lightCap = () => {
+    scene.materials.forEach(clampLights);
+    let worst = 0;
+    scene.materials.forEach((m) => { if (typeof m.maxSimultaneousLights === "number") worst = Math.max(worst, m.maxSimultaneousLights); });
+    return { max: LIGHT_CAP, worst, clamped: lightCap.clamped, lights: scene.lights.length };
+  };
+
   scene.metadata = scene.metadata || {};
   scene.metadata.renderPipeline = api;
   world.render = api;
