@@ -2675,13 +2675,34 @@
         try {
           /* Materials of meshes outside the first view (the city the title orbits over, the skin once on) would
              otherwise compile the frame they first come into view. One mesh per material, in the current light set. */
+          /* In parallel batches: with KHR_parallel_shader_compile the compiles overlap on the driver's threads, so ~8 at a time
+             finish in about the time of one, where one-by-one ran out of budget with materials left to compile on first draw
+             (the 900 ms hitches just after the card lifted). Whatever the budget leaves over carries on after the card is gone,
+             a few per frame, rather than being dropped. */
           const seen = new Set();
+          const todo = [];
           for (const m of scene.meshes) {
             const mat = m.material;
             if (!mat || seen.has(mat) || !m.getTotalVertices || !m.getTotalVertices() || !mat.forceCompilationAsync) continue;
             seen.add(mat);
-            if (Date.now() - t0 > budget / 2) break;
-            if (!(await within(mat.forceCompilationAsync(m), budget / 2 - (Date.now() - t0)))) break;
+            todo.push(m);
+          }
+          const BATCH = 8;
+          let at = 0;
+          for (; at < todo.length; at += BATCH) {
+            const left = budget / 2 - (Date.now() - t0);
+            if (left <= 0) break;
+            const ok = await within(Promise.all(todo.slice(at, at + BATCH).map((m) => m.material.forceCompilationAsync(m).catch(() => {}))), left);
+            if (!ok) { at += BATCH; break; }
+          }
+          if (at < todo.length) {
+            const rest = todo.slice(at);
+            (async () => {
+              for (let i = 0; i < rest.length; i += 2) {
+                await nextFrame();
+                try { await Promise.all(rest.slice(i, i + 2).map((m) => (m.isDisposed() || !m.material ? null : m.material.forceCompilationAsync(m).catch(() => {})))); } catch (e) { /* head start only */ }
+              }
+            })();
           }
           for (const g of sets) {
             if (Date.now() - t0 > budget) break;
