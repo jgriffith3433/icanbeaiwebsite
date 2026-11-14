@@ -160,7 +160,9 @@ if (skinWorld) {
     chunks.forEach((c) => { out.set(c, at); at += c.length; });
     return out.buffer;
   };
-  const fetchBytes = () => (typeof fetch === "function"
+  /* ?blockmodel=1 or window.__blockModel (the playtest's "GLB blocked" option): the model's fetch fails, as on a bad network */
+  const blocked = () => window.__blockModel || /[?&]blockmodel=1/.test(location.search);
+  const fetchBytes = () => (blocked() ? Promise.resolve(null) : typeof fetch === "function"
     ? fetch(control.model, { cache: "no-cache" }).then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
     : Promise.resolve(null));
   const firstBytesP = fetchBytes();
@@ -180,6 +182,25 @@ if (skinWorld) {
     }
     throw lastErr;
   };
+  /* background retries with backoff (8 s doubling to 2 min), until it lands; never reloads the page, never hides him */
+  const retryLater = (n) => {
+    const wait = Math.min(120000, 8000 * 2 ** (n - 1));
+    setTimeout(async () => {
+      if (document.hidden && n < 20) return retryLater(n);
+      try {
+        const [{ loadSmallWeather }, buf] = await Promise.all([import("./small-weather.js"), fetchBytes()]);
+        const skin = await loadSmallWeather(w, control.model, buf);
+        w.setSkin(skin);
+        Object.assign(status, { model: "small-weather", clips: skin.clips, modelError: null });
+        console.info(`[world] Small Weather's model arrived on retry ${n}`);
+        window.dispatchEvent(new CustomEvent("day:model", { detail: { ...status } }));
+      } catch (err) {
+        console.warn(`[world] model retry ${n} failed:`, err);
+        retryLater(n + 1);
+      }
+    }, wait);
+  };
+  window.__retryModelNow = () => retryLater(1);
   wear()
     .then((skin) => {
       w.setSkin(skin);
@@ -194,10 +215,13 @@ if (skinWorld) {
     .catch((err) => {
       window.__warmModelSettled = true;
       if (window.__warmLights) window.__warmLights();
-      w.setSkin(null); // he stays hidden: Small Weather or nothing, never the box figure
+      w.setSkin(null); // the stand-in figure stays drawn (never hidden); the model keeps retrying in the background below
       Object.assign(status, { model: "none", modelError: String((err && err.message) || err) });
       console.error("[world] Small Weather's model didn't load:", err);
-      loading.fail(String((err && err.message) || err), "Small Weather");
+      ready.model = true; // the card doesn't wait on a model that is coming later: the stand-in plays meanwhile
+      maybeDone();
+      console.warn("[world] the stand-in stays visible; retrying his model in the background");
+      retryLater(1);
     })
     .finally(() => window.dispatchEvent(new CustomEvent("day:model", { detail: { ...status } })));
 }
