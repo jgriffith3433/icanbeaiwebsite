@@ -813,13 +813,13 @@
       box("cushion1", 1.08, 0.14, 0.8, -0.56, 0.465, -0.1, cm, n); /* top 0.535 like the chair seat: his hips sit 0.62, thighs clear the cushion */
       box("cushion2", 1.08, 0.14, 0.8, 0.56, 0.465, -0.1, cm, n);
       box("couchback", 2.3, 0.62, 0.22, 0, 0.8, -0.5, cm2, n);
-      box("armL", 0.2, 0.55, 0.9, -1.15, 0.5, -0.12, cm2, n);
-      box("armR", 0.2, 0.55, 0.9, 1.15, 0.5, -0.12, cm2, n);
+      box("armL", 0.2, 0.675, 0.9, -1.15, 0.4375, -0.12, cm2, n); /* down to the floor (bottom was 0.225: the outer 10 cm of each arm hung 12 cm in the air) */
+      box("armR", 0.2, 0.675, 0.9, 1.15, 0.4375, -0.12, cm2, n); /* down to the floor (bottom was 0.225: the outer 10 cm of each arm hung 12 cm in the air) */
       box("throwpillow", 0.38, 0.32, 0.12, 0.8, 0.75, -0.35, mat("#c9a04f"), n);
       box("rugL", 3.4, 0.015, 2.6, 0, FLOOR + 0.008, 1.4, mat("#6e5a48"), n).receiveShadows = true; /* cast true: joins the room lights' includedOnlyMeshes (false left it hemi-only and black); furnitureSet still skips it as a shadow caster */
-      box("ctable", 1.0, 0.06, 0.55, 0, 0.45, 1.3, woodLight, n);
-      [[-0.45, 1.1], [0.45, 1.1], [-0.45, 1.5], [0.45, 1.5]].forEach((p, i) => box("ctl" + i, 0.05, 0.4, 0.05, p[0], 0.23, p[1], woodLight, n));
-      const remote = box("remote", 0.05, 0.02, 0.18, 0.3, 0.49, 1.25, dark, n);
+      box("ctable", 1.0, 0.06, 0.55, 0, 0.45, 1.6, woodLight, n);
+      [[-0.45, 1.4], [0.45, 1.4], [-0.45, 1.8], [0.45, 1.8]].forEach((p, i) => box("ctl" + i, 0.05, 0.4, 0.05, p[0], 0.23, p[1], woodLight, n));
+      const remote = box("remote", 0.05, 0.02, 0.18, 0.3, 0.49, 1.55, dark, n);
       props.remote = remote;
       const tvN = anchor("couch", 4.05, 0, PI);
       if (tvN) {
@@ -2615,7 +2615,9 @@
         const bb = m.getBoundingInfo().boundingBox;
         m.getWorldMatrix().decompose(scl, rot, pos);
         const size = new B.Vector3(bb.extendSize.x * 2 * Math.abs(scl.x), bb.extendSize.y * 2 * Math.abs(scl.y), bb.extendSize.z * 2 * Math.abs(scl.z));
-        const big = size.y >= 0.25 || (size.y >= 0.03 && Math.max(size.x, size.z) >= 1.5);
+        /* a raised top (coffee table, desk, counter) of half a square metre is in the way too: only its legs were, so he could stand
+           up, or walk, with the top through his shins */
+        const big = size.y >= 0.25 || (size.y >= 0.03 && (Math.max(size.x, size.z) >= 1.5 || (size.x * size.z >= 0.5 && bb.minimumWorld.y >= 0.3)));
         if (!big || Math.max(size.x, size.z) < 0.04) return;
         const c = B.Vector3.TransformCoordinates(bb.center, m.getWorldMatrix());
         /* Tall furniture standing on the floor (shelf, fridge, shower glass) reaches the ceiling for the mover: his three
