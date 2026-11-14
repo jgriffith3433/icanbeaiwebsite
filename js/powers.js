@@ -12,6 +12,7 @@
 
 import * as boltFx from "./lightning.js";
 import { createAbilities, startAbilityBar, VERB_IDS } from "./abilities.js";
+import { powerPose } from "./power-poses.js";
 export { debrisCap, shellCount, inPlaza, plazaCourse, FUNNEL_LIFE } from "./tornado.js";
 
 /** All spendable effects (verbs + hold depths). The bar shows VERB_IDS only. */
@@ -1578,10 +1579,7 @@ html.touch-ui.in-control .side{display:none}
     if (boltHand) return "windbolt";
     if (weatherHand) return "windrain";
     if (castFor > 0) {
-      const id = lastCast && lastCast.id;
-      if (id === "lightning" || id === "storm" || id === "bolt") return "windbolt";
-      if (id === "rain" || id === "fog" || id === "sun" || id === "gale" || id === "gust" || id === "tornado" || id === "wind") return "windrain";
-      return "cast";
+      return powerPose(lastCast && lastCast.id);
     }
     return null;
   }
