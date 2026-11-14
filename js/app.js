@@ -160,7 +160,10 @@ if (skinWorld) {
     chunks.forEach((c) => { out.set(c, at); at += c.length; });
     return out.buffer;
   };
-  const fetchBytes = () => (typeof fetch === "function"
+  /* Playtest option ?block=model: the model's file never arrives, to show the card ends in Try again instead of spinning. */
+  let blockModel = false;
+  try { blockModel = new URLSearchParams(location.search).get("block") === "model"; } catch (e) { /* no location */ }
+  const fetchBytes = () => (blockModel ? Promise.resolve(null) : typeof fetch === "function"
     ? fetch(control.model, { cache: "no-cache" }).then((r) => (r.ok ? readBody(r) : null)).catch(() => null)
     : Promise.resolve(null));
   const firstBytesP = fetchBytes();

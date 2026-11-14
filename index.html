@@ -158,6 +158,17 @@
         window.addEventListener("error", function (e) { if (e.target && e.target !== window) return; bootError((e.error && e.error.message) || e.message, e.filename); });
         window.addEventListener("unhandledrejection", function (e) { var r = e.reason; bootError((r && r.message) || r, (r && r.stack) || ""); });
         slowT = setTimeout(function () { if (state === "loading") { card.classList.add("slow"); msg.textContent = "Still loading… this is taking longer than usual."; emit("slow"); } }, 30000);
+        /* Hard deadline (one timer, no polling): the card never outlives DEADLINE_MS. If a gate (first frame, title, shader warm-up) never
+           reports, either the game is already drawing, so hand off to play, or it isn't, so show Try again. */
+        var DEADLINE_MS = 15000;
+        setTimeout(function () {
+          if (state !== "loading") return;
+          var up = false;
+          try { up = !!(window.day && window.day.now && window.day.now().frame); } catch (e) {}
+          emit("deadline", { up: up });
+          if (up) { got = { scripts: 1, model: 1, frame: 1, title: 1 }; finish(); }
+          else fail("no first frame within " + DEADLINE_MS + " ms", "the game");
+        }, DEADLINE_MS);
         window.__loading = { set: set, done: done, fail: fail, state: function () { return state; }, pct: pct, log: function () { return log.slice(); } };
         emit("show");
       })();
