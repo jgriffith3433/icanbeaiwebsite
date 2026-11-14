@@ -12459,8 +12459,10 @@ async function audioCheck(options, t) {
   const seen = {};
   for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"], ["gale", "gale"], ["fog", "fog"], ["sunbreak", "sunbreak"]]) {
     refill();
-    // watching, the press itself takes control (js/powers.js pressWatching); only a driving or returning him needs the setup
-    if (C.mode() !== "schedule" || ($("control") && $("control").disabled)) await ensureControl(t, touch, `before ${name}`);
+    // Always the real Take control first when he isn't the player's: the press-while-watching path (js/powers.js pressWatching)
+    // refuses under the title / cold open and, with him asleep, casts only after the 2.6 s wake: after this loop's wait.
+    if (C.mode() !== "control") await ensureControl(t, touch, `before ${name}`);
+    if (D.wake && D.wake.now) await t.until(() => !D.wake.now().active, 6000, "the night wake to land him on the roof").catch(() => {});
     const n0 = D.sfx.info().casts.length;
     const ok = P.command(id, touch ? "touch" : "key");
     const bl = P.now && P.now().blocked;
@@ -12502,7 +12504,7 @@ async function audioCheck(options, t) {
       const l0 = log().length;
       for (let k = 0; k < 3; k++) {
         refill();
-        if (C.mode() !== "schedule" || ($("control") && $("control").disabled)) await ensureControl(t, touch, `repeat ${name}`);
+        if (C.mode() !== "control") await ensureControl(t, touch, `repeat ${name}`);
         P.command(id, touch ? "touch" : "key");
         await sleep(450);
       }
