@@ -524,6 +524,7 @@ function install() {
     follow: 14, followY: 10, followAir: 4, // spring rates (1/s), critically damped
     ahead: 1.1, aheadFrom: 3, aheadTo: 7, // look-ahead metres at a run (speed in m/s)
     sphere: 0.3, // the camera's collision radius (its near plane is 0.2)
+    stepM: 1.3, // the most the camera moves by turning, tilting or a pull-in in one frame, metres (the sensor's limit is 3)
     blendSecs: 0.6,
     recenterAfter: 2, recenterRate: 5, touchSens: 420,
     castSecs: 1.8, castRise: 0.3, castFall: 0.5,
@@ -937,12 +938,15 @@ function install() {
     // ---- the drawn yaw and pitch: the asked-for ones plus the cast's and the blend's, turning at most the capped rate ----
     const blA = cs.blend ? cs.blend.a * (1 - smooth01(cs.blend.t / CAM.blendSecs)) : 0;
     const wantA = cs.aimA + castA + blA;
-    const capA = (CAM.yawCapDeg * Math.PI / 180) * dt;
+    // Also capped by arc length: on a long frame (shader compile, first casts) dt is large and a 150 deg/s turn at a
+    // wide radius swung the camera metres in one frame (the feel sensor's camera-jump). At most CAM.stepM per frame.
+    const arcCap = CAM.stepM / Math.max(2, r);
+    const capA = Math.min((CAM.yawCapDeg * Math.PI / 180) * dt, arcCap);
     cs.shownA += clamp(wrapPi(wantA - cs.shownA), -capA, capA);
     let wantB = camera.beta + castB + (cs.blend ? cs.blend.b * (1 - smooth01(cs.blend.t / CAM.blendSecs)) : 0);
     wantB = clamp(wantB, camera.lowerBetaLimit, camera.upperBetaLimit);
     const base = camera.beta;
-    const capB = (CAM.pitchCapDeg * Math.PI / 180) * dt;
+    const capB = Math.min((CAM.pitchCapDeg * Math.PI / 180) * dt, arcCap);
     cs.shownB += clamp(wantB - cs.shownB, -capB, capB);
     // a low angle never puts the camera on the slab or the road
     if (pl && !push.on && cs.shownB > base) {
@@ -966,7 +970,7 @@ function install() {
        out slowly after. */
     if (cs.blend) camera.radius = Math.min(r, cs.blend.r + (r - cs.blend.r) * smooth01(cs.blend.t / CAM.blendSecs));
     else if (push.on) camera.radius = r;
-    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(2.4, Math.max(0.5, 60 * dt)));
+    else if (r < camera.radius) camera.radius = Math.max(r, camera.radius - Math.min(CAM.stepM, Math.max(0.5, 60 * dt)));
     else camera.radius = damp(camera.radius, r, dt, 2.2);
     lastRadius = camera.radius;
     screenLift = damp(screenLift, hudLiftGoal(), dt, 3);
