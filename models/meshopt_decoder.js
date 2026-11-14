@@ -200,4 +200,4 @@ else if (typeof define === 'function' && define['amd']) define([], function () {
 else if (typeof exports === 'object') exports['MeshoptDecoder'] = MeshoptDecoder;
 else (typeof self !== 'undefined' ? self : this).MeshoptDecoder = MeshoptDecoder;
 
-var d = module.exports.MeshoptDecoder; (typeof globalThis !== "undefined" ? globalThis : self).MeshoptDecoder = d; return d; })();
+var d = module.exports.MeshoptDecoder || module.exports; (typeof globalThis !== "undefined" ? globalThis : self).MeshoptDecoder = d; return d; })();

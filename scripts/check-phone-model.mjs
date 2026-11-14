@@ -54,6 +54,16 @@ ok(cfg.control.modelPhone === PHONE, `day.config.js control.modelPhone is ${PHON
 const size = fs.statSync(new URL(PHONE, root)).size;
 ok(size < 900 * 1024, `phone model ${(size / 1024).toFixed(0)} KB, under 900 KB`);
 ok(fs.statSync(new URL("models/meshopt_decoder.js", root)).size < 60 * 1024, "local meshopt decoder is small");
+/* Babylon reads the global MeshoptDecoder.ready after loading the file as a classic script: run it the same way (vm, a browser-like global) */
+{
+  const vm = await import("node:vm");
+  const sandbox = { WebAssembly, console, TextDecoder, Uint8Array };
+  sandbox.self = sandbox; sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(new URL("models/meshopt_decoder.js", root), "utf8"), sandbox);
+  ok(sandbox.MeshoptDecoder && typeof sandbox.MeshoptDecoder.decodeGltfBufferAsync === "function" && typeof sandbox.MeshoptDecoder.useWorkers === "function", "decoder script defines a global MeshoptDecoder with decodeGltfBufferAsync / useWorkers");
+  ok(sandbox.MeshoptDecoder && sandbox.MeshoptDecoder.ready && typeof sandbox.MeshoptDecoder.ready.then === "function", "global MeshoptDecoder.ready is a promise (Babylon awaits it)");
+}
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ "meshopt.decoder": MeshoptDecoder });
 const full = (await io.read(new URL(FULL, root).pathname)).getRoot();
