@@ -1455,7 +1455,69 @@
     }
   });
 
+  /* ---------------- the morning told in sound: each autopilot step of the wake-up has its own ----------------
+     Read from day.watch (the schedule's current action), only while his day is on autopilot and the clock runs at a
+     watchable speed. alarm off = a click, snooze = a slap on the nightstand, feet on the floor = a soft thud, the stretch =
+     a cloth sweep and a yawn, the coffee machine = a gurgle then a toaster pop, a sip, the stair = steps up, the roof =
+     the door and the wind. `day:beat` {kind} is the event (the playtest and analytics read it). */
+  const beats = [];
+  let beatAt = -1;
+  let beatKey = "";
+  let beatAlarm = null;
+  function beat(kind, extra) {
+    beats.push({ kind, at: Math.round(clockMs()) });
+    if (beats.length > 24) beats.shift();
+    note("beat-" + kind);
+    try { window.dispatchEvent(new CustomEvent("day:beat", { detail: Object.assign({ kind }, extra || {}) })); } catch (e) { /* */ }
+    if (!soundOn()) return;
+    const n = (o) => noise(o);
+    if (kind === "alarm-off") { tone({ freq: 1200, to: 700, dur: 0.07, vol: 0.05, wave: "square" }); n({ type: "highpass", freq: 3000, dur: 0.05, vol: 0.05 }); }
+    else if (kind === "snooze") { n({ type: "lowpass", freq: 600, dur: 0.12, vol: 0.2 }); tone({ freq: 220, to: 120, dur: 0.14, vol: 0.08, wave: "triangle" }); }
+    else if (kind === "feet-down") { n({ type: "lowpass", freq: 260, dur: 0.16, vol: 0.2 }); n({ type: "lowpass", freq: 240, dur: 0.14, vol: 0.18, delay: 0.22 }); }
+    else if (kind === "stretch") {
+      n({ type: "bandpass", freq: 700, to: 1800, q: 0.6, dur: 1.4, vol: 0.07, attack: 0.5 }); // cloth and breath rising
+      tone({ freq: 190, to: 130, dur: 1.2, vol: 0.05, wave: "sawtooth", band: 420, q: 1.2, delay: 0.5 }); // the yawn
+      n({ type: "lowpass", freq: 500, dur: 0.1, vol: 0.12, delay: 1.5 }); // the back settling
+    } else if (kind === "coffee") {
+      for (let i = 0; i < 7; i++) n({ type: "bandpass", freq: 300 + Math.random() * 400, q: 3, dur: 0.18 + Math.random() * 0.1, vol: 0.09, delay: i * 0.42 + Math.random() * 0.1 });
+      n({ type: "highpass", freq: 2400, dur: 1.6, vol: 0.04, delay: 0.1, attack: 0.3 });
+      tone({ freq: 1568, dur: 0.12, vol: 0.05, wave: "sine", delay: 3.2 });
+      n({ type: "lowpass", freq: 900, dur: 0.1, vol: 0.18, delay: 3.6 }); // the toaster pops
+    } else if (kind === "sip") { n({ type: "bandpass", freq: 900, to: 400, q: 2, dur: 0.35, vol: 0.06 }); }
+    else if (kind === "stair") { for (let i = 0; i < 6; i++) n({ type: "lowpass", freq: 320, dur: 0.1, vol: 0.14, delay: i * 0.3 }); }
+    else if (kind === "roof") {
+      n({ type: "lowpass", freq: 500, dur: 0.18, vol: 0.18 }); // the roof door
+      n({ type: "bandpass", freq: 400, to: 900, q: 0.7, dur: 2.2, vol: 0.06, attack: 0.8, delay: 0.2 }); // wind up there
+    }
+  }
+  function dayBeats(info) {
+    if (!info || info.jumped || info.steered) return;
+    const a = info.fr && info.fr.action;
+    if (!a) return;
+    const mode = day.control && typeof day.control.mode === "function" ? day.control.mode() : "schedule";
+    if (mode === "control" || mode === "returning") return;
+    const key = (info.key || "") + ":" + a.i;
+    if (key === beatKey) return;
+    if (info.jumped) return; // a scrub isn't a morning: the beat plays on the frame after it settles
+    beatKey = key;
+    const prev = beatAlarm;
+    beatAlarm = a.things && a.things.alarm;
+    if (day.now && day.now().speed > 10) return;
+    const t = a.text || "";
+    const place = a.place || "";
+    if (prev === "ringing" && beatAlarm === "off") beat("alarm-off");
+    else if (prev === "ringing" && beatAlarm === "snoozed") beat("snooze");
+    else if (a.pose === "sitBed" && (/edge|floor|sits/i.test(t))) beat("feet-down");
+    else if (a.hand === "stretch") beat("stretch");
+    else if (a.hand === "cook" && place === "counter") beat("coffee");
+    else if (a.hand === "drink" && place === "counter") beat("sip");
+    else if (/aptStairTop/.test(place) || /stair/i.test(t) && a.hand === "hold") beat("stair");
+    else if (place === "aptRoof") beat("roof");
+  }
+  if (typeof day.watch === "function") day.watch(dayBeats);
+
   day.sfx = {
+    beats: () => beats.slice(),
     info: () => ({
       on: soundOn(),
       context: audio ? audio.c.state : "none",

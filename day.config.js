@@ -2849,6 +2849,7 @@ window.DAY_CONFIG = {
       chapter: "ready",
       steps: [
         { pose: "stand", for: "2-4s", do: "He stands." },
+        { pose: "stand", hand: "stretch", for: "5-8s", do: ["He stretches, both arms overhead, and yawns.", "A long stretch. His back cracks."] },
         { go: "bathCenter", set: { bathroomLight: "on" }, do: "He walks to the bathroom." },
         { at: "bathCenter", hand: "reach", for: "1-2s", do: "Light on." },
         { at: "toilet", pose: "toilet", for: "2-3.5m", body: { bladder: -1 }, do: "He uses the toilet." },
@@ -2877,10 +2878,10 @@ window.DAY_CONFIG = {
       steps: [
         { go: "counter", set: { kitchenLight: "on" }, do: "He walks to the kitchen." },
         { at: "counter", hand: "reach", for: "1-2s", do: "Light on." },
-        { at: "counter", hand: "cook", for: "20-35s", set: { mug: "in hand" }, do: "Coffee on. Bread in the toaster." },
+        { at: "counter", hand: "cook", for: "20-30s", set: { mug: "in hand" }, do: "Coffee on. Bread in the toaster." },
         { at: "counter", hand: "phone", fill: true, micro: { pools: ["phone"], every: "20-40s" }, do: ["He waits for the coffee, looking at the phone.", "The toaster ticks."] },
         { at: "counter", hand: "cook", for: "15-30s", do: "Toast up. A little butter." },
-        { at: "counter", hand: "drink", for: "2-3m", body: { hunger: -0.35, thirst: -0.25, energy: +0.2 }, do: ["Coffee and toast, eaten standing.", "A bite of toast. A sip of coffee."] },
+        { at: "counter", hand: "drink", for: "1.2-1.8m", body: { hunger: -0.35, thirst: -0.25, energy: +0.2 }, do: ["Coffee and toast, eaten standing.", "A bite of toast. A sip of coffee."] },
         {
           remembers: "birdieRain",
           steps: [
@@ -2891,14 +2892,21 @@ window.DAY_CONFIG = {
         { at: "kitchenSink", hand: "wash", for: "15-30s", set: { mug: "sink" }, do: "He rinses the mug. It stays in the sink." },
         { at: "kitchenSink", hand: "reach", for: "1-2s", set: { kitchenLight: "off" }, do: "Kitchen light off." },
         { go: "entryTable", do: "To the front door." },
-        { at: "entryTable", hand: "reach", for: "30-50s", set: { carrying: "bag, keys, lunch", phone: "pocket" }, do: "Bag, keys, wallet, phone, lunch container." },
+        { at: "entryTable", hand: "reach", for: "18-28s", set: { carrying: "bag, keys, lunch", phone: "pocket" }, do: "Bag, keys, wallet, phone, lunch container." },
         { chance: 0.3, at: "entryTable", hand: "face", for: "3-6s", do: "He pats his pocket. Phone? Yes." },
-        { at: "frontDoorIn", hand: "reach", for: "25-45s", do: "Shoes on." },
+        { at: "frontDoorIn", hand: "reach", for: "14-24s", do: "Shoes on." },
         { at: "frontDoorOut", hand: "reach", for: "3-5s", set: { frontDoor: "open" }, do: "Small Weather opens the front door and steps out." },
         { at: "frontDoorOut", hand: "reach", for: "3-6s", set: { frontDoor: "locked" }, do: "He locks it from outside." },
         { chance: 0.45, at: "frontDoorOut", hand: "reach", for: "2-3s", do: "He tugs the handle. Locked. He knew that." },
         /* what the city remembers (js/memory.js facts; `remembers`): these only appear after he has been out playing */
         { remembers: "storm", at: "frontDoorOut", hand: "face", for: "8-14s", say: "Checking what's left of that sky.", do: "He stops on the step and checks the sky before the car." },
+        /* the roof first: a look at the sky before the car (the stair is the city's own, aptStairFoot -> aptStairTop -> aptRoof) */
+        { go: "aptStairFoot", hand: "hold", do: "He walks to the stair at the end of the block." },
+        { go: "aptStairTop", hand: "hold", do: "He climbs the stair to the roof." },
+        { go: "aptRoof", hand: "none", do: "He steps out onto the roof." },
+        { at: "aptRoof", hand: "none", for: "10-16s", do: "He stands on the roof and reads the sky before the day starts." },
+        { go: "aptStairTop", hand: "hold", do: "He heads back down." },
+        { go: "aptStairFoot", hand: "hold", do: "Down the stair." },
         { go: "carSideHome", hand: "hold", do: "He walks to the car." },
         { at: "carSideHome", hand: "reach", for: "2-4s", set: { car: "unlocked" }, do: "Unlock." },
         { at: "carSideHome", pose: "sitCar", hand: "hold", for: "8-15s", set: { carrying: "bag on the seat" }, do: "He gets in. Bag on the passenger seat." },
