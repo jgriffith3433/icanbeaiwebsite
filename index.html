@@ -133,6 +133,8 @@
           bar.style.width = "100%";
           /* Handoff: the card fades over the title's crane (already under it) so the day never cuts to a black frame.
              Theme beds unlock on the first gesture when Sound is saved on (js/score.js listens for day:loading handoff). */
+          /* the label goes at once: the scene is ready, so no "Loading…" text rides the 0.9 s fade over the title */
+          msg.style.visibility = "hidden"; bar.parentNode.style.visibility = "hidden";
           card.classList.add("leaving");
           html.classList.remove("loading");
           emit("handoff", { seconds: Math.round((performance.now() - t0) / 100) / 10 });
