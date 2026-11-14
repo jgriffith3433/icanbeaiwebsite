@@ -208,33 +208,68 @@ export function startStems(dayApi) {
   const inControl = () => !!(day.control && day.control.mode && day.control.mode() === "control");
 
   async function loadFile(ctx, url) {
-    const r = await fetch(url);
+    const r = await fetch(url, { priority: "low" });
     if (!r.ok) throw new Error(String(r.status));
     const ab = await r.arrayBuffer();
     S.bytes += ab.byteLength;
     return ctx.decodeAudioData(ab);
+  }
+  async function renderSynth(key) {
+    const isLayer = LAYERS.indexOf(key) >= 0;
+    const plan = isLayer ? stemPlan(key, c) : stingPlan(key, c);
+    return { buf: await render(plan, c, isLayer && plan.noise), src: "synth" };
   }
   async function make(ctx, key) {
     const url = c.files[key];
     if (url) {
       try { return { buf: await loadFile(ctx, url), src: "file" }; } catch (e) { /* fall back to the synth */ }
     }
-    const isLayer = LAYERS.indexOf(key) >= 0;
-    const plan = isLayer ? stemPlan(key, c) : stingPlan(key, c);
-    return { buf: await render(plan, c, isLayer && plan.noise), src: "synth" };
+    return renderSynth(key);
   }
 
-  /* Streams the layers (after first input, Sound on), then starts the three on ONE start time. */
+  function swapToFiles(b, stemBus, got) {
+    if (!S.started || got.some((g) => !g || !g.buf || g.src !== "file")) return;
+    const len = Math.min(...got.map((g) => g.buf.length));
+    const loopSec = len / got[0].buf.sampleRate;
+    const tSwap = b.ctx.currentTime + 0.04;
+    const offset = S.loopSec > 0 ? Math.max(0, (tSwap - S.t0) % S.loopSec) % loopSec : 0;
+    got.forEach((g, i) => {
+      const k = LAYERS[i];
+      const prev = S.nodes[k];
+      if (!prev) return;
+      const src = b.ctx.createBufferSource();
+      src.buffer = g.buf;
+      src.loop = true;
+      src.loopEnd = loopSec;
+      try { src.__hawkesSampleId = "stem-" + k; src.__hawkesBus = "music"; } catch (e) { /* */ }
+      src.connect(prev.gain);
+      src.start(tSwap, offset);
+      try { prev.src.stop(tSwap + 0.02); } catch (e) { /* */ }
+      prev.src = src;
+      prev.kind = "file";
+      prev.seconds = g.buf.duration;
+      S.buffers[k] = g.buf;
+    });
+    S.t0 = tSwap - offset;
+    S.loopSec = loopSec;
+  }
+
+  /* Streams the layers (after the first day:power cast, Sound on), then starts the three on ONE start time. */
   async function prepare() {
     if (S.started || S.loading || !S.firstInput) return false;
     const b = bus();
     if (!b || !b.on) return false;
     S.loading = true;
     try {
-      const got = await Promise.all(LAYERS.map((k) => make(b.ctx, k)));
+      const filePromise = Promise.all(LAYERS.map((k) => make(b.ctx, k)));
+      let timedOut = false;
+      const got = await Promise.race([
+        filePromise,
+        new Promise((res) => setTimeout(() => { timedOut = true; res(null); }, 1800)),
+      ]).then((res) => res || Promise.all(LAYERS.map((k) => renderSynth(k))));
       if (got.some((g) => !g.buf)) { S.loading = false; return false; }
       const len = Math.min(...got.map((g) => g.buf.length));
-      const t0 = b.ctx.currentTime + 0.15;
+      const t0 = b.ctx.currentTime + 0.06;
       const stemBus = b.ctx.createGain();
       stemBus.gain.value = 1;
       stemBus.connect(b.bus);
@@ -244,6 +279,7 @@ export function startStems(dayApi) {
         src.buffer = g.buf;
         src.loop = true;
         src.loopEnd = len / g.buf.sampleRate;
+        try { src.__hawkesSampleId = "stem-" + k; src.__hawkesBus = "music"; } catch (e) { /* */ }
         const gain = b.ctx.createGain();
         gain.gain.value = 0;
         src.connect(gain);
@@ -256,9 +292,15 @@ export function startStems(dayApi) {
       S.loopSec = len / got[0].buf.sampleRate;
       S.bus = b;
       S.started = true;
+      steer(true);
+      if (timedOut) {
+        filePromise.then((files) => swapToFiles(b, stemBus, files)).catch(() => {});
+      }
       emit("ready", { stems: 3, source: got.map((g) => g.src).join(","), loop: Math.round(S.loopSec * 100) / 100, bytes: S.bytes });
-      // the stings are small: made once the layers play
-      ["resolution", "failure"].forEach((k) => make(b.ctx, k).then((g) => { if (g.buf) S.stings[k] = g.buf; }).catch(() => {}));
+      // the stings are small: fetched during idle once the layers play
+      const loadStings = () => ["resolution", "failure"].forEach((k) => make(b.ctx, k).then((g) => { if (g.buf) S.stings[k] = g.buf; }).catch(() => {}));
+      if (typeof requestIdleCallback === "function") requestIdleCallback(loadStings, { timeout: 5000 });
+      else setTimeout(loadStings, 1200);
     } catch (e) {
       S.loading = false;
       return false;
@@ -295,7 +337,7 @@ export function startStems(dayApi) {
     };
   }
 
-  function steer() {
+  function steer(initial) {
     if (!S.started || !S.bus) return;
     const I = intent();
     const L = levelsFor(I, c.levels);
@@ -304,9 +346,9 @@ export function startStems(dayApi) {
       if (Math.abs(L[k] - S.target[k]) < 1e-6) return;
       const rising = L[k] > S.target[k];
       S.target[k] = L[k];
-      // swells begin on the next beat line; falls on the next bar line
-      const at = nextGrid(ctx.currentTime + 0.02, S.t0, rising ? beat : bar);
-      ramp(k, L[k], at, rising ? c.ramp : c.release);
+      // initial entry swells immediately from start; later swells begin on the next beat line, falls on the next bar line
+      const at = initial ? Math.max(ctx.currentTime + 0.02, S.t0) : nextGrid(ctx.currentTime + 0.02, S.t0, rising ? beat : bar);
+      ramp(k, L[k], at, initial ? Math.min(0.55, c.ramp) : (rising ? c.ramp : c.release));
     });
     const want = I.control;
     if (want !== S.active) {
@@ -322,6 +364,7 @@ export function startStems(dayApi) {
     if (!b || !b.on || !buf) return false;
     const src = b.ctx.createBufferSource();
     src.buffer = buf;
+    try { src.__hawkesSampleId = "sting-" + (where || "stem"); src.__hawkesBus = "music"; } catch (e) { /* */ }
     const g = b.ctx.createGain();
     g.gain.value = vol;
     src.connect(g);
@@ -336,9 +379,9 @@ export function startStems(dayApi) {
     if (kind === "resolution") { S.stormUntil = 0; S.failUntil = 0; S.windup = false; }
     if (kind === "failure") { S.stormUntil = 0; S.failUntil = nowMs() + 4500; }
     const b = bus();
-    if (b && S.stings[kind]) rec.heard = playBuf(S.stings[kind], c.vol.sting);
+    if (b && S.stings[kind]) rec.heard = playBuf(S.stings[kind], c.vol.sting, kind);
     else if (b && b.on) {
-      make(b.ctx, kind).then((g) => { if (g.buf) { S.stings[kind] = g.buf; playBuf(g.buf, c.vol.sting); } }).catch(() => {});
+      make(b.ctx, kind).then((g) => { if (g.buf) { S.stings[kind] = g.buf; playBuf(g.buf, c.vol.sting, kind); } }).catch(() => {});
       rec.heard = true;
     }
     emit("sting", { kind, heard: rec.heard });
@@ -359,6 +402,9 @@ export function startStems(dayApi) {
         note(b.ctx, g, hz * 2, t + i * beat, beat * 1.2, 0.1, "sine");
       });
       rec.heard = true;
+      try {
+        window.dispatchEvent(new window.CustomEvent("hawkes-sound", { detail: { id: "motif-" + where, bus: "music", gain: c.vol.motif, rate: 1 } }));
+      } catch (e) { /* */ }
     }
     S.motifs.push(rec);
     if (S.motifs.length > 12) S.motifs.shift();
@@ -367,9 +413,17 @@ export function startStems(dayApi) {
   }
 
   // ---- what the player means ----
+  // Start the stems on the first day:power cast (ambience covers the roof before it); the cast itself never waits.
+  const first = () => {
+    if (S.firstInput) return;
+    S.firstInput = true;
+    setTimeout(() => prepare(), 0);
+  };
   window.addEventListener("day:power", (ev) => {
     const d = (ev && ev.detail) || {};
-    if (d.action === "denied" || !inControl()) return;
+    if (d.action === "denied") return;
+    first();
+    if (!inControl()) return;
     const p = d.power || d.action;
     if (c.big.indexOf(p) >= 0 || c.big.indexOf(d.action) >= 0) {
       S.stormUntil = nowMs() + c.hold.storm * 1000;
@@ -413,16 +467,11 @@ export function startStems(dayApi) {
     }
   });
 
-  // first input: from here the stems may stream
-  const first = () => {
-    S.firstInput = true;
-    const s = score();
-    if (s && s.bus && !s.bus()) { /* Sound is off: nothing is made until it is on */ }
-    setTimeout(() => prepare(), 600);
-    if (S.pendingTitle && bus() && bus().on) { S.pendingTitle = false; motif("title"); } // the title's motif, once sound can play
+  // Gesture only unlocks the title's synthesized motif; stems wait for the first day:power cast.
+  const onGesture = () => {
+    if (S.pendingTitle && bus() && bus().on) { S.pendingTitle = false; motif("title"); }
   };
-  ["pointerdown", "keydown", "touchstart"].forEach((n) => window.addEventListener(n, first, { capture: true, passive: true }));
-  window.addEventListener("day:control", () => { S.firstInput = true; setTimeout(() => prepare(), 400); });
+  ["pointerdown", "keydown", "touchstart"].forEach((n) => window.addEventListener(n, onGesture, { capture: true, passive: true }));
 
   function frame() {
     try {

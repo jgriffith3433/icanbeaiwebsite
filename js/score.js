@@ -458,13 +458,13 @@ export function startScore(dayApi) {
     return true;
   }
 
-  async function loadUrl(url) {
+  async function loadUrl(url, lowPriority) {
     if (!url || missing[url]) return null;
     if (buffers[url]) return buffers[url];
     const a = ensureCtx();
     if (!a) return null;
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, lowPriority ? { priority: "low" } : undefined);
       if (!res.ok) {
         missing[url] = true;
         return null;
@@ -494,6 +494,37 @@ export function startScore(dayApi) {
     }
   }
 
+  function waitGameplayIdle() {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      let castSeen = false;
+      const onPower = (ev) => {
+        const d = (ev && ev.detail) || {};
+        if (d.action !== "denied") castSeen = true;
+      };
+      if (typeof window !== "undefined" && window.addEventListener) {
+        window.addEventListener("day:power", onPower);
+      }
+      const check = () => {
+        const elapsed = Date.now() - start;
+        const warmDone = (typeof window !== "undefined" && (window.__warmIdle === true || !window.__warmLights)) || elapsed > 15000;
+        const titleUp = !!(day.title && day.title.showing && day.title.showing());
+        const cold = day.coldopen && day.coldopen.now ? day.coldopen.now() : null;
+        const inColdBeforeCast = !!(cold && (cold.on || (day.coldopen.pending && day.coldopen.pending())) && cold.cast == null && !castSeen);
+        if (warmDone && !titleUp && !inColdBeforeCast && elapsed >= 4000) {
+          if (typeof window !== "undefined" && window.removeEventListener) {
+            window.removeEventListener("day:power", onPower);
+          }
+          const idle = (cb) => (typeof requestIdleCallback === "function" ? requestIdleCallback(cb, { timeout: 3000 }) : setTimeout(cb, 200));
+          idle(() => resolve());
+          return;
+        }
+        setTimeout(check, 400);
+      };
+      setTimeout(check, 1200);
+    });
+  }
+
   async function loadAll() {
     const c = cfg();
     // The city hum first, alone: it is the ambience bed heard from the first tap, so it must not queue behind the beds.
@@ -504,12 +535,17 @@ export function startScore(dayApi) {
     urls.add(c.sting);
     if (c.whoosh) urls.add(c.whoosh);
     Object.keys(c.ambience).forEach((k) => c.ambience[k] && urls.add(c.ambience[k]));
-    // Secondary beds must not compete with the first minute's bundle, shaders and models on a slow link: wait for the
-    // page to settle (and idle), then fetch two at a time, the weather-critical ones (rain, wind) first.
-    await new Promise((ok) => setTimeout(ok, 8000));
-    await new Promise((ok) => (typeof requestIdleCallback === "function" ? requestIdleCallback(ok, { timeout: 4000 }) : setTimeout(ok, 0)));
+    urls.delete(c.ambience.air);
+    // Sting and secondary beds wait for idle after gameplay starts (and after the first cast in the cold open) so
+    // neither take-control.mp3 nor the beds compete with the Play tap, roof arrival, or first cast.
+    await waitGameplayIdle();
     const queue = [...urls].sort((x, y) => (/rain|wind/.test(x) ? 0 : 1) - (/rain|wind/.test(y) ? 0 : 1));
-    const lane = async () => { while (queue.length) await loadUrl(queue.shift()); };
+    const lane = async () => {
+      while (queue.length) {
+        await loadUrl(queue.shift(), true);
+        await new Promise((ok) => (typeof requestIdleCallback === "function" ? requestIdleCallback(ok, { timeout: 2000 }) : setTimeout(ok, 0)));
+      }
+    };
     await Promise.all([lane(), lane()]);
     live.samples = BEDS.some((b) => !!buffers[c.music[b]]) || AMB_LOOPS.some((k) => !!buffers[c.ambience[k]]);
     return live.samples;
@@ -736,12 +772,27 @@ export function startScore(dayApi) {
       mark();
       return true;
     }
-    // Sample not decoded yet: play it as soon as it is (if still in time), rather than stay silent.
-    if (!buffers[c.sting] && !missing[c.sting]) {
-      const asked = Date.now();
-      loadUrl(c.sting).then((buf) => {
-        if (buf && Date.now() - asked < 6000 && playOneShot(c.sting, c.stingVol)) mark();
-      });
+    // The sting MP3 is fetched during idle after gameplay starts; before it decodes, play a short synthesized
+    // take-control swell on the music bus so Take control never fetches take-control.mp3 on the critical path.
+    if (ctx && musicBus) {
+      try {
+        const t0 = ctx.currentTime + 0.02;
+        const vol = (c.stingVol != null ? c.stingVol : STING_VOL) * 0.35;
+        [220, 329.63, 440].forEach((hz, i) => {
+          const o = ctx.createOscillator();
+          o.type = "triangle";
+          o.frequency.value = hz;
+          const g = ctx.createGain();
+          env(g, t0 + i * 0.08, vol, 0.03, 0.65);
+          o.connect(g);
+          g.connect(musicBus);
+          o.start(t0 + i * 0.08);
+          o.stop(t0 + i * 0.08 + 0.7);
+        });
+        window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { id: "sting-synth", bus: "music", gain: vol, rate: jitterRate("sting-synth") } }));
+        mark();
+        return true;
+      } catch (e) { /* */ }
     }
     return false;
   }

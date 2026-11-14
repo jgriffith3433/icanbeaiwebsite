@@ -983,9 +983,9 @@
     },
     /** Soft 120 Hz neon tube buzz under the shop signs at night (called from props.js). */
     neonBuzz(level) {
-      note("neon");
       const a = ctx();
-      if (!a) return;
+      if (!a) { heard.neon = (heard.neon || 0) + 1; return; }
+      note("neon");
       const t = a.c.currentTime;
       const osc = a.c.createOscillator();
       osc.type = "sawtooth";
@@ -1004,6 +1004,9 @@
       g.connect(a.master);
       osc.start(t);
       osc.stop(t + 0.6);
+      if (a.c.state === "running") {
+        try { window.dispatchEvent(new CustomEvent("hawkes-sound", { detail: { id: "synth:neon", bus: "ambience", gain: vol, rate: jitterRate("synth:neon") } })); } catch (e) { /* */ }
+      }
     },
   };
 
@@ -1050,7 +1053,7 @@
     try {
       dust.emitter.set(x, y + 0.05, z);
       dust.manualEmitCount = Math.round(10 + 30 * k);
-      note("dust");
+      heard.dust = (heard.dust || 0) + 1;
     } catch (err) { /* particles are a nicety */ }
   }
 
@@ -1202,7 +1205,7 @@
     let state = "clear";
     try { state = (day.weather && day.weather.now().state) || "clear"; } catch (err) { /* default */ }
     const fair = state === "clear" || state === "clouds";
-    amb.fill = 4.5 + Math.random() * 2.5;
+    amb.fill = 3.5 + Math.random() * 1.8;
     const pan = Math.random() * 1.6 - 0.8;
     if (state === "rain" || state === "storm") S.dripTick(pan, 0.7);
     else if (fair && h > 5.5 && h < 20) S.bird(pan, 1);
@@ -1211,7 +1214,7 @@
   /* A render frame can stall for many seconds (shader compiles, a software-GL machine, a background tab), and the fill above
      runs in the frame loop, so it stalled too (18 s of silence in cold-start). A plain 1 s timer (no network) covers that. */
   const fillTimer = setInterval(() => {
-    try { if (ctx() && clockMs() - lastHeardMs > 7000) playFill(hour() % 24); } catch (err) { /* ambience only */ }
+    try { if (ctx() && clockMs() - lastHeardMs > 4800) playFill(hour() % 24); } catch (err) { /* ambience only */ }
   }, 1000);
   if (fillTimer && fillTimer.unref) fillTimer.unref(); // Node checks must be able to exit
   function watchCity(dt) {
@@ -1232,12 +1235,12 @@
       amb.car = cars > 0 ? Math.max(1.8, 14 - Math.min(12, cars / 4)) * (0.6 + Math.random() * 0.8) : 8;
       if (cars > 0) S.car(Math.random() < 0.5 ? -0.8 : 0.8, Math.min(1, 0.4 + cars / 60));
     }
-    // Never more than ~8 s with nothing heard: birds need fair weather and day, cars need a crowd, sirens need night, so a
+    // Never more than ~5 s with nothing heard: birds need fair weather and day, cars need a crowd, sirens need night, so a
     // storm at dusk (the cold open) could go 45 s on the roof with only the one looping bed. Whatever else fired resets it.
     amb.fill -= dt;
-    // Real time since anything was heard (note() stamps every sound): a fill is due after 7 s whatever the frame timing did to
-    // the timers above, so a stall or a throttled tab can't leave play silent for 20 s.
-    if (amb.fill <= 0 || clockMs() - lastHeardMs > 7000) playFill(h);
+    // Real time since anything was heard (note() stamps every sound): a fill is due after 4.8 s whatever the frame timing did to
+    // the timers above, so a stall or a throttled tab can't leave play silent for > 10 s.
+    if (amb.fill <= 0 || clockMs() - lastHeardMs > 4800) playFill(h);
     amb.siren -= dt;
     if (amb.siren <= 0) {
       amb.siren = 90 + Math.random() * 120;
