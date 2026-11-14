@@ -440,6 +440,7 @@ if (modelPath) {
         const hips = at('Hips');
         const feet = [at('LeftFoot'), at('RightFoot')];
         ok(head.z < hips.z - 0.5 && head.z > -1.25, `${pose} in bed: his head is at z ${head.z.toFixed(2)} (hips ${hips.z.toFixed(2)}): not on the pillow end`);
+        if (pose !== 'recline') ok(at('HeadTop_End').z > -1.08, `${pose} in bed: the top of his head is at z ${at('HeadTop_End').z.toFixed(2)}, too close to the headboard (-1.28)`);
         ok(feet.every((v) => v.z > hips.z + 0.3 && v.z < 0.8), `${pose} in bed: his feet are not at the foot of the bed`);
         ok([head, hips, ...feet].every((v) => Math.abs(v.x) < 0.45), `${pose} in bed: he is not along the bed's long axis`);
         ok(hips.y > 0.7 && hips.y < 0.95, `${pose} in bed: his hips are at y ${hips.y.toFixed(2)}, not on the mattress (0.62)`);
