@@ -307,8 +307,12 @@ export function createMover(world, cfg) {
     age += dt;
     if (updrafts.length) updrafts = updrafts.filter((u) => u.until == null || age < u.until);
     const n = Math.max(1, Math.ceil(dt / (1 / 30)));
-    let speed = 0;
-    for (let i = 0; i < n; i++) speed += sub(dt / n, input, i === 0 ? input.jump || 0 : 0) / n;
+    const fx0 = s.x, fz0 = s.z;
+    for (let i = 0; i < n; i++) sub(dt / n, input, i === 0 ? input.jump || 0 : 0);
+    /* His speed is the net ground he covered this frame, not the sum of each sub-step's push: pressed into furniture the
+       capsule is shoved in and out, and summing that read as running while he went nowhere (the walk cycle played on
+       boots that slid, anim.footSlideSeconds). */
+    const speed = Math.hypot(s.x - fx0, s.z - fz0) / Math.max(dt, 1e-6);
     s.speed = damp(s.speed, speed, dt, 10);
     if (Math.hypot(input.x || 0, input.z || 0) > 0.1) {
       s.yaw = turnToward(s.yaw, Math.atan2(input.x, input.z), dt, 12, TURN_MAX_DEG);
