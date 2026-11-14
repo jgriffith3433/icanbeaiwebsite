@@ -1040,6 +1040,12 @@ export function startWeather(world, dayApi) {
     const t = audio.ctx.currentTime;
     const src = audio.ctx.createBufferSource();
     src.buffer = audio.buffer;
+    // The thunder shares the 2 s noise buffer with the beds: tag it for the audio probe (otherwise it is read as
+    // "buf:2x88200" at rate 1 every time) and vary the pitch so no crack repeats the same buffer+rate inside 60 s.
+    thunderN++;
+    const tRate = 0.82 + ((thunderN * 0.137) % 1) * 0.36 + Math.random() * 0.01;
+    src.playbackRate.value = tRate;
+    try { src.__hawkesSampleId = "wx-thunder-" + (near ? "near" : "far"); src.__hawkesBus = "sfx"; } catch (e) { /* */ }
     const filter = audio.ctx.createBiquadFilter();
     filter.type = near ? "bandpass" : "lowpass";
     filter.frequency.setValueAtTime(near ? 420 : 190, t);
@@ -1061,6 +1067,7 @@ export function startWeather(world, dayApi) {
     src.start(t);
     src.stop(t + (near ? 1.45 : 2.2));
   }
+  let thunderN = 0;
   const soundBtn = document.getElementById && document.getElementById("sound");
   if (soundBtn) soundBtn.addEventListener("click", () => ensureAudio());
   window.addEventListener("pointerdown", () => {
