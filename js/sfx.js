@@ -1145,6 +1145,10 @@
   function hour() {
     try { return (day.now().minutes || 0) / 60; } catch (err) { return 12; }
   }
+  /* The city's timers run on the real frame time, not the dt above: that is capped at 0.1 s a frame, so on a slow phone (7 fps
+     under a 4x CPU throttle in cold-start) a 5 s fill took 25-50 s of real time and play went silent that long. Capped at
+     2 s so a tab coming back from the background plays one thing, not a burst. */
+  const cityDt = () => Math.min(2, Math.max(0, scene.getEngine().getDeltaTime() / 1000));
   function watchCity(dt) {
     if (!ctx()) return; // ambience only with the Sound button on
     const h = hour() % 24;
@@ -1185,7 +1189,7 @@
     try {
       watchHim(dt);
       watchTornado(dt);
-      watchCity(dt);
+      watchCity(cityDt());
     } catch (err) {
       if (!watchHim.warned) { watchHim.warned = true; console.warn("[sfx]", err); }
     }
