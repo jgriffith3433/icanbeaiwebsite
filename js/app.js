@@ -50,6 +50,7 @@ import "./memory.js"; // the city remembers: deeds by real date in localStorage,
 import "./tally.js"; // what the storm changed: a card after a deed, the same tally on the title (after memory)
 import "./helped.js"; // neighbours helped today: a reward pop and a counter when a cast answers an ask (before asks; after memory)
 import "./hud-layout.js"; // HUD keep-out zones for world markers and the toast lane check (before asks)
+import "./hourhint.js"; // the hour's hint on take control, drawn by the ask markers (before asks; after tally)
 import "./asks.js"; // asks in the world: a plumbob over the neighbor who asks, the verb icon over the place it is for (after street, neighbors, memory)
 import "./sfx.js"; // synthesized sound for steps, jumps, landings, bolts, the tornado, episodes, story babble and city life
 import "./titlesound.js"; // night-city ambience under the title, a click on its buttons, a whoosh on the first Gust (before title.js)
