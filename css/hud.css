@@ -298,7 +298,11 @@ html.first-min .hud, html.first-min .side, html.first-min .hud-left, html.first-
 html.first-min .public-toggle, html.first-min .version-tag, html.first-min .privacy-tag, html.first-min .update-pill,
 html.first-min .quality-btn, html.first-min .voices-btn, html.first-min .tutorial, html.first-min .nb-btn, html.first-min .ep-btn,
 html.first-min .pressure, html.first-min #weather-btn, html.first-min #episodes,
-html.first-min .abilitybar .et, html.first-min .abilitybar .cd, html.first-min .abilitybar .c { visibility: hidden; }
+html.first-min .abilitybar .et, html.first-min .abilitybar .cd, html.first-min .abilitybar .c,
+/* ...and every other line of text that is not the one prompt, the one call and the first-rain cue: name tags and bubbles, toasts, the offer, the street's promise, the story card */
+html.first-min .nb-layer, html.first-min .nb-toast, html.first-min .storm-toast, html.first-min .storm-tally, html.first-min .ep-toast,
+html.first-min .ep-say, html.first-min .ep-hud, html.first-min .ep-offer, html.first-min .take-toast, html.first-min #ability-toast,
+html.first-min #street-promise, html.first-min .helped-count .hc-t { visibility: hidden; }
 /* Back on his day inside that minute (let go): the way back into control must show, or a phone has no move, no Jump and no button. */
 html.first-min:not(.in-control):not(.cold-open):not(.title-up) .control-btn { visibility: visible; }
 .co-prompt { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px)); z-index: 37; }
