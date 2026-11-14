@@ -1355,7 +1355,8 @@
     const g = a.c.createGain();
     g.gain.value = 0.2;
     src.connect(g);
-    g.connect(out(a, 0, "ui"));
+    // A bus that can't be reached must not swallow the click: the press then plays straight to the output.
+    try { g.connect(out(a, 0, "ui")); } catch (err) { g.connect(a.c.destination); }
     src.start(a.c.currentTime);
   }
   /* Everything the UI probe counts as a control (hawkes-ui.js CONTROL) plus the game's own: the ability slots and the cold open's
@@ -1369,7 +1370,7 @@
     lastPressEv = e;
     let played = false;
     try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
-    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* no audio yet */ } }
+    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { console.warn("[sfx] press click failed", err); } }
     note("ui-press");
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
