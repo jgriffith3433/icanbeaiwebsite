@@ -10613,6 +10613,28 @@ async function phoneTouch(options, t) {
   t.event("phone-controls", `${innerWidth}x${innerHeight}: smallest control ${Math.round(minPx)} px${small.length ? ", SMALL: " + small.join(", ") : ""}`);
   if (small.length) t.problem("bug", `Controls under 44 px at ${innerWidth}x${innerHeight}: ${small.join(", ")}`);
   checkHud(t, land ? "phone landscape" : "phone portrait");
+  // 3b. The ability arc: every verb whole inside the safe area, none touching the Charge ring, none touching a neighbour.
+  {
+    const ring = document.querySelector(".abilitybar .charge .ring");
+    const rr = ring && ring.getBoundingClientRect();
+    const cs = rr ? { x: rr.left + rr.width / 2, y: rr.top + rr.height / 2, r: rr.width / 2 } : null;
+    const rects = [...document.querySelectorAll(".abilitybar .ab")].map((el) => ({ id: el.id, r: el.getBoundingClientRect() })).filter((o) => o.r.width > 0);
+    let clear = 999, gap = 999, edge = 999;
+    rects.forEach((o, i) => {
+      const r = o.r;
+      edge = Math.min(edge, r.left, r.top, innerWidth - r.right, innerHeight - r.bottom);
+      if (cs) clear = Math.min(clear, Math.hypot(r.left + r.width / 2 - cs.x, r.top + r.height / 2 - cs.y) - r.width / 2 - cs.r);
+      rects.slice(i + 1).forEach((p) => { gap = Math.min(gap, Math.hypot(r.left + r.width / 2 - p.r.left - p.r.width / 2, r.top + r.height / 2 - p.r.top - p.r.height / 2) - r.width / 2 - p.r.width / 2); });
+    });
+    t.metric("phone.abilityEdgePx", Math.round(edge));
+    t.metric("phone.chargeClearPx", Math.round(clear));
+    t.event("phone-ability-arc", `${rects.length} verbs; nearest screen edge ${Math.round(edge)} px, nearest the Charge ring ${Math.round(clear)} px, nearest each other ${Math.round(gap)} px`);
+    if (rects.length < 5) t.problem("bug", `Only ${rects.length} of 5 ability buttons are laid out on the phone`);
+    if (edge < 4) t.problem("bug", `An ability icon is cut off or hard against the screen edge (${Math.round(edge)} px) at ${innerWidth}x${innerHeight}`);
+    if (clear < 2) t.problem("bug", `The Charge disc overlaps an ability icon (${Math.round(clear)} px) at ${innerWidth}x${innerHeight}`);
+    if (gap < 4) t.problem("bug", `Two ability icons touch (${Math.round(gap)} px) at ${innerWidth}x${innerHeight}`);
+    if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The page scrolls sideways on the phone");
+  }
 
   // 4. All five abilities, each by a tap, each with its effect on screen.
   const verbs = [
