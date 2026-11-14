@@ -143,7 +143,9 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
      For seated/lying poses, account for world.js setting me.root.position.y = spec.y (0.63 for chairs) or tilting me.tilt. */
   const standAnchor = (hipsTarget || 0.91) + footMin;
   const seatAnchor = 0.53 + footMin; // spec.y (0.63) - seatAnchor (0.53) = 0.10 m floor height indoors
-  const lieAnchor = 0.62 * scale; // places Hips near spin origin when me.tilt pitches -90 deg on the bed
+  /* places Hips near the spin origin when me.tilt pitches -90 deg on the bed, 0.12 m toward the foot so the head and
+     arms stay clear of the headboard (his head top was 0.15 m from it; the pillow end is z -1.0) */
+  const lieAnchor = 0.62 * scale + 0.12;
   const reclineAnchor = 0.58 * scale;
   const clipAnchor = (c) => {
     if (c === "sit" || c === "type" || c === "window") return seatAnchor;
