@@ -521,9 +521,10 @@ function install() {
   function syncUi() {
     const fr = lastFrame;
     const driving = mode === "schedule" && fr && fr.person.inCar;
-    btn.textContent = mode === "schedule" ? "Take control" : mode === "control" ? "Let go" : "Walking back…";
-    btn.disabled = !!driving || mode === "returning";
-    btn.title = driving ? L.driving : mode === "schedule" ? "Take control (Enter)" : mode === "control" ? "Let go (Esc)" : "";
+    // While he walks back the button is still the one clear action: Take control, from wherever he is on the way (never a dead "Walking back…")
+    btn.textContent = mode === "control" ? "Let go" : "Take control";
+    btn.disabled = !!driving;
+    btn.title = driving ? L.driving : mode === "control" ? "Let go (Esc)" : "Take control (Enter)";
     btn.setAttribute("aria-pressed", mode === "control" ? "true" : "false");
     document.documentElement.classList.toggle("in-control", mode === "control");
     document.documentElement.classList.toggle("touch-ui", touchMode());
@@ -558,6 +559,7 @@ function install() {
   const pressBtn = (via) => {
     if (btn.disabled) return;
     if (mode === "schedule") take(via);
+    else if (mode === "returning") retake(via);
     else if (mode === "control") letGo(via);
     btn.blur(); // Space and Enter belong to him now, not to the button
   };
@@ -1670,6 +1672,20 @@ function install() {
     wasGliding = false;
     day.note(L.take);
     mark("take", { via, at: `${at.x.toFixed(2)},${at.z.toFixed(2)}`, physics: mover.hasPhysics() });
+    syncUi();
+    return true;
+  }
+  /* Taken again while he walks back to his day: control resumes where he stands now (no wait, no dead button). */
+  function retake(via) {
+    if (mode !== "returning") return false;
+    const at = mover.start(s.x, s.z, s.yaw, s.y + 0.6);
+    mode = "control";
+    since = 0;
+    catchUpAt = 0;
+    keys.clear();
+    jumps = 0;
+    day.note(L.take);
+    mark("take", { via, retake: true, at: `${at.x.toFixed(2)},${at.z.toFixed(2)}`, physics: mover.hasPhysics() });
     syncUi();
     return true;
   }

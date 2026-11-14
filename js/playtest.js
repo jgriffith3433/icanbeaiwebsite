@@ -11655,6 +11655,13 @@ async function wakeHimRun(options, t) {
   const back = $("control");
   if (phone) await tapEl(back); else back.click();
   t.event("wake-let-go", "Let go pressed on the roof");
+  // While he walks back the button must still offer an action (no dead "Walking back…")
+  await sleep(300);
+  if (C.mode() === "returning") {
+    const lb = $("control");
+    t.event("wake-walkback-button", `button reads "${lb ? lb.textContent : "?"}", ${lb && !lb.disabled ? "live" : "DISABLED"}`);
+    if (!lb || lb.disabled || /walking/i.test(lb.textContent)) t.problem("bug", "During the walk back the control button is dead or reads Walking back");
+  }
   // The walk back is world.js's own damped camera: once a second, name the nearest mesh between the camera and his hips (a roof
   // lip or slab hiding his legs reads as him sinking into it). A hit within 0.3 m of the hips is his own boots, not a slab.
   const lens = [];
