@@ -820,6 +820,8 @@ export function startPowers(world, dayApi) {
     const fn = commands[name];
     if (!fn) return false;
     if (mode() !== "control") return pressWatching(name, via || "key");
+    // A power pressed while the wake stretch is still playing cuts to the roof now and casts in this same input.
+    try { if (day.wake && day.wake.skip) day.wake.skip(name); } catch (e) { /* the wake never blocks a cast */ }
     if (gateFn && !gateFn(name, via || "key")) return false;
     if (releaseCast) return fn(via || "key");
     return windUp(name, via || "key", fn);

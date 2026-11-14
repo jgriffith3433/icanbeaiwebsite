@@ -111,6 +111,14 @@ export function startWake() {
 
   const api = {
     enabled: () => !quiet,
+    /** A power pressed during the stretch: no waiting for the timer, go to the roof now. True if it did. */
+    skip(why) {
+      if (phase !== "stretch") return false;
+      clear();
+      emit("skip", { why });
+      toRoof();
+      return phase === "ready";
+    },
     now: () => ({ phase, active: phase === "stretch" || phase === "cut", readyAt, startedAt: t0, bedPose, log: log.slice() }),
   };
   day.wake = api;

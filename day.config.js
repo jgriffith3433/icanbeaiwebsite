@@ -288,7 +288,7 @@ window.DAY_CONFIG = {
      back to bed by the day's own routes (or the quick catch-up) and the day carries on.
      ------------------------------------------------------------------------ */
   wake: {
-    stretch: { clip: "lookup", secs: 1.3 }, // beside the bed: arms up, a look at the window
+    stretch: { clip: "lookup", secs: 0.9 }, // beside the bed: arms up, a look at the window
     cutSecs: 0.35, // (unused since ready no longer waits on a timer) the flash that hides the move to the roof
     spot: { x: -21, z: 0.5, yaw: 0.92, from: 14 }, // the apartment roof, as the cold open's
     camera: { alpha: -2.45, beta: 1.22, radius: 5.6, from: 9, secs: 1.0 }, // dives in from 9 m behind him
