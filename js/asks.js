@@ -237,12 +237,18 @@ html.title-up .ask-mark,html.cold-open .ask-mark,html.cine-up .ask-mark,html.ep-
       const sx = rect.left + (pr.x * rect.width) / w;
       const sy = rect.top + (pr.y * rect.height) / h;
       // inside the screen with room for the 48 px target, else not drawn (a marker never sits on an edge, never half off)
-      const fits = on && sx > 28 && sx < innerWidth - 28 && sy > 28 && sy < innerHeight - 28;
+      let fits = on && sx > 28 && sx < innerWidth - 28 && sy > 28 && sy < innerHeight - 28;
+      // keep-out zones (js/hud-layout.js): never under a button, the ability arc, the clock or the toast lane; moved to the nearest free spot
+      let px = sx, py = sy;
+      if (fits && window.hudLayout) {
+        const c = window.hudLayout.clampAway(sx, sy, 24);
+        if (c) { px = c.x; py = c.y; } else fits = false;
+      }
       m.el.hidden = !fits;
-      m.screen = fits ? { x: Math.round(sx), y: Math.round(sy) } : null;
+      m.screen = fits ? { x: Math.round(px), y: Math.round(py) } : null;
       if (fits) {
-        m.el.style.left = sx.toFixed(1) + "px";
-        m.el.style.top = sy.toFixed(1) + "px";
+        m.el.style.left = px.toFixed(1) + "px";
+        m.el.style.top = py.toFixed(1) + "px";
       }
     });
   });
