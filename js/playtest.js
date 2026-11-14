@@ -11529,7 +11529,6 @@ async function checkCharacterClear(t, label) {
 /* ---------------- wake-him: a visit at 03:00, one tap on Take control, he wakes, is on the roof and casts within 10 s; Let go sends him back to bed ---------------- */
 async function wakeHim(options, t) {
   const phone = innerWidth <= 700 || !!(window.day && window.day.control && window.day.control.state().touch);
-  t.scene(phone ? "Wake him (phone, 03:00)" : "Wake him (03:00)");
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
   const D = window.day;
@@ -11549,9 +11548,14 @@ async function wakeHim(options, t) {
   // named setup: the visit is forced to 03:00 (he is asleep in bed)
   if (C.mode() === "control") C.letGo();
   await t.until(() => C.mode() === "schedule", 20000, "the day to have him").catch(() => {});
-  D.jump("03:00");
+  // The forced hour is applied behind the storm wipe (as every episode's clock jump is), and the scene is named only once it has
+  // drawn at 03:00: the scene frame used to show the 15:03 office, and the jump's rebuild showed a black "Paused" frame for 2 s.
+  if (D.transition && D.transition.wipe) await D.transition.wipe(() => D.jump("03:00"), { kind: "wake-setup", id: "wake-him" }).catch(() => {});
+  else D.jump("03:00");
   await t.until(() => { const f = D.now().frame; return f && ["lie", "side", "recline"].includes(f.person.pose); }, 8000, "him asleep in bed").catch(() => {});
   await sleep(600);
+  t.scene(phone ? "Wake him (phone, 03:00)" : "Wake him (03:00)");
+  await sleep(300);
   const fr0 = D.now().frame;
   const asleep = !!fr0 && ["lie", "side", "recline"].includes(fr0.person.pose);
   t.event("wake-asleep", `03:00: pose ${fr0 ? fr0.person.pose : "?"}, room ${fr0 ? fr0.room : "?"}, bed ${asleep ? "yes" : "NO"}`);
