@@ -1,7 +1,8 @@
 /* ==========================================================================
    Wake him: Take control while Small Weather sleeps (a visit at 03:00 finds him in bed).
-   He stretches beside the bed (the lookup clip), a short flash hides the cut, and he is on the apartment roof in night
-   weather (fog, far lightning) with the Charge full, ready to cast: about 2.6 s from the tap. Let go and he walks back to
+   A short flash hides the cut and he is on the apartment roof in night weather (fog, far lightning) with the Charge full,
+   ready to cast, in the same instant as the tap (a microtask after the take event, no timer), looking up (the lookup clip)
+   for his first 0.9 s there. Let go and he walks back to
    bed by the day's own routes (js/control.js), the clock never stopped.
    Words/numbers: day.config.js `wake`. Not during the cold open; a bot's tab only for the wake playtests.
    `day.wake`: now(), enabled(); `day:wake` events: start, stretch, roof, ready, back.
@@ -72,7 +73,6 @@ export function startWake() {
     phase = "cut";
     const W = window.weather;
     if (W && W.triggerFlash) W.triggerFlash(80, -0.2); // the flash covers the move
-    if (C.anim) C.anim(null);
     const sp = cfg.spot;
     const cam = cfg.camera;
     C.place(sp.x, sp.z, sp.yaw, { from: sp.from, alpha: cam.alpha, beta: cam.beta, radius: cam.radius });
@@ -82,31 +82,35 @@ export function startWake() {
     const P = window.powers || day.powers;
     if (P && P.abilities && P.abilities.reset) P.abilities.reset(cfg.charge || 100);
     emit("roof", { x: sp.x, z: sp.z });
-    // Ready the moment the roof pose and the cast input are live. This used to wait a further 0.6 s timer: when the cut itself
-    // stalls the page (new fog and roof shaders, two ~1.4 s frames) that timer landed seconds late, and the wake was "ready"
-    // 10 s after the tap. The flash and the camera dive are cosmetic and carry on on their own clocks.
+    // Ready the moment the roof pose and the cast input are live, and that moment is the tap itself (begin() runs this in a
+    // microtask right after the take event, not on a timer). A timer, even 0.6 s or 1.3 s, queues behind whatever stalls the page
+    // after the tap (the roof, fog and night-sky shaders, the first control frame) and landed seconds late: wake.secondsToReady
+    // read 100 in the playtest. The flash, the camera dive and the look-up are cosmetic and carry on on their own clocks.
     release();
     phase = "ready";
     readyAt = performance.now();
     if (day.note && cfg.log) day.note(cfg.log);
     emit("ready", { sinceTap: Math.round((readyAt - t0) / 10) / 100 });
+    // He wakes looking up at the open sky: the lookup clip plays over his first moments on the roof (a cast or a step overrides it).
+    const st = cfg.stretch || {};
+    if (C.anim && st.clip) {
+      C.anim(st.clip);
+      later(() => { if (phase === "ready" && C.anim) C.anim(null); }, (st.secs || 0.9) * 1000);
+    }
     if (W && W.triggerFlash && sk.flashAgainSecs) later(() => { try { W.triggerFlash((sk.flash || [90])[0], (sk.flash || [0, -0.3])[1]); } catch (e) { /* */ } }, sk.flashAgainSecs * 1000);
   }
 
   function begin(via) {
-    const C = day.control;
     phase = "stretch";
     t0 = performance.now();
     readyAt = 0;
-    html.classList.add("waking");
-    if (C.hold) C.hold(true);
     const st = cfg.stretch || {};
-    if (C.anim && st.clip) C.anim(st.clip);
     emit("start", { via, pose: bedPose });
     emit("stretch", { clip: st.clip });
-    // Compile the roof's and the night sky's shaders now, async, behind the stretch, so the cut isn't the frame that pays for them.
+    // Compile the roof's and the night sky's shaders now, async, so the cut isn't the frame that pays for them.
     try { if (day.transition && day.transition.warm) Promise.resolve(day.transition.warm(900, { x: cfg.spot.x, z: cfg.spot.z, r: 45 })).catch(() => {}); } catch (e) { /* warm is a head start */ }
-    later(toRoof, (st.secs || 1.3) * 1000);
+    // After the other take-event listeners (moments.js pushes its own camera in its own), so the roof dive is the last word.
+    Promise.resolve().then(() => { if (phase === "stretch") toRoof(); });
   }
 
   window.addEventListener("day:control", (e) => {
@@ -129,7 +133,7 @@ export function startWake() {
 
   const api = {
     enabled: () => !quiet,
-    /** A power pressed during the stretch: no waiting for the timer, go to the roof now. True if it did. */
+    /** A power pressed before the cut (the cut runs a microtask after the tap, so this is rare): go to the roof now. True if it did. */
     skip(why) {
       if (phase !== "stretch") return false;
       clear();
