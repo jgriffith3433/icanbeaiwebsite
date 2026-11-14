@@ -11128,6 +11128,25 @@ async function audioCheck(options, t) {
   if (touch) await tapEl(btn); else await clickEl(btn);
   await sleep(300);
   if (btn.getAttribute("aria-pressed") !== "true") t.problem("bug", "The sound toggle didn't turn Sound back on");
+  // menus-ui: while he is the player's, Let go, Rain (weather), Neighbors (a phone shows it as a pip) and Episodes are in the thumb's reach
+  // (the lower 55% of a portrait phone), each at least 44 px, and nothing scrolls sideways
+  if (touch && innerHeight > innerWidth) {
+    const reach = [["#control", "Let go"], ["#weather-btn", "Rain"], ["#neighbors-btn", "Neighbors"], ["#episodes", "Episodes"]];
+    const out = [];
+    let seen = 0;
+    reach.forEach(([sel, name]) => {
+      const el = document.querySelector(sel);
+      if (!el || !hudVisible(el)) return;
+      seen++;
+      const r = el.getBoundingClientRect();
+      if (r.top < innerHeight * 0.45) out.push(`${name} is ${Math.round(r.top)}px from the top (out of thumb reach)`);
+      if (r.width < 43.5 || r.height < 43.5) out.push(`${name} is ${Math.round(r.width)}x${Math.round(r.height)}px`);
+    });
+    if (document.documentElement.scrollWidth > innerWidth + 1) out.push("the page scrolls sideways");
+    out.forEach((m) => t.problem("bug", "Menus (phone): " + m));
+    if (!out.length) t.event("menus-thumb-reach", `${seen} controls in the lower 55%, all 44 px or more, no sideways scroll`);
+    checkHud(t, "audio-check: phone controls");
+  }
   const fin = audioReport();
   t.event("audio-report", JSON.stringify({ on: fin.on, buses: fin.buses, ambience: fin.ambience, bed: fin.bed, casts: fin.casts.length }));
   t.progress(1);
