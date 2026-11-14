@@ -223,7 +223,7 @@ window.DAY_CONFIG = {
       botched: "A neighbour is still waiting on you.",
     },
     logoText: ["I Can Be", "AI"], // the lockup in type until the Gen-made logo (logo) is in the repo
-    logo: "images/logo-icanbe-ai.webp", // Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
+    logo: null, // the chrome Gen lockup (images/logo-icanbe-ai.webp) clashed with the serif/amber loading card: the type lockup (Fraunces, amber) is the logo now. Was: Hawkes Gen lockup (hawkes.assets.json "title-logo", take 4 of j_b67c8eedbcff, cut out by j_fb021ebdd0e1)
     // the key-art crane: ends on Small Weather on the apartment roof (the pose the cold open's camera starts from)
     crane: {
       secs: 7,

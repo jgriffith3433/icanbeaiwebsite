@@ -64,23 +64,23 @@ export function startTitle() {
 .title-screen.fresh .clock{display:none}
 .title-screen .yday.left{color:#f0c27a}
 .title-screen .daily[hidden],.title-screen .left[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
-.title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:linear-gradient(180deg,rgba(24,36,60,.6),rgba(8,12,22,.7));color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:linear-gradient(180deg,rgba(38,30,22,.62),rgba(16,12,9,.72));color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
 .title-screen .prog b{color:#f0c27a;letter-spacing:.12em;font-weight:700}
 .title-screen .nextgoal{margin:0;max-width:min(86vw,340px);color:#f0c27a;font:600 .95rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.9);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .yday{margin:4px 0 0;max-width:30em;color:rgba(246,241,232,.78);font:500 .88rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .actions{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;opacity:0;animation:t-in .9s ease 3.2s forwards}
 .title-screen .row{display:flex;flex-wrap:nowrap;justify-content:center;gap:10px;width:100%}
-.title-screen button{white-space:nowrap;appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:linear-gradient(180deg,rgba(24,36,60,.72),rgba(8,12,22,.78));box-shadow:inset 0 1px 0 rgba(126,200,255,.22),0 4px 18px rgba(0,0,0,.35);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
-.title-screen button:hover{background:rgba(126,200,255,.16);border-color:rgba(126,200,255,.6)}
+.title-screen button{white-space:nowrap;appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:linear-gradient(180deg,rgba(38,30,22,.78),rgba(16,12,9,.82));box-shadow:inset 0 1px 0 rgba(240,194,122,.25),0 4px 18px rgba(0,0,0,.35);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.title-screen button:hover{background:rgba(240,194,122,.16);border-color:rgba(240,194,122,.6)}
 .title-screen button:active{transform:scale(.97)}
 .title-screen button:focus-visible{outline:2px solid #7ec8ff;outline-offset:3px}
 .title-screen button.play{width:min(86vw,340px);min-height:64px;font-size:1.3rem;letter-spacing:.04em;background:#f0c27a;border-color:#f0c27a;color:#141210;box-shadow:0 0 30px rgba(240,194,122,.35)}
 .title-screen button.play:hover{background:#f6d39b;transform:translateY(-1px)}
 .title-screen .row button{flex:0 1 auto}
 .title-screen button[aria-pressed="false"]{color:rgba(246,241,232,.6)}
-.title-screen .hint{font-size:.88rem;font-weight:600;letter-spacing:.04em;color:#f6f1e8;min-height:1.1em;padding:6px 14px;border-radius:999px;background:linear-gradient(180deg,rgba(24,36,60,.6),rgba(8,12,22,.7));text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .hint{font-size:.88rem;font-weight:600;letter-spacing:.04em;color:#f6f1e8;min-height:1.1em;padding:6px 14px;border-radius:999px;background:linear-gradient(180deg,rgba(38,30,22,.62),rgba(16,12,9,.72));text-shadow:0 1px 8px rgba(0,0,0,.9)}
 .title-screen .hint:empty{display:none}
-.title-screen .tset{width:min(92vw,360px);margin:0;padding:10px;border-radius:16px;background:linear-gradient(180deg,rgba(18,28,48,.9),rgba(8,12,22,.92));border:1px solid rgba(126,200,255,.25);display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.title-screen .tset{width:min(92vw,360px);margin:0;padding:10px;border-radius:16px;background:linear-gradient(180deg,rgba(32,25,18,.9),rgba(14,11,8,.92));border:1px solid rgba(240,194,122,.28);display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .title-screen .tset[hidden]{display:none}
 .title-screen .tset .settings-pop{position:static;margin:0;padding:0;align-items:stretch}
 .title-screen .clock{position:absolute;top:max(10px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));margin:0;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(246,241,232,.6)}
