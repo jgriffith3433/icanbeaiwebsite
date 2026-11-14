@@ -207,7 +207,9 @@ html.wipe-up #loading{visibility:hidden}
     emit("work-done", { ms: Math.round(performance.now() - t0) });
   }
 
-  async function warmScene(budgetMs) {
+  // near = { x, z, r }: compile the materials of the meshes within r of that point first (the place the next cut will show),
+  // nearest first, instead of the first 24 in scene order (which are mostly ones the camera already draws).
+  async function warmScene(budgetMs, near) {
     const w = day.world && day.world();
     const scene = w && w.scene;
     if (!scene) return 0;
@@ -220,7 +222,16 @@ html.wipe-up #loading{visibility:hidden}
     try {
       const seen = new Set();
       let n = 0;
-      for (const m of scene.meshes) {
+      let list = scene.meshes;
+      if (near && Number.isFinite(near.x) && Number.isFinite(near.z)) {
+        const d2 = (m) => {
+          const c = m.getBoundingInfo ? m.getBoundingInfo().boundingSphere.centerWorld : m.position;
+          return (c.x - near.x) ** 2 + (c.z - near.z) ** 2;
+        };
+        const r2 = (near.r || 40) ** 2;
+        list = scene.meshes.map((m) => [m, d2(m)]).filter((e) => e[1] <= r2).sort((a, b) => a[1] - b[1]).map((e) => e[0]);
+      }
+      for (const m of list) {
         if (performance.now() - t0 > budget) break;
         const mat = m.material;
         if (!mat || seen.has(mat) || !m.isEnabled || !m.isEnabled()) continue;
