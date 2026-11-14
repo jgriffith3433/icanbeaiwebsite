@@ -11517,6 +11517,13 @@ async function wakeHim(options, t) {
   if (D.tutorial && D.tutorial.skip) D.tutorial.skip();
   if (D.title && D.title.quiet) D.title.quiet();
   if (phone && !C.state().touch) C.touch(true);
+  // A visitor's first gesture (the title's Play) arms Sound; this bot never pressed anything before the wake tap, so the whole
+  // setup (up to ~40 s on a phone) played with the audio context never started. Press once on the Sound button, as the other scenarios do.
+  const snd = $("sound");
+  if (snd && snd.getAttribute("aria-pressed") === "true") {
+    const r = snd.getBoundingClientRect();
+    snd.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 4, clientY: r.top + 4, pointerId: 4, pointerType: phone ? "touch" : "mouse" }));
+  }
   // named setup: the visit is forced to 03:00 (he is asleep in bed)
   if (C.mode() === "control") C.letGo();
   await t.until(() => C.mode() === "schedule", 20000, "the day to have him").catch(() => {});
