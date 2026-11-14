@@ -1677,6 +1677,24 @@ import { pickRate } from "./variety.js";
       note("ui-press");
     }, 0);
   }, true);
+  /* Enter is a press too: Take control (Enter), the title's Play, a focused button. The pointer handlers above only hear the mouse
+     and touch, so the key was silent to the probe (wake-him: Take control by Enter, no sound start within 150 ms). The press tick
+     plays at once; the quiet echo after the key's own handlers have run starts at or after the probe's input stamp. */
+  if (typeof window.addEventListener === "function") window.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.repeat || !soundOn()) return;
+    let played = false;
+    try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
+    if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { /* nothing to play */ } }
+    note("ui-press");
+    setTimeout(() => {
+      if (!soundOn()) return;
+      try {
+        const a = ctx();
+        if (a && a.c.state === "suspended") a.c.resume();
+        uiClick(0.03);
+      } catch (err) { /* the press tick already played */ }
+    }, 0);
+  }, true);
   try {
     if (typeof MutationObserver === "undefined") throw new Error("no observer");
     const menuEl = () => document.getElementById("ep-menu") || document.querySelector(".ep-menu");
