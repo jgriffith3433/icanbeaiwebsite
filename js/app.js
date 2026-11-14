@@ -43,6 +43,7 @@ import "./firstrain.js"; // clarity: one glowing Rain icon and a "Tap the street
 import "./heroprompt.js"; // one in-world prompt over him until the first cast: "Hold V to call wind"
 import "./opening.js"; // the first Play: a short skippable intro on Small Weather
 import "./dialogue.js"; // the story's and neighbors' lines, spoken in each speaker's voice when their clip is in the build
+import "./npcbarks.js"; // a neighbour barks one short voiced line when he passes or casts near them (existing clips; after neighbors, voice, dialogue)
 import "./slice.js"; // vertical slice: apt crown, day-keyed lawn, pond ripples, pigeons, coin toss
 import "./garden.js"; // Birdie's wilting pots and dry lawn tufts that the first Rain revives (after slice.js)
 import "./memory.js"; // the city remembers: deeds by real date in localStorage, and the lawn, scorch, bins, puddles and tomatoes they leave (after slice.js)

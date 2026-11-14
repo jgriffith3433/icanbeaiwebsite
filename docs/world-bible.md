@@ -438,3 +438,7 @@ Birdie's ask is shown before it is spoken. Four planters on the apt stoop (x -20
 ## The morning told in play (story through play)
 
 - **What happens:** the alarm rings (red face, beeps), he snoozes it with a slap on the nightstand, rings again, off with a click; feet on the floor with a soft thud; up, in the 7:46 block he stretches both arms overhead and yawns; the coffee machine gurgles and the toaster pops; a sip; before the car he climbs the apt stair to the roof (`aptStairFoot` -> `aptStairTop` -> `aptRoof`), stands there a few seconds reading the sky (door, steps, wind), and walks back down. Each step has its own sound (`js/sfx.js` "the morning told in sound", event `day:beat`). Taking control no longer shows a speech pill: his voice says the line and the camera pushes in.
+
+## Street barks (js/npcbarks.js, `neighbors.barks` in day.config.js)
+
+The street talks back. Birdie, Dex and Ines each say one short line when Small Weather comes within 6 m (a pass bark: Birdie's tomato talk, Dex's parcel with no return address, Ines's sky keeping time) and a fitting one when he casts within 8 m (Birdie's "Look at them drink" for Rain, Dex's "Dry as a bone" for Sun break, Ines's "Look at that blue" for Lightning). Every line is an existing voiced clip; no line repeats within 3 minutes, a quiet pool stays quiet, and the music ducks under them (speakAs).

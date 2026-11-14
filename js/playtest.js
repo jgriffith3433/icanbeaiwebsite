@@ -1835,14 +1835,14 @@ async function modelBlocked(options, t) {
  *  the real input (keys, or the touch stick), and inside 6 m the head must turn to him within 1 s and a small hello must show; then a Rain
  *  (key R, or the Rain button) within 8 m must make them react (point at the sky, umbrella up). Events neighbor-look / neighbor-greet /
  *  neighbor-react; metrics neighbors.lookMs, neighbors.looks, neighbors.reactions. */
-async function neighborAwareness(t, touch, label) {
+async function neighborAwareness(t, touch, label, whoId, quiet) {
   const D = window.day;
   const C = D.control;
   const N = D.neighbors;
   const P = window.powers || D.powers;
   if (!N || !N.stand || C.mode() !== "control") { t.problem("bug", `${label}: no neighbours or not in control for the awareness check`); return; }
   const scene = D.world().scene;
-  const who = "birdie";
+  const who = whoId || "birdie";
   const sp = C.state();
   const dirx = Math.sin(sp.yaw || 0), dirz = Math.cos(sp.yaw || 0);
   const tx = sp.x + dirx * 12, tz = sp.z + dirz * 12;
@@ -1881,8 +1881,8 @@ async function neighborAwareness(t, touch, label) {
   const looks = first((e) => e.action === "look" && e.id === who && e.t >= from);
   const lookMs = looks.length ? Math.max(0, Math.round(looks[0].t - crossAt)) : -1;
   const row = (N.anim().people || []).find((p) => p.id === who) || {};
-  t.metric("neighbors.looks", looks.length);
-  t.metric("neighbors.lookMs", lookMs);
+  if (!quiet) t.metric("neighbors.looks", looks.length);
+  if (!quiet) t.metric("neighbors.lookMs", lookMs);
   t.event("neighbor-look", `${label}: ${who} noticed him at ${looks.length ? looks[0].d + " m" : "never"}, ${lookMs} ms after he came within 6 m, head turned ${(row.look || 0).toFixed(2)} rad, ${row.aware ? "still looking" : "not looking"}`);
   if (!looks.length || lookMs > 1000) t.problem("bug", `${label}: a neighbour within 6 m of him did not turn to him within 1 s (${lookMs} ms)`);
   const greets = first((e) => e.action === "greet" && e.id === who && e.t >= from);
@@ -1896,11 +1896,28 @@ async function neighborAwareness(t, touch, label) {
   await sleep(1500);
   const reacts = first((e) => e.action === "react" && e.id === who && e.t >= castAt);
   const rr = (N.anim().people || []).find((p) => p.id === who) || {};
-  t.metric("neighbors.reactions", reacts.length);
+  if (!quiet) t.metric("neighbors.reactions", reacts.length);
   t.event("neighbor-react", `${label}: Rain ${reacts.length ? "answered by " + who + " at " + reacts[0].d + " m (" + reacts[0].kind + ")" : "got no answer"}; pose ${rr.gesture || "none"}, weather pose ${rr.weather} ${(rr.weatherK || 0).toFixed(2)}`);
   if (!reacts.length) t.problem("bug", `${label}: casting Rain within 8 m made no neighbour react`);
   await sleep(1800);
   N.stand(who, null);
+}
+
+/** Street barks (js/npcbarks.js): after the awareness walks, report what the neighbours said. Heard = a bark played
+    (caption up, voice event); repeats = the same line twice inside 180 s. */
+function neighborBarks(t, label) {
+  const B = window.day.npcbarks;
+  if (!B) { t.problem("bug", `${label}: no street barks module`); return; }
+  const n = B.now();
+  const cap = document.getElementById("voice-caption-text");
+  const fs = cap ? parseFloat(getComputedStyle(cap).fontSize) : 0;
+  t.metric("npc.barksHeard", n.heard);
+  t.metric("npc.barkRepeats180s", n.repeats180);
+  t.metric("npc.barkCaptionPx", Math.round(fs));
+  t.event("npc-barks", `${label}: ${n.heard} barks (${B.log().map((b) => b.who + ": " + b.text).join(" | ")}), ${n.repeats180} repeated inside 180 s, caption ${Math.round(fs)} px`);
+  if (n.heard < 3) t.problem("bug", `${label}: only ${n.heard} neighbour barks heard while walking past neighbours (need 3)`);
+  if (n.repeats180 > 0) t.problem("bug", `${label}: a neighbour bark repeated within 180 s (${n.repeats180})`);
+  if (fs && fs < 14) t.problem("bug", `${label}: bark subtitle is ${Math.round(fs)} px (need 14+)`);
 }
 
 /* ---------------- warm-start: the longest frame after loading, each power's first-use cost, shader compile errors ---------------- */
@@ -2087,6 +2104,7 @@ async function warmStart(options, t) {
     else if (lag > 100) t.problem("bug", `The landing sound came ${lag} ms after touch-down (limit 100)`);
   }
   if (C.mode() === "control") await neighborAwareness(t, touch, "warm-start");
+  if (C.mode() === "control") { await neighborAwareness(t, touch, "warm-start", "dex", true); await neighborAwareness(t, touch, "warm-start", "quill", true); neighborBarks(t, "warm-start"); }
   // let go inside the first minute: the way back into control must be on screen (a phone has no stick then)
   if (touch) await tapEl($("control")); else pressKey("Escape");
   await t.until(() => C.mode() === "schedule", 8000, "back on the day").catch(() => {});
@@ -11608,6 +11626,7 @@ async function phoneTouch(options, t) {
 
   // 2d. A neighbour on the pavement: walk up by the stick, the head turns, a hello, and Rain gets an answer.
   if (C.mode() === "control") await neighborAwareness(t, true, land ? "phone landscape" : "phone portrait");
+  if (C.mode() === "control") { await neighborAwareness(t, true, land ? "phone landscape" : "phone portrait", "dex", true); neighborBarks(t, land ? "phone landscape" : "phone portrait"); }
 
   // 3. Every control: 44 px, on screen, no overlap.
   const sels = ["#control", ".abilitybar .ab", ".touchpad .jump", ".touchpad .stick", "#sound", "#settings", "#episodes", "#time-btn", "#weather-btn"];

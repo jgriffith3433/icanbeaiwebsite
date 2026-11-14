@@ -2519,6 +2519,24 @@ window.DAY_CONFIG = {
     near: 9, // m: how close for a beat to start
     range: 16, // m: how close he must be when he answers an ask
     tagRange: 90, // m: name tags show this far
+    /* STREET BARKS (js/npcbarks.js): passing a named neighbour (inside `awareness.look`) or casting near them (inside
+       `awareness.react`) gets one short voiced line from them. Every line below is an EXISTING clip (audio/dialogue,
+       same words as a beat, a story line or a remember line; scripts/check-npc-barks.mjs fails on one without a clip),
+       so nothing is generated. `repeat` s: a line is not used again inside it. `gap` s: any two barks. `person` s: one
+       neighbour's pass barks. An empty pool stays quiet. */
+    barks: {
+      delay: 0.6, gap: 7, person: 25, repeat: 180,
+      pass: {
+        birdie: ["A little rain. Not a lot. A little.", "Picked these for you. Don't tell the pigeons."],
+        dex: ["Parcel for you. No return address. It hums a bit.", "Some of that was perfect. Some of that was weather.", "Best seat on the avenue. Keep the beat."],
+        quill: ["The sky is keeping time. So are we.", "Whatever you do, do it on time. The sky keeps a beat."],
+      },
+      cast: {
+        birdie: { rain: ["Look at them drink. Bless you."] },
+        dex: { sun: ["Dry as a bone. I owe you a delivery."], wind: ["The stalls! Mind the stalls!"], rain: ["Parcels, produce, everything's gone soft. You can't sell soft."] },
+        quill: { bolt: ["Got it. Look at that blue."], wind: ["They're turning. Do you see how they turn?"] },
+      },
+    },
     lines: {
       open: "Neighbors",
       title: "Your neighbors",
