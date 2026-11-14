@@ -11173,6 +11173,15 @@ async function coldStart(options, t) {
     const c = D.crowd && D.crowd.info ? D.crowd.info() : {};
     if (c.people > 0 && run === 0) t.problem("bug", "No pedestrian ran for cover within 2 s of Rain");
   }
+  // Birdie's ask as action: the pots she is worried about lift and go green in front of him, before any thanks is spoken
+  if (D.garden) {
+    const g0 = D.garden.now();
+    await waitFor(() => D.garden.now().k > 0.9, 4000);
+    const g1 = D.garden.now();
+    t.event("cold-start-garden", `her ${g1.plants} pots and ${g1.tufts} lawn tufts: freshness ${g0.k} -> ${g1.k}, leaf droop ${g0.droop} -> ${g1.droop} rad, revived ${g1.revived}`);
+    t.metric("gardenRevived", g1.k);
+    if (g1.k < 0.9) t.problem("bug", `Birdie's wilting pots didn't revive after the rain (freshness ${g1.k})`);
+  } else t.problem("bug", "No garden: Birdie's wilting pots are missing (js/garden.js)");
   t.metric("secondsToFirstInput", T.input);
   t.metric("secondsToFirstCast", T.bolt);
   if (T.input == null || T.input > 3) t.problem("bug", `The first input was accepted ${T.input}s after Play (the limit is 3 s)`);

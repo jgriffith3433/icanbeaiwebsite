@@ -418,3 +418,7 @@ One storm-navy HUD language across every player-facing screen (Persona-bold fram
 - **Characters:** Dex — Want: dry parcels; Moment: Sun break after rain, he says "Dry as a bone. I owe you a delivery." if he is within ~28 m (no new line).
 - **What happens:** Rain or a storm marks the game clock; a Sun break within 2 game minutes fires the aftermath — steam ~20 s, rainbow ~28 s (fades with cloud cover), drips ~30 s (js/rain.js `afterDrip`), puddle sparkles, birds home, umbrellas close, shop owners step out; the render grade already warms from `weather.now().sun`. Phone: half steam and drip counts; rainbow stays. Playtest: `sun-aftermath`.
 - **Story beats:** clearing a storm feels like a reward — told by steam, the rainbow, dripping gutters, umbrellas folding and Dex's voice, not a text card.
+
+
+## Birdie's garden (story through play)
+Birdie's ask is shown before it is spoken. Four planters on the apt stoop (x -20.1..-17.7, z 9.15) stand wilted: leaves hang brown, stems lean, no fruit; dry tufts lie flat on the park lawn. The player's first Rain within 45 m revives them pot by pot over about 2.4 s (leaves lift and go green, tufts stand, tomatoes swell, camera swings to the stoop, a chime), and her voiced thanks lands 1.1 s into it. It stays revived for the real day and wilts on the next date. Module `js/garden.js`; playtest `cold-start` event `cold-start-garden`.
