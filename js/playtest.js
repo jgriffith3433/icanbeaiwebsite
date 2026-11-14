@@ -4410,6 +4410,22 @@ async function nightGlow(options, t) {
   if (!(at01.on <= at20.on * 0.55)) t.problem("bug", `Fewer than half the night windows stayed off after bedtime (${at01.on} still on vs ${at20.on} at 20:00)`);
   if (!(at20.rooms > 0 && (at20.warm > 0 || at20.cool > 0))) t.problem("bug", "Lit windows have no interior-mapped rooms");
   if (!(at2330.on <= at20.on * 0.75)) t.problem("bug", `Windows barely dimmed by 23:30 (${at2330.on} vs ${at20.on} at 20:00)`);
+  t.progress(0.3);
+  // dusk 18:30 -> 19:30 scrubbed: the pools and lamps fade in without a hitch (the pool shader compiles at boot)
+  {
+    let worst = 0;
+    let last = performance.now();
+    for (let m = 18 * 60 + 30; m <= 19 * 60 + 30; m += 4) {
+      scrubTo(m);
+      await sleep(40);
+      const n = performance.now();
+      worst = Math.max(worst, n - last - 40);
+      last = n;
+    }
+    t.metric("duskScrubWorstMs", Math.round(worst));
+    t.event("lamp-pools-dusk", `scrubbed 18:30-19:30, worst frame gap ${Math.round(worst)} ms, pool glow ${Number(cs.info().poolGlow).toFixed(2)}`);
+    if (worst > 100) t.problem("bug", `Dusk scrub hitched ${Math.round(worst)} ms (limit 100)`);
+  }
   t.progress(0.35);
 
   // 2. 22:00 street: lit windows, neon, lamp pools, dynamic lights
@@ -4428,6 +4444,9 @@ async function nightGlow(options, t) {
   if (info.lit.windows < 0.7) t.problem("bug", `Windows aren't lit at 22:00 (${info.lit.windows})`);
   if ((props.signs || 0) < 4) t.problem("bug", `Fewer than 4 neon signs (${props.signs})`);
   if (info.lit.lamps < 0.7) t.problem("bug", `Lamp pools aren't on (${info.lit.lamps})`);
+  t.event("lamp-pools", `${info.lamps} lamp pools drawn=${info.poolsDrawn} glow ${Number(info.poolGlow).toFixed(2)} at 22:00 (${touch ? "390x844 low" : "desktop"})`);
+  t.metric("lampPoolGlow", Math.round((info.poolGlow || 0) * 100) / 100);
+  if (!(info.poolGlow > 0.8)) t.problem("bug", `Lamp pools are too faint at 22:00 (glow ${info.poolGlow})`);
   if (touch && (dyn.active || 0) > 4) t.problem("bug", `Phone has ${dyn.active} dynamic lights (cap 4)`);
   if (!touch && (dyn.active || 0) < 1) t.problem("warning", "No dynamic lamp lights near the camera");
   t.progress(0.6);
@@ -11555,6 +11574,26 @@ async function phoneTouch(options, t) {
     ["sunbreak", (a) => a.some((e) => e.power === "sunbreak" || e.power === "sun")],
   ];
   let ok = 0;
+  // his heading while he winds up and turns: never over 720 deg/s (a turn is 600 deg/s at most)
+  let yawMax = 0;
+  let yawPrev = null;
+  let yawLast = performance.now();
+  let yawOn = true;
+  const yawLoop = () => {
+    if (!yawOn) return;
+    const st = D.control && D.control.state ? D.control.state() : null;
+    const now = performance.now();
+    if (st && Number.isFinite(st.yaw)) {
+      if (yawPrev != null && now - yawLast > 4) {
+        const d = Math.abs(((st.yaw - yawPrev + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI);
+        yawMax = Math.max(yawMax, (d * 180 / Math.PI) / ((now - yawLast) / 1000));
+      }
+      yawPrev = st.yaw;
+      yawLast = now;
+    }
+    requestAnimationFrame(yawLoop);
+  };
+  requestAnimationFrame(yawLoop);
   for (const [id, match] of verbs) {
     const el = $("ability-" + id);
     if (!el || !hudVisible(el)) { t.problem("bug", `No visible #ability-${id} button on the phone`); continue; }
@@ -11569,13 +11608,19 @@ async function phoneTouch(options, t) {
     window.removeEventListener("day:power", h);
     const cast = got.filter((g) => g.action !== "denied");
     const fx = !!match(cast) && cast.length > 0;
-    t.event("phone-cast-" + id, `${fx ? "cast" : "NO CAST"} ${Math.round(performance.now() - tc)} ms after the tap; ${cast.map((g) => g.power).join(",") || "nothing"}`);
+    const castMs = Math.round(performance.now() - tc);
+    t.event("phone-cast-" + id, `${fx ? "cast" : "NO CAST"} ${castMs} ms after the tap; ${cast.map((g) => g.power).join(",") || "nothing"}`);
+    t.metric("phone.castMs." + id, castMs);
+    if (fx && castMs > 300) t.problem("bug", `A tap on ${id} took ${castMs} ms to its first effect (wind-up included; limit 300)`);
     if (fx) ok++; else t.problem("bug", `A tap on ${id} didn't cast it (events: ${got.map((g) => g.power + ":" + g.action).join(", ") || "none"})`);
     await sleep(1800); // the effect on screen: the recording shows the sky, bolt, rain, wind or sun
     el.dispatchEvent(new PointerEvent("pointerup", { pointerId: 9, pointerType: "touch", bubbles: true })); // release any hold
     await settleToIdle(t, "phone-" + id);
     checkHud(t, "phone cast " + id);
   }
+  yawOn = false;
+  t.metric("phone.heroYawDegPerSec", Math.round(yawMax));
+  if (yawMax > 720) t.problem("bug", `His heading turned ${Math.round(yawMax)} deg/s during the casts (limit 720)`);
   t.metric("phone.castsWithEffect", ok);
   if (ok < 5) t.problem("bug", `Only ${ok} of 5 abilities cast by touch`);
   // frame rate over the casts (low quality on a phone)
