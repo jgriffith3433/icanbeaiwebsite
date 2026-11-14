@@ -147,6 +147,16 @@
         document.addEventListener("error", function (e) {
           var el = e.target; if (el && el.tagName === "SCRIPT" && el.src && /app\.js|\/assets\//.test(el.src)) fail("script " + el.src, "the game");
         }, true);
+        /* A module that throws while it evaluates (a circular chunk's TDZ, a bad import) fires no <script> error event: the card sat at 50%
+           forever. Until the day exists (window.day.now is set by js/main.js), an uncaught error or rejection from the game's own files is a failed
+           boot: say so, with Try again, instead of a frozen bar. After the day is up a stray error never takes the card down. */
+        function bootError(why, file) {
+          if (state !== "loading" || (window.day && window.day.now)) return;
+          if (file && !/\/assets\/|\/js\/|app\.js/.test(String(file))) return;
+          fail(why, "the game");
+        }
+        window.addEventListener("error", function (e) { if (e.target && e.target !== window) return; bootError((e.error && e.error.message) || e.message, e.filename); });
+        window.addEventListener("unhandledrejection", function (e) { var r = e.reason; bootError((r && r.message) || r, (r && r.stack) || ""); });
         slowT = setTimeout(function () { if (state === "loading") { card.classList.add("slow"); msg.textContent = "Still loading… this is taking longer than usual."; emit("slow"); } }, 30000);
         window.__loading = { set: set, done: done, fail: fail, state: function () { return state; }, pct: pct, log: function () { return log.slice(); } };
         emit("show");
@@ -254,8 +264,9 @@
 
     <!-- Babylon.js 9 and Havok physics from npm, the day, the world, the page and analytics: bundled by Vite (js/app.js). -->
     <script type="module" src="js/app.js?v=b2c4a141f5"></script>
-    <!-- Hawkes playtest hooks. Idle unless the runner calls them or the URL has ?playtest=<id>. -->
-    <script type="module" src="js/playtest.js?v=b2c4a141f5"></script>
+    <!-- Hawkes playtest hooks: js/playtest.js is fetched by dynamic import only for ?playtest=<id> or when the runner
+         touches window.hawkesPlaytest (js/playtest-loader.js). A player's page never downloads it. -->
+    <script type="module" src="js/playtest-loader.js?v=b2c4a141f5"></script>
     <script src="js/hawkes-release.js?v=b2c4a141f5" data-releases="releases.json" defer></script>
   </body>
 </html>

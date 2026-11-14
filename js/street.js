@@ -37,7 +37,7 @@ export function startStreet() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches" && id !== "ask-markers") quiet = true; // other scenarios never meet the lesson
+    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "street-teaches" && id !== "ask-markers" && id !== "audio-check") quiet = true; // other scenarios never meet the lesson
     else if (!id && navigator.webdriver) quiet = true;
   } catch (e) { /* no location */ }
 

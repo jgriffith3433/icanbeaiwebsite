@@ -22,7 +22,7 @@ export function startColdOpen() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "phone-touch") quiet = true;
+    if (id && id !== "cold-start" && id !== "title-key-art" && id !== "phone-touch" && id !== "audio-check") quiet = true;
     // a cold bot (the first-five run, no ?playtest) plays it like a stranger; a runner's start(id) quiets the title first, which cancels the auto-start
   } catch (e) { /* no location */ }
 
@@ -324,7 +324,7 @@ export function startColdOpen() {
       if (P.abilities.unlock) P.abilities.unlock("rain"); // the street's lessons lock the verbs from the start: the first cast is Rain
       P.aimAt({ x: cfg.rod.x, y: cfg.rod.roofY + cfg.rod.height, z: cfg.rod.z });
       P.gate((name, via) => {
-        if (passing) return true;
+        if (passing || !on || phase === "done") return true; // never refuse a cast once the opening is over
         if (name === "rain" || name === "bolt") press(via, name);
         return false; // nothing but Rain (the prompted gesture) and the rod's bolt
       });

@@ -620,6 +620,23 @@ export function installLook(world) {
     };
   }
 
+  // Phone render scale holds 30 fps: on low, the scaling level starts at 2 (half resolution) and a 1 s frame-rate guard raises it
+  // toward 3 when fps sits under 28 (a mid-range phone), and eases it back when fps is comfortable (over 44). High is untouched.
+  let scaleLow = 2;
+  let scaleClock = 0;
+  scene.onBeforeRenderObservable.add(() => {
+    const now = performance.now();
+    if (now - scaleClock < 1000) return;
+    scaleClock = now;
+    if (quality !== "low") return;
+    const fps = engine.getFps();
+    if (!fps || document.hidden) return;
+    let next = scaleLow;
+    if (fps < 28) next = Math.min(3, scaleLow + 0.25);
+    else if (fps > 44) next = Math.max(2, scaleLow - 0.25);
+    if (next !== scaleLow) { scaleLow = next; engine.setHardwareScalingLevel(scaleLow); }
+  });
+
   function applyQuality(level, via) {
     quality = level === "low" ? "low" : "high";
     const low = quality === "low";
@@ -627,7 +644,7 @@ export function installLook(world) {
     if (via === "click" || via === "api") { try { localStorage.setItem("icanbe.quality", quality); } catch (e) { /* private mode */ } }
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     // phones (low) render below CSS resolution: fewer pixels to fill is what holds fps on a mid-range GPU
-    engine.setHardwareScalingLevel(low ? 2 : 1 / Math.min(dpr, 1.5));
+    engine.setHardwareScalingLevel(low ? scaleLow : 1 / Math.min(dpr, 1.5));
     if (pipeline) {
       // Low (phones) keeps the tonemap, the grade and a half-res bloom; FXAA stays high-only (js/render-pipeline.js does the rest:
       // one 1024 shadow cascade, no SSAO, no aberration).

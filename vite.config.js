@@ -55,13 +55,13 @@ export default defineConfig({
     target: 'es2022',
     rollupOptions: {
       output: {
-        // Parallel downloads instead of one 2.3 MB (gzip) script: Babylon core (split so none is over ~1 MB gzip),
+        // Parallel downloads instead of one 2.3 MB (gzip) script: Babylon (ONE chunk),
+        // never split it into more pieces (not by folder, not its Shaders): Babylon's modules import each other both ways, so any split
+        // made circular chunks and a TDZ "Cannot access 'e' before initialization" that froze the loading card at 50%,
         // Havok's JS glue, the game. small-weather.js and its glTF loader stay their own dynamic chunk.
         manualChunks(id) {
           if (id.includes('node_modules/@babylonjs/havok')) return 'havok';
           if (!id.includes('node_modules/@babylonjs/core')) return undefined;
-          if (/@babylonjs\/core\/Shaders(WGSL)?\//.test(id)) return 'babylon-shaders';
-          if (/@babylonjs\/core\/(Physics|Particles|PostProcesses|Rendering|Lights|Cameras|Probes|Layers|Animations)\//.test(id)) return 'babylon-effects';
           return 'babylon-core';
         },
       },

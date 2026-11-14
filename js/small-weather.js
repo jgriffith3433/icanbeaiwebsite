@@ -472,7 +472,7 @@ function bodyPose(B, wrap, byShort) {
   const inv = wrap.getWorldMatrix().clone().invert();
   const at = (n) => (byShort[n] ? B.Vector3.TransformCoordinates(byShort[n].getAbsolutePosition(), inv) : null);
   const P = {};
-  ["Hips", "Neck", "Head", "LeftArm", "RightArm", "LeftHand", "RightHand", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg", "LeftFoot", "RightFoot"].forEach((n) => (P[n] = at(n)));
+  ["Hips", "Neck", "Head", "LeftArm", "RightArm", "LeftHand", "RightHand", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg", "LeftFoot", "RightFoot", "LeftToeBase", "RightToeBase"].forEach((n) => (P[n] = at(n)));
   if (Object.values(P).some((v) => !v)) return null;
   const d = (a, b) => P[b].subtract(P[a]);
   const deg = (r) => (r * 180) / Math.PI;
@@ -493,6 +493,16 @@ function bodyPose(B, wrap, byShort) {
     kneeL: bend("LeftUpLeg", "LeftLeg", "LeftFoot"),
     kneeR: bend("RightUpLeg", "RightLeg", "RightFoot"),
     handsApart: P.LeftHand.x - P.RightHand.x,
+    /* the idle-pose playtest: how far each hand is in front of the hip line (negative = behind his back), how far out
+       from the midline, and each boot's pitch (ankle to toe, deg) and roll (turned off straight ahead, deg) */
+    handFwdL: P.LeftHand.z - P.Hips.z,
+    handFwdR: P.RightHand.z - P.Hips.z,
+    handOutL: Math.abs(P.LeftHand.x),
+    handOutR: Math.abs(P.RightHand.x),
+    bootPitchL: deg(Math.atan2(d("LeftFoot", "LeftToeBase").y, Math.hypot(d("LeftFoot", "LeftToeBase").x, d("LeftFoot", "LeftToeBase").z))),
+    bootPitchR: deg(Math.atan2(d("RightFoot", "RightToeBase").y, Math.hypot(d("RightFoot", "RightToeBase").x, d("RightFoot", "RightToeBase").z))),
+    bootRollL: deg(Math.atan2(d("LeftFoot", "LeftToeBase").x, d("LeftFoot", "LeftToeBase").z)),
+    bootRollR: deg(Math.atan2(d("RightFoot", "RightToeBase").x, d("RightFoot", "RightToeBase").z)),
   };
 }
 
@@ -543,6 +553,9 @@ function makeFootIk(B, scene, nodeByShort, wrap, world, meshes) {
     const curY = footPos.y;
     const err = targetY - curY; // sole target vs ankle (boot ~2 cm is in targetY)
     if (Math.abs(err) < 0.004) return err;
+    /* A ground hit more than 15 cm from the boot is a prop's collider or a stair edge, not what he stands on: leave the
+       clip's own flat foot alone rather than fold the leg and tilt the boot to chase it. */
+    if (Math.abs(err) > 0.15) return err;
 
     // Pitch the thigh and shin in their local X to raise/lower the foot (two-bone approximation).
     const thighLen = B.Vector3.Distance(upPos, midPos) || 0.4;
@@ -564,7 +577,7 @@ function makeFootIk(B, scene, nodeByShort, wrap, world, meshes) {
     const step = Math.min(1, dt * 18);
     pitch(L.up, k * step);
     pitch(L.mid, bend * step);
-    pitch(L.foot, (-err * 0.35) * Math.min(1, dt * 12));
+    pitch(L.foot, Math.max(-0.08, Math.min(0.08, -err * 0.35)) * Math.min(1, dt * 12));
 
     // Plant lock in XZ while this foot is the lower one (stance)
         const after = L.foot.getAbsolutePosition();
@@ -575,14 +588,21 @@ function makeFootIk(B, scene, nodeByShort, wrap, world, meshes) {
       const dx = after.x - L.plant.x;
       const dz = after.z - L.plant.z;
       const slide = Math.hypot(dx, dz);
-      stats.slide = Math.max(stats.slide, slide);
-      if (slide > 0.01 && hips) {
-        // Nudge hips opposite the slide so the planted boot stays put
-        const inv = wrap.getWorldMatrix().clone().invert();
-        const pull = B.Vector3.TransformCoordinates(new B.Vector3(L.plant.x, after.y, L.plant.z), inv);
-        const now = B.Vector3.TransformCoordinates(after, inv);
-        hips.position.x += (pull.x - now.x) * 0.65;
-        hips.position.z += (pull.z - now.z) * 0.65;
+      if (slide > 0.25) {
+        /* He was placed, turned on the spot or carried (Take control, a cut, a respawn): the lock is stale, so plant
+           again here. Pulling the hips back to the old spot dragged his whole body metres away from where he stands. */
+        L.plant = null;
+      } else {
+        stats.slide = Math.max(stats.slide, slide);
+        if (slide > 0.01 && hips) {
+          // Nudge hips opposite the slide so the planted boot stays put (a few cm at most)
+          const inv = wrap.getWorldMatrix().clone().invert();
+          const pull = B.Vector3.TransformCoordinates(new B.Vector3(L.plant.x, after.y, L.plant.z), inv);
+          const now = B.Vector3.TransformCoordinates(after, inv);
+          const lim = 0.08 / Math.max(0.2, Math.abs(wrap.scaling.x));
+          hips.position.x += Math.max(-lim, Math.min(lim, (pull.x - now.x) * 0.65));
+          hips.position.z += Math.max(-lim, Math.min(lim, (pull.z - now.z) * 0.65));
+        }
       }
     }
     return residual;

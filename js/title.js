@@ -43,12 +43,12 @@ export function startTitle() {
   const WARM_WAIT_MS = 12000; // the longest the auto-start waits for the shader warm-up
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch") quiet = true;
+    if (id && id !== "title" && id !== "cold-start" && id !== "title-key-art" && id !== "title-progress" && id !== "street-teaches" && id !== "ask-markers" && id !== "phone-touch" && id !== "audio-check") quiet = true;
   } catch (e) { /* no location */ }
 
   const style = document.createElement("style");
   style.textContent = `
-.title-screen{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:max(26px,calc(env(safe-area-inset-top) + 18px)) max(20px,env(safe-area-inset-right)) max(30px,calc(env(safe-area-inset-bottom) + 22px)) max(20px,env(safe-area-inset-left));background:linear-gradient(180deg,rgba(6,9,16,.5) 0%,rgba(6,9,16,0) 30%,rgba(6,9,16,0) 58%,rgba(6,9,16,.82) 100%);color:#f6f1e8;font:500 1rem/1.4 Outfit,system-ui,sans-serif;opacity:1;transition:opacity .35s ease;text-align:center}
+.title-screen{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:max(26px,calc(env(safe-area-inset-top) + 18px)) max(20px,env(safe-area-inset-right)) max(30px,calc(env(safe-area-inset-bottom) + 22px)) max(20px,env(safe-area-inset-left));background:linear-gradient(180deg,rgba(6,9,16,.62) 0%,rgba(6,9,16,0) 34%,rgba(6,9,16,0) 52%,rgba(6,9,16,.88) 100%);color:#f6f1e8;font:500 1rem/1.4 Outfit,system-ui,sans-serif;opacity:1;transition:opacity .35s ease;text-align:center}
 .title-screen[hidden]{display:none}
 .title-screen.leaving{opacity:0;pointer-events:none}
 .title-screen .top,.title-screen .bottom{display:flex;flex-direction:column;align-items:center;width:100%}
@@ -64,23 +64,23 @@ export function startTitle() {
 .title-screen.fresh .clock{display:none}
 .title-screen .yday.left{color:#f0c27a}
 .title-screen .daily[hidden],.title-screen .left[hidden],.title-screen .yday[hidden],.title-screen .prog[hidden],.title-screen .nextgoal[hidden]{display:none}
-.title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:rgba(10,13,22,.62);color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .prog{margin:10px 0 0;padding:4px 14px;border-radius:999px;background:linear-gradient(180deg,rgba(38,30,22,.62),rgba(16,12,9,.72));color:#f6f1e8;font:600 .92rem/1.3 Outfit,system-ui,sans-serif;letter-spacing:.03em;text-shadow:0 1px 8px rgba(0,0,0,.9)}
 .title-screen .prog b{color:#f0c27a;letter-spacing:.12em;font-weight:700}
 .title-screen .nextgoal{margin:0;max-width:min(86vw,340px);color:#f0c27a;font:600 .95rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.9);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .yday{margin:4px 0 0;max-width:30em;color:rgba(246,241,232,.78);font:500 .88rem/1.3 Outfit,system-ui,sans-serif;text-shadow:0 2px 12px rgba(0,0,0,.8);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .title-screen .actions{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;opacity:0;animation:t-in .9s ease 3.2s forwards}
 .title-screen .row{display:flex;flex-wrap:nowrap;justify-content:center;gap:10px;width:100%}
-.title-screen button{white-space:nowrap;appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:rgba(14,16,22,.58);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s,border-color .15s,transform .15s}
-.title-screen button:hover{background:rgba(126,200,255,.16);border-color:rgba(126,200,255,.6)}
+.title-screen button{white-space:nowrap;appearance:none;min-height:48px;min-width:44px;padding:10px 22px;border-radius:999px;border:1px solid rgba(246,241,232,.32);background:linear-gradient(180deg,rgba(38,30,22,.78),rgba(16,12,9,.82));box-shadow:inset 0 1px 0 rgba(240,194,122,.25),0 4px 18px rgba(0,0,0,.35);color:#f6f1e8;font:600 1rem Outfit,system-ui,sans-serif;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.title-screen button:hover{background:rgba(240,194,122,.16);border-color:rgba(240,194,122,.6)}
 .title-screen button:active{transform:scale(.97)}
 .title-screen button:focus-visible{outline:2px solid #7ec8ff;outline-offset:3px}
 .title-screen button.play{width:min(86vw,340px);min-height:64px;font-size:1.3rem;letter-spacing:.04em;background:#f0c27a;border-color:#f0c27a;color:#141210;box-shadow:0 0 30px rgba(240,194,122,.35)}
 .title-screen button.play:hover{background:#f6d39b;transform:translateY(-1px)}
 .title-screen .row button{flex:0 1 auto}
 .title-screen button[aria-pressed="false"]{color:rgba(246,241,232,.6)}
-.title-screen .hint{font-size:.88rem;font-weight:600;letter-spacing:.04em;color:#f6f1e8;min-height:1.1em;padding:6px 14px;border-radius:999px;background:rgba(10,13,22,.62);text-shadow:0 1px 8px rgba(0,0,0,.9)}
+.title-screen .hint{font-size:.88rem;font-weight:600;letter-spacing:.04em;color:#f6f1e8;min-height:1.1em;padding:6px 14px;border-radius:999px;background:linear-gradient(180deg,rgba(38,30,22,.62),rgba(16,12,9,.72));text-shadow:0 1px 8px rgba(0,0,0,.9)}
 .title-screen .hint:empty{display:none}
-.title-screen .tset{width:min(92vw,360px);margin:0;padding:10px;border-radius:16px;background:rgba(10,13,22,.82);border:1px solid rgba(246,241,232,.22);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.title-screen .tset{width:min(92vw,360px);margin:0;padding:10px;border-radius:16px;background:linear-gradient(180deg,rgba(32,25,18,.9),rgba(14,11,8,.92));border:1px solid rgba(240,194,122,.28);display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .title-screen .tset[hidden]{display:none}
 .title-screen .tset .settings-pop{position:static;margin:0;padding:0;align-items:stretch}
 .title-screen .clock{position:absolute;top:max(10px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));margin:0;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(246,241,232,.6)}

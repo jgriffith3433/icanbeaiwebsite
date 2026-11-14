@@ -2669,6 +2669,137 @@ async function model(options, t) {
   t.progress(1);
 }
 
+/* ---------------- idle-pose: the default state holds a clean pose for 10 s and after every other clip ---------------- */
+// Acceptance: standing still for 10 s his hands hang at his sides in FRONT of the hip line (never behind his back), the
+// boots are flat and straight (pitch near the rest pose's, no roll), nothing pops; after a walk, a run, a jump and a
+// Lightning and a Rain cast he is back in the same pose within 2 s. A screenshot of the default state, on the roof with
+// control (desktop, and {"touch":true} at 390x844). The numbers come from skin.pose() on real frames.
+async function idlePose(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Idle pose (phone)" : "Idle pose");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model === "small-weather", 45000, "his model to load").catch(() => {});
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok").catch(() => {});
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  const WX = window.day.weather;
+  if (!C || !skinNow() || !skinNow().pose) {
+    t.problem("blocker", "Small Weather's model isn't on for idle-pose");
+    return;
+  }
+  if (touch) {
+    try { window.day.look.quality("low"); } catch (e) { /* */ }
+    try { C.touch(true); } catch (e) { /* */ }
+  }
+  const day = window.day.today();
+  const outside = carSideMoment(day) || quietMoment(day);
+  scrubTo(outside.start + 0.2);
+  clickSpeed(1);
+  if (WX && WX.set) WX.set("rain", 0.2, "key"); // not clear: the idle must stay the plain idle (no look-up)
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  if (touch) {
+    const btn = document.getElementById("control-btn") || document.querySelector("#take-control,.take-control");
+    if (btn) {
+      await tapEl(btn);
+      btn.click();
+    } else pressKey("Enter");
+  } else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 5000, "Take control");
+  const sk = () => skinNow();
+  const read = () => {
+    const m = sk() && sk().pose();
+    if (!m) return null;
+    return {
+      fwd: Math.min(m.handFwdL, m.handFwdR),
+      out: Math.min(m.handOutL, m.handOutR),
+      pitch: [Math.min(m.bootPitchL, m.bootPitchR), Math.max(m.bootPitchL, m.bootPitchR)],
+      roll: Math.max(Math.abs(m.bootRollL), Math.abs(m.bootRollR)),
+      lean: m.lean,
+      neck: m.neck,
+      m,
+    };
+  };
+  const judge = (label, r, pose) => {
+    if (!r) return;
+    t.event(`idle-pose-${label.toLowerCase().replace(/\s+/g, "-")}`, `${sk().clip()}: hands ${r.fwd.toFixed(2)} m in front of the hips, ${r.out.toFixed(2)} m out, boots pitch ${r.pitch.map((v) => v.toFixed(0)).join("..")} roll ${r.roll.toFixed(0)}`);
+    if (pose && sk().clip() !== "idle") t.problem("bug", `${label}: his model played ${sk().clip()}, not idle`);
+    if (r.fwd < 0.03) t.problem("bug", `quality.animation: ${label}: a hand is ${r.fwd.toFixed(2)} m from the hip line, behind his back`);
+    if (r.out < 0.2) t.problem("bug", `quality.animation: ${label}: a hand is only ${r.out.toFixed(2)} m from his midline`);
+    if (r.pitch[0] < -24 || r.pitch[1] > -6) t.problem("bug", `quality.animation: ${label}: boots are not flat (pitch ${r.pitch.map((v) => v.toFixed(0)).join("..")} deg)`);
+    if (r.roll > 8) t.problem("bug", `quality.animation: ${label}: a boot is turned ${r.roll.toFixed(0)} deg off straight ahead (twisted)`);
+  };
+  t.progress(0.1);
+
+  // the default state: 10 s standing, sampled every 100 ms (a screenshot at the start and the end)
+  await sleep(1200);
+  t.scene("Idle default");
+  const lim = { fwd: 9, out: 9, pitch: [99, -99], roll: 0 };
+  let prev = null;
+  let pop = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < 10000) {
+    const r = read();
+    if (r) {
+      lim.fwd = Math.min(lim.fwd, r.fwd);
+      lim.out = Math.min(lim.out, r.out);
+      lim.pitch = [Math.min(lim.pitch[0], r.pitch[0]), Math.max(lim.pitch[1], r.pitch[1])];
+      lim.roll = Math.max(lim.roll, r.roll);
+      if (prev) pop = Math.max(pop, Math.abs(r.lean - prev.lean), Math.abs(r.neck - prev.neck), Math.abs(r.m.hipYaw - prev.m.hipYaw), Math.abs(r.m.shoulderYaw - prev.m.shoulderYaw));
+      prev = r;
+    }
+    await sleep(100);
+  }
+  judge("Idle 10 s", lim, true);
+  t.metric("idle.handFwdMinM", Math.round(lim.fwd * 100) / 100);
+  t.metric("idle.bootPitchMin", Math.round(lim.pitch[0]));
+  t.metric("idle.bootPitchMax", Math.round(lim.pitch[1]));
+  t.metric("idle.bootRollMaxDeg", Math.round(lim.roll * 10) / 10);
+  t.metric("idle.popDeg", Math.round(pop * 10) / 10);
+  if (pop > 6) t.problem("bug", `quality.animation: the idle popped ${pop.toFixed(1)} deg between two 100 ms samples`);
+  t.scene("Idle after 10 s");
+  await sleep(300);
+  t.progress(0.4);
+
+  // back to idle from a walk, a run, a jump, and two weather calls
+  const back = async (label, act) => {
+    await act();
+    await sleep(2000);
+    t.scene(label);
+    judge(label, read(), true);
+  };
+  await back("Idle after walk", async () => {
+    keyDown("w");
+    await sleep(1400);
+    keyUp("w");
+  });
+  await back("Idle after run", async () => {
+    keyDown("Shift", { shiftKey: true });
+    keyDown("w", { shiftKey: true });
+    await sleep(1000);
+    keyUp("Shift");
+    keyUp("w");
+  });
+  await back("Idle after jump", async () => {
+    keyDown(" ");
+    await sleep(160);
+    keyUp(" ");
+    await sleep(900);
+  });
+  t.progress(0.7);
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await back("Idle after Lightning", async () => {
+    keyDown("e");
+    await sleep(900);
+    keyUp("e");
+    await sleep(500);
+  });
+  if (P && P.abilities && P.abilities.reset) P.abilities.reset(100);
+  await back("Idle after Rain", async () => {
+    pressKey("r");
+    await sleep(1200);
+  });
+  t.progress(1);
+}
+
 /* ---------------- clip-poses: every clip he plays, at mid-clip, never twisted; cross-fades without a pop ---------------- */
 // Acceptance: idle at two different times is upright (spine and neck within a few degrees, pelvis and shoulders square,
 // hands apart); walk, run, jump, fall/float, cast and throw each hold a screenshot with no twisted limbs; switching idle
@@ -10750,6 +10881,111 @@ function audioReport() {
     casts: X ? X.casts.slice() : [],
   };
 }
+/* ---------------- morning-beats: the day told in animation and sound, no speech pill ----------------
+   Setup (named): he is on his day (let go if driving him), the clock is stepped through 7:30-8:15 in 30 s jumps so each step's
+   frame plays on the next frame. Reads `day:beat` (js/sfx.js: alarm-off, snooze, feet-down, stretch, coffee, sip, stair, roof)
+   and the hidden take-over pill. Events morning-beat-<kind>, morning-beats; metric morningBeats. */
+async function morningBeats(options, t) {
+  const D = window.day;
+  const C = D.control;
+  if (!D.sfx || !D.sfx.beats) { t.problem("bug", "day.sfx.beats is missing"); return; }
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  try { if (D.title && D.title.quiet) D.title.quiet(); } catch (e) { /* ok */ }
+  const seen = {};
+  const onBeat = (e) => { const k = e.detail && e.detail.kind; if (k && !seen[k]) { seen[k] = true; t.event("morning-beat-" + k, `${D.now().minutes.toFixed(1)} min: ${k}`); } };
+  window.addEventListener("day:beat", onBeat);
+  const start = 7.5;
+  for (let h = start; h < 8.3; h += 0.5 / 60) {
+    D.jump(`${Math.floor(h)}:${String(Math.floor((h % 1) * 60)).padStart(2, "0")}`);
+    await sleep(110);
+  }
+  window.removeEventListener("day:beat", onBeat);
+  const want = ["alarm-off", "stretch", "coffee", "stair", "roof"];
+  const got = Object.keys(seen);
+  t.metric("morningBeats", got.length);
+  t.event("morning-beats", `heard ${got.join(", ")}`);
+  want.forEach((k) => { if (!seen[k]) t.problem("bug", `The morning never played its ${k} beat`); });
+  const pill = $("moment-line");
+  if (pill && !pill.hidden && getComputedStyle(pill).display !== "none") t.problem("bug", "A take-over speech pill is on screen");
+  if (document.documentElement.scrollWidth > innerWidth + 1) t.problem("bug", "The page scrolls sideways");
+}
+/* ---------------- first-rain: clarity. One glowing Rain icon and a pulsing "Tap the street" arrow, the other four verbs hidden until Rain is used once ----------------
+   Needs ?playtest=first-rain ({"touch":true} = 390x844 by touch). Setup (named): the saved first-rain flag, the street lesson and
+   the cold open cleared, the title quiet. Real input: Take control (the button by touch), a tap on the canvas (the street) which casts Rain.
+   Events first-rain-state (visible verbs, sizes, cue, scroll), first-rain-refused, first-rain-cast, first-rain-open; metrics
+   firstRainVisibleVerbs (1 at the start, 5 after), firstRainMinPx, firstRainScrollX. */
+function firstRainBar() {
+  const out = [];
+  document.querySelectorAll("#abilitybar .ab").forEach((b) => {
+    const r = b.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && getComputedStyle(b).display !== "none") out.push({ id: b.id.replace("ability-", ""), w: Math.round(r.width), h: Math.round(r.height) });
+  });
+  return out;
+}
+async function firstRain(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Phone: first Rain" : "First Rain");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day;
+  const P = window.powers || D.powers;
+  const C = D.control;
+  const F = D.firstrain;
+  if (!F || !P) { t.problem("bug", "day.firstrain or powers is missing"); return; }
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  try { F.reset(); if (D.street && D.street.stop) D.street.stop("check"); if (D.title && D.title.quiet) D.title.quiet(); } catch (e) { /* ok */ }
+  if (touch) { document.documentElement.classList.add("touch-ui"); if (C.touch) C.touch(true); }
+  for (let k = 0; k < 4 && C.mode() !== "control"; k++) {
+    if (k > 0 && D.jump) D.jump("19:00");
+    await sleep(400);
+    if (touch) { const tk = $("control"); if (tk && !tk.disabled) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+    await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  }
+  if (C.mode() !== "control") { t.problem("bug", "Take control never handed him over"); return; }
+  if (C.place) C.place(-21, 0.5, 1.5708, {});
+  await t.until(() => document.documentElement.classList.contains("first-rain"), 3000, "the first-Rain bar").catch(() => {});
+  await sleep(600);
+  try { P.abilities.reset && P.abilities.reset(100); } catch (e) { /* ok */ }
+  const bar = firstRainBar();
+  const cue = $("first-rain-cue");
+  const cueOn = !!cue && cue.getBoundingClientRect().width > 0;
+  const scrollX = Math.max(0, document.documentElement.scrollWidth - window.innerWidth);
+  const minPx = bar.length ? Math.min(...bar.map((b) => Math.min(b.w, b.h))) : 0;
+  t.metric("firstRainVisibleVerbs", bar.length);
+  t.metric("firstRainMinPx", minPx);
+  t.metric("firstRainScrollX", scrollX);
+  t.event("first-rain-state", `visible verbs ${JSON.stringify(bar)}, cue ${cueOn ? "shown" : "MISSING"}, scrollX ${scrollX}`);
+  if (bar.length !== 1 || bar[0].id !== "rain") t.problem("bug", `The first screen shows ${bar.length} verbs (${bar.map((b) => b.id).join(", ")}); it should be Rain alone`);
+  if (!cueOn) t.problem("bug", "The pulsing 'Tap the street' arrow isn't on screen");
+  if (minPx < 44) t.problem("bug", `The Rain button is ${minPx} px (44 minimum)`);
+  if (scrollX > 1) t.problem("bug", `The page scrolls sideways by ${scrollX} px`);
+  const hint = document.querySelector(".control-hint");
+  if (hint && !hint.hidden && getComputedStyle(hint).display !== "none") t.problem("bug", "The hint paragraph is still on screen next to the Rain icon");
+  t.progress(0.4);
+
+  // a hidden verb is refused
+  const refused = !P.command("bolt", "key");
+  t.event("first-rain-refused", `Lightning ${refused ? "refused (hidden until Rain)" : "ACCEPTED"}`);
+  if (!refused) t.problem("bug", "Lightning worked before Rain was used");
+
+  // the tap on the street casts Rain
+  const cv = document.querySelector("canvas");
+  const rc = cv.getBoundingClientRect();
+  const x = rc.left + rc.width / 2;
+  const y = rc.top + rc.height * 0.62;
+  const sendPtr = (type) => cv.dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: touch ? "touch" : "mouse", isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true }));
+  sendPtr("pointerdown");
+  await sleep(90);
+  sendPtr("pointerup");
+  const cast = await t.until(() => !F.now().on, 2500, "Rain from the street tap").then(() => true).catch(() => false);
+  t.event("first-rain-cast", cast ? "a tap on the street called Rain" : "the tap did not call Rain");
+  if (!cast) t.problem("bug", "Tapping the street didn't call Rain");
+  await sleep(600);
+  const after = firstRainBar();
+  t.metric("firstRainVisibleVerbs", after.length);
+  t.event("first-rain-open", `verbs after Rain: ${after.map((b) => b.id).join(", ")}`);
+  if (after.length < 5) t.problem("bug", `After the first Rain the bar shows ${after.length} verbs (5 expected)`);
+  t.progress(1);
+}
 async function audioCheck(options, t) {
   const touch = !!(options && options.touch);
   t.scene(touch ? "Phone: first tap" : "First tap");
@@ -10760,7 +10996,14 @@ async function audioCheck(options, t) {
   if (!D.audio || !D.score || !D.sfx || !P) { t.problem("bug", "day.audio, day.score, day.sfx or powers is missing"); return; }
   if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
   if (touch) { document.documentElement.classList.add("touch-ui"); if (C.touch) C.touch(true); }
-  if (D.title && D.title.quiet) D.title.quiet();
+  // A new player's first minute is the scenario's start: the title hands him to the roof with Rain armed (named setup: the saved
+  // opening keys cleared so the cold open is pending). If it can't run, the old quiet title applies.
+  let cold = false;
+  try {
+    if (C.mode() === "schedule" && D.coldopen && !D.coldopen.now().on) { ["icanbe.opening", "icanbe.tutorial", "icanbe.firstrain", "icanbe.street"].forEach((k) => localStorage.removeItem(k)); if (D.firstrain && D.firstrain.reset) D.firstrain.reset(); D.coldopen.arm(); cold = D.coldopen.pending(); }
+    cold = cold || (D.coldopen && D.coldopen.now().on);
+  } catch (e) { cold = false; }
+  if (!cold && D.title && D.title.quiet) D.title.quiet();
   const btn = $("sound");
   const r0 = btn.getBoundingClientRect();
   t.metric("audioToggleMinPx", Math.round(Math.min(r0.width, r0.height)));
@@ -10772,6 +11015,11 @@ async function audioCheck(options, t) {
 
   // the first tap: anywhere (the canvas), nothing else touched
   const cv = document.querySelector("canvas") || document.body;
+  // frame gaps from the first tap on: the freeze a tap, Take control or a first cast must not cause (warm-up and preload sit behind the loading bar)
+  const gaps = { tap: 0, take: 0, cast: 0, phase: "tap" };
+  let lastF = performance.now();
+  let gapOn = true;
+  (function gapLoop() { const n = performance.now(); gaps[gaps.phase] = Math.max(gaps[gaps.phase], n - lastF); lastF = n; if (gapOn) requestAnimationFrame(gapLoop); })();
   const t0 = performance.now();
   if (touch) await tapEl(cv); else await clickEl(cv);
   const heard = await t.until(() => audioReport().cityPlaying && audioReport().buses.ambience > 0, 2000, "the city ambience").then(() => true).catch(() => false);
@@ -10783,10 +11031,79 @@ async function audioCheck(options, t) {
   if (!rep.on) t.problem("bug", "The first tap changed Sound to off");
   t.progress(0.25);
 
+  // The cold open (if it ran): he is on the roof with Rain armed; one real tap (the Rain button by touch, R on a keyboard) is the first cast
+  if (cold) {
+    if (D.title && D.title.showing() && D.title.play) D.title.play("tap");
+    await t.until(() => D.coldopen.now().phase === "waiting" || D.coldopen.now().cast != null, 20000, "the cold open's prompt").catch(() => {});
+    if (D.coldopen.now().phase === "waiting") {
+      const rb = $("coldopen-bolt");
+      if (touch && rb && !rb.hidden) { await tapEl(rb); } else pressKey("r");
+      t.milestone && t.milestone("first-input-accepted", "one tap: Rain");
+      await t.until(() => D.coldopen.now().cast != null, 3000, "the first Rain").catch(() => {});
+      if (D.coldopen.now().cast != null) t.milestone && t.milestone("first-success", "first Rain");
+    }
+    t.event("audio-cold-open", `cold open ${D.coldopen.now().phase}, first input ${D.coldopen.now().firstInput}s, cast ${D.coldopen.now().cast}s`);
+    if (D.coldopen.now().cast == null) t.problem("bug", "The first tap on the roof didn't cast Rain");
+    await t.until(() => !D.coldopen.now().on, 25000, "the story line and the cold open's end").catch(() => {});
+  }
+
   // take him (Enter, or the button by touch) and cast the five
-  if (touch) { const tk = $("control") || document.querySelector("#take-control,[data-take]"); if (tk) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+  if (C.mode() === "control") { /* already his */ } else if (touch) { const tk = $("control") || document.querySelector("#take-control,[data-take]"); if (tk) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+  gaps.phase = "take";
   await t.until(() => C.mode() === "control", 6000, "Take control").catch(() => {});
+  // He may be driving (Take control is disabled in the car) or in bed: the same fallback the cold open uses, the clock to dusk
+  // where he is on foot (named setup shortcut), then the real button / Enter again.
+  for (let k = 0; k < 3 && C.mode() !== "control"; k++) {
+    if (D.jump) D.jump("19:00");
+    await sleep(500);
+    if (touch) { const tk = $("control"); if (tk && !tk.disabled) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+    await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  }
+  if (C.mode() !== "control") t.problem("bug", "Take control never handed him over, so no cast could be tried");
+  t.progress(0.3);
+
+  // The first cast, on the roof: every verb open, he stands on the apartment roof, a bolt lands on the street beside a
+  // pedestrian and rain follows. Each must be accepted, the strike must show on the street, and a pedestrian must react.
+  await sleep(300);
+  { const bar = firstRainBar(); t.metric("firstRainVisibleVerbs", bar.length); t.event("first-rain-state", `first screen under control: verbs ${bar.map((b) => b.id).join(", ")}, cue ${$("first-rain-cue") && $("first-rain-cue").getBoundingClientRect().width > 0 ? "shown" : "none"}`); }
+  try { if (D.firstrain) D.firstrain.skip(); } catch (e) { /* ok */ }
+  try { if (P.gate) P.gate(null); if (P.aimAt) P.aimAt(null); if (D.street && D.street.stop) D.street.stop("check"); } catch (e) { /* ok */ }
+  try { ["bolt", "rain", "wind", "fog", "sunbreak"].forEach((id) => P.abilities.unlock && P.abilities.unlock(id)); } catch (e) { /* ok */ }
+  if (C.place) C.place(-21, 0.5, 1.5708, {});
+  await sleep(400);
+  gaps.phase = "cast";
   const refill = () => { try { P.abilities && P.abilities.reset && P.abilities.reset(100); } catch (e) { /* ok */ } };
+  refill();
+  const crowdNow = () => (D.crowd && D.crowd.info ? D.crowd.info() : {});
+  const ppl = D.crowd && D.crowd.positions ? D.crowd.positions().people : [];
+  const me0 = C.state();
+  const near = ppl.map((p) => ({ p, d: Math.hypot(p.x - me0.x, p.z - me0.z) })).filter((q) => q.d > 6).sort((a, b) => a.d - b.d)[0];
+  if (near && P.aimAt) P.aimAt({ x: near.p.x, y: 0, z: near.p.z });
+  const strikes = [];
+  const onStrike = (e) => strikes.push((e && e.detail) || {});
+  window.addEventListener("day:strike", onStrike);
+  const okBolt = P.command("bolt", touch ? "touch" : "key");
+  const reacted = await t.until(() => { const c = crowdNow(); return (c.flinching || 0) > 0 || (c.lookingUp || 0) > 0 || (c.reacting || 0) > 0; }, 3000, "a pedestrian's reaction").then(() => true).catch(() => false);
+  window.removeEventListener("day:strike", onStrike);
+  if (P.aimAt) P.aimAt(null);
+  const st = P.now && P.now().strike;
+  t.event("first-cast-bolt", `Lightning ${okBolt ? "accepted" : "REFUSED"}; ${strikes.length} strike events; street hit ${st ? JSON.stringify({ x: Math.round(st.x), z: Math.round(st.z) }) : "none"}`);
+  t.event("first-cast-reaction", reacted ? `a pedestrian reacted: ${JSON.stringify({ flinching: crowdNow().flinching, lookingUp: crowdNow().lookingUp, reacting: crowdNow().reacting })}` : "no pedestrian reacted");
+  if (!okBolt) t.problem("bug", "The first Lightning cast on the roof was refused");
+  else if (!strikes.length && !st) t.problem("bug", "The first Lightning cast left no visible strike on the street");
+  if (okBolt && !reacted) t.problem("bug", "No pedestrian reacted to the first bolt");
+  await sleep(700);
+  refill();
+  const okRain = P.command("rain", touch ? "touch" : "key");
+  const rainOn = await t.until(() => { const w = window.weather && window.weather.now ? window.weather.now() : {}; return w.state === "rain" || (w.rain || 0) > 0.2; }, 3000, "rain").then(() => true).catch(() => false);
+  t.event("first-cast-rain", `Rain ${okRain ? "accepted" : "REFUSED"}; sky ${rainOn ? "rains" : "did not change"}; crowd reaction ${crowdNow().reaction || "none"}`);
+  if (!okRain) t.problem("bug", "The first Rain cast on the roof was refused");
+  t.metric("firstCastAccepted", okBolt && okRain ? 1 : 0);
+  await sleep(700);
+  { const inf = D.sfx.info(); const dec = inf.decoded || { power: [], cast: [] };
+    t.event("audio-predecode", `decoded before the first verb cast: power ${dec.power.join(",") || "none"}; cast clips ${dec.cast.join(",") || "none"}; quiet room loop ${inf.roomTone ? "running" : "MISSING"}`);
+    if (!inf.roomTone) t.problem("bug", "The quiet loop under idle moments isn't running");
+    if (!(dec.power.includes("gale-loop") && dec.power.includes("sun-shimmer") && dec.cast.includes("rain") && dec.cast.includes("fog"))) t.problem("warning", "Not every verb's clip was decoded before the first cast"); }
   const seen = {};
   for (const [name, id] of [["lightning", "bolt"], ["rain", "rain"], ["gale", "gale"], ["fog", "fog"], ["sunbreak", "sunbreak"]]) {
     refill();
@@ -10795,6 +11112,7 @@ async function audioCheck(options, t) {
     await t.until(() => D.sfx.info().casts.some((c, i) => i >= n0 - 0 && c.power === name), 2500, `the ${name} cast sound`).catch(() => {});
     const c = D.sfx.info().casts.filter((x) => x.power === name).pop();
     seen[name] = c || null;
+    if (!ok) t.problem("bug", `${name}: the cast command was refused`);
     t.event("audio-cast-" + name, c ? `${name}: ${c.source}${c.file ? " " + c.file : ""}` : `${name}: no cast sound (command ${ok ? "accepted" : "refused"})`);
     if (!c) t.problem("bug", `${name} played no cast sound`);
     else if (c.source !== "file") t.problem("warning", `${name}'s cast sound was the synth stand-in, not a clip (the clip hadn't decoded yet)`);
@@ -10802,6 +11120,16 @@ async function audioCheck(options, t) {
   }
   const keys = Object.keys(seen).filter((k) => seen[k]);
   const sig = new Set(keys.map((k) => seen[k].file || k));
+  gapOn = false;
+  const rnd = (v) => Math.round(v);
+  t.metric("firstTapWorstMs", rnd(gaps.tap));
+  t.metric("takeControlWorstMs", rnd(gaps.take));
+  t.metric("castWorstMs", rnd(gaps.cast));
+  let draws = -1;
+  try { const eng = D.world().scene.getEngine(); draws = (eng._drawCalls && eng._drawCalls.current) || -1; } catch (e) { /* none */ }
+  t.metric("sceneDrawCalls", draws);
+  t.event("first-tap-hitch", `worst frame gap: first tap ${rnd(gaps.tap)} ms, Take control ${rnd(gaps.take)} ms, the five casts ${rnd(gaps.cast)} ms; ${draws} draw calls; warm-up idle ${!!window.__warmIdle}`);
+  if (Math.max(gaps.tap, gaps.take, gaps.cast) > 250) t.problem("bug", `A frame took ${rnd(Math.max(gaps.tap, gaps.take, gaps.cast))} ms around the first tap, Take control or a cast (250 ms maximum): shaders or assets weren't warmed behind the loading bar`);
   t.metric("audioCastsDistinct", sig.size);
   t.event("audio-casts", `${keys.length}/5 casts heard, ${sig.size} distinct sounds`);
   if (sig.size < 5) t.problem("bug", `The five casts must each play a distinct sound (${sig.size} distinct)`);
@@ -10833,6 +11161,54 @@ async function audioCheck(options, t) {
   if (touch) await tapEl(btn); else await clickEl(btn);
   await sleep(300);
   if (btn.getAttribute("aria-pressed") !== "true") t.problem("bug", "The sound toggle didn't turn Sound back on");
+  // menus-ui: while he is the player's, Let go, Rain (weather), Neighbors (a phone shows it as a pip) and Episodes are in the thumb's reach
+  // (the lower 55% of a portrait phone), each at least 44 px, and nothing scrolls sideways
+  if (touch && innerHeight > innerWidth) {
+    // Neighbors and Episodes sit behind one Menu button (js/phonemenu.js): tap it, they must show, in reach, 44 px
+    const reach = [["#control", "Let go"], ["#weather-btn", "Rain"], ["#phone-menu-btn", "Menu"]];
+    const out = [];
+    let seen = 0;
+    const pm = document.getElementById("phone-menu-btn");
+    if (!pm || !hudVisible(pm)) out.push("the Menu button isn't on screen");
+    else {
+      if (hudVisible(document.getElementById("episodes"))) out.push("Episodes is still on screen outside the menu");
+      await tapEl(pm);
+      await sleep(250);
+      if (!hudVisible(document.getElementById("episodes"))) out.push("tapping Menu didn't show Episodes");
+      reach.push(["#episodes", "Episodes in the menu"]);
+      if (!isPublicView()) reach.push(["#neighbors-btn", "Neighbors in the menu"]);
+      t.event("phone-menu-open", "Menu tapped: Episodes" + (isPublicView() ? "" : " and Neighbors") + " shown");
+    }
+    // the five verbs: one arc at the bottom right, each 44 px or more with its cost label at least 12 px
+    const verbs = [...document.querySelectorAll(".abilitybar .ab[data-verb]")].filter((b) => hudVisible(b));
+    verbs.forEach((b) => {
+      const r = b.getBoundingClientRect();
+      if (r.left < innerWidth * 0.45 || r.top < innerHeight * 0.4) out.push(`verb ${b.dataset.ability} is outside the bottom-right thumb arc`);
+      if (r.width < 43.5 || r.height < 43.5) out.push(`verb ${b.dataset.ability} is ${Math.round(r.width)}x${Math.round(r.height)}px`);
+      const c = b.querySelector(".c");
+      if (c && hudVisible(c) && parseFloat(getComputedStyle(c).fontSize) < 12) out.push(`verb ${b.dataset.ability}'s cost label is under 12 px`);
+    });
+    if (verbs.length) t.event("verb-arc", `${verbs.length} verbs in the bottom-right arc, 44 px or more, labels 12 px or more`);
+    t.metric && t.metric("phoneRenderScale", window.day.look && window.day.look.info ? (window.day.look.info().scaling || 0) : 0);
+    reach.forEach(([sel, name]) => {
+      const el = document.querySelector(sel);
+      if (!el || !hudVisible(el)) return;
+      seen++;
+      const r = el.getBoundingClientRect();
+      if (r.top < innerHeight * 0.45) out.push(`${name} is ${Math.round(r.top)}px from the top (out of thumb reach)`);
+      if (r.width < 43.5 || r.height < 43.5) out.push(`${name} is ${Math.round(r.width)}x${Math.round(r.height)}px`);
+    });
+    if (document.documentElement.scrollWidth > innerWidth + 1) out.push("the page scrolls sideways");
+    out.forEach((m) => t.problem("bug", "Menus (phone): " + m));
+    if (!out.length) t.event("menus-thumb-reach", `${seen} controls in the lower 55%, all 44 px or more, no sideways scroll`);
+    if (window.day.phoneMenu) window.day.phoneMenu.close();
+    checkHud(t, "audio-check: phone controls");
+  }
+  // the morning's own sounds: alarm, stretch, coffee, the stair and the roof, each a beat of its own (no speech pill)
+  try {
+    if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+    await morningBeats(options, t);
+  } catch (e) { t.problem("bug", "morning beats: " + (e && e.message)); }
   const fin = audioReport();
   t.event("audio-report", JSON.stringify({ on: fin.on, buses: fin.buses, ambience: fin.ambience, bed: fin.bed, casts: fin.casts.length }));
   t.progress(1);
@@ -12458,6 +12834,7 @@ installPlaytest({
     { id: "day", title: "The whole day at 1200× (every block must start)", seconds: 90, tags: ["full"] },
     { id: "analytics", title: "Camera, speeds, day bar and keys with the analytics events going out, then the 3-minute question, dismissed", seconds: 260, tags: ["analytics"] },
     { id: "model", title: "Small Weather's 3D model: on his day it walks, idles and works; under control (Enter) it idles, walks (WASD), runs (Shift), jumps, falls and floats (Space, held); Esc and he walks back", seconds: 80, tags: ["model"], description: "Waits for models/small-weather.glb. The day bar jumps to a walk, a still moment and work at the desk (setup shortcuts); the rest is real keys." },
+    { id: "idle-pose", title: "Idle pose: in the default state his hands hang at his sides (not behind his back), boots flat and straight for 10 s with no pop, and he returns to that pose after a walk, a run, a jump and Lightning and Rain casts; the phone (390x844) the same", seconds: 45, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=idle-pose ({\"touch\":true} for 390x844). Takes control outside, stands 10 s (screenshots at the start and the end), then walk, run, jump, E and R, each followed by 2 s of idle and a screenshot. skin.pose() reads each hand's distance in front of the hip line and each boot's pitch and roll; metrics idle.handFwdMinM, idle.bootPitchMin/Max, idle.bootRollMaxDeg, idle.popDeg." },
     { id: "clip-poses", title: "Clip poses: idle at two times, walk, run, jump, float, Lightning and Rain casts and his day's clips each read upright and untwisted at mid-clip; switching clips never snaps the pose; the phone (390x844) the same", seconds: 70, tags: ["model", "control", "quality", "phone"], description: "Load with ?playtest=clip-poses ({\"touch\":true} for 390x844). Takes control outside, stands (idle early, idle later), W, Shift+W, back to idle, Space jump and hold to float, E then R casts, then his day (sit, type, window). Each scene is a screenshot at mid-clip; skin.pose() reads spine/neck lean, pelvis/shoulder yaw, knees and hand gap on the frame and files quality.animation problems; metric quality.clipPopDeg is the worst pose change between two 33 ms samples." },
     { id: "hero-move", title: "Hero move: feet plant on the apt stairs and ramp (slide under 5 cm, float under 3 cm), Lightning and Rain show distinct wind-up clips, idle under a clear sky looks up; on phone IK and clips run on low quality at ≥30 fps", seconds: 150, tags: ["model", "control", "feel", "phone", "quality"], description: "Load with ?playtest=hero-move ({\"touch\":true} for 390x844). Setup: day bar outside, clear sky, full Charge, control.place at the apt ramp. Real WASD up the ramp and across the roof, E then R for wind-ups, stand still 20 s for look-up. Events foot-plant / windups-distinct / lookup-ok / phone-fps-ok; metrics quality.footSlideM, quality.footFloatM, phone.fpsAvg." },
     { id: "control", title: "Take control (Enter): walk, sprint, orbit the camera, a jump and two in the air, float; Esc and he walks back to his day; then the phone's touch stick and jump button", seconds: 100, tags: ["control"], description: "Starts at a quiet moment at home (the day bar). On a desktop-sized window the phone part shows the touch controls with day.control.touch(true)." },
@@ -12472,6 +12849,8 @@ installPlaytest({
     { id: "night-glow", title: "District glow after dusk: windows light on schedules with interior-mapped rooms, neon flickers, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares; wet street uses SSR on high and a reflection probe on low; a bolt flickers windows", seconds: 160, tags: ["look", "photos", "phone", "feel"], description: "Day bar beside the car (setup), Enter / Take control tap, scrub 17→01 for window counts, walk the avenue at 22:00, key 3 for rain reflections. Events night-glow-schedule / -street / -reflect / -fps / -flicker; metrics windowOnDusk, windowOnNight, windowOnLate, dynamicLights, nightNeonSigns, nightReflect, nightFps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
+    { id: "first-rain", title: "First Rain: after Take control the ability bar is one glowing Rain icon with a pulsing Tap the street arrow (the other four verbs hidden and refused); a tap on the street calls Rain and the bar opens to five", seconds: 40, tags: ["clarity", "phone", "first-minute"], description: "Load with ?playtest=first-rain ({\"touch\":true} for 390x844). Setup: first-rain flag, street lesson cleared, title quiet. Real input: Take control, a tap on the street. Events first-rain-state / first-rain-refused / first-rain-cast / first-rain-open; metrics firstRainVisibleVerbs, firstRainMinPx, firstRainScrollX." },
+    { id: "morning-beats", title: "The morning in animation and sound: the alarm rings and is switched off, he stretches, makes coffee, climbs to the roof; each step has its own sound and no speech pill", seconds: 40, tags: ["story", "audio"], description: "Load with ?playtest=morning-beats. Setup: the clock stepped 7:30-8:15 in 30 s jumps. Events morning-beat-<kind>, morning-beats; metric morningBeats." },
     { id: "audio-check", title: "Audio from the first tap: sound is on by default, the city ambience plays within 2 s of the first tap with no settings change, Rain, Gale, Fog, Sun break and Lightning each play a distinct cast sound, music and ambience duck at least 6 dB under a voice line so the line is the loudest bus, and the 44 px sound toggle keeps the player's mute", seconds: 60, tags: ["audio", "phone", "first-minute"], description: "Load with ?playtest=audio-check ({\"touch\":true} for 390x844). Setup: saved mute cleared, title quiet. Real input: one tap or click on the canvas, Enter or the Take control button, taps on the sound toggle; casts by the named shortcut powers.command; a voiced line by voice.say. Events audio-before-tap / audio-ambience / audio-cast-<power> / audio-casts / audio-duck / audio-report; metrics audioAmbienceMs, audioCastsDistinct, audioDuckMusicDb, audioDuckAmbienceDb, audioToggleMinPx. Run at 1280x720 and 390x844 touch." },
     { id: "stem-score", title: "Stem score: Play opens on the 4-note motif (title, then the cold open), three stems stream after the first input and play in sync, a held bolt raises the tension layer within one bar, a tornado brings the storm layer, an episode success plays the resolution sting; on a phone the stems stay under 1.5 MB", seconds: 90, tags: ["audio", "music", "phone", "opening"], description: "Load with ?playtest=stem-score. Setup: every icanbe.* key cleared, cold open armed, title up. Real input: click or tap Play, hold the bolt (E or the Bolt button). Shortcuts: powers.command('tornado'), a day:episode score event. Events stem-motif-title / -coldopen / -ready / -windup / -storm / -sting / -transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. Run at 1280x720 and 390x844 touch." },
     { id: "day-sound", title: "Diegetic day soundscapes: at 1200× the sound log shows distinct beds for home morning, commute, office, park lunch, evening TV and night; the car radio names a weather the player called today; office keyboard starts within 3 s of the desk and stops when he leaves; on phone low quality at most 3 loops play at once", seconds: 180, tags: ["audio", "phone", "story"], description: "Load with ?playtest=day-sound ({\"touch\":true} for 390x844). Sound on (real pointer), 1200× through the day, scrub to commute and desk. Events day-scape-* / day-radio / day-keyboard-on / day-keyboard-off / day-phone-cap; metrics dayScapes, dayMaxLoops, dayKeyboardSec, dayPhoneLoops." },
@@ -12562,6 +12941,7 @@ installPlaytest({
       else if (id === "model") await model(options, t);
       else if (id === "hero-move") await heroMove(options, t);
       else if (id === "clip-poses") await clipPoses(options, t);
+      else if (id === "idle-pose") await idlePose(options, t);
       else if (id === "city") await city(options, t);
       else if (id === "look") await look(options, t);
       else if (id === "render-grade") await renderGrade(options, t);
@@ -12590,6 +12970,8 @@ installPlaytest({
       else if (id === "power-sfx") await powerSfx(options, t);
       else if (id === "stem-score") await stemScore(options, t);
       else if (id === "audio-check") await audioCheck(options, t);
+      else if (id === "morning-beats") await morningBeats(options, t);
+      else if (id === "first-rain") await firstRain(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "ui-art-kit") await uiArtKit(options, t);

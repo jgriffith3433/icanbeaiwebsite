@@ -116,7 +116,9 @@ export function startMoments() {
     lineUp = true;
     lineAt = performance.now();
     line.classList.remove("leaving");
-    line.hidden = false;
+    // No speech pill: his voice (js/voice.js) says the line and the camera push carries the beat. The element stays
+    // hidden (the text remains in the event for the log and the playtest).
+    line.hidden = true;
     const pushed = !!(day.control && day.control.push && day.control.push(T.push));
     emit("takeover", "start", { via: via || "take", text: lineText, push: pushed, from: T.push && T.push.from });
     lineTimer = setTimeout(() => endLine("end", "auto"), T.lineSecs * 1000);

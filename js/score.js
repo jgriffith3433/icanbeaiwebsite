@@ -1285,6 +1285,15 @@ export function startScore(dayApi) {
     isNight: (hour) => isNightHour(hour == null ? simHour() : hour, cfg()),
   };
   day.score = api;
+  /* Preload: the city hum is the one file the first tap needs. Its bytes are fetched once the page is idle (no AudioContext
+     needed, so no autoplay rule), so the tap itself only decodes from the HTTP cache and never waits on the network. */
+  try {
+    const hum = cfg().ambience && cfg().ambience.air;
+    if (hum && soundOn() && typeof fetch === "function") {
+      const go = () => fetch(hum).then((r) => r.arrayBuffer()).catch(() => {});
+      if (typeof requestIdleCallback === "function") requestIdleCallback(go, { timeout: 3000 }); else setTimeout(go, 1500);
+    }
+  } catch (e) { /* a head start only */ }
   window.score = api;
   return api;
 }
