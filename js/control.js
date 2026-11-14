@@ -1254,7 +1254,9 @@ function install() {
     screenLift = damp(screenLift, hudLiftGoal(), dt, 3);
     camera.targetScreenOffset.y = screenLift;
     // Pulled in tight against a wall, he fades so the camera isn't looking at the inside of his head.
-    const vis = Math.max(0.15, Math.min(1, (camera.radius - 0.5) / 0.5)); // 0.15 at 0.5 m and closer
+    // Fully gone at 0.7 m and closer, fully drawn from 1.4 m: a squeezed camera (the stair and bedroom on the walk back to bed)
+    // must never fill the view with his jacket (the playtest's camera-inside on wake-him).
+    const vis = Math.max(0, Math.min(1, (camera.radius - 0.7) / 0.7));
     if (world.person && Math.abs(vis - himVis) > 0.02) setHimVis(vis);
     // ---- what the playtest reads: the turn rate, the camera-inside frames, the cast framing ----
     const head = new B.Vector3(s.x, s.y + 1.35, s.z);
