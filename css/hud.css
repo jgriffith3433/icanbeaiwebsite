@@ -159,10 +159,10 @@ html.touch-ui:not(.in-control):not(.preview-public) .hud-left { top: auto; botto
 /* phone portrait, in control: Let go, Rain (weather), Neighbors and Episodes sit in the left thumb's reach, stacked above the stick
    (stick top is 148 px up); Pressure and the weather chip ride the same column. */
 @media (orientation: portrait) {
-  html.touch-ui.in-control .control-btn { top: auto; left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px)); }
-  html.touch-ui.in-control .hud-left { top: auto; bottom: max(220px, calc(env(safe-area-inset-bottom) + 208px)); flex-direction: column-reverse; gap: 10px; }
+  html.touch-ui.in-control .control-btn { top: auto; left: max(12px, env(safe-area-inset-left)); transform: none; bottom: max(164px, calc(env(safe-area-inset-bottom) + 152px), calc(var(--safe-b) + 148px)); }
+  html.touch-ui.in-control .hud-left { top: auto; bottom: max(220px, calc(env(safe-area-inset-bottom) + 208px), calc(var(--safe-b) + 204px)); flex-direction: column-reverse; gap: 10px; }
   html.touch-ui.in-control .hud-left .ep-btn { order: 1; }
-  html.touch-ui.in-control .control-hint { bottom: max(470px, calc(env(safe-area-inset-bottom) + 458px)); }
+  html.touch-ui.in-control .control-hint { bottom: max(470px, calc(env(safe-area-inset-bottom) + 458px), calc(var(--safe-b) + 454px)); }
 }
 
 /* ---------- bottom row: the ability bar (five verbs; phone = arc + Charge ring) ---------- */
