@@ -287,7 +287,8 @@ export function startRain(world, dayApi) {
   }
   const rippleB = ringTex ? createQuadBatch(B, scene, "rain-ripples", RAIN_BUDGET.high.hits, flatMat("rain-ripple-mat", ringTex, -3)) : null;
   const splashB = dotTex ? createQuadBatch(B, scene, "rain-splashes", RAIN_BUDGET.high.hits * 3 + RAIN_BUDGET.high.drips, flatMat("rain-splash-mat", dotTex, -1)) : null;
-  [rippleB, splashB].forEach((b) => b && b.mesh.setEnabled(false));
+  // the batches write per-quad alpha in the vertex colours: without this the fade is ignored and a square can show
+  [rippleB, splashB].forEach((b) => { if (b) { b.mesh.hasVertexAlpha = true; b.mesh.setEnabled(false); } });
 
   /* ---- curtains ---- */
   const curtains = [];
@@ -602,6 +603,9 @@ if (wrAmt > 0.02) {
       rippleB.begin();
       for (let i = 0; i < st.hits.length; i++) {
         const h = st.hits[i];
+        // an umbrella, car roof or shoulder is smaller than the ring and not flat ground: a square quad at its height
+        // read as a flat panel behind the canopy (phone-touch frame at 179 s). They get the droplet crown only.
+        if (h.kind === "umbrella" || h.kind === "car" || h.kind === "shoulder") continue;
         const t = h.age / h.life;
         const s = h.size * (0.25 + t * 1.15);
         const a = Math.pow(1 - t, 1.4) * (h.kind === "puddle" ? 0.8 : 0.55);
