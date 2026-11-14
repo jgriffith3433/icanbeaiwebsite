@@ -256,6 +256,11 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
   let offset = standAnchor;
   let clip = "idle";
   let idleClear = 0;
+  /* Playtest option (a bot's tab only): the idle clip is forced off, so after a cast he stays in the last non-locomotion clip.
+     The animation trace must then see a state held with no input (anim.stuckStateSeconds over 3). */
+  let idleOff = false;
+  let heldClip = "";
+  let traceFeet = null;
   let landT = 0;
   let landDepth = 0;
   let prevGrounded = true;
@@ -359,6 +364,33 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
        from upright, the pelvis and shoulder lines' yaw, how far the knees bend, the hands' gap. The clip-poses playtest
        reads this on a real frame to flag a twisted torso, a hanging head or an arm through the body. */
     pose: () => bodyPose(B, wrap, nodeByShort),
+    forceIdleOff: (on) => { idleOff = !!on; if (!on) heldClip = ""; },
+    /* The playtest's animation trace for one frame: the clip, every clip's blend weight, how fast the boots move relative to him
+       (the cycle's own rate, not the world's: a planted foot is still in the world while the body moves), and whether the skeleton
+       reads as a T-pose (both hands straight out level with the shoulders) or the bind pose (the weights add up to under half). */
+    trace(dt) {
+      const w = player.weights();
+      let sum = 0;
+      Object.values(w).forEach((v) => (sum += v));
+      const root = wrap.getAbsolutePosition();
+      const feet = ["LeftFoot", "RightFoot"].map((n) => nodeByShort[n]);
+      let footSpeed = null;
+      if (feet.every(Boolean)) {
+        const now = feet.map((f) => { const p = f.getAbsolutePosition(); return { x: p.x - root.x, z: p.z - root.z }; });
+        if (traceFeet && dt > 0) footSpeed = (Math.hypot(now[0].x - traceFeet[0].x, now[0].z - traceFeet[0].z) + Math.hypot(now[1].x - traceFeet[1].x, now[1].z - traceFeet[1].z)) / 2 / dt;
+        traceFeet = now;
+      }
+      let tpose = sum < 0.5;
+      const L = nodeByShort.LeftArm, R = nodeByShort.RightArm, LH = nodeByShort.LeftHand, RH = nodeByShort.RightHand;
+      if (!tpose && L && R && LH && RH) {
+        const inv = wrap.getWorldMatrix().clone().invert();
+        const at = (n) => B.Vector3.TransformCoordinates(n.getAbsolutePosition(), inv);
+        const [a, b, c, d] = [at(L), at(R), at(LH), at(RH)];
+        const out = (sh, h) => Math.abs(h.x) - Math.abs(sh.x) >= 0.45 && Math.abs(h.y - sh.y) < 0.15 && Math.abs(h.z - sh.z) < 0.2;
+        tpose = out(a, c) && out(b, d) && c.x * d.x < 0;
+      }
+      return { state: clip, weights: w, footSpeed, tpose, held: player.heldSeconds() };
+    },
     /* clip, ground speed (m/s), dt; mine: the player has him (the lightning shows) */
     play(c, speed, dt, mine) {
       const ctx = readCtx();
@@ -396,6 +428,11 @@ export function makeSkin(B, scene, res, hipsTarget, container, world, extraGroup
       // Force lookup once idleClear crosses the threshold
       if (want === "idle" && idleClear >= 4 && named("lookup") && mine) want = "lookup";
       clip = named(want) ? want : "idle";
+      if (idleOff) {
+        if (clip !== "idle" && clip !== "walk" && clip !== "run") heldClip = clip;
+        else if (clip === "idle" && heldClip) clip = heldClip;
+        else heldClip = "";
+      }
       if (clip === "lookup") {
         motion.lookupPlayed++;
         if (heroEvt !== "lookup") {
