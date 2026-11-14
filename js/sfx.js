@@ -941,6 +941,11 @@ import { pickRate } from "./variety.js";
     },
     letGo() {
       note("let-go");
+      /* The whoosh below is oscillators, which the audio probe can't see: Esc has no pointerdown, so Let go (Esc) was silent to it.
+         A buffer-source tick (the close clip, else the tagged click) answers the press at once. */
+      let ticked = false;
+      try { ticked = sample("ui-close", { gain: 0.8, bus: "ui" }); } catch (err) { ticked = false; }
+      if (!ticked) { synthTag("ui"); try { uiClick(); } catch (err) { /* the whoosh still plays */ } }
       tone({ freq: 660, to: 220, dur: 0.6, vol: 0.06, wave: "triangle" });
       noise({ type: "bandpass", freq: 2000, to: 500, q: 1, dur: 0.6, vol: 0.05, attack: 0.05 });
     },
