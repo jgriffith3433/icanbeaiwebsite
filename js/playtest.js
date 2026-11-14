@@ -1759,6 +1759,82 @@ async function castFeel(options, t) {
   pressKey("Escape");
 }
 
+/* ---------------- warm-start: the longest frame after loading, each power's first-use cost, shader compile errors ---------------- */
+async function warmStart(options, t) {
+  const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  t.scene("First seconds after the loading bar");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const world = window.day.world();
+  const scene = world.scene;
+  const C = window.day.control;
+  const P = window.powers || window.day.powers;
+  if (touch) { try { window.day.look.quality("low"); } catch (e) { /* */ } if (C.touch) C.touch(true); }
+  window.day.title && window.day.title.quiet && window.day.title.quiet();
+  // every frame, by the render observable (no timer): [time, ms since the last]
+  const frames = [];
+  let last = performance.now();
+  const obs = scene.onAfterRenderObservable.add(() => { const n = performance.now(); frames.push([n, n - last]); last = n; });
+  const t0 = last;
+  const worstIn = (from, to) => frames.reduce((m, f) => (f[0] >= from && f[0] <= to ? Math.max(m, f[1]) : m), 0);
+  const lc = window.day.render && window.day.render.lightCap ? window.day.render.lightCap() : null;
+  if (lc) {
+    t.metric("lightCapWorst", lc.worst);
+    t.event("light-cap", `most lights any material asks for ${lc.worst} (cap ${lc.max}), ${lc.clamped} clamped, ${lc.lights} lights`);
+    if (lc.worst > lc.max) t.problem("bug", `A material asks for ${lc.worst} lights, over the cap of ${lc.max}`);
+  }
+  // take control through the real control, then let the first 30 s run
+  if (touch) await tapEl($("control")); else pressKey("Enter");
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  { const o = $("episode-offer"); if (o && !o.hidden) { const d = o.querySelector(".decline"); if (d) d.click(); } }
+  C.place(-21, 0.5, 1.5708, { from: 14, alpha: 4.1, beta: 1.15, radius: 11 });
+  const errFrom = consoleErrors.length;
+  // the five first casts, one by one, in the first 30 s
+  const casts = [["rain", "r", "rain"], ["fog", "c", "fog"], ["sunbreak", "x", "sunbreak"], ["bolt", "e", "bolt"], ["gust", "g", "wind"]];
+  let worstCast = 0;
+  for (const [id, key, slotId] of casts) {
+    const cost = (P.now().abilities.find((x) => x.id === id) || {}).cost || 20;
+    if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+    await t.until(() => P.now().energy + 0.05 >= cost, 20000, `Charge for ${id}`).catch(() => {});
+    await sleep(400);
+    const a = performance.now();
+    if (touch) await tapEl($("ability-" + slotId)); else pressKey(key);
+    await sleep(1400);
+    const w = worstIn(a, performance.now());
+    worstCast = Math.max(worstCast, w);
+    t.metric(`firstCastWorstMs.${id}`, Math.round(w));
+    if (w > (touch ? 150 : 100)) t.problem("bug", `The first ${id} cast cost a ${Math.round(w)} ms frame (limit ${touch ? 150 : 100})`);
+    else t.event(`first-cast-${id}`, `worst frame ${Math.round(w)} ms`);
+  }
+  t.metric("firstCastWorstMs", Math.round(worstCast));
+  // the first 30 s as a whole, then (phone) 60 s
+  const total = touch ? 60000 : 30000;
+  const rest = total - (performance.now() - t0);
+  if (rest > 0) await sleep(rest);
+  const end = performance.now();
+  const in30 = worstIn(t0, Math.min(end, t0 + 30000));
+  t.metric("worstFrame30sMs", Math.round(in30));
+  const limit = touch ? 150 : 100;
+  if (in30 > limit) t.problem("bug", `A frame in the first 30 s took ${Math.round(in30)} ms (limit ${limit})`);
+  else t.event("first-30s", `longest frame ${Math.round(in30)} ms over ${frames.length} frames`);
+  const within = frames.filter((f) => f[0] <= t0 + total);
+  const sorted = within.map((f) => f[1]).sort((a, b) => a - b);
+  const medMs = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+  const fps = medMs ? 1000 / medMs : 0;
+  t.metric("medianFps", Number(fps.toFixed(1)));
+  t.metric("worstFrameMs", Math.round(sorted.length ? sorted[sorted.length - 1] : 0));
+  if (touch) {
+    if (fps < 30) t.problem("bug", `Median fps over the first 60 s was ${fps.toFixed(1)} on the phone (needs 30)`);
+    else t.event("phone-fps", `median ${fps.toFixed(1)} fps, worst frame ${Math.round(sorted[sorted.length - 1])} ms`);
+  }
+  scene.onAfterRenderObservable.remove(obs);
+  // BJS shader compile errors fail the run
+  const bad = consoleErrors.slice(errFrom).filter((e) => /compile|shader|uniform block|maxSimultaneousLights|GL_MAX/i.test(e));
+  t.metric("shaderErrors", bad.length);
+  if (bad.length) t.problem("bug", `Shader compile errors in the console: ${bad[0]}`);
+  else t.event("shaders-clean", "no shader compile errors");
+  pressKey("Escape");
+}
+
 /* ---------------- day: the whole day at high speed; every block must happen ---------------- */
 async function wholeDay(options, t) {
   t.scene("Start of day");
@@ -12127,6 +12203,7 @@ installPlaytest({
     { id: "sun-aftermath", title: "Sun break after rain: steam off wet roofs and a rainbow at 42° within 3 s, gutters drip for 20+ s, at least 3 walkers close umbrellas and pigeons land on a roof; on phone half steam/drips, rainbow on, fps ≥ 30", seconds: 70, tags: ["powers", "weather", "phone", "feel", "crowd"], description: "Day bar to lunch (setup), Sound on, Enter / Take control tap, control.place by the shop (setup), tap R then X (or #ability-rain / #ability-sunbreak). Events aftermath-rain / -steam / -rainbow / -drips / -umbrellas / -birds / -fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "tornado-plaza", title: "Tornado on the plaza: 3 funnel shells (2 on low) with a dust ring, lifts 8+ café props that orbit and stay where they land, 0 floating/sunk after settle; on phone debris capped at 12 and fps ≥ 30", seconds: 90, tags: ["powers", "phone", "feel"], description: "Day bar beside the car (setup), control.place on the plaza (setup), Sound on, Enter / Take control tap, hold Wind for Tornado (key or held #ability-wind). Events tornado-start / tornado-layers / tornado-lifted / tornado-landed / tornado-ground / tornado-crowd / tornado-fps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "lightning-bolt", title: "Lightning bolt: a forked bolt (3+ forks, 2+ re-strikes inside 400 ms), a flash that lights the facades within 40 m for 2+ frames, a camera-facing afterimage, sparks and smoke, a flush scorch that cools orange to black over 10 s, the crowd flinches; by touch at low quality the cast frame stays under 50 ms", seconds: 90, tags: ["powers", "phone", "feel"], description: "Takes control, walks to the avenue, casts Lightning (key, or a tap on the bolt button with touch:true) and measures the cast frame by frame. Events bolt-forks / bolt-restrikes / bolt-flash / bolt-afterimage / bolt-scorch / bolt-flush / bolt-crowd / bolt-frame." },
+    { id: "warm-start", title: "Warm start: no frame over 100 ms (phone 150) in the first 30 s after the loading bar, the first cast of each of the five powers costs no long frame, no shader compile errors, phone median fps >= 30 over 60 s", seconds: 90, tags: ["performance", "phone", "powers"], description: "Load with ?playtest=warm-start ({\"touch\":true} for 390x844 low quality). Real input: Take control, the five verb buttons one by one. Frame times by the render observable; metrics worstFrame30sMs, firstCastWorstMs.<power>, medianFps, shaderErrors, lightCapWorst." },
     { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
     { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
@@ -12182,6 +12259,7 @@ installPlaytest({
       else if (id === "cold-start") await coldStart(options, t);
       else if (id === "phone-touch") await phoneTouch(options, t);
       else if (id === "first-minute") await firstMinute(options, t);
+      else if (id === "warm-start") await warmStart(options, t);
       else if (id === "title-key-art") await titleKeyArt(options, t);
       else if (id === "title-progress") await titleProgress(options, t);
       else if (id === "street-teaches") await streetTeaches(options, t);
@@ -12210,6 +12288,7 @@ installPlaytest({
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "cast-feel") await castFeel(options, t);
+      else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "weather-abilities") await weatherAbilities(options, t);
       else if (id === "slice") await sliceScenario(options, t);
       else if (id === "neighbors") await neighborsScenario(options, t);
