@@ -1071,14 +1071,22 @@
        drawn only while the camera is outside the cutaway (cutawayWalls). Visual only: it is built after the colliders
        were collected, so the door and the open front stay walkable as before. */
     const homeFront = [];
-    if (homeB && frontDoorNode) {
-      const [fx0, , fx1, fz] = homeB;
-      const dx = frontDoorNode.position.x + 0.44;
+    const officeCfg = cfg.buildings.office;
+    const fronts = [];
+    if (homeB && frontDoorNode) fronts.push({ id: "home", b: homeB, dx: frontDoorNode.position.x + 0.44, win: [-4.4, -1.8, 3.6, 6.4, 9], trimC: "#8d5a45" });
+    if (officeCfg && officeCfg.bounds) {
+      const o = (officeCfg.origin || [0, 0])[0];
+      const ob = officeCfg.bounds;
+      /* the office's open front read as a wall-less box from the street too: same face, door gap at the lobby door */
+      fronts.push({ id: "office", b: [ob[0] + o, ob[1], ob[2] + o, ob[3]], dx: o + 6, win: [2, 4, 8, 10.5, 13.5, 16].map((x) => x + o), trimC: "#59636e" });
+    }
+    fronts.forEach(({ id, b, dx, win, trimC }) => {
+      const [fx0, , fx1, fz] = b;
       const H = 2.75;
       const outer = mat("#c9bfb0");
-      const trim = mat("#8d5a45");
+      const trim = mat(trimC);
       const part = (name, w, h, d, x, y, z, m) => {
-        const mesh = box("homefront-" + name, w, h, d, x, y, z, m, null, false);
+        const mesh = box(id + "front-" + name, w, h, d, x, y, z, m, null, false);
         homeFront.push(mesh);
         return mesh;
       };
@@ -1088,11 +1096,11 @@
       part("crown", fx1 - fx0 + 0.3, 0.14, 0.3, (fx0 + fx1) / 2, H + 0.07, fz, trim);
       const glass = mat("#1b2635", { unique: true, spec: 0.02 });
       glass.emissiveColor = new B.Color3(0.4, 0.55, 0.7);
-      [-4.4, -1.8, 3.6, 6.4, 9].forEach((wx, i) => {
+      win.forEach((wx, i) => {
         part("win" + i + "f", 1.4 + 0.16, 1.1 + 0.16, 0.06, wx, 1.5, fz + 0.1, trim);
         part("win" + i + "g", 1.4, 1.1, 0.04, wx, 1.5, fz + 0.14, glass);
       });
-    }
+    });
 
     /* Parked cars that never move, in the work lot */
     function makeCar(color) {
