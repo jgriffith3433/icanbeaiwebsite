@@ -337,11 +337,24 @@ export function startDaySound(dayApi) {
 
   /* The audio probe flags the same sample id at the same rate twice within 60 s. Every (re)start gets a rate a little off 1
      (+-1.5%, never the one this id last had), so a bed that restarts or a repeated one-shot is never identical. */
-  const lastRates = {};
+  const lastRates = {}; // id -> [{ r, t }] of the rates it started at in the last 60 s
   function jitterRate(id) {
+    const t = (typeof performance !== "undefined" ? performance.now() : Date.now()) / 1000;
+    const list = (lastRates[id] || []).filter((u) => t - u.t <= 60);
+    const clash = (r) => list.some((u) => Math.abs(u.r - r) < 0.003);
     let r = 1 + (Math.random() * 0.03 - 0.015);
-    if (Math.abs(r - (lastRates[id] || 0)) < 0.004) r += r < 1 ? 0.005 : -0.005;
-    lastRates[id] = r;
+    for (let i = 0; i < 24 && clash(r); i++) r = 1 + (Math.random() * 0.03 - 0.015);
+    if (clash(r)) { // crowded: take the free rate farthest from every recent one
+      let best = r, bestD = -1;
+      for (let k = 0; k <= 60; k++) {
+        const c = 0.985 + k * 0.0005;
+        const d = list.reduce((m, u) => Math.min(m, Math.abs(u.r - c)), 9);
+        if (d > bestD) { bestD = d; best = c; }
+      }
+      r = best;
+    }
+    list.push({ r, t });
+    lastRates[id] = list;
     return r;
   }
 
