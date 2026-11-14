@@ -11581,6 +11581,16 @@ async function coldStart(options, t) {
       if (jr && !(r.bottom <= jr.top + 2 || r.top >= jr.bottom - 2 || r.right <= jr.left || r.left >= jr.right)) t.problem("bug", "The Bolt button overlaps Jump");
     }
   }
+  {
+    // the late chunk (js/late.js): nothing of episodes, the tornado, wind and fog or moments may be in before the first cast
+    const L0 = D.late && D.late.now ? D.late.now() : null;
+    const early = L0 ? Object.keys(L0.modules).filter((k) => L0.modules[k]) : ["no day.late"];
+    t.event("cold-start-late-before", `modules loaded before gameplay: ${early.join(", ") || "none"} (started ${L0 ? L0.started : "?"})`);
+    t.metric("lateModulesBeforeGameplay", early.length);
+    if (!L0 || early.length) t.problem("bug", `Late modules were loaded before gameplay: ${early.join(", ") || "day.late is missing"}`);
+    if (D.episodes) t.problem("bug", "day.episodes exists before the first cast (episodes.js is in the first chunk)");
+    if (D.powers && D.powers.tornadoLoaded && D.powers.tornadoLoaded()) t.problem("bug", "The tornado module is loaded before the first cast");
+  }
   t.progress(0.4);
 
   // follow the cue (Rain: "Press R for rain" / the Rain button tap): no card is clicked anywhere before it
@@ -11601,6 +11611,24 @@ async function coldStart(options, t) {
   const cast = await waitFor(() => T.bolt != null, 4000);
   if (!cast) { t.problem("blocker", `Pressing the prompted rain never cast it (${cueText})`); return; }
   t.event("cold-start-bolt", `first input ${T.input}s, first cast ${T.bolt}s after Play`);
+  {
+    // after the first cast the late chunk arrives; a tap on Episodes then (loaded or still loading) opens the menu, never nothing
+    const tl = performance.now();
+    const loaded = await waitFor(() => D.late && D.late.now().loaded, 8000);
+    t.event("cold-start-late-after", `late chunk ${loaded ? "loaded" : "NOT loaded"} ${((performance.now() - tl) / 1000).toFixed(1)}s after the cast: ${JSON.stringify(D.late ? D.late.now().modules : {})}`);
+    if (!loaded) t.problem("bug", "The late chunk (episodes, tornado, wind and fog, moments) never loaded after the first cast");
+    const epb = $("episodes");
+    if (!epb) t.problem("bug", "No Episodes button after the first cast");
+    else {
+      if (phone) { const pm = $("phone-menu-btn"); if (pm && !D.phoneMenu.isOpen()) await tapEl(pm); await sleep(200); }
+      if (phone) await tapEl(epb); else await clickEl(epb);
+      const opened = await waitFor(() => { const m = $("episode-menu"); return m && !m.hidden; }, 4000);
+      t.event("cold-start-episodes-tap", `Episodes ${opened ? "opened" : "did NOT open"} after the first cast (button "${epb.textContent}")`);
+      if (!opened) t.problem("bug", "Tapping Episodes after the first cast did nothing");
+      else { epb.click(); await sleep(150); }
+    }
+    if (D.powers && D.powers.tornadoLoaded) t.metric("tornadoLoadedAfterCast", D.powers.tornadoLoaded() ? 1 : 0);
+  }
   // sound: the context woke on that first click/tap/key, the cast made a sound (rain bed up, a cast clip), a step and a UI tick follow
   {
     const ar = audioReport();

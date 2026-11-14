@@ -11,7 +11,6 @@
    ========================================================================== */
 
 import * as boltFx from "./lightning.js";
-import * as tornadoFx from "./tornado.js";
 import { createAbilities, startAbilityBar, VERB_IDS } from "./abilities.js";
 export { debrisCap, shellCount, inPlaza, plazaCourse, FUNNEL_LIFE } from "./tornado.js";
 
@@ -505,7 +504,12 @@ export function startPowers(world, dayApi) {
       }
     } catch (err) { /* memory optional */ }
   }
-  const tornadoLook = tornadoFx.createTornadoFx(B, scene, {
+  /* The tornado's module (js/tornado.js, 735 lines) is not in the first chunk: js/late.js loads it right after the first cast
+     (or on idle) through `loadTornado()`. Until then `tornadoLook` is an idle stand-in and a Tornado cast waits for it. */
+  let tornadoFx = null;
+  let tornadoLook = { warm() {}, ensurePool() {}, pool: [], propPositions: () => [], update() {}, start: () => null, info: () => ({ active: null, landed: 0, settleLeft: 0 }) };
+  let tornadoP = null;
+  const buildTornado = () => tornadoFx.createTornadoFx(B, scene, {
     quality: qOf,
     physics: () => world.physics && world.physics(),
     surfaceAt: (x, z) => {
@@ -529,7 +533,17 @@ export function startPowers(world, dayApi) {
     },
     specs: looseSpecs,
   });
-  setTimeout(() => tornadoLook.warm(), 0);
+  function loadTornado() {
+    if (!tornadoP) {
+      tornadoP = import("./tornado.js").then((mod) => {
+        tornadoFx = mod;
+        tornadoLook = buildTornado();
+        setTimeout(() => tornadoLook.warm(), 0);
+        return true;
+      }).catch((err) => { tornadoP = null; console.error("[powers] the tornado didn't load:", err); return false; });
+    }
+    return tornadoP;
+  }
 
   let cloudR = 0;
   let cloudTarget = 0;
@@ -721,9 +735,18 @@ export function startPowers(world, dayApi) {
     return true;
   }
 
+  let tornadoWait = false;
   function sendTornado(via) {
     if (mode() !== "control") return false;
     if (tornado && tornado.life > 0) return false;
+    if (!tornadoFx) { // still loading: show it, then cast once it is in (never a silent tap)
+      if (!tornadoWait) {
+        tornadoWait = true;
+        window.dispatchEvent(new CustomEvent("day:late", { detail: { feature: "tornado", state: "loading", via } }));
+        loadTornado().then((ok) => { tornadoWait = false; if (ok) sendTornado(via); });
+      }
+      return false;
+    }
     if (!gauge.spend("tornado")) return refuse("tornado", via);
     ensureProps();
     const p = who();
@@ -1621,6 +1644,8 @@ html.touch-ui.in-control .side{display:none}
 
   const api = {
     now,
+    loadTornado,
+    tornadoLoaded: () => !!tornadoFx,
     pose,
     command,
     thunderDelay,
