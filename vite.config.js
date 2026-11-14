@@ -53,7 +53,19 @@ export default defineConfig({
   optimizeDeps: { exclude: ['@babylonjs/havok'] }, // its .wasm is loaded by URL (js/app.js)
   build: {
     target: 'es2022',
-    chunkSizeWarningLimit: 9000, // Babylon is one big chunk, as the CDN file was
+    rollupOptions: {
+      output: {
+        // Parallel downloads instead of one 2.3 MB (gzip) script: Babylon core (split so none is over ~1 MB gzip),
+        // Havok's JS glue, the game. small-weather.js and its glTF loader stay their own dynamic chunk.
+        manualChunks(id) {
+          if (id.includes('node_modules/@babylonjs/havok')) return 'havok';
+          if (!id.includes('node_modules/@babylonjs/core')) return undefined;
+          if (/@babylonjs\/core\/Shaders(WGSL)?\//.test(id)) return 'babylon-shaders';
+          if (/@babylonjs\/core\/(Physics|Particles|PostProcesses|Rendering|Lights|Cameras|Probes|Layers|Animations)\//.test(id)) return 'babylon-effects';
+          return 'babylon-core';
+        },
+      },
+    },
   },
   server: {
     host: '0.0.0.0',
