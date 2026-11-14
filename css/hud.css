@@ -291,6 +291,9 @@ html.first-min:not(.in-control):not(.cold-open):not(.title-up) .control-btn { vi
 html.touch-ui .co-prompt { left: auto; right: var(--safe-r); transform: none; bottom: calc(var(--safe-b) + 232px); }
 html.touch-ui .co-say { bottom: max(320px, calc(env(safe-area-inset-bottom) + 308px)); }
 html.title-up .co-prompt, html.title-up .co-bolt, html.title-up .co-say { visibility: hidden; }
+/* The R / Tap Rain hint steps aside (fades) while any story card or caption is on screen, so it never sits over card text. */
+html:has(.voice-caption:not([hidden]):not(.leaving), .co-say:not([hidden]), #episode-say:not([hidden]), .mo-line:not([hidden]), .tutorial:not([hidden]), .opening:not([hidden])) .co-prompt.on { opacity: 0; }
+.co-prompt { transition: opacity .25s ease; }
 
 /* ---- the rain's lens: drops on the camera (js/rain.js). Not a control: it never takes a touch or a click. ---- */
 #rain-lens { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; pointer-events: none; display: none; }
