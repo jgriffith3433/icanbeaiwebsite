@@ -97,7 +97,11 @@ if (perfWorld && perfWorld.scene) installHawkesPerf(perfWorld.scene, { product: 
     const t0 = Date.now();
     setTimeout(() => { if (!ready.lights) { ready.lights = true; console.info(`[app] loading card: warm-up gate capped at ${LIGHTS_CAP_MS} ms`); maybeDone(); } }, LIGHTS_CAP_MS);
     const lightsDone = (how) => { if (ready.lights) return; ready.lights = true; console.info(`[app] loading card: warm-up gate ended by ${how} after ${Date.now() - t0} ms`); maybeDone(); };
-    w.warmLights(8000).catch(() => {}).finally(() => lightsDone("the warm-up")); // the card waits for it, up to LIGHTS_CAP_MS
+    /* then rain, fog, a sun break and wind drawn for a few frames each (weather.warmCasts): the first cast of each used to pay
+       its compile and allocation as a 400-1000 ms frame */
+    w.warmLights(8000).catch(() => {})
+      .then(() => (window.weather && window.weather.warmCasts ? window.weather.warmCasts() : null)).catch(() => {})
+      .finally(() => lightsDone("the warm-up")); // the card waits for it, up to LIGHTS_CAP_MS
   };
   window.__warmLights = () => (function afterFrame() {
     if (window.day.now && window.day.now().frame) go(); else requestAnimationFrame(afterFrame);
