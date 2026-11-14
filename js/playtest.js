@@ -4655,6 +4655,176 @@ async function npcSpots(options, t) {
   pressKey("Escape");
 }
 
+/* ---------------- neighbour-tour: Small Weather walks to every named neighbour at 09:00 and 17:00 and each one answers ---------------- */
+// Rule 12 (a bot that tries to break things). Setup shortcuts (named): the day bar to 09:00 then 17:00, and the energy refill before
+// an ask is answered. Real input: Enter / a tap on Take control, then WASD + Shift (keys) or the touch stick (`{"touch":true}`,
+// 390x844) along a route the page plans for him round the buildings (js/placement.js `routeAround` over the same solids the
+// neighbours' own routes use), re-planned every second to where the neighbour is NOW. At each neighbour he waits for a response
+// (a beat spoken, a remembered greeting, a wave or nod, or a street bark); where their ask is open he answers it with the verb
+// (its key, or its button by touch) and waits for the thanks. A problem names the neighbour and the hour: unreachable (no
+// route, stalled, never within 3 m), inside at that hour, silent, or an ask that no cast completed. Events tour-<hour>-<id>
+// (reached, response, ask), tour-summary; metrics tour.reached, tour.responses, tour.asksDone, tour.failures.
+async function neighbourTour(options, t) {
+  const touch = !!(options && options.touch) || innerWidth <= 700 || (window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  t.scene("Avenue");
+  checkBasics(t);
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().physics !== "loading", 20000, "Havok physics to load").catch(() => {});
+  await t.until(() => window.day.neighbors, 8000, "the neighbors (js/neighbors.js)").catch(() => {});
+  const D = window.day;
+  const N = D.neighbors;
+  const C = D.control;
+  const P = window.powers || D.powers;
+  if (!N || !C || !P) { t.problem("bug", "neighbors, powers or Take control isn't installed"); return; }
+  if (touch) { try { D.look.quality("low"); } catch (e) { /* */ } if (C.touch) C.touch(true); }
+  D.title && D.title.quiet && D.title.quiet();
+  const mod = await import("./placement.js");
+  const solids = (N.pavement ? N.pavement().solids : D.world().solids) || [];
+  const people = N.now().people.map((p) => ({ id: p.id, name: p.name }));
+  t.event("tour-roster", `${people.length} named neighbours: ${people.map((p) => p.name).join(", ")}`);
+  if (people.length < 4) t.problem("bug", `Only ${people.length} named neighbours (wanted Birdie, Dex, Ines and Fenn)`);
+
+  // every neighbour event, kept as they come (day.neighbors.events() holds only the last 80)
+  const heard = [];
+  const on = (e) => { const d = e.detail || {}; if (d.id) heard.push({ t: performance.now(), who: d.id, kind: e.type === "day:npcbark" ? "bark" : d.action, beat: d.kind, text: d.text }); };
+  window.addEventListener("day:neighbor", on);
+  window.addEventListener("day:npcbark", on);
+
+  // take control by the real button
+  if (C.mode() !== "control") { if (touch) await tapEl($("control")); else pressKey("Enter"); }
+  await t.until(() => C.mode() === "control", 4000, "Take control");
+  { const o = $("episode-offer"); if (o && !o.hidden) { const d = o.querySelector(".decline"); if (d) d.click(); } }
+  const setClock = async (hour) => {
+    scrubTo(Math.round(hour * 60));
+    clickSpeed(1);
+    await sleep(700);
+    if (C.mode() !== "control") { if (touch) await tapEl($("control")); else pressKey("Enter"); await t.until(() => C.mode() === "control", 4000, "Take control again"); }
+  };
+  const row = (id) => N.now().people.find((p) => p.id === id);
+
+  // one step of the stick or the keys toward (wx, wz); the camera's heading decides which way is up
+  const stickEl = $("stick");
+  const sr0 = touch && stickEl ? hudVisible(stickEl) : null;
+  let stickDown = false;
+  const drive = (wx, wz, run) => {
+    const st = C.state();
+    const dx = wx - st.x, dz = wz - st.z, dist = Math.hypot(dx, dz) || 1;
+    if (sr0) {
+      const cam = world().camera;
+      const fx = -Math.cos(cam.alpha), fz = -Math.sin(cam.alpha);
+      const f = (dx * fx + dz * fz) / dist, r = (dx * fz - dz * fx) / dist;
+      const cx = sr0.left + sr0.width / 2, cy = sr0.top + sr0.height / 2, reach = sr0.width / 2;
+      const k = run ? 0.95 : 0.6;
+      if (!stickDown) { touchOn(stickEl, "pointerdown", cx, cy); stickDown = true; }
+      touchOn(stickEl, "pointermove", cx + r * reach * k, cy - f * reach * k);
+    } else setHeld(steerKeys(wx, wz, run));
+  };
+  const stopDriving = () => {
+    if (sr0 && stickDown) { const cx = sr0.left + sr0.width / 2, cy = sr0.top + sr0.height / 2; touchOn(stickEl, "pointerup", cx, cy); stickDown = false; }
+    releaseHeld();
+  };
+
+  // walk to the neighbour where they are now; returns "" when within 3 m, else why not
+  async function walkTo(id, hourLabel) {
+    const started = simNow();
+    let still = started, last = C.state(), nextPlan = 0, route = [];
+    try {
+      while (simNow() - started < 70) {
+        const st = C.state();
+        if (st.y < -0.45) return `he fell through the world at ${st.x.toFixed(1)},${st.z.toFixed(1)}`;
+        const p = row(id);
+        if (!p) return "not in the roster";
+        if (p.inside) return "inside a building (not drawn, not reachable)";
+        const d = Math.hypot(p.x - st.x, p.z - st.z);
+        if (d < 2.6) return "";
+        if (performance.now() > nextPlan) {
+          nextPlan = performance.now() + 1000;
+          route = mod.routeAround(solids, [st.x, st.z], [p.x, p.z]);
+        }
+        while (route.length && Math.hypot(route[0][0] - st.x, route[0][1] - st.z) < 1.1) route.shift();
+        const wp = route.length ? route[0] : [p.x, p.z];
+        if (Math.hypot(st.x - last.x, st.z - last.z) > 0.12) { still = simNow(); last = st; }
+        else if (simNow() - still > 4) return `stalled 4 s at ${st.x.toFixed(1)},${st.z.toFixed(1)} ${d.toFixed(1)} m short (${route.length} waypoints)`;
+        drive(wp[0], wp[1], d > 6);
+        t.progress(0.1);
+        await sleep(120);
+      }
+      return "not there after 70 s of walking";
+    } finally { stopDriving(); }
+  }
+
+  const ABILITY_KEY = { rain: "r", sunbreak: "x", bolt: "e" };
+  const stats = { reached: 0, responses: 0, asks: 0, asksDone: 0, failures: 0 };
+  const fail = (msg) => { stats.failures++; t.problem("bug", msg); };
+
+  async function visit(id, hour, label) {
+    const p0 = people.find((p) => p.id === id);
+    const name = p0.name;
+    t.scene(`${name}, ${label}`);
+    const at = row(id);
+    const why = await walkTo(id, label);
+    if (why) { fail(`${name} is unreachable at ${label}: ${why}`); return; }
+    stats.reached++;
+    const mark = performance.now();
+    const me = C.state(), nb = row(id);
+    t.event(`tour-${label}-${id}`, `reached ${name} at ${nb.x.toFixed(1)},${nb.z.toFixed(1)} (${Math.hypot(nb.x - me.x, nb.z - me.z).toFixed(1)} m), ${nb.action || (nb.moving ? "walking" : "standing")}`);
+    // stay with a walking neighbour until they answer (greet, beat, remembered line or bark), up to 12 s
+    const got = () => heard.filter((h) => h.who === id && h.t >= mark && (h.kind === "beat" || h.kind === "greet" || h.kind === "remember" || h.kind === "bark"));
+    const ok = await (async () => {
+      const end = performance.now() + 12000;
+      while (performance.now() < end) {
+        if (got().length) return true;
+        const p = row(id), s = C.state();
+        if (p && Math.hypot(p.x - s.x, p.z - s.z) > 3.2) { const w = await walkTo(id, label); if (w) return false; }
+        await sleep(200);
+      }
+      return got().length > 0;
+    })();
+    const first = got()[0];
+    if (!ok) { fail(`${name} gave no response at ${label} (no line, wave, nod or bark within 12 s of reaching them)`); return; }
+    stats.responses++;
+    t.event(`tour-${label}-${id}-response`, `${name}: ${first.kind}${first.beat ? " " + first.beat : ""}${first.text ? ' "' + first.text + '"' : ""}`);
+    // their ask, if one is up: answer it with the verb, by key or button
+    const ask = (N.asks() || []).find((a) => a.who === id);
+    const daily = D.daily && D.daily.owns && D.daily.owns(id);
+    if (!ask) { if (daily) t.event(`tour-${label}-${id}-ask`, `${name}'s ask today is the daily request (js/daily.js), answered there`); return; }
+    stats.asks++;
+    await t.until(() => row(id).asking, 4000, `${name}'s ask`).catch(() => {});
+    const ab = ask.verb;
+    const slot = ab === "sunbreak" ? "sunbreak" : ab;
+    const cost = (P.now().abilities.find((a) => a.id === ab) || {}).cost || 20;
+    if (P.abilities && P.abilities.reset) P.abilities.reset(100);
+    await t.until(() => P.now().energy + 0.05 >= cost, 20000, `Charge for ${ab}`).catch(() => {});
+    const before = heard.length;
+    const btn = $("ability-" + slot);
+    if (touch && btn) await tapEl(btn); else pressKey(ABILITY_KEY[ab] || "r");
+    const paid = await t.until(() => heard.slice(before).some((h) => h.who === id && h.kind === "beat" && h.beat === "thanks"), 7000, `${name}'s thanks`).then(() => true).catch(() => false);
+    if (paid) {
+      stats.asksDone++;
+      t.event(`tour-${label}-${id}-ask`, `${name}'s ask (${ab}) completed by ${touch ? "the button" : "the key"}: "${row(id).bubble || "thanks said"}"`);
+    } else fail(`${name}'s ask (${ab}) could not be completed at ${label}: the cast got no thanks (stage ${row(id).stage}, ${Math.hypot(row(id).x - C.state().x, row(id).z - C.state().z).toFixed(1)} m away)`);
+    await t.until(() => (P.now().abilities.find((a) => a.id === ab) || {}).cooldown <= 0, 12000, "cooldown").catch(() => {});
+    await sleep(600);
+  }
+
+  const order = ["birdie", "dex", "fenn", "quill"].filter((id) => people.some((p) => p.id === id)).concat(people.map((p) => p.id).filter((id) => !["birdie", "dex", "fenn", "quill"].includes(id)));
+  for (const [hour, label] of [[9, "09:00"], [17, "17:00"]]) {
+    await setClock(hour);
+    t.event("tour-clock", `${label}: ${order.map((id) => `${id} ${row(id).inside ? "inside" : row(id).x.toFixed(0) + "," + row(id).z.toFixed(0)}`).join("; ")}`);
+    // the nearest neighbour first, so the walk is the shortest
+    const todo = order.slice().sort((a, b) => { const s = C.state(); const da = Math.hypot(row(a).x - s.x, row(a).z - s.z), db = Math.hypot(row(b).x - s.x, row(b).z - s.z); return da - db; });
+    for (const id of todo) await visit(id, hour, label);
+  }
+  window.removeEventListener("day:neighbor", on);
+  window.removeEventListener("day:npcbark", on);
+  t.metric("tour.reached", stats.reached);
+  t.metric("tour.responses", stats.responses);
+  t.metric("tour.asksDone", stats.asksDone);
+  t.metric("tour.failures", stats.failures);
+  t.event("tour-summary", `${stats.reached} reached, ${stats.responses} answered, ${stats.asksDone} of ${stats.asks} asks completed, ${stats.failures} failures, of ${people.length * 2} visits`);
+  pressKey("Escape");
+}
+
 /* ---------------- placement-audit: no neighbour inside a building or off the ground, 06:00 to 23:00 ---------------- */
 // Setup shortcut: the day bar is scrubbed (scrubTo) through every 15 sim minutes from 06:00 to 23:00; at each hour every
 // neighbour's standing point is read (day.neighbors.placementAt) and checked against world.solids (js/placement.js) and the
@@ -11494,6 +11664,92 @@ async function hourHints(options, t) {
   if (C.mode() === "control") C.letGo();
 }
 
+/* ---------------- any-hour: a new visitor at 03:00, 09:00 and 14:00 reaches a first success within 30 s, no wall ---------------- */
+// Setup (named): the visit's clock is forced to each hour in options.hours (default 03:00, 09:00, 14:00) and the new-visitor keys
+// (first Rain, street lesson) are cleared. Real input from there: tap / click Take control, then the cast the screen hints
+// (the pulsing "Tap the street" for Rain, else the Lightning button / E). Metric ftue.secondsToFirstSuccess.<HH> per hour is
+// seconds from the first tap to the first cast. Fails naming the hour on a wall (asleep, a card, a title) or over 30 s.
+async function anyHour(options, t) {
+  const D0 = window.day;
+  const phone = !!(options && options.touch) || innerWidth <= 700 || !!(D0 && D0.control && D0.control.state().touch);
+  t.scene(phone ? "Any hour (phone)" : "Any hour");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
+  const D = window.day;
+  const C = D.control;
+  const P = window.powers || D.powers;
+  const hours = (options && Array.isArray(options.hours) && options.hours.length ? options.hours : ["03:00", "09:00", "14:00"]).map(String);
+  const LIMIT = 30;
+  if (phone && !C.state().touch) C.touch(true);
+  let n = 0;
+  for (const hour of hours) {
+    n++;
+    const key = hour.replace(":", "");
+    const bad = (msg, sev = "bug") => t.problem(sev, `${hour}: ${msg}`);
+    if (C.mode() === "control") { C.letGo(); await t.until(() => C.mode() === "schedule", 70000, "him back on his day").catch(() => {}); }
+    // named setup: a new visitor's keys, then the clock forced to the hour
+    try {
+      ["icanbe.firstrain", "icanbe.street", "icanbe.episodes.tutorial"].forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem("icanbe.opening", "any-hour"); localStorage.setItem("icanbe.tutorial", "any-hour");
+      if (D.firstrain && D.firstrain.reset) D.firstrain.reset();
+      if (D.title && D.title.quiet) D.title.quiet();
+    } catch (e) { /* private mode */ }
+    D.jump(hour);
+    let drive = 0;
+    while (D.now().frame && D.now().frame.person.inCar && drive++ < 20) { D.jump(hour); await sleep(400); }
+    await sleep(900);
+    const wall0 = gameplayWall("any-hour");
+    const asleep = !!wall0 && /^bed/.test(wall0);
+    t.event("any-hour-setup", `${hour}: clock ${D.now().frame ? D.now().frame.clock || "" : ""} pose ${D.now().frame ? D.now().frame.person.pose : "?"}; ${wall0 ? "on screen: " + wall0 : "nothing in the way"}`);
+    if (wall0 && !asleep) { bad(`a wall before the first tap: ${wall0}`, "blocker"); continue; }
+    const pw = [];
+    const hp = (e) => { const d = e.detail || {}; if (d.action !== "denied") pw.push({ ...d, at: performance.now() }); };
+    window.addEventListener("day:power", hp);
+    const btn = $("control");
+    if (!btn || !hudVisible(btn)) { window.removeEventListener("day:power", hp); bad("no visible Take control button", "blocker"); continue; }
+    // 1. the first tap: Take control
+    const t0 = performance.now();
+    if (phone) await tapEl(btn); else btn.click();
+    t.milestone && t.milestone("first-input-accepted", `${hour}: Take control tapped`);
+    const took = await t.until(() => C.mode() === "control", 8000, "Take control").then(() => true, () => false);
+    if (!took) { window.removeEventListener("day:power", hp); bad("Take control never handed him over", "blocker"); continue; }
+    if (asleep) await t.until(() => D.wake && D.wake.now().phase === "ready", 8000, "the wake moment").catch(() => {});
+    else await sleep(500);
+    try { P.abilities.reset && P.abilities.reset(100); } catch (e) { /* ok */ }
+    // 2. the hinted cast
+    const rainCue = $("first-rain-cue");
+    const rainHint = !!rainCue && rainCue.getBoundingClientRect().width > 0 && document.documentElement.classList.contains("first-rain");
+    if (rainHint) {
+      const cv = document.querySelector("canvas");
+      const rc = cv.getBoundingClientRect();
+      const x = rc.left + rc.width / 2, y = rc.top + rc.height * 0.62;
+      const ptr = (type) => cv.dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: phone ? "touch" : "mouse", isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true }));
+      ptr("pointerdown"); await sleep(90); ptr("pointerup");
+    } else {
+      const bolt = $("ability-bolt");
+      if (phone) { if (bolt && hudVisible(bolt)) await tapEl(bolt); else bad("no visible Lightning button to cast"); }
+      else { keyDown("e"); await sleep(120); keyUp("e"); }
+    }
+    await t.until(() => pw.length > 0, 6000, "the first cast").catch(() => {});
+    window.removeEventListener("day:power", hp);
+    const first = pw[0];
+    const secs = first ? Math.round((first.at - t0) / 100) / 10 : 99999;
+    if (first) {
+      t.metric(`ftue.secondsToFirstSuccess.${key}`, secs);
+      t.milestone && t.milestone("first-success", `${hour}: first ${first.power} at ${secs}s`);
+    }
+    t.event("any-hour-success", `${hour}: ${first ? `first cast (${first.power}, ${rainHint ? "the Rain hint" : "Lightning"}) ${secs}s after the first tap` : "NO CAST"}${asleep ? "; he was asleep, woken by the tap" : ""}`);
+    if (!first) bad(`no cast within the window (${rainHint ? "the street tap" : "the Lightning button"})`, "blocker");
+    else if (secs > LIMIT) bad(`first success took ${secs}s (limit ${LIMIT} s)`);
+    await sleep(1200);
+    const wall1 = gameplayWall("any-hour");
+    if (wall1 && !/^bed/.test(wall1)) bad(`a wall met after taking control: ${wall1}`, "blocker");
+    checkHud(t, `any-hour ${hour}${phone ? " (phone)" : ""}`);
+    t.progress(n / hours.length);
+  }
+  if (C.mode() === "control") C.letGo();
+}
+
 /* ---------------- phone-touch: cold phone session on the roof, Take control and five casts, all by touch ---------------- */
 // Real input only: touch pointer events (tapEl) on Take control / the Bolt prompt / the ability buttons. Setup (named): a full
 // Charge before each cast. Works at 390x844 and 844x390 (the runner sets the window); reports every control's size and any overlap.
@@ -14231,6 +14487,7 @@ installPlaytest({
     { id: "look", title: "The city at noon, dusk and night (navy, wet surfaces, neon), then Quality: low", seconds: 80, tags: ["look"], description: "Day bar beside the car, Enter, walk to the shop front. Scrub holds noon, dusk and night. Then the quality button: bloom and shadows off, frame time recorded." },
     { id: "photos", title: "Photos of the dense city: noon at five spots along the avenue, dusk (windows and street lamps come on), night; frame rate at each", seconds: 120, tags: ["look", "photos"], description: "Day bar beside the car and to the hours (setup). Enter, then WASD with Shift east along the avenue. Events photo-noon / photo-dusk / photo-night / photo-fps; metrics photoFpsMin, photoFpsAvg, cityFillers, cityLamps." },
     { id: "crowd", title: "The street's people and cars follow the clock: quiet at 3 AM, busy at the 8:30 rush, full at lunch and dinner, thin again late; they walk, cross, go in and out of buildings; rain opens umbrellas; Quality: low thins them; frame rate at each", seconds: 90, tags: ["crowd", "photos"], description: "Day bar beside the car and to each hour (setup), then 1x. Enter, WASD with Shift to the shops, key 3, the quality button. Events crowd-night / crowd-rush / crowd-lunch / crowd-dinner / crowd-late / crowd-follows-clock / crowd-rain / crowd-quality-low / photo-fps; metrics crowd<Hour>People, crowd<Hour>Cars, photoFpsMin, photoFpsAvg." },
+    { id: "neighbour-tour", title: "Neighbour tour: he walks (by a planned route, as a player would) to Birdie, Dex, Ines and Fenn at 09:00 and again at 17:00; each answers with a line, wave, nod or bark and any open ask is completed; one unreachable or silent neighbour fails the run by name; the phone (390x844) the same by touch", seconds: 420, tags: ["control", "neighbors", "phone"], description: "Load with ?playtest=neighbour-tour ({\"touch\":true} for 390x844). Setup: the day bar to 09:00 and 17:00. Real input: Enter or a tap on Take control, WASD+Shift or the touch stick along a re-planned route round the buildings, the verb key or button for an open ask. Events tour-<hour>-<id>, tour-summary; metrics tour.reached, tour.responses, tour.asksDone, tour.failures." },
     { id: "placement-audit", title: "Placement audit: scrub 06:00 to 23:00; no neighbour inside a building footprint or more than 0.1 m off the ground; the phone (390x844) the same", seconds: 90, tags: ["control", "quality", "phone"], description: "Load with ?playtest=placement-audit ({\"touch\":true} for 390x844). Scrubs the day every 15 sim minutes; each neighbour's standing point is checked against world.solids (js/placement.js) and the ground; live drawn heights are read at each stop. Events placement-audit / placement-fix; metrics placementInside, placementOffGround." },
     { id: "npc-spots", title: "NPC spots: every neighbor, daily citizen and rescue person stands in open ground (none inside a building collider, each with room to walk up); a screenshot of each spot; neighbors' name tags fully on screen; the phone (390x844) the same", seconds: 120, tags: ["control", "quality", "phone"], description: "Load with ?playtest=npc-spots ({\"touch\":true} for 390x844). Runs the js/npc-spots.js audit on world.solids, takes control, then stands 1.6 m from each NPC spot (neighbors at the hour they are there) with a screenshot per spot. Events npc-spots / npc-spot-<who>; metric npcSpotFailures." },
     { id: "city-audit", title: "City audit: every prop from props.js and cityscape.js sits on its roof or pavement (nothing floating, sunk, coplanar or inside out); six probe cameras (three rooftops, three streets) show no flicker between two frames; he walks each walkable roof along its AC units; shots at desktop and 844x390", seconds: 240, tags: ["look", "photos"], description: "Setup: scrubs to noon, runs day.cityscape.audit(), places six probe cameras for two frames each (the second moved 2 cm). Real input: Enter, WASD with Shift up each walkable roof's ramp and along its row of units, Esc. Events city-audit / city-shots-size / flicker-<spot> / roof-walk-<block>; metrics cityAuditFailures, flickerBlocks." },
@@ -14261,6 +14518,7 @@ installPlaytest({
     { id: "warm-start", title: "Warm start: no frame over 100 ms (phone 150) in the first 30 s after the loading bar, the first cast of each of the five powers costs no long frame, no shader compile errors, phone median fps >= 30 over 60 s", seconds: 90, tags: ["performance", "phone", "powers"], description: "Load with ?playtest=warm-start ({\"touch\":true} for 390x844 low quality). Real input: Take control, the five verb buttons one by one. Frame times by the render observable; metrics worstFrame30sMs, firstCastWorstMs.<power>, medianFps, shaderErrors, lightCapWorst." },
     { id: "ui-art-kit", title: "UI art kit: five painted verb icons with ready glow and radial cooldown wipe; Episodes, Neighbors, Settings, toasts and score card share the frame set and fonts; no goal label has a bracketed key; on phone each verb is ≥44 px", seconds: 120, tags: ["hud", "menus", "phone", "abilities"], description: "Load with ?playtest=ui-art-kit ({\"touch\":true} for 390x844). Real input: Episodes, Neighbors, Settings, Take control, one verb cast, tutorial start. Events ui-art-source / ui-fonts / ui-frame / ui-busts / ui-verbs / ui-cooldown-wipe / goal-labels / ui-goal-icon / ui-phone-44; metrics uiVerbIcons, uiVerbMinPx, uiBusts." },
     { id: "hour-hints", title: "Hour hints: taking control at 03:00, 08:00, 12:00, 16:00 and 20:00 each shows one hint (a verb icon, ring and marker over a place, one line in the toast lane); the verb answers it with a visible result and a reward pop, by touch at 390x844", seconds: 150, tags: ["neighbors", "retention", "phone", "touch"], description: "Load with ?playtest=hour-hints ({\"touch\":true} for 390x844). Setup (named): returning-player keys, clock jumped to each hour, him stood 6 m from the hint place. Real input: Take control, the verb button (key on a keyboard), Let go. Events hint-shown / hint-done; metrics hourHints.shown, hourHints.answered." },
+    { id: "any-hour", title: "Any hour: a new visitor at 03:00, 09:00 and 14:00 taps Take control and casts the hinted power; first success within 30 s at each hour with no wall, by touch at 390x844", seconds: 120, tags: ["first-minute", "phone", "touch"], description: "Load with ?playtest=any-hour (390x844 touch for the phone run). Setup (named): new-visitor keys cleared and the clock forced to each hour in option hours (default 03:00, 09:00, 14:00). Real input: tap Take control, then the hinted cast (Tap the street for Rain, else the Lightning button). Events any-hour-setup / any-hour-success; metrics ftue.secondsToFirstSuccess.0300 / .0900 / .1400." },
     { id: "wake-him", title: "Wake him: a visit forced to 03:00 finds him asleep; one tap on Take control stretches him awake, puts him on the roof in night fog and he casts within 10 s of the tap, by touch at 390x844; Let go returns him to bed with the clock still running", seconds: 90, tags: ["opening", "first-minute", "phone", "touch"], description: "Load with ?playtest=wake-him (390x844 touch for the phone run). Setup (named): returning player keys set, clock jumped to 03:00. Real input: tap Take control, tap the Lightning button (E on a keyboard), tap Let go. Events wake-asleep / wake-roof / wake-cast / wake-let-go / wake-back; metrics wake.secondsToReady, wake.secondsToFirstCast, wake.backInBed." },
     { id: "phone-touch", title: "Phone touch: a cold phone session opens on the roof (no title wall), a tap on Take control enters control within 1 s, all five abilities are cast by tap with their effect on screen, and at 844x390 landscape every control is 44 px with no HUD overlap", seconds: 120, tags: ["phone", "touch", "hud", "opening"], description: "Load with ?playtest=phone-touch at 390x844 touch, then 844x390 touch. Only touch pointer events (taps). Events phone-cold-open / phone-let-go / phone-take-control / phone-cast-<verb> / phone-controls; metrics phone.secondsToRoof, phone.takeControlMs, phone.minControlPx, phone.castsWithEffect." },
     { id: "five-verbs", title: "Five verbs + Charge: bar shows Lightning Rain Wind Fog Sun; hold Lightning→Storm and full Wind→Tornado; on phone ≤7 controls none over the character; street tap aims; Sky studio gates 1–7", seconds: 180, tags: ["powers", "phone", "hud"], description: "Runs powers then phone arc checks at touch size. Events five-verbs / storm-gather / tornado-start / sky-studio-off / touch-budget / street-aim / goal-labels." },
@@ -14324,6 +14582,7 @@ installPlaytest({
       else if (id === "cold-start") await coldStart(options, t);
       else if (id === "phone-touch") await phoneTouch(options, t);
       else if (id === "wake-him") await wakeHim(options, t);
+      else if (id === "any-hour") await anyHour(options, t);
       else if (id === "first-minute") await firstMinute(options, t);
       else if (id === "warm-start") await warmStart(options, t);
       else if (id === "model-blocked") await modelBlocked(options, t);
@@ -14358,6 +14617,7 @@ installPlaytest({
       else if (id === "city-audit") await cityAudit(options, t);
       else if (id === "npc-spots") await npcSpots(options, t);
       else if (id === "placement-audit") await placementAudit(options, t);
+      else if (id === "neighbour-tour") await neighbourTour(options, t);
       else if (id === "crowd") await crowdScenario(options, t);
       else if (id === "weather") await weather(options, t);
       else if (id === "cast-feel") await castFeel(options, t);

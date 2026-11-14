@@ -15,7 +15,7 @@ export function startWake() {
   let quiet = false;
   try {
     const id = new URLSearchParams(location.search).get("playtest");
-    if (id && id !== "wake-him" && id !== "audio-check") quiet = true;
+    if (id && id !== "wake-him" && id !== "audio-check" && id !== "any-hour") quiet = true;
   } catch (e) { /* no location */ }
 
   let phase = "idle"; // idle | stretch | cut | ready
