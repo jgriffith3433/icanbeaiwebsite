@@ -2844,7 +2844,9 @@
          freeze the page on the first switch. The frame loop applies each set; resolves when done (or after maxMs). */
       async warmLights(maxMs) {
         const have = new Set(roomLights.map((rl) => rl.building));
-        const sets = [["home"], ["office"], ["car"], ["home", "car"], ["office", "car"], ["lamps"], ["home", "lamps"], ["office", "lamps"], ["car", "lamps"]].filter((g) => g.every((b) => b === "car" || b === "lamps" || have.has(b) || (b === "office" && officeLights.length)));
+        /* [] first: no room, car or lamp light (a clear noon). A page loaded at night starts with lamps and windows lit, so that set was never
+           compiled, and the first jump to day (the day bar, a scrub) recompiled every lit material at once: multi-second frames on a phone. */
+        const sets = [[], ["home"], ["office"], ["car"], ["home", "car"], ["office", "car"], ["lamps"], ["home", "lamps"], ["office", "lamps"], ["car", "lamps"]].filter((g) => g.every((b) => b === "car" || b === "lamps" || have.has(b) || (b === "office" && officeLights.length)));
         const nextFrame = () => new Promise((res) => { const o = scene.onAfterRenderObservable.addOnce(() => res()); setTimeout(() => res(), 500); return o; });
         const t0 = Date.now(), budget = maxMs || 8000;
         /* maxMs is a real deadline: a shader compile or whenReadyAsync that never settles (a slow or software GL, a lost
