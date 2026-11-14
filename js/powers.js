@@ -1256,8 +1256,22 @@ html.touch-ui.in-control .side{display:none}
         if (down && !pressWatching(id === "wind" ? "gust" : "bolt", "touch")) refuseBar(id === "wind" ? "gust" : "bolt");
         return;
       }
+      const wasBolt = touchBolt;
+      const wasWind = touchWind;
       if (id === "bolt") touchBolt = !!down;
       if (id === "wind") touchWind = !!down;
+      // A tap fires on the release itself, not on the next frame's tick: on a slow phone frame that wait was the whole latency.
+      if (!down && mode() === "control") {
+        if (id === "bolt" && wasBolt && !keyBolt && !padBolt) {
+          prevTouchBolt = false; // the tick must not release it a second time
+          releaseBolt("touch");
+          boltCharge = 0; boltResolved = false; gatherNoted = false; charge = 0;
+        } else if (id === "wind" && wasWind && !keyWind && !padWind) {
+          prevTouchWind = false;
+          releaseWind("touch");
+          windCharge = 0; windResolved = ""; windGatherNoted = false;
+        }
+      }
     },
   });
 
