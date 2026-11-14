@@ -11527,7 +11527,9 @@ async function checkCharacterClear(t, label) {
 }
 
 /* ---------------- wake-him: a visit at 03:00, one tap on Take control, he wakes, is on the roof and casts within 10 s; Let go sends him back to bed ---------------- */
-async function wakeHim(options, t) {
+function wakeHim(options, t) { return withAudioGapEvidence(t, () => wakeHimRun(options, t)); }
+
+async function wakeHimRun(options, t) {
   const phone = innerWidth <= 700 || !!(window.day && window.day.control && window.day.control.state().touch);
   await t.until(() => window.day.now().frame, 15000, "the first frame");
   await t.until(() => window.day.engineInfo && window.day.engineInfo().model !== "loading", 30000, "his model to load").catch(() => {});
