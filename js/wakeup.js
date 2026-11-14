@@ -64,14 +64,14 @@ export function startWake() {
     const P = window.powers || day.powers;
     if (P && P.abilities && P.abilities.reset) P.abilities.reset(cfg.charge || 100);
     emit("roof", { x: sp.x, z: sp.z });
-    later(() => {
-      if (phase !== "cut") return;
-      release();
-      phase = "ready";
-      readyAt = performance.now();
-      if (day.note && cfg.log) day.note(cfg.log);
-      emit("ready", { sinceTap: Math.round((readyAt - t0) / 10) / 100 });
-    }, (cfg.cutSecs || 0.35) * 1000 + 250);
+    // Ready the moment the roof pose and the cast input are live. This used to wait a further 0.6 s timer: when the cut itself
+    // stalls the page (new fog and roof shaders, two ~1.4 s frames) that timer landed seconds late, and the wake was "ready"
+    // 10 s after the tap. The flash and the camera dive are cosmetic and carry on on their own clocks.
+    release();
+    phase = "ready";
+    readyAt = performance.now();
+    if (day.note && cfg.log) day.note(cfg.log);
+    emit("ready", { sinceTap: Math.round((readyAt - t0) / 10) / 100 });
     if (W && W.triggerFlash && sk.flashAgainSecs) later(() => { try { W.triggerFlash((sk.flash || [90])[0], (sk.flash || [0, -0.3])[1]); } catch (e) { /* */ } }, sk.flashAgainSecs * 1000);
   }
 
@@ -86,6 +86,8 @@ export function startWake() {
     if (C.anim && st.clip) C.anim(st.clip);
     emit("start", { via, pose: bedPose });
     emit("stretch", { clip: st.clip });
+    // Compile the roof's and the night sky's shaders now, async, behind the stretch, so the cut isn't the frame that pays for them.
+    try { if (day.transition && day.transition.warm) Promise.resolve(day.transition.warm(900)).catch(() => {}); } catch (e) { /* warm is a head start */ }
     later(toRoof, (st.secs || 1.3) * 1000);
   }
 
