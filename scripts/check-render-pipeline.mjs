@@ -85,7 +85,7 @@ ok(R.LUT_NAMES.length >= 5 && R.LUT_NAMES.length === 8, `expected 8 grades, have
 // installs on the world without a GPU, and says what is on
 const cfg = globalThis.DAY_CONFIG;
 const day = globalThis.DayEngine.build(cfg, '2026-10-19');
-const world = globalThis.DayWorld.create({ ...events, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
+const world = globalThis.DayWorld.create({ ...events, removeAttribute() {}, setAttribute() {}, style: {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 360 }) }, cfg, day.spots, day.rooms);
 const { installLook } = await import(new URL('js/look.js', root).href);
 installLook(world);
 const api = R.installRenderPipeline(world);
