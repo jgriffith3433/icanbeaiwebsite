@@ -508,14 +508,15 @@ export function installMemory(day, world) {
       return { date: today(), deeds: Object.assign({}, d.deeds), zones: JSON.parse(JSON.stringify(d.zones)), marks: d.marks.length };
     },
     /** What the storm changed (live marks of the last days, the lawn and pond, the tomatoes): rows { id, n, text } for the title and the toast. */
+    /* ONE tally with both shapes (it was two keys, `tally:` and a later `tally,` that replaced it, so `rows` was undefined and
+       js/tally.js threw): rows / total / text / date for the title and the toast, items / hook / summary / changed for the card. */
     tally: () => {
       const t = today();
       const rows = tallyOf({ marks: liveMarks(store, t, CAP) }, liveFlag(store, t, parkRain), liveFlag(store, t, birdieRain));
-      return { rows, total: rows.length, text: rows.map((r) => r.text).join(" · "), date: t };
+      return Object.assign(tally(), { rows, total: rows.length, text: rows.map((r) => r.text).join(" · "), date: t });
     },
     since: (days) => sinceDays(store, today(), Math.max(1, days || 1)),
     marks: () => liveMarks(store, today(), CAP),
-    tally,
     now: () => Object.assign({}, nowInfo, { shift, total: Object.keys(store.days).reduce((n, k) => n + store.days[k].marks.length, 0), tally: tally() }),
     /** The playtest's clock: today is `n` real days on (kept for the session, so a reload keeps it). Rebuilds the marks. */
     shiftDays(n) {
