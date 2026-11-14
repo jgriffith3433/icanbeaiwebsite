@@ -4375,6 +4375,22 @@ async function nightGlow(options, t) {
   if (!(at01.on <= at20.on * 0.55)) t.problem("bug", `Fewer than half the night windows stayed off after bedtime (${at01.on} still on vs ${at20.on} at 20:00)`);
   if (!(at20.rooms > 0 && (at20.warm > 0 || at20.cool > 0))) t.problem("bug", "Lit windows have no interior-mapped rooms");
   if (!(at2330.on <= at20.on * 0.75)) t.problem("bug", `Windows barely dimmed by 23:30 (${at2330.on} vs ${at20.on} at 20:00)`);
+  t.progress(0.3);
+  // dusk 18:30 -> 19:30 scrubbed: the pools and lamps fade in without a hitch (the pool shader compiles at boot)
+  {
+    let worst = 0;
+    let last = performance.now();
+    for (let m = 18 * 60 + 30; m <= 19 * 60 + 30; m += 4) {
+      scrubTo(m);
+      await sleep(40);
+      const n = performance.now();
+      worst = Math.max(worst, n - last - 40);
+      last = n;
+    }
+    t.metric("duskScrubWorstMs", Math.round(worst));
+    t.event("lamp-pools-dusk", `scrubbed 18:30-19:30, worst frame gap ${Math.round(worst)} ms, pool glow ${Number(cs.info().poolGlow).toFixed(2)}`);
+    if (worst > 100) t.problem("bug", `Dusk scrub hitched ${Math.round(worst)} ms (limit 100)`);
+  }
   t.progress(0.35);
 
   // 2. 22:00 street: lit windows, neon, lamp pools, dynamic lights
@@ -4393,6 +4409,9 @@ async function nightGlow(options, t) {
   if (info.lit.windows < 0.7) t.problem("bug", `Windows aren't lit at 22:00 (${info.lit.windows})`);
   if ((props.signs || 0) < 4) t.problem("bug", `Fewer than 4 neon signs (${props.signs})`);
   if (info.lit.lamps < 0.7) t.problem("bug", `Lamp pools aren't on (${info.lit.lamps})`);
+  t.event("lamp-pools", `${info.lamps} lamp pools drawn=${info.poolsDrawn} glow ${Number(info.poolGlow).toFixed(2)} at 22:00 (${touch ? "390x844 low" : "desktop"})`);
+  t.metric("lampPoolGlow", Math.round((info.poolGlow || 0) * 100) / 100);
+  if (!(info.poolGlow > 0.8)) t.problem("bug", `Lamp pools are too faint at 22:00 (glow ${info.poolGlow})`);
   if (touch && (dyn.active || 0) > 4) t.problem("bug", `Phone has ${dyn.active} dynamic lights (cap 4)`);
   if (!touch && (dyn.active || 0) < 1) t.problem("warning", "No dynamic lamp lights near the camera");
   t.progress(0.6);
