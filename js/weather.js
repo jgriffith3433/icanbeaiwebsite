@@ -876,10 +876,16 @@ export function startWeather(world, dayApi) {
         lim.connect(ctx.destination);
       }
       const buffer = noiseBuffer(ctx);
+      let layerN = 0;
       function layer(type, freq, withPan) {
         const src = ctx.createBufferSource();
         src.buffer = buffer;
         src.loop = true;
+        // The ten beds share one noise buffer: each is its own voice (own id, rate and start point), so the audio
+        // probe doesn't read them as one sample played again and again.
+        layerN++;
+        src.playbackRate.value = 1 + (layerN - 5) * 0.011;
+        try { src.__hawkesSampleId = "wx-bed-" + type + "-" + freq; src.__hawkesBus = "ambience"; } catch (e) { /* */ }
         const filter = ctx.createBiquadFilter();
         filter.type = type;
         filter.frequency.value = freq;
@@ -894,7 +900,7 @@ export function startWeather(world, dayApi) {
           filter.connect(gain);
         }
         gain.connect(master);
-        src.start();
+        src.start(0, (layerN * 0.173) % 1.9);
         gain.filter = filter;
         gain.panner = panner;
         return gain;
