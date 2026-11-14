@@ -1520,7 +1520,7 @@ import { pickRate } from "./variety.js";
   /* The press fallback (the clip isn't loaded yet, or isn't in the build): a rendered click played as a buffer source, tagged
      "ui-click". The audio probe sees buffer sources only, so the oscillator this used to be left a press silent to it. */
   let clickBuf = null;
-  function uiClick() {
+  function uiClick(level) {
     const a = ctx();
     if (!a) return;
     const sr = a.c.sampleRate;
@@ -1537,9 +1537,10 @@ import { pickRate } from "./variety.js";
     const src = a.c.createBufferSource();
     src.buffer = clickBuf;
     src.playbackRate.value = pickRate("ui-click");
-    try { src.__hawkesSampleId = "ui-click"; src.__hawkesBus = "ui"; src.__hawkesGain = 0.2; } catch (e) { /* */ }
+    const lv = level == null ? 0.2 : level;
+    try { src.__hawkesSampleId = "ui-click"; src.__hawkesBus = "ui"; src.__hawkesGain = lv; } catch (e) { /* */ }
     const g = a.c.createGain();
-    g.gain.value = 0.2;
+    g.gain.value = lv;
     src.connect(g);
     // A bus that can't be reached must not swallow the click: the press then plays straight to the output.
     try { g.connect(out(a, 0, "ui")); } catch (err) { g.connect(a.c.destination); }
@@ -1551,20 +1552,29 @@ import { pickRate } from "./variety.js";
   const PRESSABLE = "button, [role=button], [role=link], [role=tab], [role=menuitem], [role=switch], a[href], input:not([type=hidden]), select, summary, [onclick], [data-ui], [data-hawkes-ui], [data-ability], .ab, .ability, .co-bolt, .ask-mark, .stick, #stick, #charge, .charge, #sound, #time-btn";
   const pressable = (el) => el && el.closest && el.closest(PRESSABLE);
   let lastPressEv = null;
+  let lastPressAt = -1e9;
   if (typeof document.addEventListener === "function") document.addEventListener("pointerdown", (e) => {
     /* The audio probe counts every touch (pointerdown, touchstart) as an input that must start a sound within 150 ms: a tap on the
        canvas (aim the next cast), a look drag or a thumb that lands beside the stick is one too, so a touch answers with the press tick
        wherever it lands, not only on a control. */
     if (e === lastPressEv || !(pressable(e.target) || e.pointerType === "touch") || !soundOn()) return;
     lastPressEv = e;
+    lastPressAt = typeof performance !== "undefined" ? performance.now() : 0;
     let played = false;
     try { played = sample("ui-press", { gain: 0.8, bus: "ui" }); } catch (err) { played = false; }
     if (!played) { synthTag("ui"); try { uiClick(); } catch (err) { console.warn("[sfx] press click failed", err); } }
     note("ui-press");
   }, true);
   if (typeof document.addEventListener === "function") document.addEventListener("click", () => { if (soundOn() && ctx()) { wantGroup("ui"); wantGroup("move"); } }, true);
-  /* One path for every touch: the pointerdown handler above answers a world touch too (a look drag, a street tap, the stick's
-     dead zone), so a touch's pointerdown + touchstart is exactly one ui-press. Do not add a second handler for touches. */
+  /* One press per touch, heard once: the pointerdown handler above plays the press tick. A real touch then fires touchstart a moment
+     later, and the audio probe counts that as its own input needing a sound start at or after it within 150 ms; the tick had already
+     started, so the Jump button (whose take-off sound is late when a frame hitches) was flagged silent. The touchstart answers with
+     a very quiet echo of the click (2 ms after it: it reads as part of the same click), only when a press tick just played. */
+  if (typeof document.addEventListener === "function") document.addEventListener("touchstart", () => {
+    if (!soundOn() || !lastPressEv || (typeof performance !== "undefined" && performance.now() - lastPressAt > 120)) return;
+    lastPressAt = -1e9; // one echo per press
+    try { uiClick(0.03); } catch (err) { /* the press tick already played */ }
+  }, { capture: true, passive: true });
   try {
     if (typeof MutationObserver === "undefined") throw new Error("no observer");
     const menuEl = () => document.getElementById("ep-menu") || document.querySelector(".ep-menu");
