@@ -289,7 +289,7 @@ window.DAY_CONFIG = {
      ------------------------------------------------------------------------ */
   wake: {
     stretch: { clip: "lookup", secs: 1.3 }, // beside the bed: arms up, a look at the window
-    cutSecs: 0.35, // the flash that hides the move to the roof
+    cutSecs: 0.35, // (unused since ready no longer waits on a timer) the flash that hides the move to the roof
     spot: { x: -21, z: 0.5, yaw: 0.92, from: 14 }, // the apartment roof, as the cold open's
     camera: { alpha: -2.45, beta: 1.22, radius: 5.6, from: 9, secs: 1.0 }, // dives in from 9 m behind him
     sky: { state: "fog", intensity: 0.6, flash: [90, -0.3], flashAgainSecs: 2.2 }, // fog and far lightning: both read at night
