@@ -10881,6 +10881,83 @@ function audioReport() {
     casts: X ? X.casts.slice() : [],
   };
 }
+/* ---------------- first-rain: clarity. One glowing Rain icon and a pulsing "Tap the street" arrow, the other four verbs hidden until Rain is used once ----------------
+   Needs ?playtest=first-rain ({"touch":true} = 390x844 by touch). Setup (named): the saved first-rain flag, the street lesson and
+   the cold open cleared, the title quiet. Real input: Take control (the button by touch), a tap on the canvas (the street) which casts Rain.
+   Events first-rain-state (visible verbs, sizes, cue, scroll), first-rain-refused, first-rain-cast, first-rain-open; metrics
+   firstRainVisibleVerbs (1 at the start, 5 after), firstRainMinPx, firstRainScrollX. */
+function firstRainBar() {
+  const out = [];
+  document.querySelectorAll("#abilitybar .ab").forEach((b) => {
+    const r = b.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && getComputedStyle(b).display !== "none") out.push({ id: b.id.replace("ability-", ""), w: Math.round(r.width), h: Math.round(r.height) });
+  });
+  return out;
+}
+async function firstRain(options, t) {
+  const touch = !!(options && options.touch);
+  t.scene(touch ? "Phone: first Rain" : "First Rain");
+  await t.until(() => window.day.now().frame, 15000, "the first frame");
+  const D = window.day;
+  const P = window.powers || D.powers;
+  const C = D.control;
+  const F = D.firstrain;
+  if (!F || !P) { t.problem("bug", "day.firstrain or powers is missing"); return; }
+  if (C.mode() === "control") { pressKey("Escape"); await t.until(() => C.mode() === "schedule", 15000, "him back on his day").catch(() => {}); }
+  try { F.reset(); if (D.street && D.street.stop) D.street.stop("check"); if (D.title && D.title.quiet) D.title.quiet(); } catch (e) { /* ok */ }
+  if (touch) { document.documentElement.classList.add("touch-ui"); if (C.touch) C.touch(true); }
+  for (let k = 0; k < 4 && C.mode() !== "control"; k++) {
+    if (k > 0 && D.jump) D.jump("19:00");
+    await sleep(400);
+    if (touch) { const tk = $("control"); if (tk && !tk.disabled) await tapEl(tk); else pressKey("Enter"); } else pressKey("Enter");
+    await t.until(() => C.mode() === "control", 2500, "Take control").catch(() => {});
+  }
+  if (C.mode() !== "control") { t.problem("bug", "Take control never handed him over"); return; }
+  if (C.place) C.place(-21, 0.5, 1.5708, {});
+  await t.until(() => document.documentElement.classList.contains("first-rain"), 3000, "the first-Rain bar").catch(() => {});
+  await sleep(600);
+  try { P.abilities.reset && P.abilities.reset(100); } catch (e) { /* ok */ }
+  const bar = firstRainBar();
+  const cue = $("first-rain-cue");
+  const cueOn = !!cue && cue.getBoundingClientRect().width > 0;
+  const scrollX = Math.max(0, document.documentElement.scrollWidth - window.innerWidth);
+  const minPx = bar.length ? Math.min(...bar.map((b) => Math.min(b.w, b.h))) : 0;
+  t.metric("firstRainVisibleVerbs", bar.length);
+  t.metric("firstRainMinPx", minPx);
+  t.metric("firstRainScrollX", scrollX);
+  t.event("first-rain-state", `visible verbs ${JSON.stringify(bar)}, cue ${cueOn ? "shown" : "MISSING"}, scrollX ${scrollX}`);
+  if (bar.length !== 1 || bar[0].id !== "rain") t.problem("bug", `The first screen shows ${bar.length} verbs (${bar.map((b) => b.id).join(", ")}); it should be Rain alone`);
+  if (!cueOn) t.problem("bug", "The pulsing 'Tap the street' arrow isn't on screen");
+  if (minPx < 44) t.problem("bug", `The Rain button is ${minPx} px (44 minimum)`);
+  if (scrollX > 1) t.problem("bug", `The page scrolls sideways by ${scrollX} px`);
+  const hint = document.querySelector(".control-hint");
+  if (hint && !hint.hidden && getComputedStyle(hint).display !== "none") t.problem("bug", "The hint paragraph is still on screen next to the Rain icon");
+  t.progress(0.4);
+
+  // a hidden verb is refused
+  const refused = !P.command("bolt", "key");
+  t.event("first-rain-refused", `Lightning ${refused ? "refused (hidden until Rain)" : "ACCEPTED"}`);
+  if (!refused) t.problem("bug", "Lightning worked before Rain was used");
+
+  // the tap on the street casts Rain
+  const cv = document.querySelector("canvas");
+  const rc = cv.getBoundingClientRect();
+  const x = rc.left + rc.width / 2;
+  const y = rc.top + rc.height * 0.62;
+  const sendPtr = (type) => cv.dispatchEvent(new PointerEvent(type, { pointerId: 5, pointerType: touch ? "touch" : "mouse", isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === "pointerup" ? 0 : 1, bubbles: true, cancelable: true }));
+  sendPtr("pointerdown");
+  await sleep(90);
+  sendPtr("pointerup");
+  const cast = await t.until(() => !F.now().on, 2500, "Rain from the street tap").then(() => true).catch(() => false);
+  t.event("first-rain-cast", cast ? "a tap on the street called Rain" : "the tap did not call Rain");
+  if (!cast) t.problem("bug", "Tapping the street didn't call Rain");
+  await sleep(600);
+  const after = firstRainBar();
+  t.metric("firstRainVisibleVerbs", after.length);
+  t.event("first-rain-open", `verbs after Rain: ${after.map((b) => b.id).join(", ")}`);
+  if (after.length < 5) t.problem("bug", `After the first Rain the bar shows ${after.length} verbs (5 expected)`);
+  t.progress(1);
+}
 async function audioCheck(options, t) {
   const touch = !!(options && options.touch);
   t.scene(touch ? "Phone: first tap" : "First tap");
@@ -10930,6 +11007,9 @@ async function audioCheck(options, t) {
 
   // The first cast, on the roof: every verb open, he stands on the apartment roof, a bolt lands on the street beside a
   // pedestrian and rain follows. Each must be accepted, the strike must show on the street, and a pedestrian must react.
+  await sleep(300);
+  { const bar = firstRainBar(); t.metric("firstRainVisibleVerbs", bar.length); t.event("first-rain-state", `first screen under control: verbs ${bar.map((b) => b.id).join(", ")}, cue ${$("first-rain-cue") && $("first-rain-cue").getBoundingClientRect().width > 0 ? "shown" : "none"}`); }
+  try { if (D.firstrain) D.firstrain.skip(); } catch (e) { /* ok */ }
   try { if (P.gate) P.gate(null); if (P.aimAt) P.aimAt(null); if (D.street && D.street.stop) D.street.stop("check"); } catch (e) { /* ok */ }
   try { ["bolt", "rain", "wind", "fog", "sunbreak"].forEach((id) => P.abilities.unlock && P.abilities.unlock(id)); } catch (e) { /* ok */ }
   if (C.place) C.place(-21, 0.5, 1.5708, {});
@@ -12648,6 +12728,7 @@ installPlaytest({
     { id: "night-glow", title: "District glow after dusk: windows light on schedules with interior-mapped rooms, neon flickers, lamp pools (8 nearest dynamic / 4 on phone), car headlight flares; wet street uses SSR on high and a reflection probe on low; a bolt flickers windows", seconds: 160, tags: ["look", "photos", "phone", "feel"], description: "Day bar beside the car (setup), Enter / Take control tap, scrub 17→01 for window counts, walk the avenue at 22:00, key 3 for rain reflections. Events night-glow-schedule / -street / -reflect / -fps / -flicker; metrics windowOnDusk, windowOnNight, windowOnLate, dynamicLights, nightNeonSigns, nightReflect, nightFps. Option {\"touch\":true} for 390x844 low quality." },
     { id: "weather", title: "Take control outside, walk to the avenue, and switch clear, clouds, rain, storm, fog, wind and snow (keys 1–7). Each blends and gets a shot; rain and storm leave the road wet. Then the Q wheel and a phone tap.", seconds: 110, tags: ["weather"], description: "Day bar to the front door (setup), Sound on, Enter, WASD to the avenue. Keys 1–7 are the seven states. Hold Q opens the wheel; the Weather button is the phone tap." },
     { id: "atmosphere", title: "Rain light then heavy (sight and sound), the music tenses as Pressure fills, M mutes and the choice is saved, frame rate stays over 30 fps in rain and storm", seconds: 70, tags: ["weather", "audio"], description: "Sound on, take control, rain at 0.3 then key 3, Pressure low then high (setup shortcut), M twice, storm fps sample." },
+    { id: "first-rain", title: "First Rain: after Take control the ability bar is one glowing Rain icon with a pulsing Tap the street arrow (the other four verbs hidden and refused); a tap on the street calls Rain and the bar opens to five", seconds: 40, tags: ["clarity", "phone", "first-minute"], description: "Load with ?playtest=first-rain ({\"touch\":true} for 390x844). Setup: first-rain flag, street lesson cleared, title quiet. Real input: Take control, a tap on the street. Events first-rain-state / first-rain-refused / first-rain-cast / first-rain-open; metrics firstRainVisibleVerbs, firstRainMinPx, firstRainScrollX." },
     { id: "audio-check", title: "Audio from the first tap: sound is on by default, the city ambience plays within 2 s of the first tap with no settings change, Rain, Gale, Fog, Sun break and Lightning each play a distinct cast sound, music and ambience duck at least 6 dB under a voice line so the line is the loudest bus, and the 44 px sound toggle keeps the player's mute", seconds: 60, tags: ["audio", "phone", "first-minute"], description: "Load with ?playtest=audio-check ({\"touch\":true} for 390x844). Setup: saved mute cleared, title quiet. Real input: one tap or click on the canvas, Enter or the Take control button, taps on the sound toggle; casts by the named shortcut powers.command; a voiced line by voice.say. Events audio-before-tap / audio-ambience / audio-cast-<power> / audio-casts / audio-duck / audio-report; metrics audioAmbienceMs, audioCastsDistinct, audioDuckMusicDb, audioDuckAmbienceDb, audioToggleMinPx. Run at 1280x720 and 390x844 touch." },
     { id: "stem-score", title: "Stem score: Play opens on the 4-note motif (title, then the cold open), three stems stream after the first input and play in sync, a held bolt raises the tension layer within one bar, a tornado brings the storm layer, an episode success plays the resolution sting; on a phone the stems stay under 1.5 MB", seconds: 90, tags: ["audio", "music", "phone", "opening"], description: "Load with ?playtest=stem-score. Setup: every icanbe.* key cleared, cold open armed, title up. Real input: click or tap Play, hold the bolt (E or the Bolt button). Shortcuts: powers.command('tornado'), a day:episode score event. Events stem-motif-title / -coldopen / -ready / -windup / -storm / -sting / -transfer; metrics stemLayers, stemTensionSeconds, stemStormSeconds, stemMbAfterInput. Run at 1280x720 and 390x844 touch." },
     { id: "day-sound", title: "Diegetic day soundscapes: at 1200× the sound log shows distinct beds for home morning, commute, office, park lunch, evening TV and night; the car radio names a weather the player called today; office keyboard starts within 3 s of the desk and stops when he leaves; on phone low quality at most 3 loops play at once", seconds: 180, tags: ["audio", "phone", "story"], description: "Load with ?playtest=day-sound ({\"touch\":true} for 390x844). Sound on (real pointer), 1200× through the day, scrub to commute and desk. Events day-scape-* / day-radio / day-keyboard-on / day-keyboard-off / day-phone-cap; metrics dayScapes, dayMaxLoops, dayKeyboardSec, dayPhoneLoops." },
@@ -12767,6 +12848,7 @@ installPlaytest({
       else if (id === "power-sfx") await powerSfx(options, t);
       else if (id === "stem-score") await stemScore(options, t);
       else if (id === "audio-check") await audioCheck(options, t);
+      else if (id === "first-rain") await firstRain(options, t);
       else if (id === "weather-life") await weatherLife(options, t);
       else if (id === "powers") await powers(options, t);
       else if (id === "ui-art-kit") await uiArtKit(options, t);
