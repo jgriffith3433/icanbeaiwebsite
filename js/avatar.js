@@ -56,6 +56,14 @@ export function clipAvatar(root, animationGroups, opts = {}) {
     play(clip, speed, dt) {
       const g = pick(clip);
       if (g && g !== current) {
+        /* The very first clip (or one after everything faded out) starts at full weight: a weight ramping up from 0
+           shows the bind pose underneath for ~0.3 s (his arms out, boots splayed), which is the odd default pose. */
+        let total = 0;
+        weights.forEach((w) => (total += w));
+        if (total < 0.5) {
+          weights.forEach((w, grp) => weights.set(grp, grp === g ? 1 : 0));
+          g.weight = 1;
+        }
         current = g;
         if (!g.isPlaying) g.start(loops.has(clip), 1, g.from, g.to);
         if (!loops.has(clip)) g.goToFrame(g.from);
@@ -67,6 +75,14 @@ export function clipAvatar(root, animationGroups, opts = {}) {
       const k = 1 - Math.exp(-blend * dt);
       weights.forEach((w, grp) => {
         const next = w + ((grp === current ? 1 : 0) - w) * k;
+        weights.set(grp, next);
+      });
+      /* The weights always add up to 1: the share that is missing would be filled by the node's stale "original"
+         value (a half-faded pose, or the bind pose), and an idle at 0.97 lets that leak into the hands and boots. */
+      let sum = 0;
+      weights.forEach((w) => (sum += w));
+      weights.forEach((w, grp) => {
+        const next = sum > 1e-4 ? w / sum : grp === current ? 1 : 0;
         weights.set(grp, next);
         grp.weight = next;
         if (next < 0.01 && grp !== current && grp.isPlaying) grp.stop();

@@ -149,7 +149,9 @@ function idleAt(t) {
   turn(sk, p, "Neck", X, -0.012 * Math.sin(b - 0.9));
   turn(sk, p, "Head", Y, 0.07 * Math.sin(s + 0.8));
   const sway = 0.012 * Math.sin(b - 0.5);
-  arms(p, [0.17, -0.98, 0.02 + sway], [0.13, -0.95, 0.24 + sway]);
+  /* upper arm a little out and forward, forearm a soft bend forward: the hands hang beside the thighs and in front of
+     the hip line (never behind the back), the elbows clear of the ribs */
+  arms(p, [0.2, -0.97, 0.1 + sway], [0.12, -0.9, 0.42 + sway]);
   return inPlace(p, STAND - 0.003 * (1 - breath) / 2);
 }
 /* a levelled head for the Mixamo clips: the neck's lean is what the retarget leaves (kept to the stride's own) */
@@ -279,7 +281,7 @@ const CLIPS = {
       turn(sk, up, "Spine2", X, -0.28);
       turn(sk, up, "Spine1", X, -0.12);
       turn(sk, up, "Head", X, -0.55);
-      arms(up, [0.2, -0.55, 0.15], [0.12, -0.9, 0.05], [-0.22, -0.5, 0.12], [-0.1, -0.85, 0.08]);
+      arms(up, [0.24, -0.6, 0.3], [0.12, -0.85, 0.35], [-0.26, -0.55, 0.28], [-0.1, -0.8, 0.38]);
       const p = blendPose(idleAt(t), up, k * (1 - hold));
       return inPlace(p, STAND);
     }),
