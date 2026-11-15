@@ -28,7 +28,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # The tests run but no longer stop the site going live (J, 2026-11-14: "Skip the tests and just go live asap").
+      # They were failing on main before this. Remove continue-on-error once they pass again.
       - run: npm test
+        continue-on-error: true
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
