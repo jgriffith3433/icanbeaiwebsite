@@ -10,7 +10,7 @@ const src = fs.readFileSync(new URL("js/transition.js", root), "utf8");
 const ep = fs.readFileSync(new URL("js/episodes.js", root), "utf8");
 const app = fs.readFileSync(new URL("js/app.js", root), "utf8");
 const score = fs.readFileSync(new URL("js/score.js", root), "utf8");
-const index = fs.readFileSync(new URL("index.html", root), "utf8");
+const index = fs.readFileSync(new URL("home.html", root), "utf8");
 const play = fs.readFileSync(new URL("js/playtest.js", root), "utf8");
 
 let failed = 0;

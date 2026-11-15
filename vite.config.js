@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 
-// index.html's module scripts (js/app.js: Babylon 9, Havok, the day; js/playtest.js) are bundled into dist/assets.
+// home.html (the game page; `/` is index.html, a link-free math visualization whose gate sends bots and any URL with a
+// query or hash to home.html) has module scripts (js/app.js: Babylon 9, Havok, the day; js/playtest.js) that are bundled into dist/assets.
 // The rest of the site is static and goes into dist as it is: the other pages, the classic scripts they load
 // (js/hawkes-release.js, a copy of a shared file; the analytics SDK comes from Gen), releases.json, the CNAME and models/
 // (Small Weather's GLB, loaded by URL from day.config.js control.model).
@@ -54,6 +55,8 @@ export default defineConfig({
   build: {
     target: 'es2022',
     rollupOptions: {
+      // Two pages: the visualization at / and the bundled game at /home.html
+      input: { main: path.resolve('index.html'), home: path.resolve('home.html') },
       output: {
         // Parallel downloads instead of one 2.3 MB (gzip) script: Babylon (ONE chunk),
         // never split it into more pieces (not by folder, not its Shaders): Babylon's modules import each other both ways, so any split

@@ -1,5 +1,7 @@
 # A day
 
+**Pages.** `/` (`index.html`) is only a full-screen math visualization: no buttons, no links, no way in. The game is `home.html`. The visualization's inline gate sends bots (`navigator.webdriver`) and any URL with a query string or hash (`?playtest=`, `?view=public`) straight to `home.html`, so playtests and links keep working. Everything below that says "the page" means `home.html`.
+
 I Can Be: a third-person game. Small Weather (he/him, the storm caller from Dose Of Destruction) lives his developer's day on autopilot, in real time. Open the site and you see what he's doing right now; drag the day bar to look around the day, or play it at 10×–1200×. Take control and he's yours: walk the city, run, jump the roofs, set the weather, call a storm, throw lightning, a gust or a tornado, and play the chapter episodes. Let go and he walks back to his day. Babylon.js 9 with Havok physics. More in [AGENTS.md](AGENTS.md#direction).
 
 **First visit.** The first time the page opens, a card walks the player through it in under a minute: take control, walk, jump, one lightning strike, let go. Skip ends it; done or skipped, it doesn't come back (localStorage `icanbe.tutorial`; `day.tutorial.reset()` in the console shows it again). Lines in `day.config.js` `tutorial`, code in `js/tutorial.js`.
@@ -10,7 +12,7 @@ I Can Be: a third-person game. Small Weather (he/him, the storm caller from Dose
 
 Double-click `auto-start.bat`. The first time, it installs the packages (Vite, Babylon.js 9, Havok). Then it serves the site at **http://localhost:8092** and opens your browser. `auto-stop.bat` stops whatever is running on port 8092. From a terminal you can also use `npm run dev`, `npm test` (builds the day and the world in Node and checks the physics), `npm run build` (the site in `dist/`, about 4 minutes), or `npm run preview` (serves `dist/` on port 8093).
 
-The page needs Vite: opening `index.html` straight from disk no longer works, because Babylon and Havok come from npm.
+The page needs Vite: opening `home.html` straight from disk no longer works, because Babylon and Havok come from npm.
 
 ## How it fits together
 
@@ -30,10 +32,10 @@ The page needs Vite: opening `index.html` straight from disk no longer works, be
 ## Versions and publishing
 
 Going live is Hawkes Studio's go live (beta, playtested, then J types `DEPLOY icanbe`). Before it, Studio runs
-`node scripts/stamp-build.mjs` on beta: it stamps `?v=<hash of the files>` on every local file link in `index.html` and
+`node scripts/stamp-build.mjs` on beta: it stamps `?v=<hash of the files>` on every local file link in `home.html` and
 the same hash in `<meta name="build">`, so browsers fetch fresh CSS and JS the moment it's live. The page also asks
 browsers not to cache it (GitHub Pages can't send cache headers, so `<meta>` tags do it, and Pages may still hold
-`index.html` for about 10 minutes). On the live site an open tab checks the build every 10 minutes and reloads when it
+`home.html` for about 10 minutes). On the live site an open tab checks the build every 10 minutes and reloads when it
 changes. The local dev server sends `no-store`.
 
 The version is a release (Hawkes Studio `src/releases.ts`): a semver bumped at each go live (minor when there's

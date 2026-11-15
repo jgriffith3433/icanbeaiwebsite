@@ -1,311 +1,69 @@
 <!doctype html>
-<html lang="en" class="loading">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <meta name="description" content="Small Weather lives his day on his own, in real time. Take control: walk the city, jump the roofs, and call the weather down. Rain, storms, lightning." />
-    <meta name="theme-color" content="#10131a" />
-    <!-- Don't cache this page. GitHub Pages can't send headers, so ask here. -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <!-- The build stamp (scripts/stamp-build.mjs). The version is in releases.json (whatsnew.html). -->
-    <meta name="build" content="b2c4a141f5" />
-    <title>I Can Be · Small Weather</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310131a'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23f6f1e8' stroke-width='2'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="css/ui-kit.css?v=b2c4a141f5" />
-    <link rel="stylesheet" href="css/site.css?v=b2c4a141f5" />
-    <link rel="stylesheet" href="css/hud.css?v=b2c4a141f5" />
-    <style id="loading-css">
-      /* The loading card: static, shown from the first paint. Hidden when html loses .loading (js/loading below). */
-      html.loading .hud, html.loading .hud-left, html.loading .side, html.loading .privacy-tag, html.loading .version-tag, html.loading .public-toggle, html.loading .update-pill { visibility: hidden !important; }
-      #loading { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; overflow: auto;
-        padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-        background: radial-gradient(120% 90% at 50% 20%, #1a2233 0%, #0b0e15 70%); color: #f6f1e8; font: 500 1rem/1.4 Outfit, system-ui, sans-serif; opacity: 1; transition: opacity .9s ease; }
-      #loading[hidden] { display: none; }
-      #loading.leaving { opacity: 0; pointer-events: none; }
-      #loading .card { box-sizing: border-box; width: min(100%, 380px); margin: auto; text-align: left; }
-      #loading .kicker { margin: 0; font: 600 .78rem/1 Outfit, system-ui, sans-serif; letter-spacing: .32em; text-transform: uppercase; color: #f0c27a; text-shadow: 0 0 18px rgba(240,194,122,.5); }
-      #loading h2 { margin: 10px 0 0; font: 600 clamp(2rem, 9vw, 3.2rem)/1 Fraunces, Georgia, serif; letter-spacing: -.01em; }
-      #loading .bar { height: 6px; margin-top: 22px; border-radius: 999px; background: rgba(246,241,232,.14); overflow: hidden; }
-      #loading .bar i { display: block; height: 100%; width: 4%; border-radius: inherit; background: #f0c27a; box-shadow: 0 0 12px rgba(240,194,122,.6); transition: width .3s ease; }
-      #loading .msg { margin: 12px 0 0; font-size: .95rem; color: rgba(246,241,232,.8); }
-      #loading .retry { display: none; margin-top: 16px; min-height: 48px; min-width: 44px; padding: 12px 28px; border-radius: 999px; border: 0; background: #f0c27a; color: #141210; font: 600 1rem Outfit, system-ui, sans-serif; cursor: pointer; }
-      #loading.failed .retry, #loading.slow .retry { display: inline-block; }
-      #loading.failed .bar { display: none; }
-      @media (max-height: 520px) { #loading .card { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; align-items: center; width: min(100%, 620px); } #loading .bar, #loading .msg, #loading .retry { grid-column: 2; margin-top: 8px; } #loading .kicker, #loading h2 { grid-column: 1; } #loading h2 { font-size: 2rem; } }
-    </style>
-    <script>
-      /* Show the HUD (clock, timeline, action log, details) only when testing locally. */
-      (function () {
-        var h = location.hostname;
-        var local = location.protocol === "file:" || h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1" ||
-          /^(10|192\.168)\./.test(h) || /^172\.(1[6-9]|2\d|3[01])\./.test(h) || /\.local$/.test(h);
-        var root = document.documentElement;
-        /* The public view: every real host, or ?view=public anywhere (the playtests pass it). It is the quiet page: the status
-           card, one Time control, Take control and Episodes. Local hosts keep the full developer HUD. */
-        var forced = false;
-        try { forced = new URLSearchParams(location.search).get("view") === "public"; } catch (e) {}
-        if (!local) root.classList.add("public", "preview-public");
-        else if (forced) root.classList.add("preview-public", "view-forced");
-        /* No shipped page (live or beta) shows Studio's debug badge / bug button; ?debug or ?report=1 brings it back. */
-        if (/(^|\.)icanbe\.ai$/.test(h)) root.classList.add("live");
-        try { var qs = new URLSearchParams(location.search); if (qs.get("report") === "1" || qs.has("debug")) root.classList.add("show-report"); } catch (e) {}
-      })();
-    </script>
-    <!-- Hawkes Analytics (AGENTS.md "Analytics"). The build is written by scripts/stamp-build.mjs. -->
-    <script>
-      /* Preload: on a phone the 0.8 MB model copy starts downloading now, in parallel with the bundle, so the model is on him when
-         the page is up (js/app.js takes this Response for its first fetch; same URL as day.config.js control.modelPhone). */
-      (function () {
-        try {
-          var q = location.search;
-          if (/[?&]blockmodel=1/.test(q) || /[?&]block=model/.test(q) || window.__blockModel) return;
-          var phone = /[?&]quality=low/.test(q) || (window.matchMedia && (matchMedia("(pointer:coarse)").matches || window.innerWidth <= 700));
-          if (phone && window.fetch) { window.__earlyModel = { url: "models/small-weather.phone.glb", p: fetch("models/small-weather.phone.glb", { cache: "no-cache" }).catch(function () { return null; }) }; }
-        } catch (e) { /* no preload */ }
-      })();
-    </script>
-    <script>window.HAWKES_BUILD = {"version":"1.5.0+b2c4a141f5","commit":"5a66b3f970","date":"2026-10-28T12:00:58Z"};</script>
-    <script>
-      /* A playtest bot's tab logs what it sends (the SDK's debug mode), so the playtest can show the events going out. */
-      (function () {
-        try {
-          var q = new URLSearchParams(location.search);
-          if ((navigator.webdriver || q.get("playtest")) && !q.get("hawkes-analytics-debug")) {
-            q.set("hawkes-analytics-debug", "1");
-            history.replaceState(history.state, "", location.pathname + "?" + q.toString() + location.hash);
-          }
-        } catch (e) {}
-      })();
-    </script>
-    <script src="https://hawkesgen.ai/sdk/analytics@1.js" data-product="icanbe" defer></script>
-    <!-- deferred, so a slow hawkesgen.ai can't hold up parsing; a module script runs in order after it, before js/app.js -->
-    <script type="module">window.hawkesAnalytics && hawkesAnalytics.loadStart();</script>
-  </head>
-  <body>
-    <!-- The loading card: plain HTML and CSS, so it shows from the first paint. window.__loading (below) fills the bar from real load events. -->
-    <div id="loading" role="status" aria-live="polite">
-      <div class="card">
-        <p class="kicker">I Can Be</p>
-        <h2>Small Weather</h2>
-        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="4"><i id="loading-bar"></i></div>
-        <p class="msg" id="loading-msg">Loading…</p>
-        <button type="button" class="retry" id="loading-retry">Try again</button>
-      </div>
-    </div>
-    <script>
-      /* Loading progress from real events: the page's scripts (their load events), his model's bytes (js/app.js), the first
-         frame and the title (js/title.js). Parts weigh: scripts .5, first frame .25, title .25 (his model streams in behind the title: not gated, so a phone on Slow 4G isn't held). No timers poll. */
-      (function () {
-        var html = document.documentElement, card = document.getElementById("loading"), bar = document.getElementById("loading-bar");
-        var msg = document.getElementById("loading-msg"), retry = document.getElementById("loading-retry");
-        var W = { scripts: 0.5, model: 0, frame: 0.25, title: 0.25 }, got = { scripts: 0, model: 0, frame: 0, title: 0 };
-        var t0 = performance.now(), MIN_MS = 700, state = "loading", log = [], slowT = 0, deadlineT = 0, DEADLINE_MS = 15000;
-        var TEXT = { scripts: "Loading…", model: "Loading…", frame: "Loading…", title: "Loading…" }; /* one fixed line: each new line counts as more words on screen in the first minute */
-        function emit(action, extra) {
-          var d = { action: action, t: Math.round(performance.now() - t0), pct: pct() };
-          if (extra) for (var k in extra) d[k] = extra[k];
-          log.push(d); if (log.length > 40) log.shift();
-          try { window.dispatchEvent(new CustomEvent("day:loading", { detail: d })); } catch (e) {}
-        }
-        function pct() { var p = 0; for (var k in W) p += W[k] * got[k]; return Math.round(p * 100); }
-        function paint(part) {
-          if (state !== "loading") return;
-          var p = Math.max(4, pct());
-          bar.style.width = p + "%"; bar.parentNode.setAttribute("aria-valuenow", String(p));
-          /* Name what is still pending, not the last part that moved: with everything in but the shader warm-up the card
-             used to keep saying "Loading Small Weather…" at a full bar. */
-          if (!part) { for (var k in W) if (got[k] < 1) { part = k; break; } if (!part) part = "frame"; }
-          msg.textContent = TEXT[part];
-        }
-        function set(part, frac) {
-          if (state !== "loading" || !(part in W)) return;
-          frac = Math.max(0, Math.min(1, frac));
-          if (frac <= got[part]) return;
-          got[part] = frac; paint(frac < 1 ? part : null);
-          if (part === "scripts" && frac >= 1) armDeadline();
-          emit("progress", { part: part, frac: Math.round(frac * 100) / 100 });
-        }
-        function finish() {
-          if (state !== "loading") return;
-          state = "done"; clearTimeout(slowT);
-          bar.style.width = "100%";
-          /* Handoff: the card fades over the title's crane (already under it) so the day never cuts to a black frame.
-             Theme beds unlock on the first gesture when Sound is saved on (js/score.js listens for day:loading handoff). */
-          /* the label goes at once: the scene is ready, so no "Loading…" text rides the 0.9 s fade over the title */
-          msg.style.visibility = "hidden"; bar.parentNode.style.visibility = "hidden";
-          card.classList.add("leaving");
-          html.classList.remove("loading");
-          emit("handoff", { seconds: Math.round((performance.now() - t0) / 100) / 10 });
-          setTimeout(function () { card.hidden = true; emit("done", { seconds: Math.round((performance.now() - t0) / 100) / 10 }); }, 920);
-        }
-        function done() {
-          if (state !== "loading") return;
-          got = { scripts: 1, model: 1, frame: 1, title: 1 };
-          var wait = MIN_MS - (performance.now() - t0);
-          if (wait > 0) setTimeout(finish, wait); else finish();
-        }
-        function fail(why, what) {
-          if (state === "done") return;
-          state = "failed"; clearTimeout(slowT);
-          card.classList.add("failed"); card.classList.remove("slow");
-          msg.textContent = "Couldn't load " + (what || "the day") + ". Check your connection and try again.";
-          emit("fail", { why: String(why || "") });
-        }
-        retry.addEventListener("click", function () { location.reload(); });
-        // Scripts: capture-phase load/error events on <script> elements (they don't bubble).
-        document.addEventListener("load", function (e) {
-          var el = e.target; if (!el || el.tagName !== "SCRIPT" || !el.src) return;
-          if (/app\.js|index-.*\.js|\/assets\//.test(el.src)) { set("scripts", 1); armDeadline(); }
-        }, true);
-        /* Real download progress for the bundle: the build lists every chunk as <link rel="modulepreload">; each one's load event
-           moves the bar through the first part of "scripts" (up to .9 of it; the entry module evaluating is the last .1). On Slow 4G
-           the bar now moves chunk by chunk instead of sitting at 4% until everything lands. */
-        var pre = document.querySelectorAll('link[rel="modulepreload"]'), preGot = 0;
-        if (pre.length) document.addEventListener("load", function (e) {
-          var el = e.target; if (!el || el.tagName !== "LINK" || el.rel !== "modulepreload") return;
-          preGot++; set("scripts", 0.9 * Math.min(1, preGot / pre.length));
-        }, true);
-        document.addEventListener("error", function (e) {
-          var el = e.target; if (el && el.tagName === "SCRIPT" && el.src && /app\.js|\/assets\//.test(el.src)) fail("script " + el.src, "the game");
-        }, true);
-        /* A module that throws while it evaluates (a circular chunk's TDZ, a bad import) fires no <script> error event: the card sat at 50%
-           forever. Until the day exists (window.day.now is set by js/main.js), an uncaught error or rejection from the game's own files is a failed
-           boot: say so, with Try again, instead of a frozen bar. After the day is up a stray error never takes the card down. */
-        function bootError(why, file) {
-          if (state !== "loading" || (window.day && window.day.now)) return;
-          if (file && !/\/assets\/|\/js\/|app\.js/.test(String(file))) return;
-          fail(why, "the game");
-        }
-        window.addEventListener("error", function (e) { if (e.target && e.target !== window) return; bootError((e.error && e.error.message) || e.message, e.filename); });
-        window.addEventListener("unhandledrejection", function (e) { var r = e.reason; bootError((r && r.message) || r, (r && r.stack) || ""); });
-        slowT = setTimeout(function () { if (state === "loading") { card.classList.add("slow"); msg.textContent = "Still loading… this is taking longer than usual."; emit("slow"); } }, 30000);
-        /* Hard deadline (one timer, no polling), counted from the moment the scripts are in, not from the page opening: on a slow
-           phone connection the bundle alone can take longer than 15 s, and the old clock declared "Couldn't load" (or a stall) while
-           bytes were still arriving. Once the code is in, the card never outlives DEADLINE_MS: if a gate (first frame, title, shader
-           warm-up) never reports, either the game is already drawing, so hand off to play, or it isn't, so show Try again.
-           While the bundle downloads, the "slow" note and Try again at 30 s are the only change. */
-        function armDeadline() {
-          if (deadlineT || state !== "loading") return;
-          deadlineT = setTimeout(function () {
-            if (state !== "loading") return;
-            var up = false;
-            try { up = !!(window.day && window.day.now && window.day.now().frame); } catch (e) {}
-            emit("deadline", { up: up });
-            if (up) { got = { scripts: 1, model: 1, frame: 1, title: 1 }; finish(); }
-            else fail("no first frame within " + DEADLINE_MS + " ms of the code arriving", "the game");
-          }, DEADLINE_MS);
-        }
-        window.__loading = { set: set, done: done, fail: fail, state: function () { return state; }, pct: pct, log: function () { return log.slice(); } };
-        emit("show");
-      })();
-    </script>
-    <canvas id="view" aria-label="A 3D view of Small Weather's day"></canvas>
-
-    <header class="hud top">
-      <section class="panel now" aria-live="polite">
-        <p class="mark">
-          <span id="mark-title">I can be</span>
-          <span class="sep">·</span>
-          <span class="chapter" id="chapter"></span>
-          <span class="sep" id="where-sep" hidden>·</span>
-          <span id="where" hidden></span>
-        </p>
-        <h1 class="time"><span id="time"></span><small id="ampm"></small></h1>
-        <p class="what" id="what">The day is starting.</p>
-        <div class="progress" aria-hidden="true"><i id="prog"></i></div>
-        <p class="next" id="next"></p>
-      </section>
-      <div class="tools">
-        <button type="button" id="sound" aria-pressed="true">Sound on</button>
-        <button type="button" id="details" aria-pressed="true">Details</button>
-        <button type="button" id="settings" aria-haspopup="true" aria-expanded="false" aria-controls="settings-pop">Settings</button>
-        <div class="settings-pop" id="settings-pop" role="group" aria-label="Settings" hidden></div>
-      </div>
-    </header>
-    <!-- Not inside the header: the header is hidden on a phone in control, and Episodes, weather and Pressure stay. Placement: css/hud.css -->
-    <div class="hud-left" id="hud-left"></div>
-
-    <aside class="panel side" id="side">
-      <section>
-        <h2 id="log-title">Every action</h2>
-        <ol class="log" id="log"></ol>
-      </section>
-      <section>
-        <h2>Body</h2>
-        <div class="meters" id="meters"></div>
-      </section>
-      <section>
-        <h2>Things</h2>
-        <div class="chips" id="things"></div>
-      </section>
-      <p class="foot">Edit <code>day.config.js</code> to change the day. <a href="privacy.html">Privacy</a></p>
-    </aside>
-
-    <footer class="hud bottom panel" id="timebar">
-      <!-- The public view shows only this button (a live dot and the clock); it opens the drawer. The dev HUD shows the drawer open. -->
-      <button type="button" id="time-btn" class="time-btn" aria-expanded="false" aria-controls="time-drawer" aria-label="Time: open the day bar">
-        <i class="dot" aria-hidden="true"></i><span id="time-btn-clock"></span>
-      </button>
-      <div class="time-drawer" id="time-drawer">
-        <div class="controls">
-          <button type="button" id="live" class="live" aria-pressed="true">● Live</button>
-          <button type="button" id="play">Pause</button>
-          <div class="speeds" id="speeds" role="group" aria-label="Playback speed"></div>
-          <span class="spacer"></span>
-          <span class="date" id="date"></span>
-          <span class="count" id="count"></span>
-        </div>
-        <div class="daybar">
-          <div class="segs" id="segs"></div>
-          <div class="marker" aria-hidden="true"></div>
-          <label class="sr" for="scrub">Time of day</label>
-          <input id="scrub" type="range" min="450" max="1889.99" step="0.05" value="450" />
-          <div class="ticks" id="ticks" aria-hidden="true"></div>
-        </div>
-      </div>
-    </footer>
-
-    <div class="errors" id="errors" hidden></div>
-
-    <!-- The version (releases.json, written at each release): a quiet link to What's new, also in the public view. -->
-    <a class="version-tag" href="whatsnew.html" data-hawkes-version hidden></a>
-    <!-- Anonymous viewing statistics (Hawkes Analytics): what is collected is on privacy.html. -->
-    <a class="privacy-tag" href="privacy.html">Privacy</a>
-
-    <!-- Local only: preview the page the way the public sees it (no HUD). Shortcut: H -->
-    <button type="button" class="public-toggle" id="public-toggle" aria-pressed="false" title="Preview the public view (H)">Public view</button>
-    <script>
-      (function () {
-        var root = document.documentElement;
-        var btn = document.getElementById("public-toggle");
-        if (root.classList.contains("public")) return;
-        function set(on) {
-          root.classList.toggle("preview-public", on);
-          btn.setAttribute("aria-pressed", on ? "true" : "false");
-          btn.textContent = on ? "Show HUD" : "Public view";
-          try { localStorage.setItem("previewPublic", on ? "1" : "0"); } catch (e) {}
-        }
-        var saved = false;
-        try {
-          var q = new URLSearchParams(location.search);
-          if (!navigator.webdriver && !q.get("playtest")) saved = localStorage.getItem("previewPublic") === "1";
-        } catch (e) {}
-        if (root.classList.contains("view-forced")) { btn.hidden = true; return; } // ?view=public: nothing but the page
-        set(saved);
-        btn.addEventListener("click", function () { set(!root.classList.contains("preview-public")); });
-        window.addEventListener("keydown", function (e) {
-          if ((e.key === "h" || e.key === "H") && !(e.target && e.target.tagName === "INPUT")) set(!root.classList.contains("preview-public"));
-        });
-      })();
-    </script>
-
-    <!-- Babylon.js 9 and Havok physics from npm, the day, the world, the page and analytics: bundled by Vite (js/app.js). -->
-    <script type="module" src="js/app.js?v=b2c4a141f5"></script>
-    <!-- Hawkes playtest hooks: js/playtest.js is fetched by dynamic import only for ?playtest=<id> or when the runner
-         touches window.hawkesPlaytest (js/playtest-loader.js). A player's page never downloads it. -->
-    <script type="module" src="js/playtest-loader.js?v=b2c4a141f5"></script>
-    <script src="js/hawkes-release.js?v=b2c4a141f5" data-releases="releases.json" defer></script>
-  </body>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090d12">
+<meta name="description" content="Information arrives as a V of eight wires, a vector x. The body is a matrix: its six joint angles are W times x. The signal leaves through the feet into a lattice where the potential settles by Laplace’s equation.">
+<title>I Can Be</title>
+<style>html,body{margin:0;height:100%;background:#090d12;overflow:hidden}canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}</style>
+<script>(function(){var s=location.search,h=location.hash;if(navigator.webdriver||s.length>1||h.length>1){location.replace('./home.html'+s+h);}})();</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310131a'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23f6f1e8' stroke-width='2'/%3E%3C/svg%3E" />
+<script src="https://hawkesgen.ai/sdk/analytics@1.js" data-product="icanbe" defer></script>
+</head>
+<body>
+<canvas id="v" aria-hidden="true"></canvas>
+<main class="sr"><h1>I Can Be</h1><p>Information arrives as a V of eight wires, a vector x. The body is a matrix: its six joint angles are W times x. The signal leaves through the feet into a lattice where the potential settles by Laplace’s equation.</p></main>
+<script>
+(function runtime(P, F, make) {
+  var c = document.getElementById('v'), x = c.getContext('2d'), S = make(P, F), M = { x: .5, y: .5, in: false, down: false }, Wd = 0, Ht = 0, last = 0, T = 0;
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function size() { var D = Math.min(2, window.devicePixelRatio || 1); Wd = window.innerWidth; Ht = window.innerHeight; c.width = Math.round(Wd * D); c.height = Math.round(Ht * D); x.setTransform(D, 0, 0, D, 0, 0); S.resize(Wd, Ht); if (still) for (var i = 0; i < 240; i++) S.frame(x, Wd, Ht, i / 30, 1 / 30, M); }
+  function frame(ms) { var dt = Math.min(.05, (ms - last) / 1000 || .016); last = ms; T += dt; S.frame(x, Wd, Ht, T, dt, M); window.requestAnimationFrame(frame); }
+  function pt(e) { M.x = e.clientX / Wd; M.y = e.clientY / Ht; M.in = true; }
+  c.addEventListener('pointermove', pt); c.addEventListener('pointerdown', function (e) { pt(e); M.down = true; });
+  window.addEventListener('pointerup', function () { M.down = false; }); c.addEventListener('pointerleave', function () { M.in = false; M.down = false; });
+  window.addEventListener('resize', size); size(); if (!still) window.requestAnimationFrame(frame);
+})({"bg":"#090d12","fg":"#e9eff6","dim":"#6c7c8d","rule":"#232c36","a":"#7fe0ff","b":"#ffd36b","a3":[127,224,255],"b3":[255,211,107],"bg3":[9,13,18]}, {"mono":"ui-monospace,SFMono-Regular,Menlo,Consolas,monospace","serif":"Georgia,\"Times New Roman\",serif","sans":"system-ui,-apple-system,\"Segoe UI\",Roboto,sans-serif"}, function wires(P, F) {
+  let W = 0, H = 0, Wm = [], phi, gc = 0, gr = 0, cell = 0, gx0 = 0, gy0 = 0;
+  const N = 8, J = 6, om = [0.7, 1.1, 1.6, 0.9, 1.3, 0.5, 2.0, 1.45], TAU = Math.PI * 2;
+  for (let i = 0; i < J; i++) { Wm.push([]); for (let j = 0; j < N; j++) Wm[i].push(Math.sin(i * 2.7 + j * 1.9) * 0.55); }
+  return {
+    resize(w, h) { W = w; H = h; cell = Math.max(22, Math.min(W, H) / 26); gy0 = H * 0.7; gc = Math.ceil(W / cell) + 1; gr = Math.ceil((H - gy0) / cell) + 1; gx0 = (W - (gc - 1) * cell) / 2; phi = new Float32Array(gc * gr); },
+    frame(x, w, h, T, dt, M) {
+      x.fillStyle = P.bg; x.fillRect(0, 0, W, H);
+      const lean = M.in ? (M.x - 0.5) * 2 : Math.sin(T * 0.25);
+      const xs = om.map((o, j) => Math.sin(T * o + j) * (0.55 + 0.45 * (j < N / 2 ? Math.max(0, -lean) : Math.max(0, lean)) + 0.25));
+      const th = Wm.map(row => row.reduce((a, c, j) => a + c * xs[j], 0));
+      const s = Math.min(W, H) / 620, cx = W / 2, hipY = gy0 - 96 * s, neckY = hipY - 92 * s, headY = neckY - 30 * s;
+      // the V: straight lines, each carrying one component of x
+      for (let j = 0; j < N; j++) { const left = j < N / 2, k = left ? j : j - N / 2, sx = left ? W * (0.02 + k * 0.07) : W * (0.98 - k * 0.07), val = xs[j]; x.strokeStyle = left ? P.a : P.b; x.globalAlpha = 0.25 + Math.abs(val) * 0.6; x.lineWidth = 1 + Math.abs(val) * 1.6; x.beginPath(); x.moveTo(sx, 0); x.lineTo(cx, headY); x.stroke(); const u = (T * 0.35 * (0.6 + om[j] * 0.3) + j * 0.13) % 1; x.globalAlpha = 1; x.fillStyle = left ? P.a : P.b; x.beginPath(); x.arc(sx + (cx - sx) * u, headY * u, 2.5, 0, TAU); x.fill(); x.fillStyle = P.dim; x.font = '11px ' + F.mono; x.textAlign = 'center'; x.fillText('x' + '₁₂₃₄₅₆₇₈'[j], sx, 44 + (k % 2) * 14); }
+      x.globalAlpha = 1;
+      // the body: forward kinematics from theta = W x
+      const seg = (ax, ay, ang, len) => [ax + Math.sin(ang) * len, ay + Math.cos(ang) * len];
+      x.strokeStyle = P.fg; x.lineWidth = Math.max(2, 3.2 * s); x.lineCap = 'round'; x.lineJoin = 'round';
+      const L = (a, b) => { x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke(); };
+      const neck = [cx + th[4] * 6 * s, neckY], hip = [cx + th[5] * 10 * s, hipY]; L(neck, hip);
+      const feet = [[cx - 34 * s, gy0], [cx + 34 * s, gy0]];
+      for (const sd of [-1, 1]) { const sh = [neck[0] + sd * 34 * s, neck[1] + 4 * s], a1 = sd * (0.5 + th[sd < 0 ? 0 : 1]), el = seg(sh[0], sh[1], a1, 44 * s), a2 = a1 + sd * (0.3 + th[sd < 0 ? 2 : 3] * 0.9), hd = seg(el[0], el[1], a2, 42 * s); L(neck, sh); L(sh, el); L(el, hd); const f = feet[sd < 0 ? 0 : 1], kn = [(hip[0] + f[0]) / 2 + sd * (8 + th[5] * 8) * s, (hip[1] + f[1]) / 2]; L(hip, kn); L(kn, f); }
+      x.beginPath(); x.arc(neck[0], headY - 2 * s, 20 * s, 0, TAU); x.stroke();
+      // the ground: relax Laplace's equation with the feet as +I and -I
+      const I = xs.reduce((a, c) => a + c, 0) * 1.6, fi = feet.map(f => [Math.round((f[0] - gx0) / cell), 0]);
+      for (let it = 0; it < 6; it++) { for (let j = 0; j < gr; j++) for (let i = 0; i < gc; i++) { const a = j * gc + i; if (j === 0 && i === fi[0][0]) { phi[a] = I; continue; } if (j === 0 && i === fi[1][0]) { phi[a] = -I; continue; } if (i === 0 || i === gc - 1 || j === gr - 1) { phi[a] = 0; continue; } phi[a] = (phi[a - 1] + phi[a + 1] + (j > 0 ? phi[a - gc] : phi[a]) + phi[a + gc]) / 4; } }
+      for (let j = 0; j < gr; j++) for (let i = 0; i < gc; i++) { const a = j * gc + i, px = gx0 + i * cell, py = gy0 + j * cell, p = phi[a]; if (i < gc - 1) { const c = Math.abs(p - phi[a + 1]); x.strokeStyle = P.dim; x.globalAlpha = Math.min(1, 0.12 + c * 1.6); x.lineWidth = 1 + Math.min(2, c * 3); x.beginPath(); x.moveTo(px, py); x.lineTo(px + cell, py); x.stroke(); } if (j < gr - 1) { const c = Math.abs(p - phi[a + gc]); x.strokeStyle = P.dim; x.globalAlpha = Math.min(1, 0.12 + c * 1.6); x.lineWidth = 1 + Math.min(2, c * 3); x.beginPath(); x.moveTo(px, py); x.lineTo(px, py + cell); x.stroke(); } x.globalAlpha = Math.min(1, 0.25 + Math.abs(p)); x.fillStyle = p > 0 ? P.a : P.b; x.beginPath(); x.arc(px, py, 1.5 + Math.min(4, Math.abs(p) * 3), 0, TAU); x.fill(); }
+      x.globalAlpha = 1;
+      // the matrix, live: each cell is w_ij x_j
+      const mc = Math.max(12, Math.min(20, W / 70)), mx = W - 22 - N * mc, my = H * 0.3;
+      for (let i = 0; i < J; i++) for (let j = 0; j < N; j++) { const c = Wm[i][j] * xs[j]; x.fillStyle = c > 0 ? P.a : P.b; x.globalAlpha = Math.min(1, Math.abs(c) * 2.2); x.fillRect(mx + j * mc + 1, my + i * mc + 1, mc - 2, mc - 2); }
+      x.globalAlpha = 1; x.strokeStyle = P.dim; x.lineWidth = 1; x.strokeRect(mx, my, N * mc, J * mc);
+      x.fillStyle = P.fg; x.textAlign = 'right'; x.font = 'italic ' + Math.max(16, mc * 1.1) + 'px ' + F.serif; x.fillText('θ = W x', mx + N * mc, my - 12);
+      x.font = '11px ' + F.mono; x.fillStyle = P.dim; x.fillText('six joints, eight wires', mx + N * mc, my + J * mc + 16);
+      x.textAlign = 'left'; x.fillStyle = P.fg; x.font = '600 12px ' + F.mono; x.fillText('I CAN BE', 22, H * 0.3 - 10);
+      x.font = 'italic ' + Math.max(16, mc * 1.1) + 'px ' + F.serif; x.fillText('x ∈ ℝ⁸', 22, H * 0.3 + 18); x.fillText('∇²φ = 0', 22, gy0 - 14);
+      x.font = '11px ' + F.mono; x.fillStyle = P.dim; x.fillText('information arrives as a V', 22, H * 0.3 + 36); x.fillText('and leaves through the feet', 22, gy0 - 34);
+    }
+  };
+});
+</script>
+</body>
 </html>

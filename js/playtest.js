@@ -181,7 +181,7 @@ function carScreenPos() {
 }
 
 /* The public view (a real host, or ?view=public): the quiet page. A scenario that judges the public layout asks for it, so
-   a run on a local host plays the same page the beta does. The head script in index.html sets the classes from the URL;
+   a run on a local host plays the same page the beta does. The head script in home.html sets the classes from the URL;
    this does the same for a run that wasn't given the parameter, and keeps the URL honest. */
 function forcePublicView() {
   const root = document.documentElement;
@@ -2323,7 +2323,7 @@ async function wholeDay(options, t) {
 }
 
 /* ---------------- analytics: the events going out, then the question after 3 minutes ---------------- */
-// The page turns on the SDK's debug mode for a bot's tab (index.html), so hawkesAnalytics.debugLog holds
+// The page turns on the SDK's debug mode for a bot's tab (home.html), so hawkesAnalytics.debugLog holds
 // every event and marks it `sent` when its batch goes out. Every interaction is real input.
 const sent = () => ((window.hawkesAnalytics && window.hawkesAnalytics.debugLog) || []).filter((e) => e.sent);
 const has = (name, test) => (window.hawkesAnalytics.debugLog || []).some((e) => e.name === name && (!test || test(e)));
@@ -11140,7 +11140,7 @@ async function quietUi(options, t) {
   // Say plainly which page this is: the review judges the public view, and needs the timeline to show the run used it.
   forcePublicView();
   t.event("view-public", `playing ${location.pathname}${location.search} at ${size}; html classes: ${document.documentElement.className.replace(/\s+/g, " ").trim()}`);
-  // Requests: the page must make no index.html fetch (the old 10-minute reload loop is gone).
+  // Requests: the page must make no home.html fetch (the old 10-minute reload loop is gone).
   const fetched = [];
   const realFetch = window.fetch;
   window.fetch = function (u) { fetched.push(String(u && u.url ? u.url : u)); return realFetch.apply(this, arguments); };
@@ -11236,13 +11236,13 @@ async function quietUi(options, t) {
   const ep = window.day.episodes.now();
   if (ep && ep.id) t.event("episode-from-menu", `the menu started "${ep.id}" at ${size}`);
   else t.problem("bug", `The Episodes menu didn't start an episode (${size})`);
-  // 5. No question in control, no index.html fetch, no reload
+  // 5. No question in control, no home.html fetch, no reload
   await sleep(2000);
   if (document.querySelector('[data-hawkes-ask]')) t.problem("bug", "The feedback question showed while in control");
   else t.event("no-question-in-control", "no 'Are you enjoying this so far?' while he is the player's");
   const idx = fetched.filter((u) => /index\.html/.test(u));
-  if (idx.length) t.problem("bug", `The page fetched index.html ${idx.length}x (${idx[0]})`);
-  else t.event("no-index-fetch", "no index.html fetch during the run");
+  if (idx.length) t.problem("bug", `The page fetched home.html ${idx.length}x (${idx[0]})`);
+  else t.event("no-index-fetch", "no home.html fetch during the run");
   if (performance.getEntriesByType("navigation").length !== reloads) t.problem("bug", "The page reloaded");
   window.fetch = realFetch;
   if (window.day.episodes.skip) window.day.episodes.skip();
@@ -11265,9 +11265,9 @@ async function titleScenario(options, t) {
   const first = T.now().showing;
   if (!first) T.show("playtest");
 
-  // The loading card (index.html): it showed from the first paint, it goes when the title is ready, and no HUD field is a dash.
+  // The loading card (home.html): it showed from the first paint, it goes when the title is ready, and no HUD field is a dash.
   const L = window.__loading;
-  if (!L) t.problem("blocker", "The loading card script (window.__loading) isn't in index.html");
+  if (!L) t.problem("blocker", "The loading card script (window.__loading) isn't in home.html");
   else {
     const card = $("loading");
     const seen = L.log().some((e) => e.action === "show");
@@ -14823,7 +14823,7 @@ installPlaytest({
     { id: "title-key-art", title: "Title key art: a slow crane over the district at the real time of day lands on Small Weather on the apartment roof under a forming storm with glints every few seconds, the logo lockup on top (Play 56 px+, logo and him above the fold at 390x844), at most 4 buttons; Play dives into the cold open with no cut, no black frame and control within 1 s", seconds: 45, tags: ["title", "first-minute", "phone", "audio"], description: "Load with ?playtest=title-key-art. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play. Events title-shot / title-buttons / title-phone / title-glints / title-play-dive; metrics titleButtons, titleSecondsToControl, titleBlackFrames. Run at 1280x720 and 390x844 touch." },
     { id: "cold-start", title: "Cold start: a new player presses Play and is on the apartment roof at dusk under a storm nobody called, casts the prompted Rain within 10 s with no card to click, Birdie calls up in her voice, and the episode offer arrives only after that as a corner toast under 40 words that never pauses the day, with under 25 words on screen before the first cast", seconds: 100, tags: ["opening", "first-minute", "phone", "audio", "voice"], description: "Load with ?playtest=cold-start. Setup: every icanbe.* key cleared, the cold open armed, the title up. Real input: a click (a tap on a phone) on Play, then the prompt's own cue (R pressed; the Rain button tapped on touch). Events cold-start-play / -control / -words / -cue / -bolt / -reaction / -birdie / -play-plus-5 / -15 / -30 / -free; metrics secondsToFirstInput, secondsToFirstCast, secondsToFirstReaction, wordsBeforeFirstCast. Run at 1280x720 and 390x844 touch." },
     { id: "opening", title: "Opening: a first Play shows Small Weather's own model with a few lines and a Skip button; Skip and Esc hand him over; a returning player goes straight in", seconds: 60, tags: ["opening", "story", "smoke"], description: "Load with ?playtest=opening. Real clicks: Play (the title is shown, and the saved flag cleared, as setup), watch two lines, click Skip, then Play again and press Esc, then Play as a returning player. Events opening-start / opening-model / opening-skip-ready / opening-line / opening-skipped / opening-esc / opening-once." },
-    { id: "quiet-ui", title: "The quiet page: ?view=public shows the city, the status card, one Time control, Take control and Episodes (no log, Body, Things or config text, no overlaps, six HUD regions at most); the Time control opens the day bar and speeds by click or tap and closes on take-over; the title and the Episodes menu clear the caption, ability bar and hint; the menu starts the tutorial; no index.html fetch, no question in control", seconds: 75, tags: ["hud", "menus", "smoke"], description: "Load with ?playtest=quiet-ui&view=public. Real input: clicks on the Time control, a speed, Enter, Episodes and the tutorial row. Events no-dev-text / time-control / hud-regions / episodes-clear / time-drawer-open / drawer-closed-on-take / title-exclusive / menu-exclusive / episode-from-menu / no-question-in-control / no-index-fetch. Run at 1280x720 and 390x844." },
+    { id: "quiet-ui", title: "The quiet page: ?view=public shows the city, the status card, one Time control, Take control and Episodes (no log, Body, Things or config text, no overlaps, six HUD regions at most); the Time control opens the day bar and speeds by click or tap and closes on take-over; the title and the Episodes menu clear the caption, ability bar and hint; the menu starts the tutorial; no home.html fetch, no question in control", seconds: 75, tags: ["hud", "menus", "smoke"], description: "Load with ?playtest=quiet-ui&view=public. Real input: clicks on the Time control, a speed, Enter, Episodes and the tutorial row. Events no-dev-text / time-control / hud-regions / episodes-clear / time-drawer-open / drawer-closed-on-take / title-exclusive / menu-exclusive / episode-from-menu / no-question-in-control / no-index-fetch. Run at 1280x720 and 390x844." },
     { id: "hud-layout", title: "HUD layout: Quality lives in the Settings menu, the left column stacks Episodes, Neighbors, weather and Pressure without overlap, Take control stays bottom-centre; overlap check on title and in play", seconds: 40, tags: ["hud", "smoke"], description: "Load with ?playtest=hud-layout. Real input: Settings click, Enter, Esc. Events settings-open / hud-clear / hud-layout-play. Run at 1280x720, 390x844 and 844x390." },
     { id: "title", title: "Title screen: the skyline behind Small Weather's name with Play and Episodes opens first; the music plays on it, the day bed at noon and the night bed at night (crossfaded, softer); Play starts the game, Episodes opens the menu", seconds: 75, tags: ["title", "audio", "smoke"], description: "Load with ?playtest=title (the title opens first). Real clicks: Music, then the day bar to noon, 9:40 PM and 1 PM (setup) while the title is up, then Play (he's the player's, W walks), Esc; the title again (setup) and its Episodes button. Events title-open / title-buttons / title-music / music-day / music-crossfade / music-night / music-day-night / title-play / game-started / title-episodes / console-clean." },
     { id: "smoke", title: "Boot, see Small Weather, a minute of the day at 10×, pause, back to live, then take control on a rooftop and throw one bolt; Babylon 9, physics, his name in the panel and log", seconds: 90, tags: ["smoke"], description: "Load with ?playtest=smoke. Real input: Enter, Space, the 10x button, Esc; a bolt on the roof. Events for boot, Small Weather in the panel and log, pause, back to live, take control and the bolt; run at 1280x720." },
@@ -14906,7 +14906,7 @@ installPlaytest({
     { id: "render-grade", title: "Render grade: from the apt roof at 07:00, 12:00, 18:30 and 22:00 each time of day has its own colour-grade LUT, shadows and moon key; a Storm cast moves the grade; the phone keeps its effects at 30 fps or more", seconds: 90, tags: ["look", "weather", "phone"], description: "Load with ?playtest=render-grade ({\"touch\":true} for 390x844). Setup: the day bar to each hour, control.place on the apt roof, a full Charge. Real input: Enter (a tap on Take control), the Lightning key or slot. Events render-grade-<hour> / render-grades-distinct; reads day.render.info() for the LUT, effects and casters." },
     { id: "tutorial-episode", title: "Tutorial episode: Learn the weather teaches Lightning, Rain, Gale, Fog and Sun break one at a time, each with a prompt and a goal; each unlocks with a toast; Skip opens everything", seconds: 150, tags: ["episodes", "tutorial", "abilities"], description: "Day bar to a quiet moment (setup), Enter, accepts the offer, then presses E, R, V, C, X as the prompts say; checks the locked slots, the toast, the goal ticks; restarts and presses Skip. Events tutorial-offer / unlock-toast / tutorial-prompt / tutorial-goal / locked-refused / all-unlocked / tutorial-skipped." },
   ],
-  /* Ready = a frame is drawn AND the loading card has let go of the page (index.html window.__loading). While the card is up
+  /* Ready = a frame is drawn AND the loading card has let go of the page (home.html window.__loading). While the card is up
      html.loading hides the whole HUD, so a run that started on the first frame saw the day bar, #what, #sound and #details
      as "hidden in Live mode" and screenshots of a full loading bar. A failed load counts (the run then reports it). */
   isReady: () => !!(window.day && window.day.now().frame && !(window.__loading && window.__loading.state() === "loading")),

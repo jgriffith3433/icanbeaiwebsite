@@ -242,7 +242,7 @@ window.DAY_CONFIG = {
 
   /* ------------------------------------------------------------------------
      SEAMLESS TRANSITIONS (js/transition.js) — storm-cloud wipe on episode jumps, prop fade-in, frame timing.
-     Loading card fades into the title crane (index.html); take/let-go pair a whoosh with the camera blend.
+     Loading card fades into the title crane (home.html); take/let-go pair a whoosh with the camera blend.
      ------------------------------------------------------------------------ */
   transition: {
     wipeSec: 1.2,

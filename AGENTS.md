@@ -2,6 +2,10 @@
 
 **Lanes, local dev and deploys:** `LANES.md` (branches dev -> beta -> main; `dev.bat`, `deploy-beta.bat`, `deploy-prod.bat`, `status.bat`, `links.bat`, `sync.bat`; beta and live links).
 
+**Pages:** `/` is `index.html`, only a full-screen math visualization (no links or buttons); the game is `home.html`
+(bots and any URL with a query or hash are redirected there by index.html's gate). Checks, stamping and the freshness
+check all use `home.html`. The build emits both (`rollupOptions.input`).
+
 How the site works, how to run it, versions, playtests and Hawkes Gen are in [README.md](README.md). The day is
 `day.config.js`.
 
@@ -112,7 +116,7 @@ levels get redone over time. The page is the day playing on its own until someon
 
 ### The public view (the quiet page)
 
-`html.preview-public` is the public view: every non-local host (index.html's head script adds `public` and `preview-public`), `?view=public` anywhere (adds `preview-public view-forced`, and hides the local "Public view" toggle), or the local toggle/H. It shows the city, the status card, the tools (Sound, Settings), **one Time control** (`#time-btn`: a live dot and the clock; a click or tap opens `#time-drawer`: Live, Pause, speeds, date, the day bar; it closes on a second tap, a tap outside, Esc or take-over, and the whole footer steps aside while he's the player's), Take control and Episodes (bottom-left; on a phone Take control rises a row). The side panel, Details, the action count, the "next" line and the neighbors button are not there. Local hosts keep the full developer HUD. `#hud-left` (Episodes, weather, Pressure) sits outside the header so a phone's in-control rule doesn't hide it. `playtest.js`: `forcePublicView()` (smoke, hud-layout, phone, cold-start, quiet-ui call it), `timeDrawer(on)`, `HUD_REGIONS` (six at most). **One thing at a time:** `html.title-up` and `html.ep-menu-up` (set by episodes.js) hide the voice caption, ability bar, power pad, hint, weather/Pressure and the play toasts (css/hud.css). **Updates:** no polling; `js/main.js` checks `index.html` on `visibilitychange` (public hosts, at most once per 30 min) and shows a "New version" pill (`#update-pill`), never while in control or an episode, never reloading by itself. **The question** ("Are you enjoying this so far?", `js/analytics.js`) comes after the first (non-tutorial) episode score card, at the next quiet moment (not in control, an episode, a menu or a card); the day-end ask stays. Playtest: `quiet-ui`.
+`html.preview-public` is the public view: every non-local host (home.html's head script adds `public` and `preview-public`), `?view=public` anywhere (adds `preview-public view-forced`, and hides the local "Public view" toggle), or the local toggle/H. It shows the city, the status card, the tools (Sound, Settings), **one Time control** (`#time-btn`: a live dot and the clock; a click or tap opens `#time-drawer`: Live, Pause, speeds, date, the day bar; it closes on a second tap, a tap outside, Esc or take-over, and the whole footer steps aside while he's the player's), Take control and Episodes (bottom-left; on a phone Take control rises a row). The side panel, Details, the action count, the "next" line and the neighbors button are not there. Local hosts keep the full developer HUD. `#hud-left` (Episodes, weather, Pressure) sits outside the header so a phone's in-control rule doesn't hide it. `playtest.js`: `forcePublicView()` (smoke, hud-layout, phone, cold-start, quiet-ui call it), `timeDrawer(on)`, `HUD_REGIONS` (six at most). **One thing at a time:** `html.title-up` and `html.ep-menu-up` (set by episodes.js) hide the voice caption, ability bar, power pad, hint, weather/Pressure and the play toasts (css/hud.css). **Updates:** no polling; `js/main.js` checks `home.html` on `visibilitychange` (public hosts, at most once per 30 min) and shows a "New version" pill (`#update-pill`), never while in control or an episode, never reloading by itself. **The question** ("Are you enjoying this so far?", `js/analytics.js`) comes after the first (non-tutorial) episode score card, at the next quiet moment (not in control, an episode, a menu or a card); the day-end ask stays. Playtest: `quiet-ui`.
 
 ### The HUD layout (`css/hud.css`)
 
@@ -138,7 +142,7 @@ Every HUD **placement** (position, top/right/bottom/left, transform) is in `css/
   the public site too (it isn't part of the HUD). On such a screen `html.touch-ui` is set (`js/control.js`), and the
   phone layout hangs off it: stick bottom left, Jump bottom right, the power pad above Jump, Weather top left with
   Pressure under it, Quality top right, Let go top centre, Episodes bottom centre, all 44 px or more and inside the
-  safe areas (`env(safe-area-inset-*)`; `index.html` has `viewport-fit=cover`). The `first-visit` playtest checks
+  safe areas (`env(safe-area-inset-*)`; `home.html` has `viewport-fit=cover`). The `first-visit` playtest checks
   that none is off screen or overlapping. Quality picks low by itself on a phone (`js/look.js`; `look.info()` says
   `qualityHow`: url, saved or auto).
 - **First visit** (`js/tutorial.js`, lines in `day.config.js` `tutorial`): a card the first time the page opens:
@@ -197,7 +201,7 @@ each of those is heard and that Sound off is silent. New player-facing beats get
 ## How it's built (Babylon 9, Havok, Vite)
 
 - **Packages:** `@babylonjs/core` 9 and `@babylonjs/havok` from npm (`package.json`, exact versions), bundled by
-  Vite. **Babylon is ONE chunk** (`manualChunks` in `vite.config.js`): never split it by folder or Shaders (circular chunks threw a TDZ "Cannot access 'e' before initialization" and froze the loading card at 50%); `scripts/check-chunks.mjs` (npm test; `node scripts/check-chunks.mjs dist` after a build evaluates each chunk) guards it, and index.html's loader fails with Try again on a boot exception. No CDN. `index.html` loads one module, `js/app.js`, which imports in order: `js/babylon.js` (sets
+  Vite. **Babylon is ONE chunk** (`manualChunks` in `vite.config.js`): never split it by folder or Shaders (circular chunks threw a TDZ "Cannot access 'e' before initialization" and froze the loading card at 50%); `scripts/check-chunks.mjs` (npm test; `node scripts/check-chunks.mjs dist` after a build evaluates each chunk) guards it, and home.html's loader fails with Try again on a boot exception. No CDN. `home.html` loads one module, `js/app.js`, which imports in order: `js/babylon.js` (sets
   `window.BABYLON`), `day.config.js`, `js/schedule.js`, `js/world.js`, `js/main.js`, `js/analytics.js`. Those files
   are still plain-JS IIFEs that put their API on `window` (`DAY_CONFIG`, `DayEngine`, `DayWorld`, `day`); keep that
   pattern so the order is the only coupling. New code can be a real module imported from `js/app.js`.
@@ -280,7 +284,7 @@ Hawkes Analytics is the only analytics here (J, 2026-10-18): never add another t
 `hawkesgen/docs/analytics.md`. The product id is `icanbe` (`hawkesgen/analytics/products.json`, beta `icanbe`).
 
 **Where it's loaded.** The SDK is Hawkes Gen's, `https://hawkesgen.ai/sdk/analytics@1.js`: never a copy here
-(J, 2026-10-27), so a Gen deploy updates every site at once. It's loaded with `data-product="icanbe"` on every page people see: `index.html`
+(J, 2026-10-27), so a Gen deploy updates every site at once. It's loaded with `data-product="icanbe"` on every page people see: `home.html`
 (a classic script in `<head>`, then `loadStart()` straight after it, so `game_ready.ms` includes the bundle's download),
 `whatsnew.html` and `privacy.html`. A new public page needs the same two lines (`HAWKES_BUILD` and the script tag).
 
@@ -327,6 +331,6 @@ collected: anonymous viewing statistics, no cookies, no personal data, no IP sto
 
 **Seeing it.** `?hawkes-analytics-debug=1` logs each event to the console and keeps it on
 `hawkesAnalytics.debugLog`, each with `sent` once its batch went out. A bot's tab (`navigator.webdriver` or
-`?playtest=`) gets the flag added by `index.html`. The `analytics` playtest scenario (`js/playtest.js`, about 4 min)
+`?playtest=`) gets the flag added by `home.html`. The `analytics` playtest scenario (`js/playtest.js`, about 4 min)
 uses the camera, speeds, day bar and keys, puts every sent event on the timeline, waits for the question, and
 dismisses it. Open any page once with `?hawkes-internal=1` to mark J's own browser.

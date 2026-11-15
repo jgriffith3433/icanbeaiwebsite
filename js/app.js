@@ -71,7 +71,7 @@ import havokWasm from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
   if (botParam && botParam !== "cold-start") await loadLate();
 }
 
-/* The loading card (index.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
+/* The loading card (home.html, window.__loading): the card goes when scripts, his model, the first frame and the title are all in. */
 const loading = window.__loading || { set() {}, done() {}, fail() {} };
 const ready = { model: false, frame: false, title: false, lights: false };
 /* The card does NOT wait for his 3 MB model: on a phone over Slow 4G that download alone kept it up past 20 s. He is hidden
@@ -189,7 +189,7 @@ if (skinWorld) {
   try { phoneCopy = !!(control.modelPhone && window.day.look && window.day.look.quality() === "low"); } catch (e) { phoneCopy = false; }
   const modelUrl = () => (phoneCopy ? control.modelPhone : control.model);
   status.modelFile = modelUrl();
-  let early = window.__earlyModel && window.__earlyModel.url === modelUrl() ? window.__earlyModel.p : null; // index.html's head preload (phones), used once
+  let early = window.__earlyModel && window.__earlyModel.url === modelUrl() ? window.__earlyModel.p : null; // home.html's head preload (phones), used once
   const getModel = () => { if (early) { const e = early; early = null; return e.then((r) => (r && r.ok ? r : fetch(modelUrl(), { cache: "no-cache" }))); } return fetch(modelUrl(), { cache: "no-cache" }); };
   const fetchBytes = () => (blocked() ? Promise.resolve(null) : typeof fetch === "function"
     ? getModel().then((r) => (r.ok ? readBody(r) : null)).catch(() => null)

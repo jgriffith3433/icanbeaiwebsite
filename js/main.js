@@ -646,7 +646,7 @@
     if (updateFound) return paintUpdate();
     if (performance.now() - lastCheck < 30 * 60 * 1000) return;
     lastCheck = performance.now();
-    fetch("index.html?check=" + Date.now(), { cache: "no-store" })
+    fetch("home.html?check=" + Date.now(), { cache: "no-store" })
       .then((r) => (r.ok ? r.text() : ""))
       .then((html) => {
         const m = /<meta name="(?:build|version)" content="([^"]+)"/.exec(html);

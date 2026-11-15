@@ -1,4 +1,4 @@
-// Stamps the build on every local file link in index.html: ?v=<hash of the files' contents>, and the same hash in
+// Stamps the build on every local file link in home.html: ?v=<hash of the files' contents>, and the same hash in
 // <meta name="build">. Browsers then fetch fresh CSS and JS the moment a change is published, and an open tab on the
 // live site reloads when the build changes (js/main.js). The stamp only changes when a file did.
 //
@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 const root = new URL('../', import.meta.url);
-const htmlPath = new URL('index.html', root);
+const htmlPath = new URL('home.html', root);
 let html = fs.readFileSync(htmlPath, 'utf8');
 
 const local = /\b(src|href)="(?!https?:|\/\/|data:|#)([^"?]+)(\?v=[^"]*)?"/g;
@@ -77,4 +77,4 @@ for (const page of ['whatsnew.html', 'privacy.html']) {
   const after = before.replace(BUILD_RE, line);
   if (after !== before) fs.writeFileSync(p, after);
 }
-console.log(`Build ${build} (${count} links stamped in index.html), ${line}`);
+console.log(`Build ${build} (${count} links stamped in home.html), ${line}`);

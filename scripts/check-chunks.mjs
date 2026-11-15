@@ -19,8 +19,8 @@ for (const sub of ["Maths/math.vector", "Shaders/default.fragment", "ShadersWGSL
 ok(names.size === 1 && !names.has(undefined), `Babylon core modules must all go to one chunk, got: ${[...names].join(", ")}`);
 ok(mc("/p/js/world.js") === undefined, "game files are left to Rollup");
 
-const index = fs.readFileSync(new URL("index.html", root), "utf8");
-ok(/addEventListener\("error"/.test(index) && /addEventListener\("unhandledrejection"/.test(index) && /function bootError/.test(index), "index.html: the loading card must fail (Try again) on a boot exception, not sit at 50%");
+const index = fs.readFileSync(new URL("home.html", root), "utf8");
+ok(/addEventListener\("error"/.test(index) && /addEventListener\("unhandledrejection"/.test(index) && /function bootError/.test(index), "home.html: the loading card must fail (Try again) on a boot exception, not sit at 50%");
 
 const dist = process.argv[2];
 if (dist) {
@@ -32,12 +32,12 @@ if (dist) {
   // loader) must be in assets/: a deploy missing one 404s the model load.
   const have = new Set(fs.readdirSync(dir));
   const refs = /["'`](?:\.\/|\/assets\/)?([A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.js)["'`]/g;
-  const html = fs.readFileSync(path.resolve(dist, "index.html"), "utf8");
+  const html = fs.readFileSync(path.resolve(dist, "home.html"), "utf8");
   for (const f of have) {
     if (!f.endsWith(".js")) continue;
     for (const m of fs.readFileSync(path.join(dir, f), "utf8").matchAll(refs)) ok(have.has(m[1]), `${f} references ${m[1]}, which is not in ${dist}/assets`);
   }
-  for (const m of html.matchAll(/assets\/([A-Za-z0-9_.-]+\.(?:js|css))/g)) ok(have.has(m[1]), `index.html references ${m[1]}, which is not in ${dist}/assets`);
+  for (const m of html.matchAll(/assets\/([A-Za-z0-9_.-]+\.(?:js|css))/g)) ok(have.has(m[1]), `home.html references ${m[1]}, which is not in ${dist}/assets`);
 }
 if (failed) process.exit(1);
 console.log("check-chunks: ok");

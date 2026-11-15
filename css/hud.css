@@ -4,7 +4,7 @@
    Look (colour, type, borders) stays with each piece (css/site.css, the <style> in each js module).
    WHERE it sits is only here: position, top/right/bottom/left, transform and the tokens below.
    A module that adds a HUD element adds its placement here, under the region it belongs to, never a
-   `bottom: 214px` of its own. Loaded after css/site.css (index.html), before the modules' own <style>s,
+   `bottom: 214px` of its own. Loaded after css/site.css (home.html), before the modules' own <style>s,
    so those must not set a placement property (npm test checks: scripts/check-hud.mjs).
 
    Regions (desktop, then phone portrait, then phone landscape; `html.touch-ui` is a phone or touch controls):

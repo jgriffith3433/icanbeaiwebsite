@@ -1,5 +1,5 @@
 // The HUD's placement lives in css/hud.css only (J: no hand-tuned pixel offsets spread across the modules).
-// This checks: hud.css exists and index.html links it; no module's own <style> (or site.css) places a HUD root
+// This checks: hud.css exists and home.html links it; no module's own <style> (or site.css) places a HUD root
 // (position / top / right / bottom / left) -- look only; the status card has no lone "-" placeholder in the HTML.
 import { readFileSync, existsSync } from "node:fs";
 
@@ -21,11 +21,11 @@ function scan(file, text) {
 }
 
 if (!existsSync("css/hud.css")) fail.push("css/hud.css is missing");
-if (!/css\/hud\.css/.test(readFileSync("index.html", "utf8"))) fail.push("index.html doesn't link css/hud.css");
+if (!/css\/hud\.css/.test(readFileSync("home.html", "utf8"))) fail.push("home.html doesn't link css/hud.css");
 for (const f of ["abilities", "powers", "tutorial", "neighbors", "moments", "episodes"]) scan(`js/${f}.js`, readFileSync(`js/${f}.js`, "utf8"));
 scan("css/site.css", readFileSync("css/site.css", "utf8"));
-const html = readFileSync("index.html", "utf8");
-if (/id="(chapter|where|time)"[^>]*>\s*[–—-]\s*</.test(html)) fail.push('index.html shows a lone dash in the status card');
+const html = readFileSync("home.html", "utf8");
+if (/id="(chapter|where|time)"[^>]*>\s*[–—-]\s*</.test(html)) fail.push('home.html shows a lone dash in the status card');
 
 if (fail.length) { console.error("check-hud FAILED:\n  " + fail.join("\n  ")); process.exit(1); }
 console.log("check-hud ok: HUD placement is only in css/hud.css");

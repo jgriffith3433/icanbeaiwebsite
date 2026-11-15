@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 const loader = readFileSync("js/playtest-loader.js", "utf8");
 const playtest = readFileSync("js/playtest.js", "utf8");
-const html = readFileSync("index.html", "utf8");
+const html = readFileSync("home.html", "utf8");
 const app = readFileSync("js/app.js", "utf8");
 const bad = [];
 const coldBody = (playtest.split("async function coldStart(")[1] || "").split(/\nasync function /)[0];
@@ -12,7 +12,7 @@ if (!/^if \(window\.__playtestBot\) await import\("\.\/playtest\.js"\)\.catch\(/
 if (!/navigator\.webdriver/.test(loader) || !/get\("playtest"\)/.test(loader)) bad.push("bot path must test navigator.webdriver and ?playtest=");
 if (!/if \(!bot\) \{\s*[^}]*window\.hawkesPlaytest = stub/.test(loader)) bad.push("the stub must stay for players");
 if (/requestAnimationFrame|addEventListener\("load"/.test(loader)) bad.push("no deferred load on the bot path");
-for (const [n, t] of [["index.html", html], ["js/app.js", app]]) {
+for (const [n, t] of [["home.html", html], ["js/app.js", app]]) {
   if (/import[^;\n]*playtest\.js/.test(t.replace(/playtest-loader\.js/g, ""))) bad.push(n + " statically imports playtest.js");
   if (/<script[^>]*src="[^"]*\/playtest\.js/.test(t)) bad.push(n + " loads playtest.js by script tag");
 }
